@@ -1,0 +1,35 @@
+export const PLANS = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: { monthly: 0, annual: 0 },
+    clips_per_month: 5,
+    max_video_minutes: 30,
+    watermark: true,
+    schedule: false,
+    stripePriceMonthly: null,
+    stripePriceAnnual: null,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: { monthly: 29, annual: 19 },
+    clips_per_month: 100,
+    max_video_minutes: 120,
+    watermark: false,
+    schedule: true,
+    stripePriceMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
+    stripePriceAnnual: process.env.STRIPE_PRICE_PRO_ANNUAL,
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    price: { monthly: 79, annual: 59 },
+    clips_per_month: -1, // unlimited
+    max_video_minutes: -1,
+    watermark: false,
+    schedule: true,
+    stripePriceMonthly: process.env.STRIPE_PRICE_BUSINESS_MONTHLY,
+    stripePriceAnnual: process.env.STRIPE_PRICE_BUSINESS_ANNUAL,
+  },
+]
