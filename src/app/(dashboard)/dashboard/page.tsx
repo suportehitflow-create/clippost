@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
@@ -127,6 +128,9 @@ export default function Dashboard() {
         >
           Sair
         </button>
+        <Link href="/brand-kit" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+          🎨 Brand Kit
+        </Link>
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>

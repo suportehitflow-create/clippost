@@ -31,6 +31,36 @@ class ProcessRequest(BaseModel):
     user_id: str
 
 
+class BrandKitRequest(BaseModel):
+    user_id: str
+    avatar_url: str | None = None
+    username: str | None = None
+    layout_config: dict | None = None
+
+
+@app.get("/api/brand-kit/{user_id}")
+async def get_brand_kit(user_id: str):
+    resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+    return {"brand_kit": resp.data}
+
+
+@app.post("/api/brand-kit")
+async def upsert_brand_kit(req: BrandKitRequest):
+    existing = supabase.table("brand_kits").select("id").eq("user_id", req.user_id).maybe_single().execute()
+    data = {
+        "user_id": req.user_id,
+        **({"avatar_url": req.avatar_url} if req.avatar_url is not None else {}),
+        **({"username": req.username} if req.username is not None else {}),
+        **({"layout_config": req.layout_config} if req.layout_config is not None else {}),
+    }
+    if existing.data:
+        supabase.table("brand_kits").update(data).eq("user_id", req.user_id).execute()
+    else:
+        supabase.table("brand_kits").insert(data).execute()
+    result = supabase.table("brand_kits").select("*").eq("user_id", req.user_id).maybe_single().execute()
+    return {"brand_kit": result.data}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 
 from services.ai_curator import get_viral_clips
 from services.ffmpeg_engine import create_vertical_clip
+from services.subtitle_generator import generate_ass
 
 load_dotenv()
 
@@ -102,6 +103,13 @@ def process_youtube_video(url: str, user_id: str):
         # 6. AI Curator — detectar momentos virais
         clips_meta = get_viral_clips(transcript_data)
 
+        # Brand Kit do usuário (opcional)
+        bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+        brand_kit = bk_resp.data if bk_resp and bk_resp.data else None
+
+        # Arquivo de legendas (.ass) para todo o clipe
+        subtitle_file = generate_ass(segments, str(tmp_dir / "subtitles.ass"))
+
         # 7, 8, 9. Cortar + upload + salvar cada clipe
         for i, clip in enumerate(clips_meta):
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
@@ -111,6 +119,9 @@ def process_youtube_video(url: str, user_id: str):
                     output_video=clip_out,
                     start=clip["start_time"],
                     end=clip["end_time"],
+                    brand_kit=brand_kit,
+                    subtitle_file=subtitle_file,
+                    hook_title=clip["hook_title"],
                 )
             except Exception as e:
                 print(f"[ffmpeg] erro no clipe {i}: {e}")
