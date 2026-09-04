@@ -4,6 +4,7 @@ ClipPost Backend — FastAPI
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timezone
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from tasks import process_youtube_video
@@ -38,6 +39,22 @@ class BrandKitRequest(BaseModel):
     layout_config: dict | None = None
 
 
+class SchedulePostRequest(BaseModel):
+    user_id: str
+    clip_id: str
+    social_account_id: str
+    caption: str
+    scheduled_time: str  # ISO 8601
+
+
+class SocialAccountRequest(BaseModel):
+    user_id: str
+    platform: str = "instagram"
+    access_token: str
+    account_id: str
+    username: str | None = None
+
+
 @app.get("/api/brand-kit/{user_id}")
 async def get_brand_kit(user_id: str):
     resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
@@ -59,6 +76,57 @@ async def upsert_brand_kit(req: BrandKitRequest):
         supabase.table("brand_kits").insert(data).execute()
     result = supabase.table("brand_kits").select("*").eq("user_id", req.user_id).maybe_single().execute()
     return {"brand_kit": result.data}
+
+
+@app.get("/api/social-accounts/{user_id}")
+async def list_social_accounts(user_id: str):
+    resp = supabase.table("social_accounts").select("id,platform,username,account_id,created_at").eq("user_id", user_id).execute()
+    return {"accounts": resp.data}
+
+
+@app.post("/api/social-accounts")
+async def upsert_social_account(req: SocialAccountRequest):
+    existing = supabase.table("social_accounts").select("id").eq("user_id", req.user_id).eq("platform", req.platform).eq("account_id", req.account_id).maybe_single().execute()
+    data = {"user_id": req.user_id, "platform": req.platform, "access_token": req.access_token, "account_id": req.account_id, "username": req.username}
+    if existing.data:
+        supabase.table("social_accounts").update(data).eq("id", existing.data["id"]).execute()
+        record_id = existing.data["id"]
+    else:
+        record_id = supabase.table("social_accounts").insert(data).execute().data[0]["id"]
+    result = supabase.table("social_accounts").select("*").eq("id", record_id).maybe_single().execute()
+    return {"account": result.data}
+
+
+@app.get("/api/scheduled-posts/{user_id}")
+async def list_scheduled_posts(user_id: str):
+    resp = (
+        supabase.table("scheduled_posts")
+        .select("*, clips(title, storage_url), social_accounts(platform, username)")
+        .eq("user_id", user_id)
+        .order("scheduled_time", desc=False)
+        .execute()
+    )
+    return {"posts": resp.data}
+
+
+@app.post("/api/scheduled-posts")
+async def create_scheduled_post(req: SchedulePostRequest):
+    data = {
+        "user_id": req.user_id,
+        "clip_id": req.clip_id,
+        "social_account_id": req.social_account_id,
+        "caption": req.caption,
+        "scheduled_time": req.scheduled_time,
+        "status": "pending",
+    }
+    resp = supabase.table("scheduled_posts").insert(data).execute()
+    return {"post": resp.data[0] if resp.data else None}
+
+
+@app.delete("/api/scheduled-posts/{post_id}")
+async def delete_scheduled_post(post_id: str):
+    supabase.table("scheduled_posts").delete().eq("id", post_id).eq("status", "pending").execute()
+    return {"deleted": True}
 
 
 @app.get("/health")
