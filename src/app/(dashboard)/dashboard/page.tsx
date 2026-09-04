@@ -24,6 +24,15 @@ interface Project {
   created_at: string
 }
 
+interface Analytics {
+  total_projects: number
+  total_clips: number
+  pending_posts: number
+  published_posts: number
+  success_rate: number
+  activity_last_7_days: { date: string; clips: number }[]
+}
+
 export default function Dashboard() {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,6 +42,7 @@ export default function Dashboard() {
   const [activeProject, setActiveProject] = useState<string | null>(null)
   const [clips, setClips] = useState<Clip[]>([])
   const [polling, setPolling] = useState(false)
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -40,6 +50,7 @@ export default function Dashboard() {
       if (data.user) {
         setUserId(data.user.id)
         fetchProjects(data.user.id)
+        fetch(`${API}/api/analytics/${data.user.id}`).then(r => r.ok ? r.json() : null).then(d => d && setAnalytics(d))
       }
     })
   }, [])
@@ -140,6 +151,44 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+
+        {/* Cards de Analytics */}
+        {analytics && (
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+            {[
+              { label: 'Vídeos Importados', value: analytics.total_projects, icon: '🎬' },
+              { label: 'Clipes Gerados', value: analytics.total_clips, icon: '✂️' },
+              { label: 'Agend. Pendentes', value: analytics.pending_posts, icon: '⏳' },
+              { label: 'Taxa de Sucesso', value: `${analytics.success_rate}%`, icon: '📈' },
+            ].map(card => (
+              <div key={card.label} style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', padding: '1.25rem' }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '0.4rem' }}>{card.icon} {card.label}</p>
+                <p style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.03em' }}>{card.value}</p>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* Atividade últimos 7 dias */}
+        {analytics && analytics.activity_last_7_days.length > 0 && (
+          <section style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
+              Atividade — últimos 7 dias
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '60px' }}>
+              {analytics.activity_last_7_days.map(d => {
+                const max = Math.max(...analytics.activity_last_7_days.map(x => x.clips), 1)
+                const pct = Math.max(8, (d.clips / max) * 100)
+                return (
+                  <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                    <div style={{ width: '100%', height: `${pct}%`, background: '#7c3aed', borderRadius: '3px 3px 0 0', minHeight: 4 }} title={`${d.clips} clipes`} />
+                    <span style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>{d.date.slice(5)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Input de URL */}
         <section style={{ marginBottom: '2.5rem' }}>

@@ -139,6 +139,52 @@ async def delete_scheduled_post(post_id: str):
     return {"deleted": True}
 
 
+@app.get("/api/analytics/{user_id}")
+async def get_analytics(user_id: str):
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+
+    projects = supabase.table("projects").select("id, created_at").eq("user_id", user_id).execute()
+    project_ids = [p["id"] for p in (projects.data or [])]
+
+    total_clips = 0
+    if project_ids:
+        clips_resp = supabase.table("clips").select("id", count="exact").in_("project_id", project_ids).execute()
+        total_clips = clips_resp.count or 0
+
+    posts = supabase.table("scheduled_posts").select("status, created_at").eq("user_id", user_id).execute()
+    posts_data = posts.data or []
+    published = sum(1 for p in posts_data if p["status"] == "published")
+    failed = sum(1 for p in posts_data if p["status"] == "failed")
+    pending = sum(1 for p in posts_data if p["status"] == "pending")
+    total_finished = published + failed
+    success_rate = round(published / total_finished * 100) if total_finished > 0 else 0
+
+    # Atividade últimos 7 dias (clipes por dia)
+    recent_clips: list[dict] = []
+    if project_ids:
+        rc = supabase.table("clips").select("created_at").in_("project_id", project_ids).gte("created_at", seven_days_ago).execute()
+        recent_clips = rc.data or []
+
+    from collections import defaultdict
+    daily: dict[str, int] = defaultdict(int)
+    for c in recent_clips:
+        day = c["created_at"][:10]
+        daily[day] += 1
+    activity = [{"date": k, "clips": v} for k, v in sorted(daily.items())]
+
+    return {
+        "total_projects": len(projects.data or []),
+        "total_clips": total_clips,
+        "pending_posts": pending,
+        "published_posts": published,
+        "failed_posts": failed,
+        "success_rate": success_rate,
+        "activity_last_7_days": activity,
+    }
+
+
 @app.get("/api/billing/status/{user_id}")
 async def billing_status(user_id: str):
     return get_plan_status(user_id)
