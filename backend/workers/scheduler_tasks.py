@@ -34,9 +34,10 @@ def check_and_publish_scheduled_posts():
     """
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    # Queries separadas para evitar dependência do cache de FK do PostgREST
     pending = (
         supabase.table("scheduled_posts")
-        .select("*, clips(storage_url, title), social_accounts(account_id, access_token, platform)")
+        .select("id, clip_id, social_account_id, caption, status")
         .eq("status", "pending")
         .lte("scheduled_time", now_iso)
         .execute()
@@ -50,11 +51,17 @@ def check_and_publish_scheduled_posts():
 
     for post in pending.data:
         post_id = post["id"]
-        clip = post.get("clips") or {}
-        account = post.get("social_accounts") or {}
+        caption = post.get("caption", "")
+
+        # Buscar clip
+        clip_resp = supabase.table("clips").select("storage_url, title").eq("id", post["clip_id"]).maybe_single().execute()
+        clip = clip_resp.data or {}
+
+        # Buscar conta social
+        acct_resp = supabase.table("social_accounts").select("account_id, access_token, platform").eq("id", post["social_account_id"]).maybe_single().execute()
+        account = acct_resp.data or {}
 
         video_url = clip.get("storage_url", "")
-        caption = post.get("caption", "")
         account_id = account.get("account_id", "")
         access_token = account.get("access_token", "")
         platform = account.get("platform", "instagram")

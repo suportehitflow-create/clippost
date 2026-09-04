@@ -109,14 +109,21 @@ async def upsert_social_account(req: SocialAccountRequest):
 
 @app.get("/api/scheduled-posts/{user_id}")
 async def list_scheduled_posts(user_id: str):
-    resp = (
+    posts = (
         supabase.table("scheduled_posts")
-        .select("*, clips(title, storage_url), social_accounts(platform, username)")
+        .select("*")
         .eq("user_id", user_id)
         .order("scheduled_time", desc=False)
         .execute()
     )
-    return {"posts": resp.data}
+    rows = posts.data or []
+    # Enriquecer com clips e social_accounts via queries separadas
+    for row in rows:
+        c = supabase.table("clips").select("title, storage_url").eq("id", row["clip_id"]).maybe_single().execute()
+        row["clips"] = c.data
+        a = supabase.table("social_accounts").select("platform, username").eq("id", row["social_account_id"]).maybe_single().execute()
+        row["social_accounts"] = a.data
+    return {"posts": rows}
 
 
 @app.post("/api/scheduled-posts")
