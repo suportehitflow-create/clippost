@@ -1,0 +1,32 @@
+app = "clippost-backend"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  STORAGE_BUCKET = "videos"
+  TEMP_DIR = "/tmp/clippost"
+
+[processes]
+  app = "uvicorn main:app --host 0.0.0.0 --port 8000"
+  worker = "celery -A tasks worker --loglevel=info --concurrency=2"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  processes = ["worker"]

@@ -1,16 +1,12 @@
 """
 ClipPost Backend — FastAPI
-Endpoints:
-  POST /api/jobs          — cria job de processamento
-  GET  /api/jobs/{id}     — status do job + clips
-  WS   /ws/{job_id}       — progresso em tempo real
 """
 import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from tasks import process_video
+from tasks import process_youtube_video
 from supabase import create_client
 
 load_dotenv()
@@ -26,55 +22,84 @@ app.add_middleware(
 
 supabase = create_client(
     os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+    os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
 )
 
 
-class JobRequest(BaseModel):
-    project_id: str
+class ProcessRequest(BaseModel):
+    url: str
     user_id: str
-    source_type: str  # "url" | "file"
-    source_url: str | None = None
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.post("/api/process-url")
+async def process_url(req: ProcessRequest):
+    """Aciona o worker Celery para processar a URL do YouTube."""
+    task = process_youtube_video.delay(req.url, req.user_id)
+    return {"task_id": task.id, "status": "processing"}
 
 
 @app.post("/api/jobs")
-async def create_job(req: JobRequest):
-    # Update project status to processing
-    supabase.table("projects").update({"status": "processing"}).eq("id", req.project_id).execute()
-    # Dispatch Celery task
-    task = process_video.delay(req.project_id, req.user_id, req.source_type, req.source_url)
-    return {"task_id": task.id, "project_id": req.project_id, "status": "processing"}
+async def create_job(req: ProcessRequest):
+    """Alias de /api/process-url para compatibilidade."""
+    task = process_youtube_video.delay(req.url, req.user_id)
+    return {"task_id": task.id, "status": "processing"}
 
 
-@app.get("/api/jobs/{project_id}")
-async def get_job_status(project_id: str):
-    proj = supabase.table("projects").select("*").eq("id", project_id).single().execute()
-    clips = supabase.table("clips").select("*").eq("project_id", project_id).order("score", desc=True).execute()
+@app.get("/api/projects/{user_id}")
+async def list_projects(user_id: str):
+    """Lista os vídeos importados pelo usuário."""
+    resp = (
+        supabase.table("projects")
+        .select("id, title, source_url, platform, raw_video_url, status, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return {"projects": resp.data}
+
+
+@app.get("/api/clips/{project_id}")
+async def list_clips(project_id: str):
+    """Lista os clipes gerados para um projeto, ordenados por ai_score."""
+    proj = supabase.table("projects").select("*").eq("id", project_id).maybe_single().execute()
+    if not proj.data:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado")
+
+    clips = (
+        supabase.table("clips")
+        .select("*")
+        .eq("project_id", project_id)
+        .order("score", desc=True)
+        .execute()
+    )
     return {
-        "project_id": project_id,
-        "status": proj.data["status"],
-        "error": proj.data.get("error_message"),
+        "project": proj.data,
         "clips": clips.data,
     }
 
 
-# WebSocket for real-time progress updates
-connections: dict[str, list[WebSocket]] = {}
-
-@app.websocket("/ws/{project_id}")
-async def websocket_progress(websocket: WebSocket, project_id: str):
-    await websocket.accept()
-    connections.setdefault(project_id, []).append(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        connections[project_id].remove(websocket)
-
-
-async def broadcast(project_id: str, message: dict):
-    for ws in connections.get(project_id, []):
-        try:
-            await ws.send_json(message)
-        except Exception:
-            pass
+@app.get("/api/jobs/{project_id}")
+async def get_job_status(project_id: str):
+    """Status de um job pelo project_id."""
+    proj = supabase.table("projects").select("*").eq("id", project_id).maybe_single().execute()
+    if not proj.data:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado")
+    clips = (
+        supabase.table("clips")
+        .select("*")
+        .eq("project_id", project_id)
+        .order("score", desc=True)
+        .execute()
+    )
+    return {
+        "project_id": project_id,
+        "status": proj.data["status"],
+        "title": proj.data.get("title"),
+        "raw_video_url": proj.data.get("raw_video_url"),
+        "clips": clips.data,
+    }

@@ -1,10 +1,11 @@
+setuptools>=68.0.0
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 celery==5.4.0
 redis==5.1.1
 yt-dlp==2024.10.7
 ffmpeg-python==0.2.0
-openai-whisper==20231117
+faster-whisper==1.0.3
 mediapipe==0.10.14
 opencv-python-headless==4.10.0.84
 Pillow==10.4.0
