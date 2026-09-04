@@ -1,0 +1,258 @@
+name: AI Phase Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase_file:
+        description: 'Arquivo da fase (ex: fase_06_monetizacao.txt)'
+        required: true
+        default: 'fase_06_monetizacao.txt'
+      max_iterations:
+        description: 'Máximo de tentativas de auto-correção'
+        required: false
+        default: '5'
+
+jobs:
+  run-phase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências Node
+        run: npm ci
+
+      - name: Instalar dependências Python
+        run: pip install anthropic
+
+      - name: Ler fase e regras
+        id: read_phase
+        run: |
+          PHASE_CONTENT=$(cat "fases_do_projeto/${{ github.event.inputs.phase_file }}")
+          RULES_CONTENT=$(cat ".cursorrules")
+          echo "phase_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$PHASE_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Loop IA — Implementar e corrigir
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import anthropic
+          import subprocess
+          import sys
+          import os
+          import json
+
+          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+          MAX_ITER = int("${{ github.event.inputs.max_iterations }}")
+
+          phase_file = "fases_do_projeto/${{ github.event.inputs.phase_file }}"
+          rules_file = ".cursorrules"
+
+          with open(phase_file) as f:
+              phase = f.read()
+          with open(rules_file) as f:
+              rules = f.read()
+
+          # Listar arquivos relevantes do projeto para dar contexto à IA
+          relevant_files = {}
+          file_paths = [
+              "backend/main.py",
+              "backend/tasks.py",
+              "backend/celery_app.py",
+              "src/app/(dashboard)/dashboard/page.tsx",
+              "package.json",
+              "backend/requirements.txt",
+          ]
+          for fp in file_paths:
+              if os.path.exists(fp):
+                  with open(fp) as f:
+                      relevant_files[fp] = f.read()[:3000]  # primeiros 3000 chars
+
+          context_files = "\n\n".join(
+              f"=== {path} ===\n{content}"
+              for path, content in relevant_files.items()
+          )
+
+          error_context = ""
+          success = False
+
+          for iteration in range(1, MAX_ITER + 1):
+              print(f"\n{'='*60}")
+              print(f"ITERAÇÃO {iteration}/{MAX_ITER}")
+              print('='*60)
+
+              # Montar prompt para Claude
+              if iteration == 1:
+                  user_msg = f"""Você é um engenheiro sênior trabalhando no ClipPost.
+
+          REGRAS FIXAS DO PROJETO:
+          {rules}
+
+          ARQUIVOS ATUAIS DO PROJETO:
+          {context_files}
+
+          TAREFA — {phase_file}:
+          {phase}
+
+          Implemente TUDO que está descrito na tarefa. Para cada arquivo que precisa ser criado ou modificado, responda no formato exato:
+
+          FILE: caminho/do/arquivo
+          ```
+          conteúdo completo do arquivo
+          ```
+
+          Inclua TODOS os arquivos necessários. Comece pela implementação diretamente, sem explicações longas."""
+              else:
+                  user_msg = f"""A implementação anterior falhou nos testes. Corrija os erros.
+
+          ERROS ENCONTRADOS:
+          {error_context}
+
+          REGRAS FIXAS (não violar):
+          {rules}
+
+          Reescreva APENAS os arquivos que precisam de correção, no mesmo formato:
+
+          FILE: caminho/do/arquivo
+          ```
+          conteúdo completo do arquivo
+          ```"""
+
+              # Chamar Claude API
+              print("Chamando Claude API...")
+              response = client.messages.create(
+                  model="claude-haiku-4-5-20251001",
+                  max_tokens=8096,
+                  messages=[{"role": "user", "content": user_msg}]
+              )
+
+              ai_output = response.content[0].text
+              print(f"Claude respondeu ({len(ai_output)} chars)")
+
+              # Extrair e aplicar arquivos da resposta
+              import re
+              file_blocks = re.findall(
+                  r'FILE:\s*(.+?)\n```(?:\w*\n)?(.*?)```',
+                  ai_output,
+                  re.DOTALL
+              )
+
+              if not file_blocks:
+                  print("AVISO: Nenhum arquivo encontrado na resposta da IA")
+                  error_context = "A IA não gerou nenhum arquivo no formato esperado."
+                  continue
+
+              for file_path, content in file_blocks:
+                  file_path = file_path.strip()
+                  os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else ".", exist_ok=True)
+                  with open(file_path, "w") as f:
+                      f.write(content.strip())
+                  print(f"  ✓ Escrito: {file_path}")
+
+              # Rodar testes
+              print("\nRodando testes...")
+              errors = []
+
+              # Teste 1: TypeScript build
+              result = subprocess.run(
+                  ["npx", "tsc", "--noEmit", "--skipLibCheck"],
+                  capture_output=True, text=True, timeout=120
+              )
+              if result.returncode != 0:
+                  errors.append(f"ERRO TypeScript:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+                  print(f"  ✗ TypeScript falhou")
+              else:
+                  print(f"  ✓ TypeScript OK")
+
+              # Teste 2: Next.js build
+              if not errors:
+                  result = subprocess.run(
+                      ["npm", "run", "build"],
+                      capture_output=True, text=True, timeout=180,
+                      env={**os.environ, "NEXT_PUBLIC_API_URL": "https://clippost-backend.fly.dev",
+                           "NEXT_PUBLIC_SUPABASE_URL": "https://alntulecjshpbrhesaoo.supabase.co",
+                           "NEXT_PUBLIC_SUPABASE_ANON_KEY": "placeholder"}
+                  )
+                  if result.returncode != 0:
+                      errors.append(f"ERRO Next.js build:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+                      print(f"  ✗ Next.js build falhou")
+                  else:
+                      print(f"  ✓ Next.js build OK")
+
+              # Teste 3: Python syntax check
+              py_files = []
+              for root, dirs, files in os.walk("backend"):
+                  for f in files:
+                      if f.endswith(".py"):
+                          py_files.append(os.path.join(root, f))
+
+              for py_file in py_files:
+                  result = subprocess.run(
+                      ["python3", "-m", "py_compile", py_file],
+                      capture_output=True, text=True
+                  )
+                  if result.returncode != 0:
+                      errors.append(f"ERRO Python {py_file}:\n{result.stderr}")
+                      print(f"  ✗ Python syntax error: {py_file}")
+
+              if not errors:
+                  print(f"\n✅ TODOS OS TESTES PASSARAM na iteração {iteration}!")
+                  success = True
+                  break
+              else:
+                  error_context = "\n\n".join(errors)
+                  print(f"\n❌ {len(errors)} erro(s) encontrado(s). Tentando corrigir...")
+
+          if not success:
+              print(f"\n💥 Falhou após {MAX_ITER} iterações.")
+              sys.exit(1)
+
+          print("\n🎉 Fase implementada com sucesso!")
+          PYTHON_SCRIPT
+
+      - name: Commit código gerado pela IA
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "feat: AI implementou ${{ github.event.inputs.phase_file }}
+
+          Gerado automaticamente pelo AI Phase Runner.
+          Iterações de auto-correção ativadas.
+
+          Co-Authored-By: Claude Haiku <noreply@anthropic.com>"
+
+      - name: Push para branch da fase
+        run: |
+          BRANCH="ai-phase/${{ github.event.inputs.phase_file }}"
+          BRANCH="${BRANCH/.txt/}"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+          git push origin "$BRANCH" --force
+
+      - name: Notificar sucesso
+        if: success()
+        run: |
+          echo "::notice title=✅ Fase Concluída::${{ github.event.inputs.phase_file }} implementada com sucesso! Revise o PR e faça merge para main."
+
+      - name: Notificar falha
+        if: failure()
+        run: |
+          echo "::error title=❌ Fase Falhou::${{ github.event.inputs.phase_file }} não foi implementada após ${{ github.event.inputs.max_iterations }} tentativas. Verifique os logs."

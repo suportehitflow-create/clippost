@@ -1,0 +1,73 @@
+# Fase 06 — Monetização com Stripe
+
+## Objetivo
+Implementar cobrança recorrente (subscription) para o ClipPost usando Stripe.
+Usuários free têm 3 clipes/mês. Usuários Pro têm ilimitado.
+
+## O que precisa ser feito
+
+### 1. Banco de dados (Supabase SQL)
+Adicionar coluna `plan` na tabela `auth.users` via tabela pública:
+```sql
+CREATE TABLE IF NOT EXISTS user_plans (
+  user_id       uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  plan          text NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro')),
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  clips_used_this_month int NOT NULL DEFAULT 0,
+  period_reset  timestamptz NOT NULL DEFAULT date_trunc('month', now()) + interval '1 month',
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE user_plans ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own plan" ON user_plans FOR SELECT USING (auth.uid() = user_id);
+```
+
+### 2. Backend FastAPI (backend/services/stripe_service.py)
+- `create_checkout_session(user_id, email) -> str` — cria sessão Stripe Checkout para plano Pro ($19/mês), retorna URL
+- `handle_webhook(payload, sig_header) -> None` — processa eventos:
+  - `checkout.session.completed` → atualiza `user_plans` para plan='pro', salva stripe IDs
+  - `customer.subscription.deleted` → reverte para plan='free'
+- Usar `stripe` Python SDK
+- STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET via env vars
+
+### 3. Rotas FastAPI (backend/main.py)
+- `POST /api/billing/checkout` — recebe `{user_id, email}`, retorna `{url}`
+- `POST /api/billing/webhook` — endpoint Stripe webhook (sem auth, valida assinatura)
+- `GET /api/billing/status/{user_id}` — retorna `{plan, clips_used, clips_limit, period_reset}`
+
+### 4. Guard de uso (backend/tasks.py)
+Antes de iniciar processamento, verificar:
+- Se plan='free' e clips_used_this_month >= 3 → raise Exception("Limite de clipes gratuitos atingido")
+- Após gerar clipes com sucesso → incrementar clips_used_this_month
+
+### 5. Frontend (src/app/(dashboard)/billing/page.tsx)
+- Mostrar plano atual (free/pro) com badge
+- Mostrar uso: "X de 3 clipes usados este mês" (para free)
+- Botão "Fazer upgrade para Pro — $19/mês" → chama /api/billing/checkout → redireciona para Stripe
+- Mostrar data de reset do contador
+- Link para portal Stripe (gerenciar assinatura/cancelar)
+
+### 6. Dashboard (src/app/(dashboard)/dashboard/page.tsx)
+- Adicionar link "💳 Plano" no header
+- Se free e clips_used >= 3, mostrar banner de upgrade antes do formulário de URL
+
+## Variáveis de ambiente necessárias
+No backend/.env e nos secrets do Fly.io:
+- STRIPE_SECRET_KEY=sk_live_...
+- STRIPE_WEBHOOK_SECRET=whsec_...
+- STRIPE_PRO_PRICE_ID=price_... (ID do preço mensal no Stripe Dashboard)
+
+No frontend (.env.local e Vercel):
+- NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+
+## Testes que devem passar
+1. GET /api/billing/status/{user_id} retorna JSON com plan, clips_used, clips_limit
+2. POST /api/billing/checkout retorna {url} começando com https://checkout.stripe.com
+3. Usuário free com 3 clipes usados recebe erro ao tentar processar novo vídeo
+4. Página /billing carrega sem erro 500
+
+## Definição de "pronto"
+- Vercel build passa sem erro TypeScript
+- GET /health no Fly.io retorna 200
+- Página /billing acessível após login
+- Rota /api/billing/status/{user_id} retorna JSON válido

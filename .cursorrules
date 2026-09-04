@@ -1,0 +1,50 @@
+# ClipPost — Regras Fixas para IA
+# Este arquivo define as regras que NUNCA mudam entre as fases.
+
+## Stack obrigatória
+- Frontend: Next.js 16+ (App Router), TypeScript, Tailwind CSS
+- Backend: Python 3.11, FastAPI, Celery, Redis
+- Banco de dados: Supabase (PostgreSQL + Auth + Storage)
+- Deploy frontend: Vercel
+- Deploy backend: Fly.io
+- Pagamentos: Stripe (quando solicitado)
+- Vídeo: yt-dlp + faster-whisper + FFmpeg
+- IA: Claude API (claude-haiku-4-5-20251001 para tarefas de produção)
+
+## Segurança — NUNCA violar
+- JAMAIS expor chaves de API, tokens ou senhas no código
+- Todas as variáveis sensíveis via variáveis de ambiente (.env ou secrets do CI)
+- Row Level Security (RLS) ativado em TODAS as tabelas Supabase
+- Validar input do usuário em todas as rotas FastAPI com Pydantic
+- CORS configurado para aceitar apenas origens conhecidas em produção
+
+## Padrões de código
+- Nomes de funções e variáveis em inglês, snake_case no Python, camelCase no TypeScript
+- Sem comentários óbvios; comentar apenas o "porquê" não óbvio
+- Sem `console.log` ou `print` de depuração no código final
+- Erros tratados com mensagens claras ao usuário; logs no servidor
+
+## Banco de dados
+- Toda nova tabela: `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `created_at timestamptz DEFAULT now()`
+- Sempre habilitar RLS e criar política após criar tabela
+- Migrations via SQL puro (sem ORMs adicionais)
+
+## APIs
+- Prefixo `/api/` em todas as rotas FastAPI
+- Retornar JSON consistente: `{"data": ..., "error": null}` ou `{"data": null, "error": "mensagem"}`
+- Documentação automática via FastAPI (Swagger em `/docs`)
+
+## Estrutura de pastas (não alterar)
+```
+clippost/
+  src/app/(dashboard)/   ← páginas autenticadas
+  src/app/(auth)/        ← login, signup
+  backend/
+    services/            ← lógica de negócio
+    workers/             ← tasks Celery
+    main.py              ← FastAPI entry
+    tasks.py             ← task principal Celery
+    celery_app.py        ← configuração Celery
+  fases_do_projeto/      ← especificações das fases (não deployar)
+  .github/workflows/     ← automação CI/CD
+```
