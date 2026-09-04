@@ -7,8 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from fastapi import Request
 from tasks import process_youtube_video
 from supabase import create_client
+from services.stripe_service import (
+    create_checkout_session, handle_webhook,
+    get_plan_status, get_billing_portal_url,
+)
 
 load_dotenv()
 
@@ -53,6 +58,11 @@ class SocialAccountRequest(BaseModel):
     access_token: str
     account_id: str
     username: str | None = None
+
+
+class CheckoutRequest(BaseModel):
+    user_id: str
+    email: str
 
 
 @app.get("/api/brand-kit/{user_id}")
@@ -127,6 +137,36 @@ async def create_scheduled_post(req: SchedulePostRequest):
 async def delete_scheduled_post(post_id: str):
     supabase.table("scheduled_posts").delete().eq("id", post_id).eq("status", "pending").execute()
     return {"deleted": True}
+
+
+@app.get("/api/billing/status/{user_id}")
+async def billing_status(user_id: str):
+    return get_plan_status(user_id)
+
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(req: CheckoutRequest):
+    url = create_checkout_session(req.user_id, req.email)
+    return {"url": url}
+
+
+@app.get("/api/billing/portal/{user_id}")
+async def billing_portal(user_id: str):
+    url = get_billing_portal_url(user_id)
+    if not url:
+        raise HTTPException(status_code=404, detail="Nenhuma assinatura encontrada")
+    return {"url": url}
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        handle_webhook(payload, sig)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"received": True}
 
 
 @app.get("/health")

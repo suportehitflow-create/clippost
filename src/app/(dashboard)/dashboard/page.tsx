@@ -134,6 +134,9 @@ export default function Dashboard() {
         <Link href="/schedule" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
           📅 Agendamentos
         </Link>
+        <Link href="/billing" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+          💳 Plano
+        </Link>
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>

@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from services.ai_curator import get_viral_clips
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
+from services.stripe_service import check_clip_limit, increment_clips_used
 
 load_dotenv()
 
@@ -36,6 +37,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str):
+    check_clip_limit(user_id)
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
@@ -154,6 +156,7 @@ def process_youtube_video(url: str, user_id: str):
 
         # Atualizar status final
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
+        increment_clips_used(user_id)
 
         return {"status": "success", "project_id": project_id, "title": title}
 
