@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi import Request
-from tasks import process_youtube_video
+from tasks import process_youtube_video, process_bulk_videos
 from supabase import create_client
 from services.stripe_service import (
     create_checkout_session, handle_webhook,
@@ -71,6 +71,18 @@ class SocialAccountRequest(BaseModel):
 class CheckoutRequest(BaseModel):
     user_id: str
     email: str
+
+
+class BulkProcessRequest(BaseModel):
+    urls: list[str]
+    user_id: str
+    clip_duration: str = "auto"
+
+
+class InstagramListRequest(BaseModel):
+    username_or_url: str
+    limit: int = 10
+    sort_by: str = "recent"  # "recent" | "views"
 
 
 @app.get("/api/brand-kit/{user_id}")
@@ -239,6 +251,28 @@ async def health():
 async def process_url(req: ProcessRequest):
     task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration)
     return {"task_id": task.id, "status": "processing"}
+
+
+@app.post("/api/process-bulk")
+async def process_bulk(req: BulkProcessRequest):
+    """Fila de processamento em massa — apenas Pro."""
+    if not req.urls:
+        raise HTTPException(status_code=400, detail="Nenhuma URL fornecida")
+    if len(req.urls) > 20:
+        raise HTTPException(status_code=400, detail="Máximo de 20 URLs por vez")
+    task = process_bulk_videos.delay(req.urls, req.user_id, req.clip_duration)
+    return {"task_id": task.id, "status": "queued", "count": len(req.urls)}
+
+
+@app.post("/api/instagram/list")
+async def instagram_list(req: InstagramListRequest):
+    """Lista vídeos de um perfil público do Instagram."""
+    try:
+        from services.instagram_scraper import list_instagram_videos
+        videos = list_instagram_videos(req.username_or_url, limit=req.limit, sort_by=req.sort_by)
+        return {"videos": videos, "count": len(videos)}
+    except Exception as e:
+        return {"videos": [], "count": 0, "error": str(e)}
 
 
 @app.post("/api/jobs")

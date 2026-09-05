@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from services.ai_curator import get_viral_clips
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
-from services.stripe_service import check_clip_limit, increment_clips_used
+from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
 
 load_dotenv()
 
@@ -35,8 +35,24 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVIC
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
+@celery.task(name="process_bulk_videos")
+def process_bulk_videos(urls: list[str], user_id: str, clip_duration: str = "auto"):
+    """Fila de processamento em massa — apenas usuários Pro."""
+    plan = get_plan_status(user_id)
+    if plan["plan"] != "pro":
+        raise Exception("Processamento em massa disponível apenas no plano Pro.")
+    results = []
+    for url in urls:
+        try:
+            task = process_youtube_video.delay(url, user_id, clip_duration)
+            results.append({"url": url, "task_id": task.id, "status": "queued"})
+        except Exception as e:
+            results.append({"url": url, "status": "error", "error": str(e)})
+    return {"queued": len(results), "results": results}
+
+
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
     check_clip_limit(user_id)
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
@@ -103,7 +119,7 @@ def process_youtube_video(url: str, user_id: str):
         project_id = db_response.data[0]['id']
 
         # 6. AI Curator — detectar momentos virais
-        clips_meta = get_viral_clips(transcript_data)
+        clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration)
 
         # Brand Kit do usuário (opcional)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()

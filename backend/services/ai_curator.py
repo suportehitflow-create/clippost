@@ -8,7 +8,7 @@ import anthropic
 _client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
 
-def get_viral_clips(transcript_data: dict) -> list[dict]:
+def get_viral_clips(transcript_data: dict, clip_duration: str = "auto") -> list[dict]:
     """
     Recebe transcript_data (dict com 'segments' e 'words') e retorna
     uma lista de até 3 cortes virais com start_time, end_time, hook_title, ai_score.
@@ -17,15 +17,31 @@ def get_viral_clips(transcript_data: dict) -> list[dict]:
     if not segments:
         return []
 
+    duration_rule = {
+        "30": "entre 25 e 35 segundos (clipes curtos)",
+        "60": "entre 50 e 65 segundos (clipes longos)",
+        "auto": "entre 30 e 60 segundos (IA decide conforme o conteúdo)",
+    }.get(clip_duration, "entre 30 e 60 segundos")
+
+    max_duration = 35 if clip_duration == "30" else 65 if clip_duration == "60" else 60
+
     prompt = f"""Você é um especialista em conteúdo viral para TikTok, Instagram Reels e YouTube Shorts.
 
 Analise a transcrição abaixo e encontre os 3 melhores momentos para clipes curtos virais.
 
-Critérios para selecionar um bom momento:
-- Gancho de curiosidade forte (algo surpreendente, contra-intuitivo ou revelador)
-- Resposta direta a uma pergunta relevante
-- Momento de emoção, humor ou insight poderoso
-- Duração entre 30 e 60 segundos
+IGNORE completamente:
+- Introduções ("Oi galera", "Olá pessoal", "Bem-vindos", "No vídeo de hoje")
+- Encerramento ("Se gostou curte", "Até o próximo", "Obrigado")
+- Transições sem conteúdo ("Como eu falei antes", "Continuando...")
+
+PRIORIZE:
+- Revelação surpreendente ou contra-intuitiva
+- Pergunta seguida de resposta direta e poderosa
+- Polêmica, conflito ou declaração audaciosa
+- Insight ou técnica acionável
+- Momento de emoção intensa ou humor
+
+Duração dos clipes: {duration_rule}
 
 Transcrição (com timestamps em segundos):
 {json.dumps(segments[:100], ensure_ascii=False)}
@@ -57,15 +73,16 @@ Retorne ESTRITAMENTE um array JSON válido com exatamente 3 objetos, sem nenhum 
         else:
             clips = []
 
-    # Garantir duração máxima de 60s e campos obrigatórios
+    # Garantir duração e campos obrigatórios
+    default_dur = 30 if clip_duration == "30" else 55 if clip_duration == "60" else 45
     validated = []
     for c in clips[:3]:
         start = float(c.get("start_time", 0))
-        end = float(c.get("end_time", start + 45))
-        if end - start > 60:
-            end = start + 60
+        end = float(c.get("end_time", start + default_dur))
+        if end - start > max_duration:
+            end = start + max_duration
         if end - start < 10:
-            end = start + 30
+            end = start + default_dur
         validated.append({
             "start_time": round(start, 2),
             "end_time": round(end, 2),
