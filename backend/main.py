@@ -19,9 +19,16 @@ load_dotenv()
 
 app = FastAPI(title="ClipPost API")
 
+FRONTEND_ORIGINS = [
+    "https://clippost-silk.vercel.app",
+    "http://localhost:3000",
+    os.environ.get("FRONTEND_URL", ""),
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o for o in FRONTEND_ORIGINS if o],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,6 +42,7 @@ supabase = create_client(
 class ProcessRequest(BaseModel):
     url: str
     user_id: str
+    clip_duration: str = "auto"  # "30", "60", "auto"
 
 
 class BrandKitRequest(BaseModel):
@@ -229,8 +237,7 @@ async def health():
 
 @app.post("/api/process-url")
 async def process_url(req: ProcessRequest):
-    """Aciona o worker Celery para processar a URL do YouTube."""
-    task = process_youtube_video.delay(req.url, req.user_id)
+    task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration)
     return {"task_id": task.id, "status": "processing"}
 
 
@@ -243,15 +250,17 @@ async def create_job(req: ProcessRequest):
 
 @app.get("/api/projects/{user_id}")
 async def list_projects(user_id: str):
-    """Lista os vídeos importados pelo usuário."""
-    resp = (
-        supabase.table("projects")
-        .select("id, title, source_url, platform, raw_video_url, status, created_at")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return {"projects": resp.data}
+    try:
+        resp = (
+            supabase.table("projects")
+            .select("id, title, source_url, platform, raw_video_url, status, created_at")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return {"projects": resp.data or []}
+    except Exception:
+        return {"projects": []}
 
 
 @app.get("/api/clips/{project_id}")

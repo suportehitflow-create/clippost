@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [clips, setClips] = useState<Clip[]>([])
   const [polling, setPolling] = useState(false)
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60'>('auto')
   const supabase = createClient()
 
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function Dashboard() {
       const res = await fetch(`${API}/api/process-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, user_id: userId }),
+        body: JSON.stringify({ url, user_id: userId, clip_duration: clipDuration }),
       })
       if (!res.ok) throw new Error('Erro ao iniciar processamento')
       setUrl('')
@@ -128,7 +129,7 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Header */}
-      <header style={{ borderBottom: '1px solid var(--card-border)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '1.5rem' }}>✂️</span>
           <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>ClipPost</span>
@@ -211,6 +212,27 @@ export default function Dashboard() {
                 borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none',
               }}
             />
+            {/* Seletor de duração */}
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {(['auto', '30', '60'] as const).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setClipDuration(d)}
+                  style={{
+                    padding: '0.8rem 1rem',
+                    background: clipDuration === d ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${clipDuration === d ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: '0.5rem', cursor: 'pointer',
+                    color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600,
+                    backdropFilter: 'blur(20px)',
+                  }}
+                >
+                  {d === 'auto' ? '🤖 Auto' : `${d}s`}
+                </button>
+              ))}
+            </div>
+
             <button
               type="submit"
               disabled={loading || !userId}

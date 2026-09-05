@@ -31,6 +31,9 @@ def create_vertical_clip(
     brand_kit: dict | None = None,
     subtitle_file: str | None = None,
     hook_title: str | None = None,
+    hflip: bool = True,
+    remove_silence: bool = True,
+    speed: float = 1.0,
 ) -> str:
     """
     Renderiza um clipe vertical 9:16 com:
@@ -63,10 +66,30 @@ def create_vertical_clip(
         avatar_url = (brand_kit or {}).get("avatar_url", "")
 
         # --- Construção do filter_complex ---
-        # [0:v] crop 9:16 → scale 1080x1920
+        # Truques de retenção: hflip + speed
+        video_transforms = "crop=ih*9/16:ih,scale=1080:1920"
+        if hflip:
+            video_transforms += ",hflip"
+        if speed and speed != 1.0:
+            video_transforms += f",setpts={round(1/speed, 4)}*PTS"
+
         filter_parts = [
-            "[0:v]crop=ih*9/16:ih,scale=1080:1920[base]"
+            f"[0:v]{video_transforms}[base]"
         ]
+
+        # Audio transforms
+        audio_filters = []
+        if remove_silence:
+            audio_filters.append(
+                "silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-50dB"
+            )
+        if speed and speed != 1.0:
+            audio_filters.append(f"atempo={min(2.0, speed)}")
+        if audio_filters:
+            filter_parts.append(f"[0:a]{','.join(audio_filters)}[aout]")
+            audio_map = "[aout]"
+        else:
+            audio_map = "0:a"
         last_video = "[base]"
         input_files = [
             "-ss", str(start), "-t", str(duration), "-i", input_video,
@@ -137,11 +160,10 @@ def create_vertical_clip(
         cmd = (
             ["ffmpeg", "-y"]
             + input_files
-            + ["-ss", str(start), "-t", str(duration), "-i", input_video]  # audio input
             + [
                 "-filter_complex", filter_complex,
                 "-map", last_video,
-                "-map", f"{input_count}:a",
+                "-map", audio_map,
                 "-vcodec", "libx264", "-preset", "fast", "-crf", "23",
                 "-acodec", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
