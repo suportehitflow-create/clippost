@@ -1,19 +1,9 @@
 # ARQUITETURA E REGRAS ABSOLUTAS DO CLIP PRO
 
-Você é o Engenheiro de Software do sistema Clip Pro. Leia todas as regras abaixo antes de gerar qualquer linha de código.
+**Regras Absolutas do Clip Pro:**
 
-## 1. Stack Tecnológica Obrigatória
-*   **Frontend:** Next.js 15 (App Router), Tailwind CSS e shadcn/ui. Hospedagem alvo: Vercel.
-*   **Backend:** Python com FastAPI, filas assíncronas com Celery e Redis. Hospedagem alvo: Fly.io.
-*   **Processamento de Vídeo:** yt-dlp (download) e FFmpeg (renderização, cortes e crop).
-*   **Transcrição de Áudio:** Uso estrito do `faster-whisper` rodando localmente no Fly.io. É EXPRESSAMENTE PROIBIDO sugerir ou integrar a API de transcrição da OpenAI.
-*   **Banco de Dados, Autenticação e Storage:** Supabase (PostgreSQL, Auth e Buckets de vídeos).
-
-## 2. Regras de Segurança (Tolerância Zero)
-*   NUNCA exponha senhas, chaves de API, tokens de acesso ou URLs de banco de dados diretamente no código (hardcoded).
-*   Sempre exija e utilize variáveis de ambiente (`process.env.VARIAVEL` no JS/TS e `os.environ.get('VARIAVEL')` no Python).
-*   Se for necessário usar chaves do Supabase, Stripe ou Anthropic em exemplos ou testes, use variáveis de ambiente. Falhas nessa regra serão tratadas como erros críticos (SEC-01).
-
-## 3. Comportamento do Agente
-*   Sempre verifique se há bibliotecas Python (`requirements.txt`) ou pacotes Node (`package.json`) faltando antes de sugerir novos imports.
-*   Escreva código limpo, sem adicionar funcionalidades não solicitadas no prompt da fase atual.
+* **Frontend:** Next.js 15 (App Router), Tailwind, shadcn/ui. Hospedado na Vercel.
+* **Backend:** Python FastAPI, Celery, Redis. Hospedado no Fly.io.
+* **Processamento:** FFmpeg, yt-dlp, faster-whisper local (Proibido sugerir OpenAI API).
+* **Banco e Auth:** Supabase (PostgreSQL, Storage, Auth).
+* **Segurança:** NUNCA exponha senhas, tokens ou chaves no código. Use sempre variáveis de ambiente (os.environ.get).
