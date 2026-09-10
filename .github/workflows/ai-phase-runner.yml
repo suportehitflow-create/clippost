@@ -4,13 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       phase_file:
-        description: "Phase file path (e.g. docs/fases/fase_03_emergencia_comunicacao.md)"
+        description: "Phase file path (e.g. docs/fases/fase_03b_resgate_completo.md)"
         required: true
-        default: "docs/fases/fase_03_emergencia_comunicacao.md"
+        default: "docs/fases/fase_03b_resgate_completo.md"
       max_iterations:
         description: "Max autocorrection attempts"
         required: false
-        default: "8"
+        default: "6"
+
+permissions:
+  contents: write
 
 jobs:
   run-phase:
@@ -18,6 +21,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -28,8 +33,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm ci
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
 
       - name: Run AI Phase Runner
         env:
@@ -37,6 +47,8 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           PHASE_FILE: ${{ github.event.inputs.phase_file }}
           MAX_ITERATIONS: ${{ github.event.inputs.max_iterations }}
+          FRONTEND_DIR: "."
+          BACKEND_DIR: "backend"
         run: python3 .github/scripts/phase_runner.py
 
       - name: Commit implemented phase
@@ -44,10 +56,11 @@ jobs:
           PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
           git config user.name "AI Phase Runner"
           git config user.email "bot@clippost.ai"
-          git checkout -b "ai-phase/${PHASE_NAME}" 2>/dev/null || git checkout "ai-phase/${PHASE_NAME}"
+          BRANCH="ai-phase/${PHASE_NAME}"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
           git add -A
-          git commit -m "ai: implement ${PHASE_NAME}" || echo "Nothing to commit"
-          git push origin "ai-phase/${PHASE_NAME}" --force
+          git diff --cached --quiet || git commit -m "ai: implement ${PHASE_NAME}"
+          git push origin "$BRANCH" --force
 
       - name: Deploy Frontend (Vercel)
         env:
@@ -70,7 +83,33 @@ jobs:
 
       - name: Verify health endpoints
         run: |
-          sleep 15
+          sleep 20
           VERCEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-silk.vercel.app)
           FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
           echo "Vercel: $VERCEL_STATUS | Fly.io: $FLY_STATUS"
+          if [ "$VERCEL_STATUS" = "200" ] && [ "$FLY_STATUS" = "200" ]; then
+            echo "BOTH_OK=true" >> $GITHUB_ENV
+          fi
+
+      - name: Notify success
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\":white_check_mark: *ClipPost — ${PHASE_NAME} deployada!*\nVercel + Fly.io respondendo 200.\nhttps://clippost-silk.vercel.app\"}"
+          fi
+
+      - name: Notify failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\":x: *AI Phase Runner falhou.*\nLogs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+          fi

@@ -5,6 +5,8 @@ PHASE_FILE = os.environ["PHASE_FILE"]
 API_KEY = os.environ["OPENROUTER_API_KEY"]
 SLACK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 MAX_ITER = int(os.environ.get("MAX_ITERATIONS", "8"))
+FRONTEND_DIR = os.environ.get("FRONTEND_DIR", ".")
+BACKEND_DIR = os.environ.get("BACKEND_DIR", "backend")
 
 # Fallback model list — tries next if rate-limited
 MODELS = [
@@ -126,13 +128,15 @@ def write_files(files):
 
 def run_tests():
     errors = []
-    r = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True)
+    # Frontend: TypeScript check + build (runs from repo root where package.json is)
+    r = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, cwd=FRONTEND_DIR)
     if r.returncode != 0:
         errors.append(f"TypeScript:\n{r.stdout}\n{r.stderr}")
-    r = subprocess.run(["npm", "run", "build"], capture_output=True, text=True, timeout=300)
+    r = subprocess.run(["npm", "run", "build"], capture_output=True, text=True, timeout=300, cwd=FRONTEND_DIR)
     if r.returncode != 0:
         errors.append(f"Next.js build:\n{r.stdout[-3000:]}\n{r.stderr[-2000:]}")
-    for root, _, fnames in os.walk("backend"):
+    # Backend: Python syntax check
+    for root, _, fnames in os.walk(BACKEND_DIR):
         for fn in fnames:
             if fn.endswith(".py"):
                 p = os.path.join(root, fn)
