@@ -73,6 +73,14 @@ def call_ai(messages, attempt=0):
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
             data = json.loads(resp.read())
+            if "choices" not in data:
+                print(f"Unexpected response (no choices): {json.dumps(data)[:500]}")
+                # Treat as rate limit — try next model
+                if current_model_idx < len(MODELS) - 1:
+                    current_model_idx += 1
+                    print(f"Switching to {MODELS[current_model_idx]}...")
+                    return call_ai(messages, 0)
+                raise RuntimeError(f"No choices in response: {data}")
             return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as e:
         body = e.read().decode()
