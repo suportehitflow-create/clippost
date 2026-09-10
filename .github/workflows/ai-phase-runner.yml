@@ -33,7 +33,7 @@ jobs:
 
       - name: Run AI Phase Runner
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PHASE_FILE: ${{ github.event.inputs.phase_file }}
           MAX_ITERATIONS: ${{ github.event.inputs.max_iterations }}
         run: python3 .github/scripts/phase_runner.py

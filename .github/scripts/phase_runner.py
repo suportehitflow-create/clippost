@@ -2,7 +2,7 @@ import os, sys, json, subprocess, time, re
 import urllib.request, urllib.error
 
 PHASE_FILE = os.environ["PHASE_FILE"]
-API_KEY = os.environ["ANTHROPIC_API_KEY"]
+API_KEY = os.environ["OPENROUTER_API_KEY"]
 MAX_ITER = int(os.environ.get("MAX_ITERATIONS", "8"))
 
 with open(PHASE_FILE, "r", encoding="utf-8") as f:
@@ -24,19 +24,20 @@ SYSTEM = (
 
 
 def call_claude(messages, attempt=0):
+    msgs_with_system = [{"role": "system", "content": SYSTEM}] + messages
     payload = json.dumps({
-        "model": "claude-haiku-4-5-20251001",
+        "model": "google/gemini-2.0-flash-exp:free",
         "max_tokens": 8192,
-        "system": SYSTEM,
-        "messages": messages,
+        "messages": msgs_with_system,
     }).encode()
 
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
+        "https://openrouter.ai/api/v1/chat/completions",
         data=payload,
         headers={
-            "x-api-key": API_KEY,
-            "anthropic-version": "2023-06-01",
+            "Authorization": f"Bearer {API_KEY}",
+            "HTTP-Referer": "https://github.com/suportehitflow-create/clippost",
+            "X-Title": "ClipPost AI Phase Runner",
             "content-type": "application/json",
         },
         method="POST",
@@ -44,12 +45,13 @@ def call_claude(messages, attempt=0):
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read())["content"][0]["text"]
+            data = json.loads(resp.read())
+            return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as e:
         body = e.read().decode()
         code = e.code
         if code == 402:
-            print("::error::ANTHROPIC CREDITS EXHAUSTED (402). Add credits at console.anthropic.com and re-run.")
+            print("::error::OPENROUTER CREDITS EXHAUSTED (402).")
             sys.exit(2)
         if code == 429 or code >= 500:
             wait = min(10 * (2 ** attempt), 120)
