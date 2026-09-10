@@ -34,6 +34,7 @@ jobs:
       - name: Run AI Phase Runner
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           PHASE_FILE: ${{ github.event.inputs.phase_file }}
           MAX_ITERATIONS: ${{ github.event.inputs.max_iterations }}
         run: python3 .github/scripts/phase_runner.py
