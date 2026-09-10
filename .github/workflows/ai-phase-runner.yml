@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       phase_file:
-        description: "Arquivo da fase (ex: docs/fases/fase_03_correcao_youtube_e_score.md)"
+        description: "Phase file path (e.g. docs/fases/fase_03_emergencia_comunicacao.md)"
         required: true
-        default: "docs/fases/fase_03_correcao_youtube_e_score.md"
+        default: "docs/fases/fase_03_emergencia_comunicacao.md"
       max_iterations:
-        description: "Máximo de tentativas de autocorreção"
+        description: "Max autocorrection attempts"
         required: false
         default: "8"
 
@@ -16,7 +16,6 @@ jobs:
   run-phase:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
     steps:
       - uses: actions/checkout@v4
 
@@ -32,151 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Read phase file and .cursorrules
-        id: context
-        run: |
-          PHASE=$(cat "${{ github.event.inputs.phase_file }}")
-          RULES=$(cat .cursorrules)
-          echo "PHASE_CONTENT<<EOF" >> $GITHUB_OUTPUT
-          echo "$PHASE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "RULES_CONTENT<<EOF" >> $GITHUB_OUTPUT
-          echo "$RULES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: AI Phase Runner Loop
+      - name: Run AI Phase Runner
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          cat << 'PYEOF' > /tmp/runner.py
-          import os, sys, json, subprocess, time, re, textwrap
-
-          PHASE    = os.environ["PHASE_CONTENT"]
-          RULES    = os.environ["RULES_CONTENT"]
-          API_KEY  = os.environ["ANTHROPIC_API_KEY"]
-          MAX_ITER = int(os.environ.get("MAX_ITERATIONS", "8"))
-
-          import urllib.request, urllib.error
-
-          def call_claude(messages, attempt=0):
-              payload = json.dumps({
-                  "model": "claude-haiku-4-5-20251001",
-                  "max_tokens": 8192,
-                  "system": f"{RULES}\n\nVocê é um engenheiro sênior implementando fases do Clip Pro. Retorne APENAS blocos de código no formato:\nFILE: caminho/do/arquivo\n```linguagem\nconteúdo\n```\nNenhum texto fora dos blocos.",
-                  "messages": messages,
-              }).encode()
-
-              req = urllib.request.Request(
-                  "https://api.anthropic.com/v1/messages",
-                  data=payload,
-                  headers={
-                      "x-api-key": API_KEY,
-                      "anthropic-version": "2023-06-01",
-                      "content-type": "application/json",
-                  },
-                  method="POST",
-              )
-
-              try:
-                  with urllib.request.urlopen(req, timeout=120) as resp:
-                      return json.loads(resp.read())["content"][0]["text"]
-              except urllib.error.HTTPError as e:
-                  body = e.read().decode()
-                  code = e.code
-                  if code == 402:
-                      print("::error::CRÉDITOS ANTHROPIC ESGOTADOS (402). Adicione créditos em console.anthropic.com e re-execute o workflow.")
-                      sys.exit(2)
-                  if code == 429 or code >= 500:
-                      wait = min(10 * (2 ** attempt), 120)
-                      print(f"Rate limit / server error {code}. Aguardando {wait}s (exponential backoff)...")
-                      time.sleep(wait)
-                      if attempt < 6:
-                          return call_claude(messages, attempt + 1)
-                  print(f"Erro HTTP {code}: {body}")
-                  sys.exit(1)
-
-          def extract_files(text):
-              files = {}
-              pattern = re.compile(r'FILE:\s*(\S+)\n```[^\n]*\n(.*?)```', re.DOTALL)
-              for m in pattern.finditer(text):
-                  files[m.group(1)] = m.group(2)
-              return files
-
-          def write_files(files):
-              for path, content in files.items():
-                  os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
-                  with open(path, "w", encoding="utf-8") as f:
-                      f.write(content)
-                  print(f"  → escrito: {path}")
-
-          def run_tests():
-              errors = []
-              # TypeScript
-              r = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True)
-              if r.returncode != 0:
-                  errors.append(f"TypeScript:\n{r.stdout}\n{r.stderr}")
-              # Next.js build
-              r = subprocess.run(["npm", "run", "build"], capture_output=True, text=True, timeout=300)
-              if r.returncode != 0:
-                  errors.append(f"Next.js build:\n{r.stdout[-3000:]}\n{r.stderr[-2000:]}")
-              # Python syntax
-              for root, _, fnames in os.walk("backend"):
-                  for fn in fnames:
-                      if fn.endswith(".py"):
-                          p = os.path.join(root, fn)
-                          r = subprocess.run(["python", "-m", "py_compile", p], capture_output=True, text=True)
-                          if r.returncode != 0:
-                              errors.append(f"Python {p}:\n{r.stderr}")
-              return errors
-
-          # ── Main loop ──────────────────────────────────────────────────────────
-          messages = [{"role": "user", "content": f"Implemente a seguinte fase do Clip Pro:\n\n{PHASE}"}]
-
-          for iteration in range(1, MAX_ITER + 1):
-              print(f"\n{'='*60}\n  ITERAÇÃO {iteration}/{MAX_ITER}\n{'='*60}")
-
-              response = call_claude(messages)
-              files = extract_files(response)
-
-              if not files:
-                  print("⚠ Nenhum arquivo retornado pela IA. Pedindo novamente...")
-                  messages.append({"role": "assistant", "content": response})
-                  messages.append({"role": "user", "content": "Você não retornou nenhum bloco FILE:. Retorne APENAS os arquivos no formato especificado."})
-                  continue
-
-              print(f"Arquivos recebidos: {list(files.keys())}")
-              write_files(files)
-
-              errors = run_tests()
-              if not errors:
-                  print("\n✅ TODOS OS TESTES PASSARAM!")
-                  # Salvar lista de arquivos para o próximo step
-                  with open("/tmp/changed_files.txt", "w") as f:
-                      f.write("\n".join(files.keys()))
-                  sys.exit(0)
-
-              combined_errors = "\n\n".join(errors)
-              print(f"\n❌ Erros detectados:\n{combined_errors[:2000]}")
-              messages.append({"role": "assistant", "content": response})
-              messages.append({"role": "user", "content": f"Os testes falharam. Corrija APENAS os erros abaixo sem alterar o resto:\n\n{combined_errors}"})
-
-          print(f"\n💥 Limite de {MAX_ITER} iterações atingido sem sucesso.")
-          sys.exit(1)
-          PYEOF
-
-          export PHASE_CONTENT="${{ steps.context.outputs.PHASE_CONTENT }}"
-          export RULES_CONTENT="${{ steps.context.outputs.RULES_CONTENT }}"
-          export MAX_ITERATIONS="${{ github.event.inputs.max_iterations }}"
-          python /tmp/runner.py
+          PHASE_FILE: ${{ github.event.inputs.phase_file }}
+          MAX_ITERATIONS: ${{ github.event.inputs.max_iterations }}
+        run: python3 .github/scripts/phase_runner.py
 
       - name: Commit implemented phase
         run: |
           PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
-          git config user.name  "AI Phase Runner"
+          git config user.name "AI Phase Runner"
           git config user.email "bot@clippost.ai"
           git checkout -b "ai-phase/${PHASE_NAME}" 2>/dev/null || git checkout "ai-phase/${PHASE_NAME}"
           git add -A
-          git commit -m "ai: implement ${PHASE_NAME}" || echo "Nada para commitar"
+          git commit -m "ai: implement ${PHASE_NAME}" || echo "Nothing to commit"
           git push origin "ai-phase/${PHASE_NAME}" --force
 
       - name: Deploy Frontend (Vercel)
@@ -186,11 +55,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm i -g vercel
-          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1 | tee /tmp/vercel.log
-          if grep -q "Error" /tmp/vercel.log; then
-            echo "::error::Deploy Vercel falhou"
-            exit 1
-          fi
+          vercel --token "$VERCEL_TOKEN" --prod --yes
 
       - name: Deploy Backend (Fly.io)
         env:
@@ -200,11 +65,7 @@ jobs:
           export FLYCTL_INSTALL="/root/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
           cd backend
-          flyctl deploy --remote-only 2>&1 | tee /tmp/fly.log
-          if grep -qi "error\|failed" /tmp/fly.log; then
-            echo "::error::Deploy Fly.io falhou"
-            exit 1
-          fi
+          flyctl deploy --remote-only
 
       - name: Verify health endpoints
         run: |
@@ -212,31 +73,3 @@ jobs:
           VERCEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-silk.vercel.app)
           FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
           echo "Vercel: $VERCEL_STATUS | Fly.io: $FLY_STATUS"
-          if [ "$VERCEL_STATUS" != "200" ] || [ "$FLY_STATUS" != "200" ]; then
-            echo "::error::Health check falhou (Vercel=$VERCEL_STATUS Fly=$FLY_STATUS)"
-            exit 1
-          fi
-          echo "✅ Ambos os deployments respondendo 200!"
-
-      - name: Notify success
-        if: success()
-        run: |
-          PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
-          echo "🚀 FASE CONCLUÍDA: ${PHASE_NAME}"
-          echo "Frontend: https://clippost-silk.vercel.app"
-          echo "Backend:  https://clippost-backend.fly.dev"
-          # Slack webhook (opcional — configure SLACK_WEBHOOK_URL nos secrets)
-          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
-            curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"text\":\"✅ *Clip Pro — ${PHASE_NAME} deployada!*\nVercel + Fly.io respondendo 200.\nhttps://clippost-silk.vercel.app\"}"
-          fi
-
-      - name: Notify failure (credits exhausted)
-        if: failure()
-        run: |
-          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
-            curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"text\":\"⚠️ *AI Phase Runner falhou.* Verifique os logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
-          fi
