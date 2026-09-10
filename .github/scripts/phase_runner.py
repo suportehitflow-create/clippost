@@ -26,7 +26,7 @@ SYSTEM = (
 def call_claude(messages, attempt=0):
     msgs_with_system = [{"role": "system", "content": SYSTEM}] + messages
     payload = json.dumps({
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": "google/gemma-4-31b-it:free",
         "max_tokens": 8192,
         "messages": msgs_with_system,
     }).encode()
