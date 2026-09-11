@@ -1,0 +1,33 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Backend (Fly.io)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export FLYCTL_INSTALL="/root/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          cd backend
+          flyctl deploy --remote-only
+
+      - name: Verify health
+        run: |
+          sleep 30
+          FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
+          echo "Fly.io health: $FLY_STATUS"
+          [ "$FLY_STATUS" = "200" ] && echo "Backend OK" || echo "Backend not responding yet"
