@@ -28,12 +28,14 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npm i -g vercel@latest
-          echo "=== Vercel version ==="
-          vercel --version
-          echo "=== Listing projects ==="
-          vercel project ls --token "$VERCEL_TOKEN" 2>&1 || echo "project ls failed"
+          echo "=== Listing all projects ==="
+          vercel project ls --token "$VERCEL_TOKEN" 2>&1
+          echo "=== project.json after link ==="
+          cat .vercel/project.json 2>/dev/null || echo "no project.json yet"
           echo "=== Deploying ==="
-          vercel --token "$VERCEL_TOKEN" --prod --yes --debug 2>&1 | tail -50
+          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
+          echo "=== project.json after deploy ==="
+          cat .vercel/project.json 2>/dev/null || echo "no project.json"
 
   deploy-backend:
     runs-on: ubuntu-latest
