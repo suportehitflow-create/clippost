@@ -28,13 +28,15 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npm i -g vercel@latest
-          echo "=== Listing projects in personal scope ==="
-          vercel ls --scope suportehitflow-creates-projects --token "$VERCEL_TOKEN" 2>&1 || true
-          echo "=== Vercel whoami ==="
+          echo "=== Token scope info ==="
           vercel whoami --token "$VERCEL_TOKEN" 2>&1 || true
-          echo "=== Linking ==="
+          echo "=== All projects accessible ==="
+          vercel ls --token "$VERCEL_TOKEN" 2>&1 | head -30 || true
+          echo "=== Projects in personal scope ==="
+          vercel ls --scope suportehitflow-create --token "$VERCEL_TOKEN" 2>&1 | head -30 || true
+          echo "=== Try link without scope ==="
           rm -f .vercel/project.json
-          vercel link --yes --scope suportehitflow-creates-projects --project clippost-silk --token "$VERCEL_TOKEN" 2>&1 || true
+          vercel link --yes --project clippost-silk --token "$VERCEL_TOKEN" 2>&1 || true
           echo "=== project.json ==="
           cat .vercel/project.json 2>/dev/null || echo "no project.json"
           echo "=== Deploying ==="
