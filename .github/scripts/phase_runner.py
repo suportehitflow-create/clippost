@@ -28,7 +28,16 @@ if os.path.exists(".cursorrules"):
 
 SYSTEM = (
     RULES + "\n\n"
-    "You are a senior engineer implementing phases of a SaaS project. "
+    "You are a senior engineer implementing phases of a SaaS project.\n\n"
+    "CRITICAL — Repository structure (do NOT deviate):\n"
+    "- Frontend (Next.js 15, App Router): files live at ROOT level. src/ is at the repo root.\n"
+    "  Examples: src/app/page.tsx, src/components/JobForm.tsx, next.config.ts\n"
+    "  NEVER write paths like frontend/src/... — there is NO frontend/ subfolder.\n"
+    "- Backend (FastAPI): files live in backend/ subfolder.\n"
+    "  Examples: backend/main.py, backend/requirements.txt\n"
+    "- shadcn/ui components do NOT exist. Use plain Tailwind CSS only.\n"
+    "  Do NOT import from @/components/ui/button, @/components/ui/card, etc.\n"
+    "- Secrets: NEVER hardcode keys. Use process.env.NAME (frontend) or os.environ.get('NAME') (backend).\n\n"
     "Return ONLY code blocks in this format:\n"
     "FILE: path/to/file\n"
     "```language\ncontent\n```\n"
@@ -116,8 +125,16 @@ def extract_files(text):
     return files
 
 
+def normalize_path(path):
+    # AI sometimes writes frontend/src/... — remap to src/...
+    if path.startswith("frontend/"):
+        path = path[len("frontend/"):]
+        print(f"  [remap] frontend/ prefix removed -> {path}")
+    return path
+
 def write_files(files):
-    for path, content in files.items():
+    for raw_path, content in files.items():
+        path = normalize_path(raw_path)
         dir_ = os.path.dirname(path)
         if dir_:
             os.makedirs(dir_, exist_ok=True)
