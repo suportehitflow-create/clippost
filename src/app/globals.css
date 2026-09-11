@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 
+/* theme: orange v2 */
 :root {
   --background: #060608;
   --foreground: #f0f0ff;
