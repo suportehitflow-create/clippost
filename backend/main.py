@@ -249,8 +249,11 @@ async def health():
 
 @app.post("/api/process-url")
 async def process_url(req: ProcessRequest):
-    task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration)
-    return {"task_id": task.id, "status": "processing"}
+    try:
+        task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration)
+        return {"task_id": task.id, "status": "processing"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Worker unavailable: {str(e)}")
 
 
 @app.post("/api/process-bulk")
@@ -278,8 +281,11 @@ async def instagram_list(req: InstagramListRequest):
 @app.post("/api/jobs")
 async def create_job(req: ProcessRequest):
     """Alias de /api/process-url para compatibilidade."""
-    task = process_youtube_video.delay(req.url, req.user_id)
-    return {"task_id": task.id, "status": "processing"}
+    try:
+        task = process_youtube_video.delay(req.url, req.user_id)
+        return {"task_id": task.id, "status": "processing"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Worker unavailable: {str(e)}")
 
 
 @app.get("/api/projects/{user_id}")
