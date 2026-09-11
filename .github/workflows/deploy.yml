@@ -28,54 +28,6 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npm i -g vercel@latest
-
-          # Find project that serves clippost-silk.vercel.app via Vercel API
-          echo "=== Searching all accessible Vercel projects ==="
-          PROJECTS=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects?limit=50" 2>&1)
-          echo "$PROJECTS" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          for p in d.get('projects', []):
-              aliases = [a.get('domain','') for a in p.get('alias', [])]
-              print(p['id'], p['name'], aliases)
-          " 2>&1 || echo "parse failed: $PROJECTS"
-
-          # Try to find the silk project specifically
-          SILK_ID=$(echo "$PROJECTS" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          for p in d.get('projects', []):
-              aliases = [a.get('domain','') for a in p.get('alias', [])]
-              if any('silk' in a for a in aliases) or 'silk' in p.get('name',''):
-                  print(p['id'])
-                  break
-          " 2>/dev/null)
-          SILK_ORG=$(echo "$PROJECTS" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          print(d.get('pagination',{}).get('count','?'))
-          " 2>/dev/null)
-
-          echo "Silk project ID: $SILK_ID"
-          rm -f .vercel/project.json
-
-          # If found, use it; otherwise link to clippost-silk scope
-          if [ -n "$SILK_ID" ]; then
-            # Get orgId from API
-            ORG=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v9/projects/$SILK_ID" | \
-              python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('accountId',''))")
-            mkdir -p .vercel
-            echo "{\"orgId\":\"$ORG\",\"projectId\":\"$SILK_ID\"}" > .vercel/project.json
-          else
-            vercel link --yes --project clippost-silk --token "$VERCEL_TOKEN" 2>&1 || true
-          fi
-
-          echo "=== project.json ==="
-          cat .vercel/project.json 2>/dev/null || echo "no project.json"
-
-          echo "=== Deploying ==="
           vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
 
   deploy-backend:
