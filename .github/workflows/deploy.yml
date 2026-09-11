@@ -30,9 +30,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm i -g vercel
-          rm -rf .vercel
-          vercel link --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" --project "$VERCEL_PROJECT_ID" 2>/dev/null || true
-          vercel --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" --prod --yes
+          mkdir -p .vercel
+          echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+          vercel --token "$VERCEL_TOKEN" --prod --yes
 
   deploy-backend:
     runs-on: ubuntu-latest
