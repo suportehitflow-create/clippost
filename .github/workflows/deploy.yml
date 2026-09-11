@@ -26,19 +26,12 @@ jobs:
       - name: Deploy Frontend (Vercel)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm i -g vercel@latest
           rm -f .vercel/project.json
-          if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
-            mkdir -p .vercel
-            echo "{\"orgId\":\"$VERCEL_ORG_ID\",\"projectId\":\"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
-          else
-            vercel link --yes --scope suportehitflow-creates-projects --token "$VERCEL_TOKEN" 2>&1 || true
-          fi
-          cat .vercel/project.json 2>/dev/null || echo "no project.json"
-          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
+          vercel link --yes --scope suportehitflow-creates-projects --token "$VERCEL_TOKEN"
+          cat .vercel/project.json
+          vercel --token "$VERCEL_TOKEN" --prod --yes
 
   deploy-backend:
     runs-on: ubuntu-latest
