@@ -8,9 +8,9 @@
   --card-border: rgba(255,255,255,0.08);
   --card-blur: blur(20px);
   --muted: #6b7280;
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-glow: rgba(124, 58, 237, 0.25);
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+  --accent-glow: rgba(234, 88, 12, 0.25);
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -41,9 +41,9 @@ h1, h2, h3 {
 }
 
 .glass-accent {
-  background: rgba(124,58,237,0.12);
+  background: rgba(234,88,12,0.12);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(124,58,237,0.25);
+  border: 1px solid rgba(234,88,12,0.25);
 }
 
 ::selection { background: var(--accent-glow); }

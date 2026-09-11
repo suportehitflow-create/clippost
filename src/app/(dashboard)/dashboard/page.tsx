@@ -182,7 +182,7 @@ export default function Dashboard() {
                 const pct = Math.max(8, (d.clips / max) * 100)
                 return (
                   <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                    <div style={{ width: '100%', height: `${pct}%`, background: '#7c3aed', borderRadius: '3px 3px 0 0', minHeight: 4 }} title={`${d.clips} clipes`} />
+                    <div style={{ width: '100%', height: `${pct}%`, background: '#ea580c', borderRadius: '3px 3px 0 0', minHeight: 4 }} title={`${d.clips} clipes`} />
                     <span style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>{d.date.slice(5)}</span>
                   </div>
                 )
