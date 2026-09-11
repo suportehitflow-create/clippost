@@ -28,19 +28,23 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           npm i -g vercel@latest
-          echo "=== Token scope info ==="
-          vercel whoami --token "$VERCEL_TOKEN" 2>&1 || true
-          echo "=== All projects accessible ==="
-          vercel ls --token "$VERCEL_TOKEN" 2>&1 | head -30 || true
-          echo "=== Projects in personal scope ==="
-          vercel ls --scope suportehitflow-create --token "$VERCEL_TOKEN" 2>&1 | head -30 || true
-          echo "=== Try link without scope ==="
+          WHOAMI=$(vercel whoami --token "$VERCEL_TOKEN" 2>&1 || echo "whoami failed")
+          ALL_PROJECTS=$(vercel ls --token "$VERCEL_TOKEN" 2>&1 | head -40 || echo "ls failed")
           rm -f .vercel/project.json
           vercel link --yes --project clippost-silk --token "$VERCEL_TOKEN" 2>&1 || true
-          echo "=== project.json ==="
-          cat .vercel/project.json 2>/dev/null || echo "no project.json"
-          echo "=== Deploying ==="
-          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
+          PROJECT_JSON=$(cat .vercel/project.json 2>/dev/null || echo "no project.json")
+          DEPLOY_OUT=$(vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1 || echo "deploy failed")
+          echo "## Vercel Debug" >> $GITHUB_STEP_SUMMARY
+          echo "**whoami:** $WHOAMI" >> $GITHUB_STEP_SUMMARY
+          echo "**projects:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$ALL_PROJECTS" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "**project.json:** $PROJECT_JSON" >> $GITHUB_STEP_SUMMARY
+          echo "**deploy output:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$DEPLOY_OUT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
   deploy-backend:
     runs-on: ubuntu-latest
