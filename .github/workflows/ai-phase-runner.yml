@@ -4,13 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       phase_file:
-        description: "Phase file path (e.g. docs/fases/fase_03b_resgate_completo.md)"
+        description: "Arquivo da fase (ex: fase_06_monetizacao.md)"
         required: true
-        default: "docs/fases/fase_03b_resgate_completo.md"
-      max_iterations:
-        description: "Max autocorrection attempts"
-        required: false
-        default: "6"
+        default: "fase_06_monetizacao.md"
 
 permissions:
   contents: write
@@ -19,96 +15,173 @@ jobs:
   run-phase:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      MAX_ATTEMPTS: "5"
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
+      - name: Install dependencies
+        run: npm ci
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Install AI runner deps
+        run: pip install anthropic
 
-      - name: Install backend dependencies
+      - name: Run AI Phase Loop
+        id: ai_loop
         run: |
-          cd backend
-          pip install -r requirements.txt
+          python - <<'PYEOF'
+          import os, json, subprocess, time, sys
 
-      - name: Run AI Phase Runner
+          PHASE_FILE = os.environ.get("INPUT_PHASE_FILE", "${{ github.event.inputs.phase_file }}")
+          MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
+          API_KEY = os.environ["ANTHROPIC_API_KEY"]
+
+          import anthropic
+          client = anthropic.Anthropic(api_key=API_KEY)
+
+          # Read phase instructions
+          phase_path = f"docs/fases/{PHASE_FILE}"
+          with open(phase_path, "r") as f:
+              phase_content = f.read()
+
+          print(f"=== AI Phase Runner: {PHASE_FILE} ===")
+          print(f"Phase instructions loaded ({len(phase_content)} chars)")
+
+          cursorrules = ""
+          if os.path.exists(".cursorrules"):
+              with open(".cursorrules") as f:
+                  cursorrules = f.read()
+
+          system_prompt = f"""Você é um engenheiro de software sênior trabalhando no projeto Clip Pro.
+
+REGRAS ABSOLUTAS (nunca viole):
+{cursorrules}
+
+Sua tarefa: implementar exatamente o que está descrito no arquivo de fase.
+Retorne APENAS código funcional nos arquivos corretos.
+Formato de resposta: para cada arquivo, use blocos ```filepath:caminho/do/arquivo``` seguido do código completo.
+NÃO explique, NÃO use markdown além dos blocos de código, NÃO invente funcionalidades extras."""
+
+          error_context = ""
+          attempt = 0
+
+          while attempt < MAX_ATTEMPTS:
+              attempt += 1
+              print(f"\n--- Tentativa {attempt}/{MAX_ATTEMPTS} ---")
+
+              # Build prompt
+              if error_context:
+                  user_msg = f"A implementação anterior quebrou com este erro:\n\n{error_context}\n\nCorrijae implemente novamente:\n\n{phase_content}"
+              else:
+                  user_msg = f"Implemente a seguinte fase:\n\n{phase_content}"
+
+              # Call Claude with exponential backoff
+              backoff = 10
+              for api_try in range(3):
+                  try:
+                      response = client.messages.create(
+                          model="claude-sonnet-4-6",
+                          max_tokens=8096,
+                          system=system_prompt,
+                          messages=[{"role": "user", "content": user_msg}]
+                      )
+                      break
+                  except anthropic.RateLimitError:
+                      print(f"Rate limit hit, waiting {backoff}s...")
+                      time.sleep(backoff)
+                      backoff *= 2
+                  except anthropic.BadRequestError as e:
+                      if "402" in str(e) or "credit" in str(e).lower():
+                          print("ERRO: Créditos da API zerados! Pausando pipeline.")
+                          sys.exit(1)
+                      raise
+
+              ai_code = response.content[0].text
+              print(f"AI response received ({len(ai_code)} chars)")
+
+              # Parse and write files
+              import re
+              file_blocks = re.findall(r'```filepath:(.+?)\n(.*?)```', ai_code, re.DOTALL)
+
+              if not file_blocks:
+                  # Try alternative format
+                  file_blocks = re.findall(r'```[\w./-]*\n#\s*file:\s*(.+?)\n(.*?)```', ai_code, re.DOTALL)
+
+              if file_blocks:
+                  for filepath, code in file_blocks:
+                      filepath = filepath.strip()
+                      os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
+                      with open(filepath, "w") as f:
+                          f.write(code.strip())
+                      print(f"  Written: {filepath}")
+              else:
+                  print("  No file blocks found in response, saving raw output for review")
+                  with open(f"docs/fases/output_{PHASE_FILE}", "w") as f:
+                      f.write(ai_code)
+
+              # Test frontend build
+              print("\nTesting frontend build (Vercel)...")
+              build_result = subprocess.run(
+                  ["npm", "run", "build"],
+                  capture_output=True, text=True, timeout=300
+              )
+
+              if build_result.returncode == 0:
+                  print("Frontend build: GREEN")
+                  # Test backend
+                  print("Testing backend (Fly.io)...")
+                  backend_result = subprocess.run(
+                      ["python", "-c", "import sys; sys.path.insert(0, 'backend'); import main; print('Backend OK')"],
+                      capture_output=True, text=True, timeout=60,
+                      cwd="."
+                  )
+                  if backend_result.returncode == 0:
+                      print("Backend check: GREEN")
+                      print(f"\n=== LOOP GREEN on attempt {attempt} ===")
+                      sys.exit(0)
+                  else:
+                      error_context = f"Backend error:\n{backend_result.stderr}\n{backend_result.stdout}"
+                      print(f"Backend check: RED\n{error_context}")
+              else:
+                  error_context = f"Frontend build error:\n{build_result.stderr}\n{build_result.stdout}"
+                  print(f"Frontend build: RED")
+                  print(error_context[:2000])
+
+              if attempt < MAX_ATTEMPTS:
+                  print(f"Retrying in 5s...")
+                  time.sleep(5)
+
+          print(f"\n=== FAILED after {MAX_ATTEMPTS} attempts ===")
+          sys.exit(1)
+          PYEOF
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          PHASE_FILE: ${{ github.event.inputs.phase_file }}
-          MAX_ITERATIONS: ${{ github.event.inputs.max_iterations }}
-          FRONTEND_DIR: "."
-          BACKEND_DIR: "backend"
-        run: python3 .github/scripts/phase_runner.py
+          INPUT_PHASE_FILE: ${{ github.event.inputs.phase_file }}
 
-      - name: Commit implemented phase
+      - name: Deploy Frontend if Green
+        if: success()
         run: |
-          PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
-          git config user.name "AI Phase Runner"
-          git config user.email "bot@clippost.ai"
-          BRANCH="ai-phase/${PHASE_NAME}"
-          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
-          git add -A
-          git diff --cached --quiet || git commit -m "ai: implement ${PHASE_NAME}"
-          git push origin "$BRANCH" --force
+          npm i -g vercel@latest
+          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
 
-      - name: Deploy Frontend (Vercel)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          npm i -g vercel
-          vercel --token "$VERCEL_TOKEN" --prod --yes
-
-      - name: Deploy Backend (Fly.io)
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Deploy Backend if Green
+        if: success()
         run: |
           curl -L https://fly.io/install.sh | sh
           export PATH="$HOME/.fly/bin:$PATH"
           cd backend
           flyctl deploy --remote-only
-
-      - name: Verify health endpoints
-        run: |
-          sleep 20
-          VERCEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-silk.vercel.app)
-          FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
-          echo "Vercel: $VERCEL_STATUS | Fly.io: $FLY_STATUS"
-          if [ "$VERCEL_STATUS" = "200" ] && [ "$FLY_STATUS" = "200" ]; then
-            echo "BOTH_OK=true" >> $GITHUB_ENV
-          fi
-
-      - name: Notify success
-        if: success()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          PHASE_NAME=$(basename "${{ github.event.inputs.phase_file }}" .md)
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -s -X POST "$SLACK_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              -d "{\"text\":\":white_check_mark: *ClipPost — ${PHASE_NAME} deployada!*\nVercel + Fly.io respondendo 200.\nhttps://clippost-silk.vercel.app\"}"
-          fi
-
-      - name: Notify failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -s -X POST "$SLACK_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              -d "{\"text\":\":x: *AI Phase Runner falhou.*\nLogs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
-          fi

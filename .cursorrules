@@ -1,9 +1,11 @@
-# ARQUITETURA E REGRAS ABSOLUTAS DO CLIP PRO
+# Regras Absolutas do Clip Pro
 
-**Regras Absolutas do Clip Pro:**
+Frontend: Next.js 15 (App Router), Tailwind, shadcn/ui. Hospedado na Vercel.
 
-* **Frontend:** Next.js 15 (App Router), Tailwind, shadcn/ui. Hospedado na Vercel.
-* **Backend:** Python FastAPI, Celery, Redis. Hospedado no Fly.io.
-* **Processamento:** FFmpeg, yt-dlp, faster-whisper local (Proibido sugerir OpenAI API).
-* **Banco e Auth:** Supabase (PostgreSQL, Storage, Auth).
-* **Segurança:** NUNCA exponha senhas, tokens ou chaves no código. Use sempre variáveis de ambiente (os.environ.get).
+Backend: Python FastAPI, Celery, Redis. Hospedado no Fly.io.
+
+Processamento: FFmpeg, yt-dlp, faster-whisper local (É expressamente PROIBIDO sugerir a API da OpenAI).
+
+Banco e Auth: Supabase (PostgreSQL, Storage, Auth).
+
+Segurança Absoluta: NUNCA exponha senhas, tokens ou chaves no código. Use estritamente variáveis de ambiente (ex: os.environ.get('SUPABASE_KEY')).
