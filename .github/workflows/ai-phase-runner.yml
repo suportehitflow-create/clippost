@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      EXPLABS_API_KEY: ${{ secrets.EXPLABS_API_KEY }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -39,7 +39,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install AI runner deps
-        run: pip install anthropic
+        run: pip install openai
 
       - name: Run AI Phase Loop
         id: ai_loop

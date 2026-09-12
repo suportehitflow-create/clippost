@@ -1,5 +1,4 @@
 import os
-import json
 import subprocess
 import time
 import sys
@@ -7,10 +6,13 @@ import re
 
 PHASE_FILE = os.environ.get("INPUT_PHASE_FILE", "fase_06_monetizacao.md")
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
-API_KEY = os.environ["ANTHROPIC_API_KEY"]
+API_KEY = os.environ["EXPLABS_API_KEY"]
+BASE_URL = "https://api.experientiallabs.ai/v1"
+MODEL = "claude-sonnet-5"
 
-import anthropic
-client = anthropic.Anthropic(api_key=API_KEY)
+from openai import OpenAI, RateLimitError, APIStatusError
+
+client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 phase_path = f"docs/fases/{PHASE_FILE}"
 with open(phase_path, "r") as f:
@@ -47,26 +49,33 @@ while attempt < MAX_ATTEMPTS:
         user_msg = f"Implemente a seguinte fase:\n\n{phase_content}"
 
     backoff = 10
+    response = None
     for api_try in range(3):
         try:
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
+            response = client.chat.completions.create(
+                model=MODEL,
                 max_tokens=8096,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_msg}]
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_msg}
+                ]
             )
             break
-        except anthropic.RateLimitError:
+        except RateLimitError:
             print(f"Rate limit hit, waiting {backoff}s...")
             time.sleep(backoff)
             backoff *= 2
-        except anthropic.BadRequestError as e:
-            if "402" in str(e) or "credit" in str(e).lower():
+        except APIStatusError as e:
+            if e.status_code in (402, 429) or "credit" in str(e).lower():
                 print("ERRO: Créditos da API zerados! Pausando pipeline.")
                 sys.exit(1)
             raise
 
-    ai_code = response.content[0].text
+    if response is None:
+        print("Falha na API após 3 tentativas.")
+        sys.exit(1)
+
+    ai_code = response.choices[0].message.content
     print(f"AI response received ({len(ai_code)} chars)")
 
     file_blocks = re.findall(r'```filepath:(.+?)\n(.*?)```', ai_code, re.DOTALL)
@@ -84,7 +93,7 @@ while attempt < MAX_ATTEMPTS:
                 f.write(code.strip())
             print(f"  Written: {filepath}")
     else:
-        print("  No file blocks found in response, saving raw output for review")
+        print("  No file blocks found, saving raw output for review")
         with open(f"docs/fases/output_{PHASE_FILE}", "w") as f:
             f.write(ai_code)
 
@@ -99,8 +108,7 @@ while attempt < MAX_ATTEMPTS:
         print("Testing backend (Fly.io)...")
         backend_result = subprocess.run(
             ["python", "-c", "import sys; sys.path.insert(0, 'backend'); import main; print('Backend OK')"],
-            capture_output=True, text=True, timeout=60,
-            cwd="."
+            capture_output=True, text=True, timeout=60
         )
         if backend_result.returncode == 0:
             print("Backend check: GREEN")
