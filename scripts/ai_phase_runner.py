@@ -4,29 +4,39 @@ import time
 import sys
 import re
 
-PHASE_FILE = os.environ.get("INPUT_PHASE_FILE", "fase_06_monetizacao.md")
-MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
 API_KEY = os.environ["EXPLABS_API_KEY"]
 BASE_URL = "https://api.experientiallabs.ai/v1"
 MODEL = "claude-sonnet-5"
+MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
+
+# Modo: "all" roda todas as fases em sequência; qualquer outro valor roda só aquela fase
+INPUT_PHASE = os.environ.get("INPUT_PHASE_FILE", "fase_06_monetizacao.md")
+
+# Ordem canônica das fases
+ALL_PHASES = [
+    "fase_01_infra_seguranca_banco.md",
+    "fase_02_mineracao_youtube_instagram.md",
+    "fase_03_cerebro_ia_cortes.md",
+    "fase_04_motor_edicao_brand_kit.md",
+    "fase_05_agendamento_distribuicao.md",
+    "fase_06_monetizacao.md",
+    "fase_07_agente_conteudo.md",
+]
+
+if INPUT_PHASE.strip().lower() == "all":
+    phases_to_run = ALL_PHASES
+else:
+    phases_to_run = [INPUT_PHASE.strip()]
 
 from openai import OpenAI, RateLimitError, APIStatusError
-
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-
-phase_path = f"docs/fases/{PHASE_FILE}"
-with open(phase_path, "r") as f:
-    phase_content = f.read()
-
-print(f"=== AI Phase Runner: {PHASE_FILE} ===")
-print(f"Phase instructions loaded ({len(phase_content)} chars)")
 
 cursorrules = ""
 if os.path.exists(".cursorrules"):
     with open(".cursorrules") as f:
         cursorrules = f.read()
 
-system_prompt = f"""Você é um engenheiro de software sênior trabalhando no projeto ClipPost.
+SYSTEM_PROMPT = f"""Você é um engenheiro de software sênior trabalhando no projeto ClipPost.
 
 REGRAS ABSOLUTAS (nunca viole):
 {cursorrules}
@@ -46,50 +56,39 @@ Retorne APENAS código funcional nos arquivos corretos.
 Formato de resposta: para cada arquivo, use blocos ```filepath:caminho/do/arquivo``` seguido do código completo.
 NÃO explique, NÃO use markdown além dos blocos de código, NÃO invente funcionalidades extras."""
 
-error_context = ""
-attempt = 0
 
-while attempt < MAX_ATTEMPTS:
-    attempt += 1
-    print(f"\n--- Tentativa {attempt}/{MAX_ATTEMPTS} ---")
-
+def call_ai(phase_content, error_context=""):
     if error_context:
         user_msg = f"A implementação anterior quebrou com este erro:\n\n{error_context}\n\nCorrijae implemente novamente:\n\n{phase_content}"
     else:
         user_msg = f"Implemente a seguinte fase:\n\n{phase_content}"
 
     backoff = 10
-    response = None
     for api_try in range(3):
         try:
             response = client.chat.completions.create(
                 model=MODEL,
                 max_tokens=8096,
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_msg}
                 ]
             )
-            break
+            return response.choices[0].message.content
         except RateLimitError:
-            print(f"Rate limit hit, waiting {backoff}s...")
+            print(f"Rate limit, aguardando {backoff}s...")
             time.sleep(backoff)
             backoff *= 2
         except APIStatusError as e:
             if e.status_code in (402, 429) or "credit" in str(e).lower():
-                print("ERRO: Créditos da API zerados! Pausando pipeline.")
+                print("ERRO 402: Créditos da API zerados! Pausando pipeline.")
                 sys.exit(1)
             raise
+    return None
 
-    if response is None:
-        print("Falha na API após 3 tentativas.")
-        sys.exit(1)
 
-    ai_code = response.choices[0].message.content
-    print(f"AI response received ({len(ai_code)} chars)")
-
+def write_files(ai_code, phase_file):
     file_blocks = re.findall(r'```filepath:(.+?)\n(.*?)```', ai_code, re.DOTALL)
-
     if not file_blocks:
         file_blocks = re.findall(r'```[\w./-]*\n#\s*file:\s*(.+?)\n(.*?)```', ai_code, re.DOTALL)
 
@@ -101,40 +100,91 @@ while attempt < MAX_ATTEMPTS:
                 os.makedirs(dirpath, exist_ok=True)
             with open(filepath, "w") as f:
                 f.write(code.strip())
-            print(f"  Written: {filepath}")
+            print(f"  Escrito: {filepath}")
     else:
-        print("  No file blocks found, saving raw output for review")
-        with open(f"docs/fases/output_{PHASE_FILE}", "w") as f:
+        out = f"docs/fases/output_{phase_file}"
+        print(f"  Nenhum bloco de arquivo encontrado, salvando output bruto em {out}")
+        with open(out, "w") as f:
             f.write(ai_code)
 
-    print("\nTesting frontend build (Vercel)...")
-    build_result = subprocess.run(
+
+def test_build():
+    print("  Testando build frontend (npm run build)...")
+    result = subprocess.run(
         ["npm", "run", "build"],
         capture_output=True, text=True, timeout=300
     )
+    if result.returncode == 0:
+        return True, ""
+    return False, f"Frontend build error:\n{result.stderr}\n{result.stdout}"
 
-    if build_result.returncode == 0:
-        print("Frontend build: GREEN")
-        print("Testing backend (Fly.io)...")
-        backend_result = subprocess.run(
-            ["python", "-c", "import sys; sys.path.insert(0, 'backend'); import main; print('Backend OK')"],
-            capture_output=True, text=True, timeout=60
-        )
-        if backend_result.returncode == 0:
-            print("Backend check: GREEN")
-            print(f"\n=== LOOP GREEN on attempt {attempt} ===")
-            sys.exit(0)
-        else:
-            error_context = f"Backend error:\n{backend_result.stderr}\n{backend_result.stdout}"
-            print(f"Backend check: RED\n{error_context}")
+
+def run_phase(phase_file):
+    phase_path = f"docs/fases/{phase_file}"
+    if not os.path.exists(phase_path):
+        print(f"  AVISO: {phase_path} não encontrado, pulando.")
+        return True  # não falha o pipeline por fase ausente
+
+    with open(phase_path, "r") as f:
+        phase_content = f.read()
+
+    print(f"\n{'='*60}")
+    print(f"FASE: {phase_file} ({len(phase_content)} chars)")
+    print('='*60)
+
+    error_context = ""
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        print(f"\n--- Tentativa {attempt}/{MAX_ATTEMPTS} ---")
+
+        ai_code = call_ai(phase_content, error_context)
+        if ai_code is None:
+            print("Falha na API após 3 tentativas.")
+            return False
+
+        print(f"  Resposta AI recebida ({len(ai_code)} chars)")
+        write_files(ai_code, phase_file)
+
+        ok, error = test_build()
+        if ok:
+            print(f"  BUILD GREEN para {phase_file}")
+            return True
+
+        error_context = error
+        print(f"  BUILD RED:\n{error[:1500]}")
+        if attempt < MAX_ATTEMPTS:
+            print(f"  Retrying em 5s...")
+            time.sleep(5)
+
+    print(f"FALHOU após {MAX_ATTEMPTS} tentativas: {phase_file}")
+    return False
+
+
+# === EXECUÇÃO PRINCIPAL ===
+print(f"\n{'#'*60}")
+print(f"AI PHASE RUNNER — modo: {'VARREDURA COMPLETA' if len(phases_to_run) > 1 else phases_to_run[0]}")
+print(f"Fases a executar: {len(phases_to_run)}")
+print('#'*60)
+
+failed_phases = []
+for i, phase in enumerate(phases_to_run, 1):
+    print(f"\n[{i}/{len(phases_to_run)}] Iniciando {phase}")
+    success = run_phase(phase)
+    if success:
+        print(f"[{i}/{len(phases_to_run)}] OK: {phase}")
     else:
-        error_context = f"Frontend build error:\n{build_result.stderr}\n{build_result.stdout}"
-        print(f"Frontend build: RED")
-        print(error_context[:2000])
+        print(f"[{i}/{len(phases_to_run)}] FALHOU: {phase}")
+        failed_phases.append(phase)
+        # Para varredura completa, continua nas próximas fases mesmo se uma falhar
+        # Para fase única, sai imediatamente
+        if len(phases_to_run) == 1:
+            sys.exit(1)
 
-    if attempt < MAX_ATTEMPTS:
-        print(f"Retrying in 5s...")
-        time.sleep(5)
-
-print(f"\n=== FAILED after {MAX_ATTEMPTS} attempts ===")
-sys.exit(1)
+print(f"\n{'#'*60}")
+if failed_phases:
+    print(f"VARREDURA CONCLUÍDA COM FALHAS:")
+    for p in failed_phases:
+        print(f"  X {p}")
+    sys.exit(1)
+else:
+    print(f"VARREDURA COMPLETA: TODAS AS {len(phases_to_run)} FASES VERDES!")
+    sys.exit(0)

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       phase_file:
-        description: "Arquivo da fase (ex: fase_06_monetizacao.md)"
+        description: "Arquivo da fase (ex: fase_06_monetizacao.md) ou 'all' para varredura completa"
         required: true
-        default: "fase_06_monetizacao.md"
+        default: "all"
 
 permissions:
   contents: write
