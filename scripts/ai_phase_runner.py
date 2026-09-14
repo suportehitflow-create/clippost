@@ -26,10 +26,20 @@ if os.path.exists(".cursorrules"):
     with open(".cursorrules") as f:
         cursorrules = f.read()
 
-system_prompt = f"""Você é um engenheiro de software sênior trabalhando no projeto Clip Pro.
+system_prompt = f"""Você é um engenheiro de software sênior trabalhando no projeto ClipPost.
 
 REGRAS ABSOLUTAS (nunca viole):
 {cursorrules}
+
+ESTRUTURA DO PROJETO (OBRIGATÓRIO):
+- Frontend Next.js 15 App Router: arquivos em src/app/ (NÃO em frontend/app/ ou app/)
+- Backend FastAPI: arquivos em backend/
+- Componentes React: src/components/
+- Utilitários: src/lib/
+- NUNCA importe de @/components/ui/* (shadcn/ui não está instalado)
+- NUNCA importe de bibliotecas não listadas no package.json
+- Use apenas Tailwind CSS para estilos, sem CSS Modules
+- Implemente componentes inline quando precisar de Button, Card etc.
 
 Sua tarefa: implementar exatamente o que está descrito no arquivo de fase.
 Retorne APENAS código funcional nos arquivos corretos.
