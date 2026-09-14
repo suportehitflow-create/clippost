@@ -50,6 +50,8 @@ ESTRUTURA DO PROJETO (OBRIGATÓRIO):
 - NUNCA importe de bibliotecas não listadas no package.json
 - Use apenas Tailwind CSS para estilos, sem CSS Modules
 - Implemente componentes inline quando precisar de Button, Card etc.
+- NUNCA crie arquivo src/middleware.ts (convenção depreciada no Next.js 15; use src/proxy.ts se necessário)
+- Em arquivos CSS, coloque @import sempre como PRIMEIRA linha antes de qualquer outra regra
 
 Sua tarefa: implementar exatamente o que está descrito no arquivo de fase.
 Retorne APENAS código funcional nos arquivos corretos.
@@ -63,8 +65,8 @@ def call_ai(phase_content, error_context=""):
     else:
         user_msg = f"Implemente a seguinte fase:\n\n{phase_content}"
 
-    backoff = 10
-    for api_try in range(3):
+    backoff = 30
+    for api_try in range(5):
         try:
             response = client.chat.completions.create(
                 model=MODEL,
@@ -78,11 +80,16 @@ def call_ai(phase_content, error_context=""):
         except RateLimitError:
             print(f"Rate limit, aguardando {backoff}s...")
             time.sleep(backoff)
-            backoff *= 2
+            backoff = min(backoff * 2, 180)
         except APIStatusError as e:
-            if e.status_code in (402, 429) or "credit" in str(e).lower():
+            if e.status_code == 402 or "credit" in str(e).lower():
                 print("ERRO 402: Créditos da API zerados! Pausando pipeline.")
                 sys.exit(1)
+            if e.status_code == 429:
+                print(f"429 Too Many Requests, aguardando {backoff}s...")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 180)
+                continue
             raise
     return None
 
@@ -152,8 +159,8 @@ def run_phase(phase_file):
         error_context = error
         print(f"  BUILD RED:\n{error[:1500]}")
         if attempt < MAX_ATTEMPTS:
-            print(f"  Retrying em 5s...")
-            time.sleep(5)
+            print(f"  Retrying em 30s...")
+            time.sleep(30)
 
     print(f"FALHOU após {MAX_ATTEMPTS} tentativas: {phase_file}")
     return False
@@ -174,10 +181,13 @@ for i, phase in enumerate(phases_to_run, 1):
     else:
         print(f"[{i}/{len(phases_to_run)}] FALHOU: {phase}")
         failed_phases.append(phase)
-        # Para varredura completa, continua nas próximas fases mesmo se uma falhar
-        # Para fase única, sai imediatamente
         if len(phases_to_run) == 1:
             sys.exit(1)
+
+    # Pausa entre fases para evitar rate limit da API
+    if i < len(phases_to_run):
+        print(f"  Aguardando 60s antes da próxima fase (evitar rate limit)...")
+        time.sleep(60)
 
 print(f"\n{'#'*60}")
 if failed_phases:
