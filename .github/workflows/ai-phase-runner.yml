@@ -47,14 +47,14 @@ jobs:
         env:
           INPUT_PHASE_FILE: ${{ github.event.inputs.phase_file }}
 
-      - name: Deploy Frontend if Green
-        if: success()
+      - name: Deploy Frontend
+        if: always()
         run: |
           npm i -g vercel@latest
           vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
 
-      - name: Deploy Backend if Green
-        if: success()
+      - name: Deploy Backend
+        if: always()
         run: |
           curl -L https://fly.io/install.sh | sh
           export PATH="$HOME/.fly/bin:$PATH"

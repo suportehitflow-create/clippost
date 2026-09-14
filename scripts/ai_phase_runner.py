@@ -65,9 +65,10 @@ def call_ai(phase_content, error_context=""):
     else:
         user_msg = f"Implemente a seguinte fase:\n\n{phase_content}"
 
-    backoff = 30
+    backoff = 60
     for api_try in range(5):
         try:
+            print(f"  API call tentativa {api_try+1}/5...")
             response = client.chat.completions.create(
                 model=MODEL,
                 max_tokens=8096,
@@ -77,20 +78,25 @@ def call_ai(phase_content, error_context=""):
                 ]
             )
             return response.choices[0].message.content
-        except RateLimitError:
-            print(f"Rate limit, aguardando {backoff}s...")
+        except RateLimitError as e:
+            print(f"  RateLimitError: {e} — aguardando {backoff}s...")
             time.sleep(backoff)
-            backoff = min(backoff * 2, 180)
+            backoff = min(backoff * 2, 300)
         except APIStatusError as e:
+            print(f"  APIStatusError {e.status_code}: {e}")
             if e.status_code == 402 or "credit" in str(e).lower():
                 print("ERRO 402: Créditos da API zerados! Pausando pipeline.")
                 sys.exit(1)
-            if e.status_code == 429:
-                print(f"429 Too Many Requests, aguardando {backoff}s...")
+            if e.status_code in (429, 503, 529):
+                print(f"  Aguardando {backoff}s...")
                 time.sleep(backoff)
-                backoff = min(backoff * 2, 180)
+                backoff = min(backoff * 2, 300)
                 continue
             raise
+        except Exception as e:
+            print(f"  Erro inesperado ({type(e).__name__}): {e} — aguardando {backoff}s...")
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
     return None
 
 
