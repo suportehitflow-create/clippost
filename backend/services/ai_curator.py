@@ -9,6 +9,7 @@ uma lista vazia — sem cortes o produto nao entrega nada.
 import json
 import os
 import re
+import time
 
 import httpx
 
@@ -16,7 +17,10 @@ import httpx
 # Os modelos ":free" da OpenRouter foram testados e devolvem 429 ja na primeira
 # chamada quando a conta nao tem creditos, entao nao servem como padrao.
 BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
-MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-2.0-flash")
+MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-3.6-flash")
+# Modelos de raciocinio gastam centenas de tokens "pensando" antes de responder.
+# Com 1024 o JSON voltava cortado no meio do segundo objeto (finish_reason=length).
+MAX_TOKENS = int(os.environ.get("AI_CURATOR_MAX_TOKENS", "4096"))
 API_KEY = (
     os.environ.get("AI_CURATOR_API_KEY")
     or os.environ.get("GEMINI_API_KEY")
@@ -30,14 +34,24 @@ def _call_free_model(prompt: str) -> str:
         headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
         json={
             "model": MODEL,
-            "max_tokens": 1024,
+            "max_tokens": MAX_TOKENS,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=120.0,
+        timeout=180.0,
     )
     resp.raise_for_status()
-    choices = resp.json().get("choices") or []
-    return (choices[0]["message"].get("content") or "").strip() if choices else ""
+    body = resp.json()
+    # O endpoint do Gemini devolve erro como lista, nao como objeto.
+    if not isinstance(body, dict):
+        raise RuntimeError(f"resposta inesperada da API: {str(body)[:200]}")
+    choices = body.get("choices") or []
+    if not choices:
+        return ""
+    if choices[0].get("finish_reason") == "length":
+        raise RuntimeError(
+            f"resposta truncada em max_tokens={MAX_TOKENS}; aumente AI_CURATOR_MAX_TOKENS"
+        )
+    return (choices[0]["message"].get("content") or "").strip()
 
 
 def _call_anthropic(prompt: str) -> str:
@@ -101,10 +115,16 @@ Retorne ESTRITAMENTE um array JSON válido com exatamente 3 objetos, sem nenhum 
 
     raw = ""
     if API_KEY:
-        try:
-            raw = _call_free_model(prompt)
-        except Exception as e:
-            print(f"[ai_curator] modelo gratuito falhou ({type(e).__name__}: {e})")
+        # 503 e 429 sao comuns no free tier e costumam passar na tentativa
+        # seguinte; sem retry cairiamos na reserva paga por um erro passageiro.
+        for tentativa in range(3):
+            try:
+                raw = _call_free_model(prompt)
+                break
+            except Exception as e:
+                print(f"[ai_curator] tentativa {tentativa + 1}/3 falhou ({type(e).__name__}: {e})")
+                if tentativa < 2:
+                    time.sleep(2 * (tentativa + 1))
 
     if not raw and os.environ.get("ANTHROPIC_API_KEY"):
         print("[ai_curator] usando Anthropic como reserva")
