@@ -8,6 +8,7 @@ API_KEY = os.environ["EXPLABS_API_KEY"]
 BASE_URL = "https://api.experientiallabs.ai/v1"
 MODEL = "claude-sonnet-5"
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "32000"))
 
 # Modo: "all" roda todas as fases em sequência; qualquer outro valor roda só aquela fase
 INPUT_PHASE = os.environ.get("INPUT_PHASE_FILE", "fase_06_monetizacao.md")
@@ -71,13 +72,30 @@ def call_ai(phase_content, error_context=""):
             print(f"  API call tentativa {api_try+1}/5...")
             response = client.chat.completions.create(
                 model=MODEL,
-                max_tokens=8096,
+                max_tokens=MAX_TOKENS,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_msg}
                 ]
             )
-            return response.choices[0].message.content
+            choice = response.choices[0] if response.choices else None
+            content = choice.message.content if choice else None
+            finish = getattr(choice, "finish_reason", None)
+            if finish == "length":
+                # Resposta cortada no teto de tokens: escrever isso gera arquivos
+                # truncados no meio (foi assim que um SyntaxError foi para producao).
+                print(f"  Resposta truncada em max_tokens={MAX_TOKENS} — descartando e tentando de novo...")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 300)
+                continue
+            if content and content.strip():
+                return content
+            print(f"  Resposta vazia da API "
+                  f"(finish_reason={getattr(choice, 'finish_reason', None)}, "
+                  f"refusal={getattr(getattr(choice, 'message', None), 'refusal', None)}) "
+                  f"— aguardando {backoff}s...")
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
         except RateLimitError as e:
             print(f"  RateLimitError: {e} — aguardando {backoff}s...")
             time.sleep(backoff)
@@ -167,7 +185,7 @@ def run_phase(phase_file):
 
         ai_code = call_ai(phase_content, error_context)
         if ai_code is None:
-            print("Falha na API após 3 tentativas.")
+            print("  API nao retornou conteudo utilizavel apos 5 tentativas.")
             return False
 
         print(f"  Resposta AI recebida ({len(ai_code)} chars)")
