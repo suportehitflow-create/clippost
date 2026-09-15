@@ -75,6 +75,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             info = ydl.extract_info(url, download=True)
             video_id = info.get('id', 'video')
             title = info.get('title', 'Sem título')
+            video_duration = info.get('duration')
 
         # 2. Upload vídeo raw para Supabase Storage
         storage_path = f"{user_id}/{video_id}.mp4"
@@ -136,6 +137,11 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         for i, clip in enumerate(clips_meta):
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
+            # A IA às vezes devolve fim além do vídeo (53s num vídeo de 19s).
+            if video_duration:
+                end = min(end, float(video_duration))
+            if end - start < 1:
+                continue
             subtitle_file = generate_ass(
                 segments, str(tmp_dir / f"subtitles_{i}.ass"),
                 clip_start=start, clip_end=end, words=words,
