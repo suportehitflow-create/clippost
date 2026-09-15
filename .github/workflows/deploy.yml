@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# Dois pushes seguidos disparavam deploys simultâneos que disputavam as mesmas
+# máquinas no Fly e falhavam ambos (releases v80 e v81). O segundo agora espera.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
