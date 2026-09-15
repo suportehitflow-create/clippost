@@ -26,7 +26,7 @@ export default function Sidebar({ user }: { user: User }) {
     <aside style={{ width: '220px', flexShrink: 0, background: 'var(--card)', borderRight: '1px solid var(--card-border)', display: 'flex', flexDirection: 'column', padding: '1.5rem 0' }}>
       <div style={{ padding: '0 1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1.15rem', borderBottom: '1px solid var(--card-border)', marginBottom: '1rem' }}>
         <Scissors size={18} color="var(--accent)" />
-        Clip<span style={{ color: 'var(--accent)' }}>Post</span>
+        clip<span style={{ color: 'var(--accent)' }}>ost</span>
       </div>
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0 0.75rem' }}>
         {NAV.map(({ href, icon: Icon, label }) => {

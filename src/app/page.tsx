@@ -8,7 +8,7 @@ export default function HomePage() {
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 2rem', borderBottom: '1px solid var(--card-border)', position: 'sticky', top: 0, background: 'rgba(10,10,15,0.8)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1.25rem' }}>
           <Scissors size={22} color="var(--accent)" />
-          <span>Clip<span style={{ color: 'var(--accent)' }}>Post</span></span>
+          <span>clip<span style={{ color: 'var(--accent)' }}>ost</span></span>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <Link href="/login" style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>Entrar</Link>
