@@ -42,24 +42,35 @@ export default function UploadPage() {
     }
 
     // If file upload, send to Supabase Storage
+    let sourceUrl = youtubeUrl
     if (mode === 'file' && file) {
+      const storagePath = `${user.id}/${project.id}/original.${file.name.split('.').pop()}`
       const { error: uploadError } = await supabase.storage
         .from('videos')
-        .upload(`${user.id}/${project.id}/original.${file.name.split('.').pop()}`, file)
+        .upload(storagePath, file)
       if (uploadError) {
         setError('Erro no upload: ' + uploadError.message)
         setLoading(false)
         return
       }
+      sourceUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl
     }
 
-    // Send to Python backend for processing
+    // Send to Python backend for processing.
+    // O schema ProcessRequest exige url e user_id — mandar source_url/project_id
+    // devolvia 422 e o .catch vazio engolia o erro, deixando o projeto em pending.
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
-    await fetch(`${apiUrl}/api/jobs`, {
+    const res = await fetch(`${apiUrl}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: project.id, user_id: user.id, source_type: mode, source_url: mode === 'url' ? youtubeUrl : null }),
-    }).catch(() => {})
+      body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto' }),
+    }).catch(() => null)
+
+    if (!res?.ok) {
+      setError('Erro ao iniciar o processamento no servidor.')
+      setLoading(false)
+      return
+    }
 
     router.push(`/project/${project.id}`)
   }
