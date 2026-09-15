@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Request
 from tasks import process_youtube_video, process_bulk_videos
 from supabase import create_client
+from services import upload_post
 from services.stripe_service import (
     create_checkout_session, handle_webhook,
     get_plan_status, get_billing_portal_url,
@@ -55,9 +56,16 @@ class BrandKitRequest(BaseModel):
 class SchedulePostRequest(BaseModel):
     user_id: str
     clip_id: str
-    social_account_id: str
+    platform: str  # tiktok | instagram | youtube_shorts
     caption: str
-    scheduled_time: str  # ISO 8601
+    scheduled_at: str  # ISO 8601
+
+
+class ConnectRequest(BaseModel):
+    user_id: str
+
+
+SCHEDULE_PLATFORMS = {"tiktok", "instagram", "youtube_shorts"}
 
 
 class SocialAccountRequest(BaseModel):
@@ -133,28 +141,27 @@ async def list_scheduled_posts(user_id: str):
         supabase.table("scheduled_posts")
         .select("*")
         .eq("user_id", user_id)
-        .order("scheduled_time", desc=False)
+        .order("scheduled_at", desc=False)
         .execute()
     )
     rows = posts.data or []
-    # Enriquecer com clips e social_accounts via queries separadas
     for row in rows:
         c = supabase.table("clips").select("title, storage_url").eq("id", row["clip_id"]).maybe_single().execute()
-        row["clips"] = c.data
-        a = supabase.table("social_accounts").select("platform, username").eq("id", row["social_account_id"]).maybe_single().execute()
-        row["social_accounts"] = a.data
+        row["clips"] = c.data if c else None
     return {"posts": rows}
 
 
 @app.post("/api/scheduled-posts")
 async def create_scheduled_post(req: SchedulePostRequest):
+    if req.platform not in SCHEDULE_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"Plataforma inválida: {req.platform}")
     data = {
         "user_id": req.user_id,
         "clip_id": req.clip_id,
-        "social_account_id": req.social_account_id,
+        "platform": req.platform,
         "caption": req.caption,
-        "scheduled_time": req.scheduled_time,
-        "status": "pending",
+        "scheduled_at": req.scheduled_at,
+        "status": "scheduled",
     }
     resp = supabase.table("scheduled_posts").insert(data).execute()
     return {"post": resp.data[0] if resp.data else None}
@@ -162,7 +169,7 @@ async def create_scheduled_post(req: SchedulePostRequest):
 
 @app.delete("/api/scheduled-posts/{post_id}")
 async def delete_scheduled_post(post_id: str):
-    supabase.table("scheduled_posts").delete().eq("id", post_id).eq("status", "pending").execute()
+    supabase.table("scheduled_posts").delete().eq("id", post_id).eq("status", "scheduled").execute()
     return {"deleted": True}
 
 
@@ -184,7 +191,7 @@ async def get_analytics(user_id: str):
     posts_data = posts.data or []
     published = sum(1 for p in posts_data if p["status"] == "published")
     failed = sum(1 for p in posts_data if p["status"] == "failed")
-    pending = sum(1 for p in posts_data if p["status"] == "pending")
+    pending = sum(1 for p in posts_data if p["status"] == "scheduled")
     total_finished = published + failed
     success_rate = round(published / total_finished * 100) if total_finished > 0 else 0
 
@@ -240,6 +247,28 @@ async def billing_webhook(request: Request):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"received": True}
+
+
+@app.post("/api/social/connect-url")
+async def social_connect_url(req: ConnectRequest):
+    try:
+        return {"access_url": upload_post.connect_url(req.user_id)}
+    except upload_post.UploadPostError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/social/accounts/{user_id}")
+async def list_connected_social(user_id: str):
+    if not os.environ.get("UPLOAD_POST_API_KEY"):
+        return {"configured": False, "accounts": []}
+    try:
+        accounts = upload_post.connected_accounts(user_id)
+    except upload_post.UploadPostError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    for a in accounts:
+        if a["platform"] == "youtube":
+            a["platform"] = "youtube_shorts"
+    return {"configured": True, "accounts": accounts}
 
 
 @app.get("/health")
