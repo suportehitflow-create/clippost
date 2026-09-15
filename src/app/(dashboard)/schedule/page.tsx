@@ -173,7 +173,7 @@ export default function SchedulePage() {
                     style={{
                       textAlign: 'left', padding: '0.75rem',
                       background: selectedClip === clip.id ? 'var(--card, #18181b)' : 'transparent',
-                      border: selectedClip === clip.id ? '1px solid #7c3aed' : '1px solid var(--card-border, #27272a)',
+                      border: selectedClip === clip.id ? '1px solid #ea580c' : '1px solid var(--card-border, #27272a)',
                       borderRadius: '0.5rem', cursor: 'pointer', color: 'var(--foreground, #fafafa)',
                       display: 'flex', gap: '0.75rem', alignItems: 'center',
                     }}
@@ -257,7 +257,7 @@ export default function SchedulePage() {
                   type="submit"
                   disabled={saving || !selectedClip || !selectedAccount}
                   style={{
-                    padding: '0.8rem', background: '#7c3aed', color: '#fff',
+                    padding: '0.8rem', background: '#ea580c', color: '#fff',
                     border: 'none', borderRadius: '0.5rem', fontWeight: 700,
                     fontSize: '0.95rem', cursor: saving ? 'not-allowed' : 'pointer',
                     opacity: saving || !selectedClip || !selectedAccount ? 0.6 : 1,

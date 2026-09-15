@@ -288,7 +288,7 @@ export default function BrandKitPage() {
             disabled={saving || uploading}
             style={{
               width: '100%', padding: '0.875rem',
-              background: 'var(--accent, #7c3aed)', color: '#fff',
+              background: 'var(--accent, #ea580c)', color: '#fff',
               border: 'none', borderRadius: '0.5rem',
               fontWeight: 700, fontSize: '1rem', cursor: saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1,

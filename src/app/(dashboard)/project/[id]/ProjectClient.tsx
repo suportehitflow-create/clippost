@@ -13,7 +13,7 @@ export default function ProjectClient({ project, clips: initialClips }: { projec
   // Poll job status while processing
   useEffect(() => {
     if (status === 'done' || status === 'failed') return
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
     const interval = setInterval(async () => {
       const res = await fetch(`${apiUrl}/api/jobs/${project.id}`).catch(() => null)
       if (!res?.ok) return

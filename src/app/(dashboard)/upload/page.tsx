@@ -59,7 +59,7 @@ export default function UploadPage() {
     // Send to Python backend for processing.
     // O schema ProcessRequest exige url e user_id — mandar source_url/project_id
     // devolvia 422 e o .catch vazio engolia o erro, deixando o projeto em pending.
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
     const res = await fetch(`${apiUrl}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

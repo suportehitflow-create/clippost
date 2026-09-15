@@ -111,16 +111,16 @@ export default function BulkPage() {
       <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', gap: '1rem', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
         <Link href="/dashboard" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '0.85rem' }}>← Dashboard</Link>
         <span style={{ fontWeight: 700 }}>⚡ Processamento em Massa</span>
-        {!isPro && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', padding: '0.25rem 0.75rem', borderRadius: '999px', color: '#a78bfa' }}>Apenas Pro</span>}
+        {!isPro && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: 'rgba(234,88,12,0.15)', border: '1px solid rgba(234,88,12,0.3)', padding: '0.25rem 0.75rem', borderRadius: '999px', color: '#a78bfa' }}>Apenas Pro</span>}
       </header>
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
 
         {!isPro && (
-          <div style={{ ...card, borderColor: 'rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.08)', textAlign: 'center', padding: '2.5rem' }}>
+          <div style={{ ...card, borderColor: 'rgba(234,88,12,0.3)', background: 'rgba(234,88,12,0.08)', textAlign: 'center', padding: '2.5rem' }}>
             <p style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>⚡ Recurso exclusivo Pro</p>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Processe até 20 vídeos de uma vez, sem limites mensais.</p>
-            <Link href="/billing" style={{ padding: '0.75rem 1.5rem', background: '#7c3aed', color: '#fff', borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 700 }}>Fazer upgrade →</Link>
+            <Link href="/billing" style={{ padding: '0.75rem 1.5rem', background: '#ea580c', color: '#fff', borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 700 }}>Fazer upgrade →</Link>
           </div>
         )}
 
@@ -132,13 +132,13 @@ export default function BulkPage() {
               <h2 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>🔍 Buscar no Instagram</h2>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 <input value={igHandle} onChange={e => setIgHandle(e.target.value)} placeholder="@username ou URL" style={{ ...inputStyle, flex: 1 }} onKeyDown={e => e.key === 'Enter' && searchInstagram()} />
-                <button onClick={searchInstagram} disabled={igLoading} style={{ padding: '0.7rem 1rem', background: '#7c3aed', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <button onClick={searchInstagram} disabled={igLoading} style={{ padding: '0.7rem 1rem', background: '#ea580c', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {igLoading ? '...' : 'Buscar'}
                 </button>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
                 {(['recent', 'views'] as const).map(s => (
-                  <button key={s} onClick={() => setIgSort(s)} style={{ padding: '0.35rem 0.75rem', background: igSort === s ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.04)', border: `1px solid ${igSort === s ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '999px', color: 'var(--foreground)', fontSize: '0.78rem', cursor: 'pointer' }}>
+                  <button key={s} onClick={() => setIgSort(s)} style={{ padding: '0.35rem 0.75rem', background: igSort === s ? 'rgba(234,88,12,0.3)' : 'rgba(255,255,255,0.04)', border: `1px solid ${igSort === s ? 'rgba(234,88,12,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '999px', color: 'var(--foreground)', fontSize: '0.78rem', cursor: 'pointer' }}>
                     {s === 'recent' ? '🕐 Recentes' : '👁 + Vistas'}
                   </button>
                 ))}
@@ -151,14 +151,14 @@ export default function BulkPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{igVideos.length} vídeos encontrados</span>
                   {selectedIg.size > 0 && (
-                    <button onClick={addSelectedToQueue} style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', background: '#7c3aed', border: 'none', borderRadius: '0.4rem', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                    <button onClick={addSelectedToQueue} style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', background: '#ea580c', border: 'none', borderRadius: '0.4rem', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
                       + Adicionar {selectedIg.size} à fila
                     </button>
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '400px', overflowY: 'auto' }}>
                   {igVideos.map(v => (
-                    <button key={v.id} onClick={() => toggleIg(v.url)} style={{ textAlign: 'left', padding: '0.6rem 0.75rem', background: selectedIg.has(v.url) ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedIg.has(v.url) ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)' }}>
+                    <button key={v.id} onClick={() => toggleIg(v.url)} style={{ textAlign: 'left', padding: '0.6rem 0.75rem', background: selectedIg.has(v.url) ? 'rgba(234,88,12,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedIg.has(v.url) ? 'rgba(234,88,12,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)' }}>
                       <p style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '0.15rem' }}>{v.title}</p>
                       <p style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>👁 {v.view_count.toLocaleString('pt-BR')} · {Math.round(v.duration)}s</p>
                     </button>
@@ -184,7 +184,7 @@ export default function BulkPage() {
 
                 <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
                   {(['auto', '30', '60'] as const).map(d => (
-                    <button key={d} type="button" onClick={() => setClipDuration(d)} style={{ flex: 1, padding: '0.55rem', background: clipDuration === d ? '#7c3aed' : 'rgba(255,255,255,0.04)', border: `1px solid ${clipDuration === d ? '#7c3aed' : 'rgba(255,255,255,0.08)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)', fontSize: '0.82rem', fontWeight: 600 }}>
+                    <button key={d} type="button" onClick={() => setClipDuration(d)} style={{ flex: 1, padding: '0.55rem', background: clipDuration === d ? '#ea580c' : 'rgba(255,255,255,0.04)', border: `1px solid ${clipDuration === d ? '#ea580c' : 'rgba(255,255,255,0.08)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)', fontSize: '0.82rem', fontWeight: 600 }}>
                       {d === 'auto' ? '🤖 Auto' : `${d}s`}
                     </button>
                   ))}
@@ -199,7 +199,7 @@ export default function BulkPage() {
                 <button
                   type="submit"
                   disabled={submitting || !bulkUrls.trim()}
-                  style={{ width: '100%', padding: '0.85rem', background: '#7c3aed', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting || !bulkUrls.trim() ? 0.6 : 1 }}
+                  style={{ width: '100%', padding: '0.85rem', background: '#ea580c', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting || !bulkUrls.trim() ? 0.6 : 1 }}
                 >
                   {submitting ? 'Enfileirando…' : '⚡ Processar Tudo'}
                 </button>
