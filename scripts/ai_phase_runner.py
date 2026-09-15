@@ -127,6 +127,14 @@ def write_files(ai_code, phase_file):
 
 
 def test_build():
+    print("  Validando sintaxe do backend Python...")
+    py = subprocess.run(
+        [sys.executable, "-m", "compileall", "-q", "backend"],
+        capture_output=True, text=True
+    )
+    if py.returncode != 0:
+        return False, f"Backend Python syntax error:\n{py.stdout}\n{py.stderr}"
+
     print("  Testando build frontend (npm run build)...")
     try:
         result = subprocess.run(

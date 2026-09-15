@@ -57,6 +57,10 @@ jobs:
       - name: Deploy Backend
         if: always()
         run: |
+          if ! python -m compileall -q backend; then
+            echo "::error::Backend com erro de sintaxe Python — deploy abortado para nao quebrar producao."
+            exit 1
+          fi
           curl -L https://fly.io/install.sh | sh
           export PATH="$HOME/.fly/bin:$PATH"
           cd backend
