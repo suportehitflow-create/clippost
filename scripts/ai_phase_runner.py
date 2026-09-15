@@ -97,6 +97,12 @@ def call_ai(phase_content, error_context=""):
             time.sleep(backoff)
             backoff = min(backoff * 2, 300)
         except RateLimitError as e:
+            # A Experiential Labs devolve falta de credito como 429, nao 402.
+            # Sem este corte o runner dorme ~15 min por fase num erro que nao passa sozinho.
+            msg = str(e).lower()
+            if "insufficient_credits" in msg or "insufficient_quota" in msg or "out of platform credits" in msg:
+                print(f"\nCREDITOS DA API ZERADOS — abortando o pipeline.\n{e}\n")
+                sys.exit(1)
             print(f"  RateLimitError: {e} — aguardando {backoff}s...")
             time.sleep(backoff)
             backoff = min(backoff * 2, 300)
