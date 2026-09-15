@@ -23,6 +23,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 from services.ai_curator import get_viral_clips
+from services.clip_check import validate_clip
 from services.cut_rules import snap_to_words
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
@@ -163,6 +164,13 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 continue
 
             if not os.path.exists(clip_out):
+                continue
+
+            # O FFmpeg pode sair com código 0 e deixar arquivo sem áudio ou com
+            # duração errada; sem conferir, o clipe quebrado ia para o Storage.
+            check = validate_clip(clip_out, expected_duration=end - start)
+            if not check["ok"]:
+                print(f"[clip {i}] descartado: {'; '.join(check['issues'])}")
                 continue
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
