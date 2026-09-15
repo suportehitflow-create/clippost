@@ -32,10 +32,17 @@ else:
 from openai import OpenAI, RateLimitError, APIStatusError
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
+# ARQUITETURA_CLIPPRO.md e a constituicao do projeto e tem precedencia.
+# O .cursorrules e a versao curta, usada como reserva.
 cursorrules = ""
-if os.path.exists(".cursorrules"):
-    with open(".cursorrules") as f:
-        cursorrules = f.read()
+for fonte in ("ARQUITETURA_CLIPPRO.md", ".cursorrules"):
+    if os.path.exists(fonte):
+        with open(fonte, encoding="utf-8") as f:
+            cursorrules = f.read()
+        print(f"Regras carregadas de: {fonte} ({len(cursorrules)} chars)")
+        break
+else:
+    print("AVISO: nenhum arquivo de regras encontrado.")
 
 SYSTEM_PROMPT = f"""Você é um engenheiro de software sênior trabalhando no projeto ClipPost.
 

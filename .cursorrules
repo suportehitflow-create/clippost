@@ -1,8 +1,12 @@
-# Regras Absolutas do Clip Pro
+# Regras Absolutas do clipost
 
-Frontend: Next.js 15 (App Router), Tailwind, shadcn/ui. Hospedado na Vercel.
+A constituição completa do projeto está em ARQUITETURA_CLIPPRO.md — leia antes de gerar código.
 
-Backend: Python FastAPI, Celery, Redis. Hospedado no Fly.io.
+Frontend: Next.js 15 (App Router) em src/app/, Tailwind CSS puro. Hospedado na Vercel.
+É EXPRESSAMENTE PROIBIDO usar shadcn/ui ou importar de @/components/ui/* — não está instalado.
+
+Backend: Python FastAPI com Celery e Redis, em backend/ (sem subpasta src/ ou app/). Hospedado no Fly.io.
+É PROIBIDO substituir Celery por ARQ ou qualquer outra biblioteca de filas.
 
 Processamento: FFmpeg, yt-dlp, faster-whisper local (É expressamente PROIBIDO sugerir a API da OpenAI).
 
