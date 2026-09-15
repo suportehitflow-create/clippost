@@ -97,7 +97,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 4. Transcrição com faster-whisper (word timestamps)
         from faster_whisper import WhisperModel
         model = WhisperModel("base", device="cpu", compute_type="int8")
-        fw_segments, _ = model.transcribe(audio_path, language="pt", word_timestamps=True)
+        # Idioma detectado automaticamente: forçar "pt" em vídeo de outro idioma
+        # gerava legendas sem sentido.
+        fw_segments, _ = model.transcribe(audio_path, word_timestamps=True)
 
         segments = []
         words = []

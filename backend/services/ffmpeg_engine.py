@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import textwrap
 import urllib.request
 from pathlib import Path
 
@@ -128,17 +129,22 @@ def create_vertical_clip(
                 f"borderw=3:bordercolor=black:x={ux}-text_w/2:y={uy}"
             )
 
-        # Drawtext: hook title
+        # Drawtext: hook title — o drawtext não quebra linha, então um gancho de
+        # 50+ caracteres saía cortado nas duas bordas do vídeo 1080px.
         if hook_title:
-            safe_hook = hook_title.replace("'", "\\'").replace(":", "\\:")
-            hx = hook_cfg.get("x", 540)
             hy = hook_cfg.get("y", 1600)
-            # quebra em 2 linhas se longo
-            text_filters.append(
-                f"drawtext=text='{safe_hook}':fontcolor=yellow:fontsize=56:"
-                f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"borderw=4:bordercolor=black:x=(w-text_w)/2:y={hy}:line_spacing=10"
-            )
+            lines = textwrap.wrap(hook_title, width=24)[:3]
+            fontsize = 56 if len(lines) == 1 else 48
+            line_h = int(fontsize * 1.25)
+            top = hy - (len(lines) - 1) * line_h
+            for n, line in enumerate(lines):
+                safe_line = (line.replace("\\", "\\\\").replace("'", "’")
+                             .replace(":", "\\:").replace("%", "\\%"))
+                text_filters.append(
+                    f"drawtext=text='{safe_line}':fontcolor=yellow:fontsize={fontsize}:"
+                    f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+                    f"borderw=4:bordercolor=black:x=(w-text_w)/2:y={top + n * line_h}"
+                )
 
         if text_filters:
             combined = ",".join(text_filters)
