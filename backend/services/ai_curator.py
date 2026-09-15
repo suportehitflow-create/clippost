@@ -12,9 +12,16 @@ import re
 
 import httpx
 
-BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://openrouter.ai/api/v1")
-MODEL = os.environ.get("AI_CURATOR_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
-API_KEY = os.environ.get("AI_CURATOR_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+# Padrao: Gemini free tier (~15 req/min, 1500/dia, sem cartao).
+# Os modelos ":free" da OpenRouter foram testados e devolvem 429 ja na primeira
+# chamada quando a conta nao tem creditos, entao nao servem como padrao.
+BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
+MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-2.0-flash")
+API_KEY = (
+    os.environ.get("AI_CURATOR_API_KEY")
+    or os.environ.get("GEMINI_API_KEY")
+    or os.environ.get("OPENROUTER_API_KEY", "")
+)
 
 
 def _call_free_model(prompt: str) -> str:
