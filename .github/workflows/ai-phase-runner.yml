@@ -52,7 +52,7 @@ jobs:
         run: |
           npm i -g vercel@latest
           rm -rf .vercel
-          vercel --token "$VERCEL_TOKEN" --org-id "$VERCEL_ORG_ID" --project-id "$VERCEL_PROJECT_ID" --prod --yes 2>&1
+          vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
 
       - name: Deploy Backend
         if: always()
