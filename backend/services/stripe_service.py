@@ -11,7 +11,7 @@ _supabase = create_client(
 
 PRO_PRICE_ID = os.environ.get("STRIPE_PRO_PRICE_ID", "")
 WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://clippost-silk.vercel.app")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://clippost-three.vercel.app")
 
 
 def create_checkout_session(user_id: str, email: str) -> str:

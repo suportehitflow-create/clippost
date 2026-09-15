@@ -2,7 +2,7 @@
 
 O sistema atual está inoperante. O frontend (Vercel) e o backend (Fly.io) não conseguem se comunicar, travando a geração de clipes e o dashboard.
 
-**URL de Produção:** https://clippost-silk.vercel.app
+**URL de Produção:** https://clippost-three.vercel.app
 **Backend:** https://clippost-backend.fly.dev
 
 ## Objetivo Imediato
@@ -48,7 +48,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://clippost-silk.vercel.app",
+        "https://clippost-three.vercel.app",
         "http://localhost:3000",
     ],
     allow_credentials=True,

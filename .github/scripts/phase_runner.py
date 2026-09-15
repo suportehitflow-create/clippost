@@ -192,7 +192,7 @@ for iteration in range(1, MAX_ITER + 1):
         print("\nALL TESTS PASSED!")
         with open("/tmp/changed_files.txt", "w") as f:
             f.write("\n".join(files.keys()))
-        slack(f":white_check_mark: *ClipPost — `{PHASE_NAME}` implementada com sucesso!*\nArquivos modificados: {list(files.keys())}\nAcesse: https://clippost-silk.vercel.app")
+        slack(f":white_check_mark: *ClipPost — `{PHASE_NAME}` implementada com sucesso!*\nArquivos modificados: {list(files.keys())}\nAcesse: https://clippost-three.vercel.app")
         sys.exit(0)
 
     combined = "\n\n".join(errors)

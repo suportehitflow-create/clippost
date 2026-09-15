@@ -2,7 +2,7 @@
 
 Você é um Arquiteto Full-Stack Senior. O SaaS (Frontend Next.js na Vercel e Backend FastAPI no Fly.io) está sofrendo com erros de comunicação e interface genérica. Você tem total permissão para analisar, refatorar e aplicar as mudanças abaixo em toda a base de código.
 
-**Frontend:** https://clippost-silk.vercel.app (Next.js 15, App Router, Tailwind, shadcn/ui)
+**Frontend:** https://clippost-three.vercel.app (Next.js 15, App Router, Tailwind, shadcn/ui)
 **Backend:** https://clippost-backend.fly.dev (FastAPI, Celery, Redis, Supabase)
 
 ## MISSAO 1: Erradicar o Erro 422 e Falhas de Comunicacao
@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://clippost-silk.vercel.app", "http://localhost:3000"],
+    allow_origins=["https://clippost-three.vercel.app", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

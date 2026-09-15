@@ -9,7 +9,7 @@ O objetivo é solidificar as fundações do SaaS e eliminar erros 500, 422 e blo
 - Regra Absoluta: NUNCA expor chaves. `os.environ.get('SUPABASE_KEY')` no Python, `process.env` no Next.js
 
 ## 2. Fallbacks e CORS (FastAPI no Fly.io)
-- CORSMiddleware aceitar `https://clippost-silk.vercel.app` com `allow_credentials=True`
+- CORSMiddleware aceitar `https://clippost-three.vercel.app` com `allow_credentials=True`
 - Todas as rotas GET com `try/except`: retornar `[]` ou `{}` com Status 200 em caso de erro
 - Nunca retornar 500 para o frontend
 

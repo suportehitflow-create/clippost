@@ -20,7 +20,7 @@ load_dotenv()
 app = FastAPI(title="ClipPost API")
 
 FRONTEND_ORIGINS = [
-    "https://clippost-silk.vercel.app",
+    "https://clippost-three.vercel.app",
     "http://localhost:3000",
     os.environ.get("FRONTEND_URL", ""),
 ]
