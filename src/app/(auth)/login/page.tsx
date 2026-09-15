@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div style={{ width: '100%', maxWidth: '400px' }}>
       <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '1rem', padding: '2rem' }}>
         <h1 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: '0.5rem' }}>Entrar na conta</h1>
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>Bem-vindo de volta ao ClipPost</p>
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>Bem-vindo de volta ao clipost</p>
 
         <button onClick={handleGoogle} disabled={googleLoading}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'var(--background)', border: '1px solid var(--card-border)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.95rem', cursor: googleLoading ? 'not-allowed' : 'pointer', opacity: googleLoading ? 0.7 : 1, marginBottom: '1.25rem' }}>

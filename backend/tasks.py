@@ -1,5 +1,5 @@
 """
-ClipPost — Worker Celery (processo completo)
+clipost — Worker Celery (processo completo)
 1. Download (yt-dlp)
 2. Upload vídeo raw → Supabase Storage
 3. Extração de áudio (FFmpeg)

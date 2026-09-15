@@ -91,7 +91,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontSize: '0.85rem', borderTop: '1px solid var(--card-border)' }}>
-        © 2025 ClipPost. Todos os direitos reservados.
+        © 2025 clipost. Todos os direitos reservados.
       </footer>
     </main>
   )

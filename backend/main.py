@@ -1,5 +1,5 @@
 """
-ClipPost Backend — FastAPI
+clipost Backend — FastAPI
 """
 import os
 from fastapi import FastAPI, HTTPException
@@ -17,7 +17,7 @@ from services.stripe_service import (
 
 load_dotenv()
 
-app = FastAPI(title="ClipPost API")
+app = FastAPI(title="clipost API")
 
 FRONTEND_ORIGINS = [
     "https://clippost-three.vercel.app",
