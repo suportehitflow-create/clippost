@@ -1,6 +1,7 @@
 import os
 import stripe
 from supabase import create_client
+from services.db_utils import maybe_one
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
@@ -28,7 +29,7 @@ def create_checkout_session(user_id: str, email: str) -> str:
 
 
 def get_billing_portal_url(user_id: str) -> str | None:
-    plan = _supabase.table("user_plans").select("stripe_customer_id").eq("user_id", user_id).maybe_single().execute()
+    plan = maybe_one(_supabase.table("user_plans").select("stripe_customer_id").eq("user_id", user_id))
     if not plan.data or not plan.data.get("stripe_customer_id"):
         return None
     session = stripe.billing_portal.Session.create(
@@ -55,7 +56,7 @@ def handle_webhook(payload: bytes, sig_header: str) -> None:
     elif event["type"] in ("customer.subscription.deleted", "customer.subscription.paused"):
         sub = event["data"]["object"]
         customer_id = sub["customer"]
-        plan = _supabase.table("user_plans").select("user_id").eq("stripe_customer_id", customer_id).maybe_single().execute()
+        plan = maybe_one(_supabase.table("user_plans").select("user_id").eq("stripe_customer_id", customer_id))
         if plan.data:
             _upsert_plan(plan.data["user_id"], "free", customer_id, None)
 
@@ -63,14 +64,14 @@ def handle_webhook(payload: bytes, sig_header: str) -> None:
         sub = event["data"]["object"]
         customer_id = sub["customer"]
         status = sub["status"]
-        plan_row = _supabase.table("user_plans").select("user_id").eq("stripe_customer_id", customer_id).maybe_single().execute()
+        plan_row = maybe_one(_supabase.table("user_plans").select("user_id").eq("stripe_customer_id", customer_id))
         if plan_row.data:
             new_plan = "pro" if status == "active" else "free"
             _upsert_plan(plan_row.data["user_id"], new_plan, customer_id, sub["id"])
 
 
 def _upsert_plan(user_id: str, plan: str, customer_id: str, subscription_id: str | None) -> None:
-    existing = _supabase.table("user_plans").select("user_id").eq("user_id", user_id).maybe_single().execute()
+    existing = maybe_one(_supabase.table("user_plans").select("user_id").eq("user_id", user_id))
     data = {
         "user_id": user_id,
         "plan": plan,
@@ -85,7 +86,7 @@ def _upsert_plan(user_id: str, plan: str, customer_id: str, subscription_id: str
 
 
 def get_plan_status(user_id: str) -> dict:
-    plan = _supabase.table("user_plans").select("*").eq("user_id", user_id).maybe_single().execute()
+    plan = maybe_one(_supabase.table("user_plans").select("*").eq("user_id", user_id))
     if not plan.data:
         # Criar registro free se não existe
         _supabase.table("user_plans").insert({"user_id": user_id}).execute()

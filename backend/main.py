@@ -15,6 +15,7 @@ from services.stripe_service import (
     create_checkout_session, handle_webhook,
     get_plan_status, get_billing_portal_url,
 )
+from services.db_utils import maybe_one
 
 load_dotenv()
 
@@ -95,13 +96,13 @@ class InstagramListRequest(BaseModel):
 
 @app.get("/api/brand-kit/{user_id}")
 async def get_brand_kit(user_id: str):
-    resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+    resp = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", user_id))
     return {"brand_kit": resp.data}
 
 
 @app.post("/api/brand-kit")
 async def upsert_brand_kit(req: BrandKitRequest):
-    existing = supabase.table("brand_kits").select("id").eq("user_id", req.user_id).maybe_single().execute()
+    existing = maybe_one(supabase.table("brand_kits").select("id").eq("user_id", req.user_id))
     data = {
         "user_id": req.user_id,
         **({"avatar_url": req.avatar_url} if req.avatar_url is not None else {}),
@@ -112,7 +113,7 @@ async def upsert_brand_kit(req: BrandKitRequest):
         supabase.table("brand_kits").update(data).eq("user_id", req.user_id).execute()
     else:
         supabase.table("brand_kits").insert(data).execute()
-    result = supabase.table("brand_kits").select("*").eq("user_id", req.user_id).maybe_single().execute()
+    result = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", req.user_id))
     return {"brand_kit": result.data}
 
 
@@ -124,14 +125,14 @@ async def list_social_accounts(user_id: str):
 
 @app.post("/api/social-accounts")
 async def upsert_social_account(req: SocialAccountRequest):
-    existing = supabase.table("social_accounts").select("id").eq("user_id", req.user_id).eq("platform", req.platform).eq("account_id", req.account_id).maybe_single().execute()
+    existing = maybe_one(supabase.table("social_accounts").select("id").eq("user_id", req.user_id).eq("platform", req.platform).eq("account_id", req.account_id))
     data = {"user_id": req.user_id, "platform": req.platform, "access_token": req.access_token, "account_id": req.account_id, "username": req.username}
     if existing.data:
         supabase.table("social_accounts").update(data).eq("id", existing.data["id"]).execute()
         record_id = existing.data["id"]
     else:
         record_id = supabase.table("social_accounts").insert(data).execute().data[0]["id"]
-    result = supabase.table("social_accounts").select("*").eq("id", record_id).maybe_single().execute()
+    result = maybe_one(supabase.table("social_accounts").select("*").eq("id", record_id))
     return {"account": result.data}
 
 
@@ -146,7 +147,7 @@ async def list_scheduled_posts(user_id: str):
     )
     rows = posts.data or []
     for row in rows:
-        c = supabase.table("clips").select("title, storage_url").eq("id", row["clip_id"]).maybe_single().execute()
+        c = maybe_one(supabase.table("clips").select("title, storage_url").eq("id", row["clip_id"]))
         row["clips"] = c.data if c else None
     return {"posts": rows}
 
@@ -335,7 +336,7 @@ async def list_projects(user_id: str):
 @app.get("/api/clips/{project_id}")
 async def list_clips(project_id: str):
     """Lista os clipes gerados para um projeto, ordenados por ai_score."""
-    proj = supabase.table("projects").select("*").eq("id", project_id).maybe_single().execute()
+    proj = maybe_one(supabase.table("projects").select("*").eq("id", project_id))
     if not proj.data:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
@@ -355,7 +356,7 @@ async def list_clips(project_id: str):
 @app.get("/api/jobs/{project_id}")
 async def get_job_status(project_id: str):
     """Status de um job pelo project_id."""
-    proj = supabase.table("projects").select("*").eq("id", project_id).maybe_single().execute()
+    proj = maybe_one(supabase.table("projects").select("*").eq("id", project_id))
     if not proj.data:
         raise HTTPException(status_code=404, detail="Projeto não encontrado")
     clips = (
