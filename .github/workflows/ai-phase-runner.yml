@@ -48,6 +48,23 @@ jobs:
         env:
           INPUT_PHASE_FILE: ${{ github.event.inputs.phase_file }}
 
+      # Sem este passo o codigo gerado existia so no runner: o Vercel deployava
+      # a partir dele e o repositorio continuava sem as mudancas, entao o proximo
+      # push de master revertia tudo em producao.
+      - name: Commit do codigo gerado
+        if: steps.ai_loop.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A ':!.vercel' ':!node_modules'
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao gerada pela IA."
+          else
+            git commit -m "chore(ai): ${{ github.event.inputs.phase_file }} aplicada pelo phase runner"
+            git pull --rebase origin master
+            git push origin HEAD:master
+          fi
+
       - name: Deploy Frontend
         if: always()
         run: |
