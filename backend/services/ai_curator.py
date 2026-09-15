@@ -1,11 +1,47 @@
 """
-AI Curator — detecta os melhores momentos para clipes virais usando Claude.
+AI Curator — detecta os melhores momentos para clipes virais.
+
+Usa um endpoint compativel com a API da OpenAI (OpenRouter, Gemini, Groq),
+escolhido por variavel de ambiente, para rodar sem custo. Se o modelo gratuito
+falhar e houver ANTHROPIC_API_KEY, cai para a Anthropic em vez de devolver
+uma lista vazia — sem cortes o produto nao entrega nada.
 """
 import json
 import os
-import anthropic
+import re
 
-_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+import httpx
+
+BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://openrouter.ai/api/v1")
+MODEL = os.environ.get("AI_CURATOR_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+API_KEY = os.environ.get("AI_CURATOR_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+
+
+def _call_free_model(prompt: str) -> str:
+    resp = httpx.post(
+        f"{BASE_URL}/chat/completions",
+        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+        json={
+            "model": MODEL,
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        timeout=120.0,
+    )
+    resp.raise_for_status()
+    choices = resp.json().get("choices") or []
+    return (choices[0]["message"].get("content") or "").strip() if choices else ""
+
+
+def _call_anthropic(prompt: str) -> str:
+    import anthropic
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()
 
 
 def get_viral_clips(transcript_data: dict, clip_duration: str = "auto") -> list[dict]:
@@ -56,17 +92,24 @@ Retorne ESTRITAMENTE um array JSON válido com exatamente 3 objetos, sem nenhum 
   }}
 ]"""
 
-    message = _client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    raw = ""
+    if API_KEY:
+        try:
+            raw = _call_free_model(prompt)
+        except Exception as e:
+            print(f"[ai_curator] modelo gratuito falhou ({type(e).__name__}: {e})")
 
-    raw = message.content[0].text.strip()
+    if not raw and os.environ.get("ANTHROPIC_API_KEY"):
+        print("[ai_curator] usando Anthropic como reserva")
+        raw = _call_anthropic(prompt)
+
+    if not raw:
+        print("[ai_curator] nenhum provedor disponivel — configure AI_CURATOR_API_KEY")
+        return []
+
     try:
         clips = json.loads(raw)
     except json.JSONDecodeError:
-        import re
         match = re.search(r'\[.*\]', raw, re.DOTALL)
         if match:
             clips = json.loads(match.group())
