@@ -226,8 +226,13 @@ def test_build():
 def run_phase(phase_file):
     phase_path = f"docs/fases/{phase_file}"
     if not os.path.exists(phase_path):
-        print(f"  AVISO: {phase_path} não encontrado, pulando.")
-        return True  # não falha o pipeline por fase ausente
+        # Antes isso devolvia True e o run terminava "verde" sem ter feito nada —
+        # falso positivo que esconde erro de digitacao no nome da fase.
+        print(f"  ERRO: {phase_path} nao existe. Fases disponiveis:")
+        for f in sorted(os.listdir("docs/fases")):
+            if f.endswith(".md"):
+                print(f"    - {f}")
+        return False
 
     with open(phase_path, "r") as f:
         phase_content = f.read()
