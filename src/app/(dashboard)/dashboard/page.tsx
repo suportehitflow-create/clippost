@@ -129,26 +129,27 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Header */}
-      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>✂️</span>
-          <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>clipost</span>
-        </div>
-        <button
-          onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
-          style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', cursor: 'pointer', fontSize: '0.85rem' }}
-        >
-          Sair
-        </button>
-        <Link href="/brand-kit" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-          🎨 Brand Kit
-        </Link>
-        <Link href="/schedule" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-          📅 Agendamentos
-        </Link>
-        <Link href="/billing" style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-          💳 Plano
-        </Link>
+      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <span style={{ fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
+          clip<span style={{ color: 'var(--accent)' }}>ost</span>
+        </span>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link href="/brand-kit" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+            Brand Kit
+          </Link>
+          <Link href="/schedule" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+            Agendamentos
+          </Link>
+          <Link href="/billing" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+            Plano
+          </Link>
+          <button
+            onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
+            style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', cursor: 'pointer', fontSize: '0.85rem', marginLeft: '0.25rem' }}
+          >
+            Sair
+          </button>
+        </nav>
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
@@ -207,7 +208,7 @@ export default function Dashboard() {
               required
               placeholder="https://youtube.com/watch?v=..."
               style={{
-                flex: 1, minWidth: '280px', padding: '0.8rem 1rem',
+                flex: 1, minWidth: 'min(100%, 280px)', padding: '0.8rem 1rem',
                 background: 'var(--card)', border: '1px solid var(--card-border)',
                 borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none',
               }}
@@ -254,7 +255,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 260px) 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="grid items-start gap-6 md:grid-cols-[minmax(200px,260px)_1fr]">
 
           {/* Sidebar de projetos */}
           <aside>

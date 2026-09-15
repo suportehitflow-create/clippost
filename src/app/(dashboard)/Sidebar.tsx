@@ -26,13 +26,13 @@ export default function Sidebar({ user }: { user: User }) {
     <aside style={{ width: '220px', flexShrink: 0, background: 'var(--card)', borderRight: '1px solid var(--card-border)', display: 'flex', flexDirection: 'column', padding: '1.5rem 0' }}>
       <div style={{ padding: '0 1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1.15rem', borderBottom: '1px solid var(--card-border)', marginBottom: '1rem' }}>
         <Scissors size={18} color="var(--accent)" />
-        clip<span style={{ color: 'var(--accent)' }}>ost</span>
+        <span>clip<span style={{ color: 'var(--accent)' }}>ost</span></span>
       </div>
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0 0.75rem' }}>
         {NAV.map(({ href, icon: Icon, label }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
-            <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: '0.5rem', textDecoration: 'none', fontSize: '0.9rem', fontWeight: active ? 600 : 400, color: active ? 'var(--foreground)' : 'var(--muted)', background: active ? 'rgba(124,58,237,0.15)' : 'transparent', transition: 'all 0.15s' }}>
+            <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: '0.5rem', textDecoration: 'none', fontSize: '0.9rem', fontWeight: active ? 600 : 400, color: active ? 'var(--foreground)' : 'var(--muted)', background: active ? 'rgba(234,88,12,0.12)' : 'transparent', transition: 'all 0.15s' }}>
               <Icon size={17} color={active ? 'var(--accent)' : undefined} />
               {label}
             </Link>
