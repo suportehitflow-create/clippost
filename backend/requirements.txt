@@ -3,7 +3,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 celery==5.4.0
 redis==5.1.1
-yt-dlp==2024.10.7
+yt-dlp[default]>=2026.8.19
 ffmpeg-python==0.2.0
 faster-whisper==1.0.3
 mediapipe==0.10.14

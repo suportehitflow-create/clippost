@@ -61,7 +61,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
     project_id = None
 
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        # Exigir mp4+m4a falhava com "Requested format is not available" quando o
+        # site não oferece esse par; o merge para mp4 fica a cargo do FFmpeg.
+        'format': 'bestvideo+bestaudio/best',
         'outtmpl': video_path,
         'quiet': True,
         'noplaylist': True,
