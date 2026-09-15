@@ -32,7 +32,7 @@ def create_vertical_clip(
     subtitle_file: str | None = None,
     hook_title: str | None = None,
     hflip: bool = True,
-    remove_silence: bool = True,
+    remove_silence: bool = False,
     speed: float = 1.0,
 ) -> str:
     """
@@ -80,16 +80,16 @@ def create_vertical_clip(
         # Audio transforms
         audio_filters = []
         if remove_silence:
+            # Encurta só o áudio: o vídeo não acompanha e a fala sai da boca.
+            # Desligado por padrão até existir corte de silêncio sincronizado.
             audio_filters.append(
                 "silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-50dB"
             )
         if speed and speed != 1.0:
             audio_filters.append(f"atempo={min(2.0, speed)}")
-        if audio_filters:
-            filter_parts.append(f"[0:a]{','.join(audio_filters)}[aout]")
-            audio_map = "[aout]"
-        else:
-            audio_map = "0:a"
+        audio_filters += _edge_fades(duration / (speed or 1.0))
+        filter_parts.append(f"[0:a]{','.join(audio_filters)}[aout]")
+        audio_map = "[aout]"
         last_video = "[base]"
         input_files = [
             "-ss", str(start), "-t", str(duration), "-i", input_video,
@@ -183,12 +183,24 @@ def create_vertical_clip(
     return output_video
 
 
+FADE_SECONDS = 0.03
+
+
+def _edge_fades(out_duration: float) -> list[str]:
+    """Fade de 30ms nas duas pontas: corte seco no áudio gera um estalo audível."""
+    return [
+        f"afade=t=in:st=0:d={FADE_SECONDS}",
+        f"afade=t=out:st={max(0.0, out_duration - FADE_SECONDS):.3f}:d={FADE_SECONDS}",
+    ]
+
+
 def _simple_render(input_video: str, output_video: str, start: float, duration: float):
     """Fallback: crop 9:16 simples sem overlays."""
     subprocess.run([
         "ffmpeg", "-y",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
         "-vf", "crop=ih*9/16:ih,scale=1080:1920",
+        "-af", ",".join(_edge_fades(duration)),
         "-vcodec", "libx264", "-preset", "fast", "-crf", "23",
         "-acodec", "aac", "-b:a", "128k",
         "-movflags", "+faststart",

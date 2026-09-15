@@ -23,6 +23,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 from services.ai_curator import get_viral_clips
+from services.cut_rules import snap_to_words
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
 from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
@@ -57,6 +58,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
+    project_id = None
 
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -108,6 +110,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
         # 5. INSERT na tabela projects
         project_data = {
             "user_id": user_id,
+            "source_type": "url",
             "source_url": url,
             "platform": "youtube",
             "raw_video_url": raw_video_url,
@@ -125,18 +128,20 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
         brand_kit = bk_resp.data if bk_resp and bk_resp.data else None
 
-        # Arquivo de legendas (.ass) para todo o clipe
-        subtitle_file = generate_ass(segments, str(tmp_dir / "subtitles.ass"))
-
         # 7, 8, 9. Cortar + upload + salvar cada clipe
         for i, clip in enumerate(clips_meta):
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
+            start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
+            subtitle_file = generate_ass(
+                segments, str(tmp_dir / f"subtitles_{i}.ass"),
+                clip_start=start, clip_end=end, words=words,
+            )
             try:
                 create_vertical_clip(
                     input_video=video_path,
                     output_video=clip_out,
-                    start=clip["start_time"],
-                    end=clip["end_time"],
+                    start=start,
+                    end=end,
                     brand_kit=brand_kit,
                     subtitle_file=subtitle_file,
                     hook_title=clip["hook_title"],
@@ -162,11 +167,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
                 "user_id": user_id,
                 "title": clip["hook_title"],
                 "hook": clip["hook_title"],
-                "start_time": clip["start_time"],
-                "end_time": clip["end_time"],
+                "start_time": start,
+                "end_time": end,
                 "score": clip["ai_score"],
                 "storage_url": clip_url,
-                "storage_path": clip_key,
                 "status": "ready",
             }).execute()
 
@@ -177,6 +181,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
         return {"status": "success", "project_id": project_id, "title": title}
 
     except Exception as e:
+        if project_id:
+            try:
+                supabase.table("projects").update({
+                    "status": "failed", "error_message": str(e)[:1000],
+                }).eq("id", project_id).execute()
+            except Exception as update_err:
+                print(f"[pipeline] não consegui marcar o projeto {project_id} como falho: {update_err}")
+        print(f"[pipeline] erro processando {url}: {e}")
         return {"status": "error", "message": str(e)}
 
     finally:
