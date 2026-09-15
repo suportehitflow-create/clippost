@@ -4,9 +4,18 @@ import time
 import sys
 import re
 
-API_KEY = os.environ["EXPLABS_API_KEY"]
-BASE_URL = "https://api.experientiallabs.ai/v1"
-MODEL = "claude-sonnet-5"
+# Padrao: Gemini free tier. Testado gerando uma fase completa — resposta inteira
+# (finish_reason=stop), Python compilando e sem violar a constituicao.
+BASE_URL = os.environ.get("AI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
+MODEL = os.environ.get("AI_MODEL", "gemini-3.6-flash")
+API_KEY = (
+    os.environ.get("AI_API_KEY")
+    or os.environ.get("GEMINI_API_KEY")
+    or os.environ.get("EXPLABS_API_KEY")
+)
+if not API_KEY:
+    print("ERRO: defina AI_API_KEY (ou GEMINI_API_KEY) nos secrets do repositorio.")
+    sys.exit(1)
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "32000"))
 
