@@ -43,7 +43,7 @@ jobs:
 
       - name: Run AI Phase Loop
         id: ai_loop
-        run: python scripts/ai_phase_runner.py
+        run: python -u scripts/ai_phase_runner.py
         env:
           INPUT_PHASE_FILE: ${{ github.event.inputs.phase_file }}
 
