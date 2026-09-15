@@ -53,12 +53,11 @@ def process_bulk_videos(urls: list[str], user_id: str, clip_duration: str = "aut
 
 
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None):
     check_clip_limit(user_id)
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
-    project_id = None
 
     ydl_opts = {
         # Exigir mp4+m4a falhava com "Requested format is not available" quando o
@@ -109,10 +108,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
 
         transcript_data = {"segments": segments, "words": words}
 
-        # 5. INSERT na tabela projects
+        # 5. Projeto: atualiza o que a tela de upload já criou ou cria um novo.
+        # Criar sempre um novo deixava o projeto aberto pelo usuário em "pending" para sempre.
         project_data = {
-            "user_id": user_id,
-            "source_type": "url",
             "source_url": url,
             "platform": "youtube",
             "raw_video_url": raw_video_url,
@@ -120,8 +118,12 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto"):
             "title": title,
             "status": "processing",
         }
-        db_response = supabase.table("projects").insert(project_data).execute()
-        project_id = db_response.data[0]['id']
+        if project_id:
+            supabase.table("projects").update(project_data).eq("id", project_id).execute()
+        else:
+            project_data.update({"user_id": user_id, "source_type": "url"})
+            db_response = supabase.table("projects").insert(project_data).execute()
+            project_id = db_response.data[0]['id']
 
         # 6. AI Curator — detectar momentos virais
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration)

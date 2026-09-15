@@ -45,6 +45,7 @@ class ProcessRequest(BaseModel):
     url: str
     user_id: str
     clip_duration: str = "auto"  # "30", "60", "auto"
+    project_id: str | None = None  # projeto já criado pela tela de upload
 
 
 class BrandKitRequest(BaseModel):
@@ -312,7 +313,7 @@ async def instagram_list(req: InstagramListRequest):
 async def create_job(req: ProcessRequest):
     """Alias de /api/process-url para compatibilidade."""
     try:
-        task = process_youtube_video.delay(req.url, req.user_id)
+        task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration, req.project_id)
         return {"task_id": task.id, "status": "processing"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Worker unavailable: {str(e)}")

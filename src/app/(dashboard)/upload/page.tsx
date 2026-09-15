@@ -63,7 +63,7 @@ export default function UploadPage() {
     const res = await fetch(`${apiUrl}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto' }),
+      body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto', project_id: project.id }),
     }).catch(() => null)
 
     if (!res?.ok) {
