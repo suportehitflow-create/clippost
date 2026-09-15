@@ -118,8 +118,43 @@ def call_ai(phase_content, error_context=""):
     return None
 
 
+def parse_file_blocks(ai_code):
+    """Extrai (caminho, codigo) de blocos ```filepath:...```.
+
+    Percorre linha a linha em vez de usar regex nao-gulosa: o codigo gerado
+    costuma conter crases triplas dentro de prompts e docstrings, e a regex
+    parava na primeira delas, gravando o arquivo cortado no meio de uma string.
+    So fecha o bloco numa linha que seja exatamente ```.
+    """
+    lines = ai_code.split("\n")
+    starts = []
+    for i, line in enumerate(lines):
+        m = re.match(r'^\s*```filepath:\s*(.+?)\s*$', line)
+        if m:
+            starts.append((i, m.group(1)))
+
+    blocks = []
+    for n, (start, path) in enumerate(starts):
+        limit = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
+        body = []
+        depth = 0
+        i = start + 1
+        while i < limit:
+            line = lines[i]
+            if re.match(r'^\s*```\s*$', line):
+                if depth == 0:
+                    break  # fecha o bloco do arquivo
+                depth -= 1  # fecha uma cerca aninhada dentro do codigo
+            elif re.match(r'^\s*```\S', line):
+                depth += 1  # abre cerca aninhada (ex: ```json num prompt)
+            body.append(line)
+            i += 1
+        blocks.append((path, "\n".join(body)))
+    return blocks
+
+
 def write_files(ai_code, phase_file):
-    file_blocks = re.findall(r'```filepath:(.+?)\n(.*?)```', ai_code, re.DOTALL)
+    file_blocks = parse_file_blocks(ai_code)
     if not file_blocks:
         file_blocks = re.findall(r'```[\w./-]*\n#\s*file:\s*(.+?)\n(.*?)```', ai_code, re.DOTALL)
 
