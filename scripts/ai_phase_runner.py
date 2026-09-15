@@ -106,12 +106,17 @@ def write_files(ai_code, phase_file):
         file_blocks = re.findall(r'```[\w./-]*\n#\s*file:\s*(.+?)\n(.*?)```', ai_code, re.DOTALL)
 
     if file_blocks:
+        repo_root = os.path.abspath(".")
         for filepath, code in file_blocks:
             filepath = filepath.strip()
-            dirpath = os.path.dirname(filepath)
+            target = os.path.abspath(filepath)
+            if os.path.commonpath([repo_root, target]) != repo_root:
+                print(f"  IGNORADO (fora do repo): {filepath}")
+                continue
+            dirpath = os.path.dirname(target)
             if dirpath:
                 os.makedirs(dirpath, exist_ok=True)
-            with open(filepath, "w") as f:
+            with open(target, "w", encoding="utf-8") as f:
                 f.write(code.strip())
             print(f"  Escrito: {filepath}")
     else:
@@ -123,10 +128,13 @@ def write_files(ai_code, phase_file):
 
 def test_build():
     print("  Testando build frontend (npm run build)...")
-    result = subprocess.run(
-        ["npm", "run", "build"],
-        capture_output=True, text=True, timeout=300
-    )
+    try:
+        result = subprocess.run(
+            ["npm", "run", "build"],
+            capture_output=True, text=True, timeout=300
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Frontend build error: npm run build excedeu 300s"
     if result.returncode == 0:
         return True, ""
     return False, f"Frontend build error:\n{result.stderr}\n{result.stdout}"
@@ -181,7 +189,13 @@ print('#'*60)
 failed_phases = []
 for i, phase in enumerate(phases_to_run, 1):
     print(f"\n[{i}/{len(phases_to_run)}] Iniciando {phase}")
-    success = run_phase(phase)
+    try:
+        success = run_phase(phase)
+    except Exception:
+        import traceback
+        print(f"  EXCECAO NAO TRATADA em {phase}:")
+        traceback.print_exc()
+        success = False
     if success:
         print(f"[{i}/{len(phases_to_run)}] OK: {phase}")
     else:
