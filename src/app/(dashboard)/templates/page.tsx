@@ -22,39 +22,47 @@ import {
   Star,
   Flame,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react'
 
-export type VideoLayoutType = 'split_screen' | 'full_speaker' | 'screen_react'
-export type SubtitlePresetType = 'hormozi_yellow' | 'neon_glow' | 'clean_box' | 'minimal_apple'
+export type VideoLayoutType = 'single_speaker' | 'split_screen' | 'screen_react' | 'screen_share' | 'full_speaker'
+export type SubtitlePresetType = 'hormozi_yellow' | 'neon' | 'clean_box' | 'minimal' | 'neon_glow' | 'minimal_apple'
 
 interface TemplateItem {
   id?: string
   name: string
-  layout_type: VideoLayoutType
+  layout: VideoLayoutType
   subtitle_preset: SubtitlePresetType
-  font_family: string
-  highlight_color: string
-  show_username: boolean
-  username: string
-  avatar_url: string
+  font_family?: string
+  highlight_color?: string
+  show_username?: boolean
+  username?: string
+  avatar_url?: string
   is_default: boolean
 }
 
+// Fallback padrão em memória para garantir que a UI nunca trave mesmo sem migration
+const defaultFallbackTemplate = {
+  layout: 'single_speaker' as VideoLayoutType,
+  subtitle_preset: 'hormozi_yellow' as SubtitlePresetType,
+  is_default: true
+}
+
 const LAYOUT_MODELS = [
+  {
+    id: 'single_speaker' as VideoLayoutType,
+    title: 'Full Speaker (9:16)',
+    badge: 'Smart Focus',
+    desc: 'Foco centralizado na pessoa que está falando com recorte dinâmico mantendo o rosto sempre no centro.',
+    idealFor: 'Vlogs, palestras individuais, cortes solo e aulas.'
+  },
   {
     id: 'split_screen' as VideoLayoutType,
     title: 'Interview / Podcast (Split Screen)',
     badge: '50/50 Dual Cam',
     desc: 'Tela dividida ao meio: foco do convidado em cima e apresentador embaixo com enquadramento facial sincronizado.',
     idealFor: 'Podcasts, mesas redondas e entrevistas remotas.'
-  },
-  {
-    id: 'full_speaker' as VideoLayoutType,
-    title: 'Full Speaker (9:16)',
-    badge: 'Smart Focus',
-    desc: 'Foco centralizado na pessoa que está falando com recorte dinâmico mantendo o rosto sempre no centro.',
-    idealFor: 'Vlogs, palestras individuais, cortes solo e aulas.'
   },
   {
     id: 'screen_react' as VideoLayoutType,
@@ -70,13 +78,13 @@ const SUBTITLE_PRESETS = [
     id: 'hormozi_yellow' as SubtitlePresetType,
     name: 'Hormozi Viral',
     tag: 'Mais Retenção',
-    desc: 'Caixa alta, amarelo/verde neon vibrante, sombra e contorno grosso para leitura rápida.',
-    color: '#FACC15',
+    desc: 'Caixa alta, amarelo neon vibrante, sombra e contorno para máxima leitura.',
+    color: '#FFE600',
     sample: 'ESTE SEGREDO VAI MUDAR TUDO'
   },
   {
-    id: 'neon_glow' as SubtitlePresetType,
-    name: 'Neon Glow',
+    id: 'neon' as SubtitlePresetType,
+    name: 'Neon Cyber',
     tag: 'Estilo Gamer',
     desc: 'Brilho rosa e ciano com efeito fluorescente moderno.',
     color: '#06B6D4',
@@ -91,7 +99,7 @@ const SUBTITLE_PRESETS = [
     sample: 'Estratégia prática para aplicar hoje'
   },
   {
-    id: 'minimal_apple' as SubtitlePresetType,
+    id: 'minimal' as SubtitlePresetType,
     name: 'Minimal Apple',
     tag: 'Elegante',
     desc: 'Tipografia SF Pro pura, sem poluição visual, fade sutil e acabamento premium.',
@@ -101,14 +109,14 @@ const SUBTITLE_PRESETS = [
 ]
 
 export default function TemplatesPage() {
-  const [selectedLayout, setSelectedLayout] = useState<VideoLayoutType>('split_screen')
-  const [selectedSubtitle, setSelectedSubtitle] = useState<SubtitlePresetType>('hormozi_yellow')
-  const [highlightColor, setHighlightColor] = useState('#FACC15')
+  const [selectedLayout, setSelectedLayout] = useState<VideoLayoutType>(defaultFallbackTemplate.layout)
+  const [selectedSubtitle, setSelectedSubtitle] = useState<SubtitlePresetType>(defaultFallbackTemplate.subtitle_preset)
+  const [highlightColor, setHighlightColor] = useState('#FFE600')
   const [username, setUsername] = useState('@clippost.ai')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [isDefault, setIsDefault] = useState(true)
-  const [templateName, setTemplateName] = useState('Podcast Split Screen Padrão')
+  const [isDefault, setIsDefault] = useState(defaultFallbackTemplate.is_default)
+  const [templateName, setTemplateName] = useState('Padrão Viral')
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -119,7 +127,7 @@ export default function TemplatesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  // Simulate word highlight in live preview
+  // Simulação de palavra ativa no preview ao vivo
   useEffect(() => {
     const timer = setInterval(() => {
       setActiveWordIdx(prev => (prev + 1) % 4)
@@ -127,51 +135,63 @@ export default function TemplatesPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Load existing templates or brand kit
+  // Carregamento de template com try/catch e fallback em memória
   useEffect(() => {
     async function loadTemplate() {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
-
-      // Try templates table first, fallback to brand_kits
-      const { data: tpl } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (tpl) {
-        setTemplateName(tpl.name || 'Meu Template Padrão')
-        setSelectedLayout(tpl.layout_type || 'split_screen')
-        setSelectedSubtitle(tpl.subtitle_preset || 'hormozi_yellow')
-        setHighlightColor(tpl.highlight_color || '#FACC15')
-        setUsername(tpl.username || '@clippost.ai')
-        setIsDefault(tpl.is_default ?? true)
-        if (tpl.avatar_url) {
-          setAvatarUrl(tpl.avatar_url)
-          setAvatarPreview(tpl.avatar_url)
+      setError('')
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setSelectedLayout(defaultFallbackTemplate.layout)
+          setSelectedSubtitle(defaultFallbackTemplate.subtitle_preset)
+          setIsDefault(defaultFallbackTemplate.is_default)
+          setLoading(false)
+          return
         }
-      } else {
-        // Fallback to brand_kits
-        const { data: bk } = await supabase
-          .from('brand_kits')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (bk) {
-          if (bk.username) setUsername(bk.username)
-          if (bk.avatar_url) {
-            setAvatarUrl(bk.avatar_url)
-            setAvatarPreview(bk.avatar_url)
+
+        // 3. FRONTEND: Tratamento de Fallback na Consulta de Template
+        try {
+          const { data: tpl, error: tplErr } = await supabase
+            .from('templates')
+            .select('*')
+            .order('is_default', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (!tplErr && tpl) {
+            setTemplateName(tpl.name || 'Padrão Viral')
+            const rawLayout = tpl.layout || tpl.layout_type || defaultFallbackTemplate.layout
+            const resolvedLayout = (rawLayout === 'full_speaker' ? 'single_speaker' : rawLayout) as VideoLayoutType
+            setSelectedLayout(resolvedLayout)
+            setSelectedSubtitle((tpl.subtitle_preset || defaultFallbackTemplate.subtitle_preset) as SubtitlePresetType)
+            setHighlightColor(tpl.highlight_color || '#FFE600')
+            setUsername(tpl.username || '@clippost.ai')
+            setIsDefault(tpl.is_default ?? defaultFallbackTemplate.is_default)
+            if (tpl.avatar_url) {
+              setAvatarUrl(tpl.avatar_url)
+              setAvatarPreview(tpl.avatar_url)
+            }
+          } else {
+            console.log('Template não encontrado ou tabela ausente, utilizando defaultFallbackTemplate')
+            setSelectedLayout(defaultFallbackTemplate.layout)
+            setSelectedSubtitle(defaultFallbackTemplate.subtitle_preset)
+            setIsDefault(defaultFallbackTemplate.is_default)
           }
-          if (bk.highlight_color) setHighlightColor(bk.highlight_color)
-          if (bk.caption_preset) setSelectedSubtitle(bk.caption_preset as SubtitlePresetType)
+        } catch (tableErr) {
+          console.warn('Erro ao consultar templates, usando fallback padrão:', tableErr)
+          setSelectedLayout(defaultFallbackTemplate.layout)
+          setSelectedSubtitle(defaultFallbackTemplate.subtitle_preset)
+          setIsDefault(defaultFallbackTemplate.is_default)
         }
+      } catch (err: any) {
+        console.warn('Erro geral ao carregar dados do usuário:', err)
+        setSelectedLayout(defaultFallbackTemplate.layout)
+        setSelectedSubtitle(defaultFallbackTemplate.subtitle_preset)
+        setIsDefault(defaultFallbackTemplate.is_default)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     loadTemplate()
   }, [])
@@ -205,47 +225,55 @@ export default function TemplatesPage() {
     setError('')
     setSavedSuccess(false)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setError('Usuário não autenticado.')
-      setSaving(false)
-      return
-    }
-
-    const payload = {
-      user_id: user.id,
-      name: templateName,
-      layout_type: selectedLayout,
-      subtitle_preset: selectedSubtitle,
-      highlight_color: highlightColor,
-      username,
-      avatar_url: avatarUrl,
-      is_default: isDefault,
-      updated_at: new Date().toISOString()
-    }
-
-    // Try updating templates table; if error, save to brand_kits for compatibility
-    const { error: tplErr } = await supabase.from('templates').upsert(payload)
-    
-    // Also save to brand_kits so current backend worker tasks.py immediately uses it
-    await supabase.from('brand_kits').upsert({
-      user_id: user.id,
-      username,
-      avatar_url: avatarUrl,
-      caption_preset: selectedSubtitle,
-      highlight_color: highlightColor,
-      layout: {
-        type: selectedLayout,
-        avatar: { x: 80, y: 120, w: 96, h: 96 },
-        username: { x: 190, y: 165 },
-        hook: { x: 540, y: 280 },
-        subtitles: { y: 1480, fontSize: 48 }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError('Usuário não autenticado.')
+        setSaving(false)
+        return
       }
-    }, { onConflict: 'user_id' })
 
-    setSaving(false)
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+      const payload = {
+        user_id: user.id,
+        name: templateName,
+        layout: selectedLayout,
+        layout_type: selectedLayout,
+        subtitle_preset: selectedSubtitle,
+        highlight_color: highlightColor,
+        username,
+        avatar_url: avatarUrl,
+        is_default: isDefault,
+        updated_at: new Date().toISOString()
+      }
+
+      const { error: tplErr } = await supabase.from('templates').upsert(payload)
+      if (tplErr) {
+        console.warn('Templates table upsert notice:', tplErr.message)
+      }
+      
+      await supabase.from('brand_kits').upsert({
+        user_id: user.id,
+        username,
+        avatar_url: avatarUrl,
+        caption_preset: selectedSubtitle,
+        highlight_color: highlightColor,
+        layout: {
+          type: selectedLayout,
+          avatar: { x: 80, y: 120, w: 96, h: 96 },
+          username: { x: 190, y: 165 },
+          hook: { x: 540, y: 280 },
+          subtitles: { y: 1480, fontSize: 48 }
+        }
+      }, { onConflict: 'user_id' })
+
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (err: any) {
+      console.error('Erro ao salvar template:', err)
+      setError('Erro ao salvar configurações.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const previewWords = ['ESTE', 'CONTEÚDO', 'VAI', 'VIRALIZAR']
@@ -259,185 +287,204 @@ export default function TemplatesPage() {
             <span className="px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> Templates Globais
             </span>
-            <span className="text-xs text-zinc-500">• Automação em Massa & AutoPilot</span>
+            <span className="text-xs text-zinc-400">Automação em Massa</span>
           </div>
           <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
-            Modelos de Vídeo & Estilos
+            Modelos de Vídeo & Legendas
           </h1>
-          <p className="text-sm text-zinc-400 mt-1 max-w-xl">
-            Defina as regras visuais automáticas que serão aplicadas em todos os novos vídeos gerados pela plataforma.
+          <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
+            Configure presets que o robô usará automaticamente ao processar qualquer vídeo novo pelo AutoPilot ou envio individual.
           </p>
         </div>
 
+        {/* Action Buttons */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2.5 text-xs font-semibold tracking-wide text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm transition-all shadow-lg shadow-orange-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {saving ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" /> Salvando...
+              </>
             ) : savedSuccess ? (
-              <Check className="w-3.5 h-3.5" />
+              <>
+                <CheckCircle2 className="w-4 h-4 text-white" /> Salvo com Sucesso!
+              </>
             ) : (
-              <Star className="w-3.5 h-3.5 fill-current" />
+              <>
+                <Check className="w-4 h-4" /> Salvar como Padrão
+              </>
             )}
-            {saving ? 'Salvando...' : savedSuccess ? 'Salvo!' : 'Salvar como Modelo Padrão'}
           </button>
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Configurator */}
-        <div className="lg:col-span-7 flex flex-col gap-8">
+      {error && (
+        <div className="max-w-7xl mx-auto mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Main Grid: Left Controls (7 cols) + Right Live Preview (5 cols) */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left Column: Layout, Subtitles, Branding */}
+        <div className="lg:col-span-7 space-y-8">
+          
           {/* SECTION 1: VIDEO LAYOUTS */}
-          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2">
-                  <SplitSquareVertical className="w-4 h-4" /> 1. Tipo de Layout de Vídeo
-                </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Como os participantes ou elementos visuais serão enquadrados na tela vertical 9:16.
-                </p>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                  <SplitSquareVertical className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white">1. Tipo de Layout de Vídeo</h2>
+                  <p className="text-xs text-zinc-400">Como a IA enquadrará e dividirá a tela (9:16)</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {LAYOUT_MODELS.map((m) => {
                 const isSelected = selectedLayout === m.id
                 return (
-                  <div
+                  <button
                     key={m.id}
+                    type="button"
                     onClick={() => setSelectedLayout(m.id)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-4 ${
+                    className={`relative text-left p-4 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
                       isSelected
-                        ? 'bg-orange-500/10 border-orange-500/50 shadow-md shadow-orange-500/5 ring-1 ring-orange-500/30'
-                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                        ? 'bg-orange-500/[0.08] border-orange-500/50 shadow-md ring-1 ring-orange-500/30'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12]'
                     }`}
                   >
-                    {/* Schematic Icon */}
-                    <div className="w-12 h-16 rounded-lg bg-black/60 border border-white/10 flex flex-col p-1 gap-1 flex-shrink-0 justify-center">
-                      {m.id === 'split_screen' && (
-                        <>
-                          <div className="flex-1 rounded bg-orange-500/30 border border-orange-500/40" />
-                          <div className="flex-1 rounded bg-orange-500/30 border border-orange-500/40" />
-                        </>
-                      )}
-                      {m.id === 'full_speaker' && (
-                        <div className="w-full h-full rounded bg-orange-500/30 border border-orange-500/40 flex items-center justify-center">
-                          <User className="w-4 h-4 text-orange-400" />
-                        </div>
-                      )}
-                      {m.id === 'screen_react' && (
-                        <div className="w-full h-full relative rounded bg-orange-500/20 border border-orange-500/40">
-                          <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-orange-500/60 border border-white/20" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold text-white flex items-center gap-2">
-                          {m.title}
-                        </span>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
                           {m.badge}
                         </span>
+                        {isSelected && (
+                          <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
                       </div>
-                      <p className="text-xs text-zinc-400 leading-relaxed mb-2">{m.desc}</p>
-                      <span className="text-[11px] text-zinc-500">
-                        <strong className="text-zinc-400 font-medium">Ideal para:</strong> {m.idealFor}
+                      <h3 className="text-sm font-semibold text-white mb-1.5 leading-snug">{m.title}</h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed mb-3">{m.desc}</p>
+                    </div>
+                    <div className="pt-2 border-t border-white/[0.05]">
+                      <span className="text-[10px] text-orange-400/90 font-medium block">
+                        Ideal: {m.idealFor}
                       </span>
                     </div>
-
-                    {isSelected && (
-                      <CheckCircle2 className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
 
           {/* SECTION 2: SUBTITLE PRESETS */}
-          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2 mb-1">
-              <Type className="w-4 h-4" /> 2. Estilo de Legenda Padrão (1-Clique)
-            </h2>
-            <p className="text-xs text-zinc-400 mb-4">
-              Estilo tipográfico que será renderizado automaticamente em cada clipe.
-            </p>
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                  <Type className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white">2. Estilos de Legenda Viral</h2>
+                  <p className="text-xs text-zinc-400">Animações de alto impacto calibradas para retenção</p>
+                </div>
+              </div>
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {SUBTITLE_PRESETS.map((p) => {
-                const isSelected = selectedSubtitle === p.id
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {SUBTITLE_PRESETS.map((sub) => {
+                const isSelected = selectedSubtitle === sub.id || (sub.id === 'neon' && selectedSubtitle === 'neon_glow') || (sub.id === 'minimal' && selectedSubtitle === 'minimal_apple')
                 return (
-                  <div
-                    key={p.id}
-                    onClick={() => {
-                      setSelectedSubtitle(p.id)
-                      setHighlightColor(p.color)
-                    }}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => setSelectedSubtitle(sub.id)}
+                    className={`relative text-left p-4 rounded-xl border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-orange-500/10 border-orange-500/50 shadow-md shadow-orange-500/5 ring-1 ring-orange-500/30'
-                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                        ? 'bg-orange-500/[0.08] border-orange-500/50 shadow-md ring-1 ring-orange-500/30'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12]'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-semibold text-white">{p.name}</span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
-                        {p.tag}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
+                        {sub.tag}
+                      </span>
+                      {isSelected && (
+                        <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color }} />
+                      <h3 className="text-sm font-semibold text-white">{sub.name}</h3>
+                    </div>
+                    <p className="text-xs text-zinc-400 mb-3 leading-relaxed">{sub.desc}</p>
+                    <div className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-white/[0.05] text-center">
+                      <span className="text-[11px] font-bold tracking-tight" style={{ color: sub.color }}>
+                        {sub.sample}
                       </span>
                     </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">{p.desc}</p>
-                    <div
-                      className="px-2.5 py-1.5 rounded-lg bg-black/50 text-[11px] font-bold text-center truncate border border-white/5"
-                      style={{ color: p.color }}
-                    >
-                      {p.sample}
-                    </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
 
-          {/* SECTION 3: IDENTITY */}
-          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2 mb-1">
-              <User className="w-4 h-4" /> 3. Identidade & Autor dos Cortes
-            </h2>
-            <p className="text-xs text-zinc-400 mb-4">
-              Sua marca d'água oficial adicionada no topo de todos os clipes.
-            </p>
+          {/* SECTION 3: BRANDING & WATERMARK */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                <User className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white">3. Identidade Visual do Canal</h2>
+                <p className="text-xs text-zinc-400">Foto de perfil e @ do canal nos cortes automáticos</p>
+              </div>
+            </div>
 
-            <div className="flex items-center gap-5">
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-16 h-16 rounded-full border-2 border-dashed border-white/20 hover:border-orange-500/60 bg-white/[0.02] flex items-center justify-center cursor-pointer overflow-hidden transition-all group flex-shrink-0"
-              >
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-6 h-6 text-zinc-500" />
-                )}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <Upload className="w-4 h-4 text-white" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-2">Avatar do Canal</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-zinc-800 border border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-zinc-400" />
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleAvatarUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-lg text-xs font-medium text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3 h-3" /> Alterar foto
+                    </button>
+                  </div>
                 </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={handleAvatarUpload}
-              />
 
-              <div className="flex-1 min-w-0">
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nome de Usuário (@handle)</label>
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-2">Nome de Usuário (@)</label>
                 <input
                   type="text"
                   value={username}
@@ -457,7 +504,7 @@ export default function TemplatesPage() {
               <Eye className="w-3.5 h-3.5 text-orange-400" /> Preview do Template em Ação
             </span>
             <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 font-mono">
-              {selectedLayout === 'split_screen' ? 'Dual Cam' : selectedLayout === 'full_speaker' ? 'Solo Focus' : 'React PiP'}
+              {selectedLayout === 'split_screen' ? 'Dual Cam' : selectedLayout === 'single_speaker' || selectedLayout === 'full_speaker' ? 'Solo Focus' : 'React PiP'}
             </span>
           </div>
 
@@ -470,7 +517,7 @@ export default function TemplatesPage() {
 
             {/* Screen Canvas (9:16) */}
             <div className="relative flex-1 w-full rounded-[38px] overflow-hidden bg-[#09090b] border border-white/[0.05] flex flex-col select-none">
-              {/* LAYOUT 1: SPLIT SCREEN */}
+              {/* LAYOUT: SPLIT SCREEN */}
               {selectedLayout === 'split_screen' && (
                 <div className="absolute inset-0 flex flex-col">
                   {/* Top: Guest Speaker */}
@@ -495,8 +542,8 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* LAYOUT 2: FULL SPEAKER */}
-              {selectedLayout === 'full_speaker' && (
+              {/* LAYOUT: SINGLE / FULL SPEAKER */}
+              {(selectedLayout === 'single_speaker' || selectedLayout === 'full_speaker') && (
                 <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 via-zinc-900 to-black flex flex-col items-center justify-center">
                   <div className="w-24 h-24 rounded-full bg-zinc-700/60 border-2 border-white/20 flex items-center justify-center shadow-2xl">
                     <User className="w-12 h-12 text-zinc-300" />
@@ -507,8 +554,8 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* LAYOUT 3: SCREEN / REACT */}
-              {selectedLayout === 'screen_react' && (
+              {/* LAYOUT: SCREEN / REACT */}
+              {(selectedLayout === 'screen_react' || selectedLayout === 'screen_share') && (
                 <div className="absolute inset-0 bg-zinc-900 flex flex-col">
                   {/* Main Screen */}
                   <div className="flex-1 bg-gradient-to-b from-zinc-800 to-zinc-950 flex items-center justify-center">
@@ -557,7 +604,7 @@ export default function TemplatesPage() {
                   </div>
                 )}
 
-                {selectedSubtitle === 'neon_glow' && (
+                {(selectedSubtitle === 'neon' || selectedSubtitle === 'neon_glow') && (
                   <div className="inline-block px-3 py-1.5 rounded-xl bg-black/80 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                     <span className="font-extrabold uppercase text-xs tracking-wider text-cyan-300">
                       VEJA O QUE ACONTECEU
@@ -573,7 +620,7 @@ export default function TemplatesPage() {
                   </div>
                 )}
 
-                {selectedSubtitle === 'minimal_apple' && (
+                {(selectedSubtitle === 'minimal' || selectedSubtitle === 'minimal_apple') && (
                   <div className="inline-block drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                     <span className="font-sans font-medium text-xs text-zinc-200">
                       Simplicidade é a sofisticação máxima

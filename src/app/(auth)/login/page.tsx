@@ -32,6 +32,28 @@ export default function LoginPage() {
     if (error) { setError(error.message); setGoogleLoading(false) }
   }
 
+  const handleQuickTestLogin = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      // Credenciais da conta de teste pré-configurada
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: "teste@clippost.com",
+        password: "TestePassword123!",
+      })
+      if (signInErr) throw signInErr
+      router.push("/dashboard")
+    } catch (err: any) {
+      console.error("Erro no login de teste:", err)
+      // Fallback: se não estiver logada/criada ainda, preenche os inputs na tela
+      setEmail("teste@clippost.com")
+      setPassword("TestePassword123!")
+      setError("Credenciais de teste preenchidas. Se a conta ainda não existir no Supabase, crie-a com o e-mail teste@clippost.com.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div style={{ width: '100%', maxWidth: '400px' }}>
       <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '1rem', padding: '2rem' }}>
@@ -72,6 +94,37 @@ export default function LoginPage() {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        {/* Quick Test Login / Acesso Rápido */}
+        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--card-border)' }}>
+          <button
+            type="button"
+            onClick={handleQuickTestLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              padding: '0.7rem',
+              borderRadius: '0.5rem',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px dashed rgba(255, 255, 255, 0.2)',
+              color: 'var(--foreground)',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            🧪 Entrar com Conta de Teste
+          </button>
+          <span style={{ display: 'block', textAlign: 'center', marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)' }}>
+            1 clique para teste rápido (teste@clippost.com)
+          </span>
+        </div>
+
         <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
           Não tem conta? <Link href="/signup" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Criar conta grátis →</Link>
         </p>
