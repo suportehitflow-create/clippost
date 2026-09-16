@@ -1,13 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Scissors, LayoutDashboard, Upload, Calendar, CreditCard, LogOut } from 'lucide-react'
+import { Scissors, LayoutDashboard, Upload, Calendar, CreditCard, LogOut, Tv2, Palette } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 const NAV = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/upload', icon: Upload, label: 'Novo clipe' },
+  { href: '/autopilot', icon: Tv2, label: 'AutoPilot' },
+  { href: '/brand-kit', icon: Palette, label: 'Brand Kit' },
   { href: '/schedule', icon: Calendar, label: 'Agendamentos' },
   { href: '/billing', icon: CreditCard, label: 'Plano' },
 ]
