@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -15,13 +15,30 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Verifica se já está logado sem disparar loop cíclico
+  useEffect(() => {
+    // Remove qualquer resquício de cookie antigo de mock
+    document.cookie = "clippost_demo_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("clippost_demo_auth")
+    }
+
+    let active = true
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (active && user) {
+        window.location.href = '/dashboard'
+      }
+    })
+    return () => { active = false }
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError(error.message); setLoading(false); return }
-    router.push('/dashboard')
+    window.location.href = '/dashboard'
   }
 
   async function handleGoogle() {
@@ -34,36 +51,44 @@ export default function LoginPage() {
     if (error) { setError(error.message); setGoogleLoading(false) }
   }
 
-  // 🧪 ACESSO IMEDIATO DE 1 CLIQUE (SEM SENHA E SEM CONFIRMAÇÃO DE E-MAIL)
+  // 🧪 LOGIN REAL DA CONTA DE TESTE VIA SDK OFICIAL SUPABASE
   const handleQuickTestLogin = async () => {
     setTestLoading(true)
     setError('')
     
     try {
-      // 1. Grava cookies e localStorage de sessão de teste imediata
-      document.cookie = "clippost_demo_auth=true; path=/; max-age=604800; SameSite=Lax"
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("clippost_demo_auth", "true")
-        localStorage.setItem("clippost_demo_user_id", "a0000000-0000-0000-0000-000000000001")
-        localStorage.setItem("clippost_demo_user_email", "teste@clippost.com")
+      const { error } = await supabase.auth.signInWithPassword({
+        email: 'teste@clippost.com',
+        password: 'TestePassword123!',
+      })
+      
+      if (error) {
+        // Se a conta ainda não foi criada no banco com o SQL, tenta criar automaticamente
+        if (error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')) {
+          const signUpRes = await supabase.auth.signUp({
+            email: 'teste@clippost.com',
+            password: 'TestePassword123!',
+            options: {
+              data: { full_name: 'Usuário de Teste' }
+            }
+          })
+          if (signUpRes.error) {
+            throw new Error(
+              'Conta de teste não configurada no Supabase. Execute o script 0009_test_user_seed.sql no painel do Supabase.'
+            )
+          }
+        } else {
+          throw error
+        }
       }
 
-      // 2. Tenta autenticar no Supabase Auth em segundo plano (se as credenciais existirem)
-      try {
-        await supabase.auth.signInWithPassword({
-          email: "teste@clippost.com",
-          password: "TestePassword123!",
-        })
-      } catch (e) {
-        console.warn("Autenticação em background ignorada, entrando via demo session:", e)
-      }
-
-      // 3. Entra direto no Dashboard sem pedir nada
-      window.location.href = "/dashboard"
+      // Redirecionamento limpo com token JWT gravado nos cookies pelo SDK
+      window.location.href = '/dashboard'
     } catch (err: any) {
-      console.warn("Erro ao entrar:", err)
-      // Fallback final infalível
-      window.location.href = "/dashboard"
+      console.error('Erro no login de teste:', err)
+      setError(err.message || 'Falha ao autenticar conta de teste.')
+    } finally {
+      setTestLoading(false)
     }
   }
 
@@ -84,7 +109,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE (DESTAQUE NO TOPO) */}
+        {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE */}
         <button
           type="button"
           onClick={handleQuickTestLogin}
@@ -109,7 +134,7 @@ export default function LoginPage() {
           }}
         >
           {testLoading ? (
-            'Entrando no painel...'
+            'Autenticando via Supabase...'
           ) : (
             <>
               <span>🧪 Entrar com Conta de Teste</span>
@@ -120,7 +145,7 @@ export default function LoginPage() {
 
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>
-            ⚡ 1 clique direto • Sem senha • Sem confirmar e-mail
+            ⚡ 1 clique direto • Sessão JWT Real • Sem loop
           </span>
         </div>
 

@@ -2,9 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Verifica se o usuário ativou o modo de teste rápido de 1 clique
-  const isDemo = request.cookies.get('clippost_demo_auth')?.value === 'true'
-
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -24,10 +21,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Validação estrita da sessão oficial Supabase
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuth = request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup')
+
   const isProtected = request.nextUrl.pathname.startsWith('/dashboard') ||
     request.nextUrl.pathname.startsWith('/upload') ||
     request.nextUrl.pathname.startsWith('/project') ||
@@ -38,10 +37,11 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/templates') ||
     request.nextUrl.pathname.startsWith('/clips')
 
-  if (!user && !isDemo && isProtected) {
+  if (!user && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if ((user || isDemo) && isAuth) {
+
+  if (user && isAuth) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
