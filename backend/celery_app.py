@@ -37,4 +37,10 @@ celery.conf.beat_schedule = {
         "task": "check_and_publish_scheduled_posts",
         "schedule": 60.0,
     },
+    # Canal AutoPilot: 15 min é suficiente para pegar um upload logo após sair,
+    # sem martelar o RSS do YouTube a cada minuto.
+    "autopilot-canais": {
+        "task": "check_channel_watches",
+        "schedule": 900.0,
+    },
 }

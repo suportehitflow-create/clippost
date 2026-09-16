@@ -15,7 +15,11 @@ import os
 import shutil
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
+
+import httpx
 
 import yt_dlp
 from celery_app import celery
@@ -51,6 +55,87 @@ def process_bulk_videos(urls: list[str], user_id: str, clip_duration: str = "aut
         except Exception as e:
             results.append({"url": url, "status": "error", "error": str(e)})
     return {"queued": len(results), "results": results}
+
+
+RSS_NS = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
+
+
+@celery.task(name="check_channel_watches")
+def check_channel_watches():
+    """Canal AutoPilot: detecta vídeo novo nos canais monitorados e enfileira o corte.
+
+    Roda no beat que já existe, lendo o RSS público do YouTube (sem chave de API).
+    O baseline gravado no cadastro evita clipar o vídeo antigo que está no topo do feed.
+    """
+    watches = (
+        supabase.table("channel_watches").select("*").eq("is_active", True).execute().data or []
+    )
+    novos = 0
+
+    for w in watches:
+        erro = None
+        try:
+            resp = httpx.get(
+                "https://www.youtube.com/feeds/videos.xml",
+                params={"channel_id": w["channel_id"]},
+                timeout=20,
+                follow_redirects=True,
+            )
+            resp.raise_for_status()
+
+            for entry in ET.fromstring(resp.text).findall("atom:entry", RSS_NS)[:5]:
+                video_id = entry.find("yt:videoId", RSS_NS).text
+                title = entry.find("atom:title", RSS_NS).text
+
+                # O feed vem do mais novo para o mais antigo: ao alcançar o baseline,
+                # tudo daí para baixo já existia quando o canal foi cadastrado.
+                if video_id == w.get("baseline_video_id"):
+                    break
+
+                ja_processado = (
+                    supabase.table("autopilot_processed")
+                    .select("video_id")
+                    .eq("user_id", w["user_id"]).eq("video_id", video_id)
+                    .execute().data
+                )
+                if ja_processado:
+                    continue
+
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                projeto = supabase.table("projects").insert({
+                    "user_id": w["user_id"],
+                    "title": title,
+                    "source_type": "url",
+                    "source_url": url,
+                    "platform": "youtube",
+                    "status": "pending",
+                }).execute().data[0]
+
+                # Registra antes de enfileirar: se o worker caísse entre as duas
+                # etapas, o mesmo vídeo voltaria a virar projeto no ciclo seguinte.
+                supabase.table("autopilot_processed").insert({
+                    "user_id": w["user_id"],
+                    "video_id": video_id,
+                    "watch_id": w["id"],
+                    "project_id": projeto["id"],
+                }).execute()
+
+                process_youtube_video.delay(
+                    url, w["user_id"], w.get("clip_duration", "auto"), projeto["id"]
+                )
+                novos += 1
+                print(f"[autopilot] {w.get('channel_name') or w['channel_id']}: {title}")
+
+        except Exception as e:
+            erro = str(e)[:500]
+            print(f"[autopilot] erro no canal {w['channel_id']}: {erro}")
+
+        supabase.table("channel_watches").update({
+            "last_checked_at": datetime.now(timezone.utc).isoformat(),
+            "last_error": erro,
+        }).eq("id", w["id"]).execute()
+
+    return {"canais": len(watches), "novos": novos}
 
 
 @celery.task(name="process_youtube_video")
