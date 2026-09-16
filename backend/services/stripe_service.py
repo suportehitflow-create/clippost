@@ -16,7 +16,10 @@ _SUPABASE_KEY = (
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     or ""
 )
-_supabase = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+try:
+    _supabase = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+except Exception:
+    _supabase = None
 
 PRO_PRICE_ID = os.environ.get("STRIPE_PRO_PRICE_ID", "")
 WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")

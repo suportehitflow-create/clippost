@@ -11,8 +11,8 @@ primary_region = "gru"
 
 [processes]
   app = "uvicorn main:app --host 0.0.0.0 --port 8000"
-  worker = "celery -A celery_app worker --loglevel=info --concurrency=2"
-  beat = "celery -A celery_app beat --loglevel=info"
+  worker = "sh -c 'celery -A celery_app worker --loglevel=info --concurrency=2 || sleep 86400'"
+  beat = "sh -c 'celery -A celery_app beat --loglevel=info || sleep 86400'"
 
 [http_service]
   internal_port = 8000

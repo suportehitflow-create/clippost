@@ -85,7 +85,10 @@ SUPABASE_KEY = (
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     or ""
 )
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception:
+    supabase = None
 
 
 class ProcessRequest(BaseModel):

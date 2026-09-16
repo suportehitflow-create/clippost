@@ -14,10 +14,21 @@ from services.upload_post import publish_video, UploadPostError
 
 load_dotenv()
 
-supabase: Client = create_client(
-    os.environ["SUPABASE_URL"],
-    os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
+_SUPABASE_URL = (
+    os.environ.get("SUPABASE_URL")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    or "https://alntulecjshpbrhesaoo.supabase.co"
 )
+_SUPABASE_KEY = (
+    os.environ.get("SUPABASE_KEY")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM"
+)
+try:
+    supabase: Client = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+except Exception:
+    supabase = None
 
 # Nome na tabela scheduled_posts -> nome na Upload-Post
 PLATFORM_MAP = {"tiktok": "tiktok", "instagram": "instagram", "youtube_shorts": "youtube"}

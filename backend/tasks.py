@@ -46,7 +46,10 @@ SUPABASE_KEY = (
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     or ""
 )
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception:
+    supabase = None
 
 
 @celery.task(name="process_bulk_videos")
@@ -233,7 +236,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as e:
             print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
 
-    check_clip_limit(user_id)
+    try:
+        check_clip_limit(user_id)
+    except Exception as limit_err:
+        print(f"[tasks] check_clip_limit warning: {limit_err}")
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")

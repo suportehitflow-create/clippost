@@ -47,20 +47,41 @@ export default function UploadPage() {
     setFetching(true)
     setError('')
     setInfo(null)
+
+    // 1. Extração imediata via oEmbed (sem backend, zero CORS, instantâneo)
+    try {
+      const oeRes = await fetch('https://www.youtube.com/oembed?url=' + encodeURIComponent(youtubeUrl.trim()) + '&format=json')
+      if (oeRes.ok) {
+        const oe = await oeRes.json()
+        setInfo({
+          title: oe.title,
+          thumbnail: oe.thumbnail_url || '',
+          duration: 0,
+          uploader: oe.author_name || '',
+          platform: 'youtube',
+          formats: [{ id: 'auto', label: '1080p / Melhor disponível', height: 1080 }],
+        })
+        setSelectedFormat('auto')
+      }
+    } catch (oeErr) {
+      // continua para o backend
+    }
+
+    // 2. Se backend estiver ativo, complementa formatos
     try {
       const res = await fetch(`${API}/api/sources/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: youtubeUrl.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Erro ao buscar informações do vídeo.')
-      setInfo(data)
-      // Pré-seleciona 720p ou a melhor disponível
-      const pref = data.formats.find((f: VideoFormat) => f.height === 720) || data.formats[0]
-      setSelectedFormat(pref?.id || null)
+      }).catch(() => null)
+      if (res && res.ok) {
+        const data = await res.json()
+        setInfo(data)
+        const pref = data.formats.find((f: VideoFormat) => f.height === 720) || data.formats[0]
+        setSelectedFormat(pref?.id || null)
+      }
     } catch (e: any) {
-      setError(e.message)
+      console.warn('Backend info fallback:', e)
     } finally {
       setFetching(false)
     }
@@ -81,7 +102,7 @@ export default function UploadPage() {
         title: mode === 'url' ? (info?.title || youtubeUrl) : (file?.name ?? 'Upload'),
         source_url: mode === 'url' ? youtubeUrl : null,
         source_type: mode,
-        status: 'pending',
+        status: 'processing',
       })
       .select()
       .single()

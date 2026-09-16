@@ -15,7 +15,7 @@ celery = Celery(
 # O Redis gerenciado derruba conexões ociosas ("Broken pipe" / "Connection closed
 # by server" nos logs do worker). Sem keepalive e health check o worker só
 # percebe a queda ao tentar usar o socket, e tarefas ficam paradas na fila.
-celery.conf.broker_connection_retry_on_startup = True
+celery.conf.broker_connection_retry_on_startup = False
 celery.conf.broker_transport_options = {
     "socket_keepalive": True,
     "health_check_interval": 30,

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 type Project = {
   id: string
@@ -51,6 +52,7 @@ export default function ProjectClient({
   project: Project
   clips: Clip[]
 }) {
+  const supabase = createClient()
   const [clips, setClips] = useState(initialClips)
   const [status, setStatus] = useState(project.status)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -72,42 +74,91 @@ export default function ProjectClient({
     return () => clearInterval(timer)
   }, [isPendingOrProcessing])
 
-  // Poll job status while processing
+  // Poll job status while processing - direct Supabase query (zero CORS, immune to 502)
   useEffect(() => {
     if (status === 'done' || status === 'failed') return
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
-    const interval = setInterval(async () => {
+    const checkStatus = async () => {
+      // 1. Direct Supabase query (instant, resilient)
       try {
-        const res = await fetch(`${apiUrl}/api/jobs/${project.id}`)
-        if (!res.ok) return
-        const data = await res.json()
-        if (data.status) setStatus(data.status)
-        if (data.clips && data.clips.length > 0) setClips(data.clips)
-        if (data.error_message) setErrorMessage(data.error_message)
-        if (data.status === 'done' || data.status === 'failed') {
-          clearInterval(interval)
-        }
-      } catch (err) {
-        console.error('Polling error:', err)
-      }
-    }, 3000)
+        const { data: dbProj } = await supabase
+          .from('projects')
+          .select('status, error_message')
+          .eq('id', project.id)
+          .single()
 
+        if (dbProj) {
+          if (dbProj.status && dbProj.status !== status) {
+            setStatus(dbProj.status)
+          }
+          if (dbProj.error_message) {
+            setErrorMessage(dbProj.error_message)
+          }
+        }
+
+        const { data: dbClips } = await supabase
+          .from('clips')
+          .select('*')
+          .eq('project_id', project.id)
+          .order('score', { ascending: false })
+
+        if (dbClips && dbClips.length > 0) {
+          setClips(dbClips as any)
+          if (dbProj?.status === 'done' || !dbProj?.status || dbProj?.status === 'processing') {
+            setStatus('done')
+          }
+        }
+      } catch (dbErr) {
+        // silent
+      }
+
+      // 2. Secondary check to API (silent catch)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
+        const res = await fetch(`${apiUrl}/api/jobs/${project.id}`).catch(() => null)
+        if (res && res.ok) {
+          const data = await res.json()
+          if (data.status) setStatus(data.status)
+          if (data.clips && data.clips.length > 0) setClips(data.clips)
+          if (data.error_message) setErrorMessage(data.error_message)
+          if (data.status === 'done' || data.status === 'failed') {
+            setStatus(data.status)
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    checkStatus()
+    const interval = setInterval(checkStatus, 3000)
     return () => clearInterval(interval)
   }, [project.id, status])
 
   const handleManualCheck = async () => {
     setIsRetrying(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
     try {
-      const res = await fetch(`${apiUrl}/api/jobs/${project.id}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.status) setStatus(data.status)
-        if (data.clips && data.clips.length > 0) setClips(data.clips)
+      const { data: dbProj } = await supabase
+        .from('projects')
+        .select('status, error_message')
+        .eq('id', project.id)
+        .single()
+
+      if (dbProj?.status) setStatus(dbProj.status)
+      if (dbProj?.error_message) setErrorMessage(dbProj.error_message)
+
+      const { data: dbClips } = await supabase
+        .from('clips')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('score', { ascending: false })
+
+      if (dbClips && dbClips.length > 0) {
+        setClips(dbClips as any)
+        setStatus('done')
       }
     } catch (e) {
-      console.error(e)
+      console.warn(e)
     } finally {
       setIsRetrying(false)
     }
