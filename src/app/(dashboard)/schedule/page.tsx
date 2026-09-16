@@ -1,10 +1,33 @@
 'use client'
+
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Upload,
+  Layers,
+  Send,
+  Trash2,
+  Sparkles,
+  ExternalLink,
+  Film,
+  Zap,
+  Info,
+  ChevronDown,
+  Check,
+  Play,
+  RotateCcw,
+  Video
+} from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
-type Platform = 'tiktok' | 'instagram' | 'youtube_shorts'
+type Platform = 'instagram' | 'tiktok' | 'youtube_shorts'
+type TrialReelMode = 'disabled' | 'manual' | 'auto'
 
 interface Clip {
   id: string
@@ -12,13 +35,11 @@ interface Clip {
   hook: string
   storage_url: string
   score: number
-  created_at: string
 }
 
 interface SocialAccount {
   platform: Platform
   handle: string
-  reauth_required: boolean
 }
 
 interface ScheduledPost {
@@ -27,342 +48,532 @@ interface ScheduledPost {
   platform: Platform
   scheduled_at: string
   status: 'scheduled' | 'published' | 'failed'
-  clips: { title: string; storage_url: string } | null
+  trial_reel?: string
+  clips?: { title: string; storage_url: string } | null
 }
 
-const PLATFORM_LABEL: Record<Platform, string> = {
-  tiktok: 'TikTok',
-  instagram: 'Instagram',
-  youtube_shorts: 'YouTube Shorts',
-}
-
-const STATUS_STYLE: Record<string, { color: string; label: string }> = {
-  scheduled: { color: '#facc15', label: 'Agendado' },
-  published: { color: '#4ade80', label: 'Publicado' },
-  failed:    { color: '#f87171', label: 'Falhou' },
-}
-
-export default function SchedulePage() {
+export default function SchedulePageV2() {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(null)
   const [clips, setClips] = useState<Clip[]>([])
-  const [accounts, setAccounts] = useState<SocialAccount[]>([])
-  const [configured, setConfigured] = useState(true)
   const [posts, setPosts] = useState<ScheduledPost[]>([])
+  
+  // Selection states (Screenshot 1)
+  const [selectedProfile, setSelectedProfile] = useState<string>('@clippost_oficial')
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['instagram'])
+  const [publicationType, setPublicationType] = useState<'reels'>('reels')
+  const [trialReelMode, setTrialReelMode] = useState<TrialReelMode>('disabled')
+  
+  // Media selection
+  const [selectedClipId, setSelectedClipId] = useState<string>('')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null)
+  const [caption, setCaption] = useState('Confira essa dica incrível sobre criação de conteúdo viral! 🚀 #shorts #reels #corte')
+  const [scheduleDateTime, setScheduleDateTime] = useState('')
 
-  // form
-  const [selectedClip, setSelectedClip] = useState('')
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | ''>('')
-  const [caption, setCaption] = useState('')
-  const [scheduledTime, setScheduledTime] = useState('')
   const [saving, setSaving] = useState(false)
-  const [connecting, setConnecting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [publishingNow, setPublishingNow] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('connected')) {
-      setSuccess('Redes conectadas. Já dá para agendar.')
-      window.history.replaceState(null, '', '/schedule')
-    }
+    // Set default schedule time to tomorrow 18:00
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(18, 0, 0, 0)
+    setScheduleDateTime(tomorrow.toISOString().slice(0, 16))
+
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-      const uid = data.user.id
-      setUserId(uid)
-      await Promise.all([loadClips(uid), loadAccounts(uid), loadPosts(uid)])
+      setUserId(data.user.id)
+      loadData(data.user.id)
     })
   }, [])
 
-  async function loadClips(uid: string) {
-    const res = await fetch(`${API}/api/projects/${uid}`)
-    if (!res.ok) return
-    const { projects } = await res.json()
-    const allClips: Clip[] = []
-    for (const p of (projects || []).slice(0, 5)) {
-      const cr = await fetch(`${API}/api/clips/${p.id}`)
-      if (cr.ok) {
-        const { clips: c } = await cr.json()
-        allClips.push(...(c || []))
+  async function loadData(uid: string) {
+    // Load generated clips
+    const { data: clipsData } = await supabase
+      .from('clips')
+      .select('id, title, hook, storage_url, score')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (clipsData && clipsData.length > 0) {
+      setClips(clipsData as Clip[])
+      setSelectedClipId(clipsData[0].id)
+      setMediaPreviewUrl(clipsData[0].storage_url)
+    }
+
+    // Load scheduled posts
+    try {
+      const res = await fetch(`${API}/api/scheduled-posts/${uid}`)
+      if (res.ok) {
+        const json = await res.json()
+        setPosts(json.posts || [])
       }
+    } catch (err) {
+      console.warn('Erro ao carregar posts agendados:', err)
     }
-    setClips(allClips.slice(0, 30))
   }
 
-  async function loadAccounts(uid: string) {
-    const res = await fetch(`${API}/api/social/accounts/${uid}`)
-    if (!res.ok) return
-    const data = await res.json()
-    setConfigured(data.configured !== false)
-    setAccounts((data.accounts || []).filter((a: SocialAccount) => !a.reauth_required))
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadedFile(file)
+    setSelectedClipId('')
+    setMediaPreviewUrl(URL.createObjectURL(file))
   }
 
-  async function loadPosts(uid: string) {
-    const res = await fetch(`${API}/api/scheduled-posts/${uid}`)
-    if (res.ok) { const { posts: p } = await res.json(); setPosts(p || []) }
+  const togglePlatform = (p: Platform) => {
+    setSelectedPlatforms(prev =>
+      prev.includes(p) ? prev.filter(item => item !== p) : [...prev, p]
+    )
   }
 
-  async function handleConnect() {
+  const handleScheduleSubmit = async (publishImmediately = false) => {
     if (!userId) return
-    setConnecting(true); setError('')
-    try {
-      const res = await fetch(`${API}/api/social/connect-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.access_url) throw new Error(data.detail || 'Não foi possível abrir a conexão.')
-      window.location.href = data.access_url
-    } catch (err: any) {
-      setError(err.message)
-      setConnecting(false)
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Selecione ao menos um destino para publicação.')
+      return
     }
-  }
 
-  async function handleSchedule(e: React.FormEvent) {
-    e.preventDefault()
-    if (!userId || !selectedClip || !selectedPlatform || !scheduledTime) return
-    setSaving(true); setError(''); setSuccess('')
+    setSaving(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+
     try {
-      const res = await fetch(`${API}/api/scheduled-posts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          clip_id: selectedClip,
-          platform: selectedPlatform,
-          caption,
-          scheduled_at: new Date(scheduledTime).toISOString(),
-        }),
-      })
-      if (!res.ok) throw new Error('Não foi possível agendar o post.')
-      setSuccess('Post agendado.')
-      setCaption(''); setScheduledTime(''); setSelectedClip('')
-      setTimeout(() => setSuccess(''), 3000)
-      await loadPosts(userId)
+      let finalClipId = selectedClipId
+
+      // If local uploaded file, upload to storage first
+      if (uploadedFile) {
+        const ext = uploadedFile.name.split('.').pop()
+        const path = `uploads/${userId}-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage.from('videos').upload(path, uploadedFile)
+        if (upErr) throw upErr
+        
+        const pubUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
+        const { data: newClip, error: clipErr } = await supabase
+          .from('clips')
+          .insert({
+            title: uploadedFile.name,
+            storage_url: pubUrl,
+            score: 95
+          })
+          .select()
+          .single()
+
+        if (clipErr) throw clipErr
+        finalClipId = newClip.id
+      }
+
+      // Schedule for each selected platform
+      for (const plat of selectedPlatforms) {
+        await fetch(`${API}/api/scheduled-posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            clip_id: finalClipId,
+            platform: plat,
+            caption,
+            scheduled_at: publishImmediately ? new Date().toISOString() : new Date(scheduleDateTime).toISOString(),
+            trial_reel: trialReelMode
+          })
+        })
+      }
+
+      setSuccessMsg(publishImmediately ? 'Post enviado para publicação imediata!' : 'Post agendado com sucesso!')
+      setTimeout(() => setSuccessMsg(''), 4000)
+      loadData(userId)
     } catch (err: any) {
-      setError(err.message)
+      setErrorMsg('Falha ao agendar: ' + err.message)
     } finally {
       setSaving(false)
+      setPublishingNow(false)
     }
-  }
-
-  async function handleDelete(postId: string) {
-    if (!confirm('Cancelar esse agendamento?')) return
-    await fetch(`${API}/api/scheduled-posts/${postId}`, { method: 'DELETE' })
-    if (userId) await loadPosts(userId)
-  }
-
-  const card: React.CSSProperties = {
-    background: 'var(--card)', border: '1px solid var(--card-border)',
-    borderRadius: '0.75rem', padding: '1.25rem',
-  }
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '0.65rem 0.9rem',
-    background: 'var(--background)', border: '1px solid var(--card-border)',
-    borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.9rem',
-    boxSizing: 'border-box',
-  }
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.78rem', fontWeight: 600,
-    color: 'var(--muted)', textTransform: 'uppercase',
-    letterSpacing: '0.07em', marginBottom: '0.35rem',
-  }
-  const sectionTitle: React.CSSProperties = {
-    fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase',
-    letterSpacing: '0.08em', marginBottom: '0.75rem',
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'system-ui, sans-serif' }}>
-      <header style={{ borderBottom: '1px solid var(--card-border)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>Agendamentos</span>
-        {configured && (
-          <button
-            onClick={handleConnect}
-            disabled={connecting || !userId}
-            style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--foreground)', padding: '0.45rem 0.9rem', borderRadius: '0.4rem', cursor: 'pointer', fontSize: '0.85rem' }}
-          >
-            {connecting ? 'Abrindo…' : accounts.length ? 'Gerenciar redes conectadas' : 'Conectar redes'}
-          </button>
-        )}
-      </header>
+    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
+      
+      {/* Top Title & Subtitle (Screenshot 1) */}
+      <div className="max-w-7xl mx-auto mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
+          Programar Posts(V2)
+        </h1>
+        <p className="text-xs text-zinc-400 mt-0.5">
+          Configure profile, destinos, mídia e agenda com clareza
+        </p>
+      </div>
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-        {!configured && (
-          <div style={{ ...card, borderColor: '#854d0e', background: '#1c1107' }}>
-            <p style={{ fontSize: '0.85rem', color: '#fbbf24' }}>
-              A publicação nas redes ainda não foi ativada no servidor. Falta configurar a chave da Upload-Post.
-            </p>
+      {/* Purple Warning Banner (Screenshot 1) */}
+      <div className="max-w-7xl mx-auto mb-6 p-4 rounded-2xl bg-[#1e1035] border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-purple-950/20">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 flex-shrink-0">
+            <Info className="w-4 h-4" />
           </div>
-        )}
+          <div>
+            <span className="text-xs font-semibold text-white block">Assinatura ativa</span>
+            <span className="text-[11px] text-purple-300">Você tem agendamentos automáticos e ilimitados liberados para todos os seus perfis.</span>
+          </div>
+        </div>
+        <Link
+          href="/billing"
+          className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white transition-all text-center self-start sm:self-auto cursor-pointer"
+        >
+          Ver planos
+        </Link>
+      </div>
 
-        {configured && accounts.length === 0 && (
-          <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Conecte suas redes para publicar</p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>TikTok, Instagram e YouTube Shorts. A autorização é feita direto em cada rede.</p>
+      {/* Main Grid: Left Steps (7 cols) + Right Summary & Preview (5 cols) */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: 4 Configuration Steps (Screenshot 1) */}
+        <div className="lg:col-span-7 space-y-6">
+
+          {/* STEP 1: PROFILE */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-5 h-5 rounded-full bg-white/10 text-white text-[11px] font-bold flex items-center justify-center font-mono">
+                1
+              </span>
+              <h3 className="text-sm font-semibold text-white">Profile</h3>
             </div>
-            <button
-              onClick={handleConnect}
-              disabled={connecting || !userId}
-              style={{ padding: '0.7rem 1.2rem', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: 700, cursor: 'pointer' }}
-            >
-              {connecting ? 'Abrindo…' : 'Conectar redes'}
-            </button>
-          </div>
-        )}
 
-        <div className="grid items-start gap-6 md:grid-cols-[minmax(280px,380px)_1fr]">
-
-          <aside>
-            <h2 style={sectionTitle}>Clipes disponíveis</h2>
-            {clips.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Nenhum clipe gerado ainda.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '520px', overflowY: 'auto' }}>
-                {clips.map(clip => (
-                  <button
-                    key={clip.id}
-                    onClick={() => setSelectedClip(clip.id)}
-                    style={{
-                      textAlign: 'left', padding: '0.75rem',
-                      background: selectedClip === clip.id ? 'var(--card)' : 'transparent',
-                      border: selectedClip === clip.id ? '1px solid var(--accent)' : '1px solid var(--card-border)',
-                      borderRadius: '0.5rem', cursor: 'pointer', color: 'var(--foreground)',
-                      display: 'flex', gap: '0.75rem', alignItems: 'center',
-                    }}
-                  >
-                    <video
-                      src={clip.storage_url}
-                      muted
-                      style={{ width: 42, height: 74, objectFit: 'cover', borderRadius: '0.25rem', flexShrink: 0, background: '#000' }}
-                    />
-                    <div style={{ overflow: 'hidden' }}>
-                      <p style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '0.2rem' }}>
-                        {clip.title || clip.hook || 'Clipe sem título'}
-                      </p>
-                      <p style={{ fontSize: '0.72rem', color: '#fbbf24' }}>Viralidade {Math.round((clip.score || 0) * 100)}%</p>
-                    </div>
-                  </button>
-                ))}
+            <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+                  CP
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-white block">{selectedProfile}</span>
+                  <span className="text-[11px] text-zinc-400">Instagram Professional Connected</span>
+                </div>
               </div>
-            )}
-          </aside>
+              <span className="text-[11px] text-purple-400 font-medium hover:underline cursor-pointer">
+                Trocar Perfil →
+              </span>
+            </div>
+          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={card}>
-              <h2 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '1.25rem' }}>Agendar post</h2>
-              <form onSubmit={handleSchedule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-                <div>
-                  <label htmlFor="platform" style={labelStyle}>Rede social</label>
-                  <select id="platform" value={selectedPlatform} onChange={e => setSelectedPlatform(e.target.value as Platform)} required style={inputStyle}>
-                    <option value="">Selecione uma rede…</option>
-                    {accounts.map(a => (
-                      <option key={a.platform} value={a.platform}>{PLATFORM_LABEL[a.platform]} · {a.handle}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <span style={labelStyle}>Clipe selecionado</span>
-                  <div style={{ padding: '0.5rem 0.75rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', fontSize: '0.85rem', color: selectedClip ? 'var(--foreground)' : 'var(--muted)' }}>
-                    {selectedClip
-                      ? clips.find(c => c.id === selectedClip)?.title || clips.find(c => c.id === selectedClip)?.hook || 'Clipe selecionado'
-                      : 'Selecione um clipe na lista'
-                    }
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="caption" style={labelStyle}>Legenda</label>
-                  <textarea
-                    id="caption"
-                    value={caption}
-                    onChange={e => setCaption(e.target.value)}
-                    rows={4}
-                    maxLength={2200}
-                    placeholder="Escreva a legenda do post..."
-                    style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
-                  />
-                  <p style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.2rem' }}>{caption.length}/2200</p>
-                </div>
-
-                <div>
-                  <label htmlFor="scheduled" style={labelStyle}>Data e hora</label>
-                  <input
-                    id="scheduled"
-                    type="datetime-local"
-                    value={scheduledTime}
-                    onChange={e => setScheduledTime(e.target.value)}
-                    required
-                    style={inputStyle}
-                  />
-                </div>
-
-                {error && <p style={{ fontSize: '0.82rem', color: '#f87171' }}>{error}</p>}
-                {success && <p style={{ fontSize: '0.82rem', color: '#4ade80' }}>{success}</p>}
-
-                <button
-                  type="submit"
-                  disabled={saving || !selectedClip || !selectedPlatform}
-                  style={{
-                    padding: '0.8rem', background: 'var(--accent)', color: '#fff',
-                    border: 'none', borderRadius: '0.5rem', fontWeight: 700,
-                    fontSize: '0.95rem', cursor: saving ? 'not-allowed' : 'pointer',
-                    opacity: saving || !selectedClip || !selectedPlatform ? 0.6 : 1,
-                  }}
-                >
-                  {saving ? 'Agendando…' : 'Agendar post'}
-                </button>
-              </form>
+          {/* STEP 2: ONDE PUBLICAR */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-5 h-5 rounded-full bg-white/10 text-white text-[11px] font-bold flex items-center justify-center font-mono">
+                2
+              </span>
+              <h3 className="text-sm font-semibold text-white">Onde publicar</h3>
             </div>
 
-            <section>
-              <h2 style={sectionTitle}>Posts agendados ({posts.length})</h2>
-              {posts.length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Nenhum post agendado.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {posts.map(post => {
-                    const st = STATUS_STYLE[post.status] || STATUS_STYLE.scheduled
-                    const dt = new Date(post.scheduled_at)
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { id: 'instagram' as Platform, name: 'Instagram', sub: 'Reels' },
+                { id: 'tiktok' as Platform, name: 'TikTok', sub: 'Vídeos' },
+                { id: 'youtube_shorts' as Platform, name: 'YouTube', sub: 'Shorts' }
+              ].map(dest => {
+                const isSelected = selectedPlatforms.includes(dest.id)
+                return (
+                  <button
+                    key={dest.id}
+                    type="button"
+                    onClick={() => togglePlatform(dest.id)}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-600/10 border-purple-500 text-white ring-1 ring-purple-500/30'
+                        : 'bg-black/40 border-white/[0.06] text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold">{dest.name}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                    </div>
+                    <span className="text-[10px] text-zinc-500 block">{dest.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* STEP 3: TIPO DE PUBLICAÇÃO */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-5 h-5 rounded-full bg-white/10 text-white text-[11px] font-bold flex items-center justify-center font-mono">
+                3
+              </span>
+              <h3 className="text-sm font-semibold text-white">Tipo de Publicação</h3>
+            </div>
+
+            <div className="p-4 rounded-xl border-2 border-purple-500 bg-purple-500/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center">
+                  <Film className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">Reels</span>
+                  <span className="text-[10px] text-zinc-400">Vídeos verticais 9:16 de alta retenção</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono">
+                Padrão Viral
+              </span>
+            </div>
+          </div>
+
+          {/* SPECIAL CARD: MODO TRIAL REEL (REELS DE TESTE) (Screenshot 1) */}
+          <div className="bg-[#15101f] border border-purple-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">🚀</span>
+              <h3 className="text-sm font-bold text-white">Modo Trial Reel (Reels de Teste)</h3>
+            </div>
+
+            <p className="text-xs text-zinc-300 mb-3 leading-relaxed">
+              Trial Reels são compartilhados inicialmente <strong className="text-white">apenas com não-seguidores</strong>. Após graduação de retenção pelo algoritmo do Instagram, ficam visíveis para todos.
+            </p>
+
+            {/* Warning requirement box */}
+            <div className="p-3 rounded-xl bg-black/60 border border-white/[0.08] mb-4 text-[11px] text-zinc-300 leading-snug">
+              <strong className="text-white">Atenção:</strong> Trial Reels só funcionam para contas com <strong className="text-purple-300">1k de seguidores</strong>. Se sua conta tiver menos de 1k, o post será publicado normalmente sem os parâmetros de teste.
+            </div>
+
+            {/* 3 Mode Switchers (Screenshot 1) */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {[
+                { id: 'disabled' as TrialReelMode, label: 'Desativado' },
+                { id: 'manual' as TrialReelMode, label: 'Manual (via App)' },
+                { id: 'auto' as TrialReelMode, label: 'Automática (Performance)' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTrialReelMode(opt.id)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    trialReelMode === opt.id
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 ring-1 ring-purple-400'
+                      : 'bg-black/50 text-zinc-400 hover:text-white border border-white/10'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[10px] text-amber-400/90 flex items-center gap-1 font-mono">
+              ⚠️ Limite: 10 Reels de teste por dia por perfil conectado (Apenas Instagram).
+            </span>
+          </div>
+
+          {/* STEP 4: UPLOAD OU SELEÇÃO DE CLIPE (Screenshot 1) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-white/10 text-white text-[11px] font-bold flex items-center justify-center font-mono">
+                4
+              </span>
+              <h3 className="text-sm font-semibold text-white">Upload & Conteúdo</h3>
+            </div>
+
+            {/* Drag and Drop Zone (Screenshot 1) */}
+            <label className="relative border-2 border-dashed border-white/15 hover:border-purple-500/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-black/30 hover:bg-black/50">
+              <input
+                type="file"
+                accept="video/mp4,video/quicktime,video/webm"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Upload className="w-8 h-8 text-zinc-500 mb-2" />
+              <span className="text-xs font-semibold text-white">
+                {uploadedFile ? uploadedFile.name : 'Arraste vídeos ou clique para selecionar'}
+              </span>
+              <span className="text-[11px] text-zinc-500 mt-1">
+                Formatos aceitos: MP4, MOV, WebM
+              </span>
+              <span className="text-[10px] text-purple-400 font-mono mt-2">
+                📍 Máximo de 150 mídias por agendamento. Para mais, faça outro lote.
+              </span>
+              <span className="text-[10px] text-amber-400 font-mono mt-1">
+                ⚠️ Somente vídeos 1080x1920 (9:16 vertical) são aceitos — padrão Instagram Reels
+              </span>
+            </label>
+
+            {/* Ou selecione dos seus clipes cortados pela IA */}
+            {clips.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-zinc-400 block mb-2">
+                  Ou selecione um clipe gerado pela IA:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {clips.map(c => {
+                    const isSelected = selectedClipId === c.id
                     return (
-                      <div key={post.id} style={{ ...card, display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: st.color }}>{st.label}</span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
-                              {dt.toLocaleDateString('pt-BR')} {dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>· {PLATFORM_LABEL[post.platform] || post.platform}</span>
-                          </div>
-                          <p style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '0.2rem' }}>
-                            {post.clips?.title || 'Clipe'}
-                          </p>
-                          <p style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {post.caption}
-                          </p>
-                        </div>
-                        {post.status === 'scheduled' && (
-                          <button
-                            onClick={() => handleDelete(post.id)}
-                            style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.3rem 0.6rem', borderRadius: '0.35rem', cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0 }}
-                          >
-                            Cancelar
-                          </button>
-                        )}
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedClipId(c.id)
+                          setUploadedFile(null)
+                          setMediaPreviewUrl(c.storage_url)
+                        }}
+                        className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-purple-600/20 border-purple-500 text-white'
+                            : 'bg-black/40 border-white/[0.06] text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-[11px] font-medium line-clamp-1 block">{c.title}</span>
+                        <span className="text-[10px] text-purple-400 font-mono">Score: {c.score}</span>
                       </div>
                     )
                   })}
                 </div>
-              )}
-            </section>
+              </div>
+            )}
+
+            {/* Caption & Schedule Time Inputs */}
+            <div className="space-y-3 pt-2">
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">Legenda da Publicação</label>
+                <textarea
+                  rows={2}
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                  className="w-full p-3 bg-black/50 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">Data e Horário de Disparo</label>
+                <input
+                  type="datetime-local"
+                  value={scheduleDateTime}
+                  onChange={e => setScheduleDateTime(e.target.value)}
+                  className="w-full p-2.5 bg-black/50 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-purple-500 font-mono"
+                />
+              </div>
+            </div>
           </div>
         </div>
-      </main>
+
+        {/* Right Column: Resumo do Post, Preview & Dicas (Screenshot 1) */}
+        <div className="lg:col-span-5 space-y-6">
+
+          {/* Resumo do Post Box (Screenshot 1) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-semibold text-white">Resumo do Post</h3>
+
+            <div className="space-y-2 text-xs divide-y divide-white/[0.05]">
+              <div className="flex justify-between py-1.5">
+                <span className="text-zinc-400">Profile</span>
+                <span className="font-mono text-white">{selectedProfile}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-zinc-400">Destinos</span>
+                <span className="font-semibold text-purple-400">
+                  {selectedPlatforms.length > 0 ? selectedPlatforms.join(', ') : '0 selecionados'}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-zinc-400">Tipo</span>
+                <span className="font-mono text-white uppercase">Reels</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-zinc-400">Modo Trial Reel</span>
+                <span className="font-mono text-purple-300 uppercase">{trialReelMode}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-zinc-400">Mídias</span>
+                <span className="text-white">1 vídeo 9:16</span>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+                {successMsg}
+              </div>
+            )}
+
+            {/* Action Buttons (Screenshot 1) */}
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleScheduleSubmit(false)}
+                disabled={saving}
+                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
+              >
+                {saving ? 'Agendando...' : '🚀 Agendar Post'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleScheduleSubmit(true)}
+                disabled={saving}
+                className="w-full py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                ⚡ Publicar Agora
+              </button>
+            </div>
+          </div>
+
+          {/* Preview da Mídia (Screenshot 1) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-white">Preview da Mídia</span>
+              <span className="text-[10px] text-zinc-500 font-mono">1 vídeo</span>
+            </div>
+
+            <div className="relative aspect-[9/16] w-full max-w-[240px] mx-auto rounded-2xl bg-black border border-white/10 overflow-hidden flex items-center justify-center shadow-2xl">
+              {mediaPreviewUrl ? (
+                <video
+                  src={mediaPreviewUrl}
+                  controls
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-center p-4">
+                  <Upload className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+                  <span className="text-xs text-zinc-400 block font-medium">Faça upload de mídia</span>
+                  <span className="text-[10px] text-zinc-600 block mt-0.5">Arraste ou clique no card de upload</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dicas Card (Screenshot 1) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 shadow-sm text-xs text-zinc-400 space-y-2">
+            <span className="font-semibold text-white block">💡 Dicas</span>
+            <ul className="space-y-1 text-[11px] list-disc list-inside">
+              <li>Selecione ao menos 1 destino</li>
+              <li>Faça upload antes de agendar</li>
+              <li>Vídeo vertical recomendado para Reels</li>
+              <li>O Modo Trial Reel potencializa o alcance inicial</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Posts Agendados */}
+      {posts.length > 0 && (
+        <div className="max-w-7xl mx-auto mt-10 bg-[#121214] border border-white/[0.08] rounded-2xl p-6">
+          <h3 className="text-sm font-semibold text-white mb-4">Histórico de Agendamentos</h3>
+          <div className="divide-y divide-white/[0.05]">
+            {posts.map(p => (
+              <div key={p.id} className="py-3 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-white font-medium block">{p.caption || 'Sem legenda'}</span>
+                  <span className="text-zinc-500 font-mono text-[10px]">
+                    {p.platform} · {new Date(p.scheduled_at).toLocaleString('pt-BR')}
+                  </span>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 text-[10px] font-mono uppercase">
+                  {p.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

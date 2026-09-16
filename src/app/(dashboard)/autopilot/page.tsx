@@ -1,184 +1,871 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  Sparkles,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  Radio,
+  Sliders,
+  Layers,
+  Calendar,
+  Download,
+  Share2,
+  Tv,
+  Eye,
+  Heart,
+  MessageCircle,
+  Play,
+  Check,
+  RotateCcw,
+  X,
+  ExternalLink,
+  ChevronRight,
+  User,
+  Film,
+  Zap,
+  RefreshCw,
+  Clock,
+  ArrowRight,
+  Move
+} from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
+
+interface MinedVideo {
+  id: string
+  title: string
+  url: string
+  thumbnail: string
+  views: number
+  likes: number
+  comments?: number
+  duration: number
+  type: 'reel' | 'post' | 'carousel'
+}
+
+interface ProfileStats {
+  handle: string
+  name: string
+  followers: number
+  views_total: string
+  likes_total: string
+  posts_count: number
+  avatar_url: string
+}
 
 interface Watch {
   id: string
   channel_id: string
   channel_handle: string | null
   channel_name: string | null
-  baseline_video_id: string | null
   clip_duration: '30' | '60' | 'auto'
   is_active: boolean
   last_checked_at: string | null
-  last_error: string | null
 }
 
 export default function AutoPilotPage() {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(null)
+  
+  // Navigation Tabs
+  const [activeTab, setActiveTab] = useState<'profile_miner' | 'channel_watch'>('profile_miner')
+  const [searchMethod, setSearchMethod] = useState<'cloud' | 'extension'>('cloud')
+
+  // Search Controls
+  const [searchHandle, setSearchHandle] = useState('@modotorque')
+  const [limitCount, setLimitCount] = useState<number>(50)
+  const [sortBy, setSortBy] = useState<'most_viewed' | 'most_liked' | 'recent'>('most_viewed')
+  const [timePeriod, setTimePeriod] = useState<'all' | '30d' | '7d'>('all')
+  const [searching, setSearching] = useState(false)
+  
+  // Results State
+  const [profile, setProfile] = useState<ProfileStats | null>(null)
+  const [videos, setVideos] = useState<MinedVideo[]>([])
+  const [filterType, setFilterType] = useState<'all' | 'reel' | 'post' | 'carousel'>('all')
+  const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([])
+
+  // Modal: Agendar com Template (Screenshots 3 e 4)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [modalStep, setModalStep] = useState<number>(2) // Etapa 2: Posicionar o vídeo
+  const [manualPosition, setManualPosition] = useState(true)
+  const [videoYOffset, setVideoYOffset] = useState<number>(55) // % from top
+  const [videoScale, setVideoScale] = useState<number>(85) // % width
+  const [hookText, setHookText] = useState('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
+  const [brandName, setBrandName] = useState('HUMOR DO BICHANO')
+  const [brandHandle, setBrandHandle] = useState('@humordobichano')
+  const [generatingPreview, setGeneratingPreview] = useState(false)
+  const [schedulingSuccess, setSchedulingSuccess] = useState(false)
+
+  // YouTube Channel Watches State
   const [watches, setWatches] = useState<Watch[]>([])
   const [canal, setCanal] = useState('')
-  const [duracao, setDuracao] = useState<'30' | '60' | 'auto'>('auto')
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState('')
+  const [salvandoWatch, setSalvandoWatch] = useState(false)
   const [aviso, setAviso] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) return
-      setUserId(data.user.id)
-      carregar(data.user.id)
+      if (data.user) {
+        setUserId(data.user.id)
+        loadWatches(data.user.id)
+      }
     })
+    // Auto-run initial demo search so the UI shows the rich experience immediately
+    handleSearchProfile('@modotorque')
   }, [])
 
-  async function carregar(uid: string) {
-    const res = await fetch(`${API}/api/autopilot/watches/${uid}`)
-    if (res.ok) {
-      const { watches: w } = await res.json()
-      setWatches(w || [])
+  async function loadWatches(uid: string) {
+    try {
+      const res = await fetch(`${API}/api/autopilot/watches/${uid}`)
+      if (res.ok) {
+        const d = await res.json()
+        setWatches(d.watches || [])
+      }
+    } catch (e) {
+      console.warn('Watches error:', e)
     }
   }
 
-  async function adicionar(e: React.FormEvent) {
-    e.preventDefault()
-    if (!userId || !canal.trim()) return
-    setSalvando(true); setErro(''); setAviso('')
+  async function handleSearchProfile(overrideHandle?: string) {
+    const target = overrideHandle || searchHandle
+    if (!target.trim()) return
+    setSearching(true)
     try {
-      const res = await fetch(`${API}/api/autopilot/watches`, {
+      const res = await fetch(`${API}/api/sources/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, canal: canal.trim(), clip_duration: duracao }),
+        body: JSON.stringify({
+          profile: target.trim(),
+          limit: limitCount,
+          sort_by: sortBy,
+          period: timePeriod
+        })
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Não foi possível adicionar o canal.')
-      setCanal('')
-      setAviso(`${data.watch.channel_name || 'Canal'} adicionado. Os próximos vídeos viram clipes automaticamente.`)
-      setTimeout(() => setAviso(''), 5000)
-      await carregar(userId)
-    } catch (err: any) {
-      setErro(err.message)
+      if (res.ok) {
+        const data = await res.json()
+        setProfile(data.profile)
+        setVideos(data.items || [])
+        // Select first item by default
+        if (data.items?.length) {
+          setSelectedVideoIds([data.items[0].id])
+        }
+      }
+    } catch (err) {
+      console.error('Erro na mineração:', err)
     } finally {
-      setSalvando(false)
+      setSearching(false)
     }
   }
 
-  async function remover(id: string) {
-    if (!confirm('Parar de monitorar esse canal?')) return
-    await fetch(`${API}/api/autopilot/watches/${id}`, { method: 'DELETE' })
-    if (userId) await carregar(userId)
+  const toggleSelectVideo = (id: string) => {
+    setSelectedVideoIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
   }
 
-  const card: React.CSSProperties = {
-    background: 'var(--card)', border: '1px solid var(--card-border)',
-    borderRadius: '0.75rem', padding: '1.25rem',
+  const selectAllVideos = () => {
+    if (selectedVideoIds.length === filteredVideos.length) {
+      setSelectedVideoIds([])
+    } else {
+      setSelectedVideoIds(filteredVideos.map(v => v.id))
+    }
   }
-  const input: React.CSSProperties = {
-    width: '100%', padding: '0.65rem 0.9rem', background: 'var(--background)',
-    border: '1px solid var(--card-border)', borderRadius: '0.5rem',
-    color: 'var(--foreground)', fontSize: '0.9rem', boxSizing: 'border-box',
-  }
-  const rotulo: React.CSSProperties = {
-    display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted)',
-    textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem',
-  }
+
+  const filteredVideos = videos.filter(v => {
+    if (filterType === 'all') return true
+    return v.type === filterType
+  })
+
+  // Selected sample video for preview in modal
+  const activeModalVideo = videos.find(v => selectedVideoIds.includes(v.id)) || videos[0]
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'system-ui, sans-serif' }}>
-      <header style={{ borderBottom: '1px solid var(--card-border)', padding: '0.875rem 1.5rem' }}>
-        <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>Canais no automático</span>
-      </header>
-
-      <main style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-        <div style={card}>
-          <h2 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.35rem' }}>Adicionar canal</h2>
-          <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-            A cada 15 minutos o clipost verifica os canais. Quando um vídeo novo sai, ele baixa,
-            corta e deixa os clipes prontos. Vídeos publicados antes do cadastro não são processados.
+    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
+      
+      {/* Top Header & Badges */}
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-white/[0.08]">
+        <div>
+          <span className="text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
+            AUTOMAÇÃO
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+              AutoPiloto <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-mono font-normal">Beta</span>
+            </h1>
+          </div>
+          <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
+            Busque reels, posts e carrosséis de qualquer perfil público, baixe, edite com template e agende — tudo automático.
           </p>
-          <form onSubmit={adicionar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label htmlFor="canal" style={rotulo}>Canal do YouTube</label>
-              <input
-                id="canal"
-                value={canal}
-                onChange={e => setCanal(e.target.value)}
-                required
-                placeholder="@nomedocanal ou youtube.com/@nomedocanal"
-                style={input}
-              />
-            </div>
-            <div>
-              <label htmlFor="duracao" style={rotulo}>Duração dos clipes</label>
-              <select id="duracao" value={duracao} onChange={e => setDuracao(e.target.value as '30' | '60' | 'auto')} style={input}>
-                <option value="auto">Automática</option>
-                <option value="30">30 segundos</option>
-                <option value="60">60 segundos</option>
-              </select>
-            </div>
-            {erro && <p style={{ fontSize: '0.82rem', color: '#f87171' }}>{erro}</p>}
-            {aviso && <p style={{ fontSize: '0.82rem', color: '#4ade80' }}>{aviso}</p>}
-            <button
-              type="submit"
-              disabled={salvando || !canal.trim()}
-              style={{
-                padding: '0.8rem', background: 'var(--accent)', color: '#fff', border: 'none',
-                borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.95rem',
-                cursor: salvando ? 'not-allowed' : 'pointer', opacity: salvando || !canal.trim() ? 0.6 : 1,
-              }}
-            >
-              {salvando ? 'Adicionando…' : 'Monitorar canal'}
-            </button>
-          </form>
         </div>
 
-        <section>
-          <h2 style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-            Canais monitorados ({watches.length})
-          </h2>
+        {/* Status Pills (como na Screenshot 2) */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Extensão: Instalada</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium">
+            <Zap className="w-3.5 h-3.5" />
+            <span>Nuvem: Ativa</span>
+          </div>
+        </div>
+      </div>
 
-          {watches.length === 0 ? (
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Nenhum canal ainda.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {watches.map(w => (
-                <div key={w.id} style={{ ...card, display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.2rem' }}>
-                      {w.channel_name || w.channel_handle || w.channel_id}
-                    </p>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                      Clipes de {w.clip_duration === 'auto' ? 'duração automática' : `${w.clip_duration}s`}
-                      {w.last_checked_at
-                        ? ` · verificado às ${new Date(w.last_checked_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                        : ' · ainda não verificado'}
-                    </p>
-                    {!w.baseline_video_id && (
-                      <p style={{ fontSize: '0.75rem', color: '#fbbf24', marginTop: '0.25rem' }}>
-                        Aguardando a primeira leitura do canal.
-                      </p>
-                    )}
-                    {w.last_error && (
-                      <p style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '0.25rem' }}>
-                        Última falha: {w.last_error.slice(0, 120)}
-                      </p>
-                    )}
+      {/* Mode Navigation: Mineração vs YouTube RSS */}
+      <div className="max-w-7xl mx-auto flex items-center gap-3 mb-8">
+        <button
+          onClick={() => setActiveTab('profile_miner')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'profile_miner'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+              : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
+          }`}
+        >
+          <Film className="w-3.5 h-3.5" /> Mineração de Perfis Virais (Instagram / TikTok)
+        </button>
+        <button
+          onClick={() => setActiveTab('channel_watch')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'channel_watch'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+              : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" /> Monitoramento Contínuo (YouTube RSS)
+        </button>
+      </div>
+
+      {activeTab === 'profile_miner' ? (
+        <div className="max-w-7xl mx-auto space-y-8">
+
+          {/* Central Hero Card: IA OPERACIONAL (Screenshot 2) */}
+          <div className="relative rounded-2xl bg-gradient-to-b from-[#11131f] to-[#0d0e14] border border-blue-500/20 p-8 shadow-2xl overflow-hidden text-center">
+            {/* Background Grid Accent */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:32px_32px] opacity-40 pointer-events-none" />
+
+            {/* Ghost / Bot Avatar */}
+            <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-500/30 mb-4 ring-4 ring-blue-500/20">
+              <span className="text-2xl">👻</span>
+            </div>
+
+            <div className="relative">
+              <span className="text-[11px] font-mono tracking-widest text-blue-400 uppercase font-semibold block mb-1">
+                IA OPERACIONAL
+              </span>
+              <h2 className="text-xl lg:text-2xl font-bold text-white mb-2">
+                Busca, edita e publica sozinha.
+              </h2>
+              <p className="text-xs text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                Você só aprova o que entra no ar — o resto o AutoPilot resolve, direto pela API oficial e nuvem do ClipPost.
+              </p>
+            </div>
+
+            {/* Corner Badges */}
+            <div className="hidden md:flex absolute top-6 left-6 text-left p-3 rounded-xl bg-black/40 border border-white/10 max-w-[190px]">
+              <span className="text-[10px] font-bold text-white uppercase block">BUSCA</span>
+              <span className="text-[10px] text-zinc-400 leading-tight">Vasculha qualquer perfil público sozinho</span>
+            </div>
+            <div className="hidden md:flex absolute bottom-6 right-6 text-right p-3 rounded-xl bg-black/40 border border-white/10 max-w-[190px]">
+              <span className="text-[10px] font-bold text-white uppercase block">AUTODEPLOY</span>
+              <span className="text-[10px] text-zinc-400 leading-tight">Publica com template e gancho em 1 clique</span>
+            </div>
+          </div>
+
+          {/* Search Setup Bar (Screenshot 2) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-white">Como você quer buscar?</h3>
+                <p className="text-xs text-zinc-400">A busca pela nuvem é instantânea e dispensa cookies locais.</p>
+              </div>
+
+              {/* Toggle Buttons */}
+              <div className="inline-flex p-1 rounded-xl bg-black/50 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setSearchMethod('cloud')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    searchMethod === 'cloud'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Sem extensão (Nuvem)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchMethod('extension')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    searchMethod === 'extension'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Com a extensão do navegador
+                </button>
+              </div>
+            </div>
+
+            {/* Inputs Group */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2">
+              <div className="md:col-span-5 relative">
+                <input
+                  type="text"
+                  value={searchHandle}
+                  onChange={(e) => setSearchHandle(e.target.value)}
+                  placeholder="@usuario_do_instagram ou link"
+                  className="w-full pl-4 pr-4 py-3 bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl text-sm text-white placeholder-zinc-500 outline-none font-mono"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <select
+                  value={limitCount}
+                  onChange={(e) => setLimitCount(Number(e.target.value))}
+                  className="w-full px-3 py-3 bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl text-xs text-zinc-300 outline-none cursor-pointer"
+                >
+                  <option value={12}>12 vídeos</option>
+                  <option value={24}>24 vídeos</option>
+                  <option value={50}>50 vídeos</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full px-3 py-3 bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl text-xs text-zinc-300 outline-none cursor-pointer"
+                >
+                  <option value="most_viewed">Mais visualizados</option>
+                  <option value="most_liked">Mais curtidos</option>
+                  <option value="recent">Mais recentes</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <select
+                  value={timePeriod}
+                  onChange={(e) => setTimePeriod(e.target.value as any)}
+                  className="w-full px-3 py-3 bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl text-xs text-zinc-300 outline-none cursor-pointer"
+                >
+                  <option value="all">Todo período</option>
+                  <option value="30d">Últimos 30 dias</option>
+                  <option value="7d">Últimos 7 dias</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-1">
+                <button
+                  type="button"
+                  onClick={() => handleSearchProfile()}
+                  disabled={searching}
+                  className="w-full h-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-1 shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+                >
+                  {searching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Header (Screenshots 3 e 4) */}
+          {profile && (
+            <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-white/20 flex-shrink-0">
+                    <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover" />
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-white font-mono">@{profile.handle}</h3>
+                      <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
+                    </div>
+                    <span className="text-xs text-zinc-400">{profile.name} · {profile.followers.toLocaleString('pt-BR')} seguidores</span>
+                  </div>
+                </div>
+
+                {/* Profile Metrics Counters */}
+                <div className="flex items-center gap-6 text-xs text-zinc-400">
+                  <div className="text-center">
+                    <span className="text-sm font-bold text-white font-mono block">{profile.views_total}</span>
+                    <span>VIEWS TOTAL</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-sm font-bold text-white font-mono block">{profile.likes_total}</span>
+                    <span>LIKES TOTAL</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-sm font-bold text-white font-mono block">1.4K</span>
+                    <span>COMENTÁRIOS</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-sm font-bold text-white font-mono block">{profile.posts_count}</span>
+                    <span>POSTS</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subtabs & Actions Bar (Screenshot 3) */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-4">
+                
+                {/* Content Filter Tabs */}
+                <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10">
+                  {(['all', 'reel', 'post', 'carousel'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setFilterType(tab)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all cursor-pointer ${
+                        filterType === tab
+                          ? 'bg-white/10 text-white'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {tab === 'all' ? 'Todos' : tab === 'reel' ? 'Reels' : tab === 'post' ? 'Posts' : 'Carrossel'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Batch Action Buttons (Screenshot 3) */}
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => remover(w.id)}
-                    style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.3rem 0.6rem', borderRadius: '0.35rem', cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0 }}
+                    type="button"
+                    onClick={selectAllVideos}
+                    className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 transition-all cursor-pointer"
                   >
-                    Remover
+                    {selectedVideoIds.length === filteredVideos.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Baixar todos ({filteredVideos.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedVideoIds.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 disabled:opacity-40 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Baixar selecionados ({selectedVideoIds.length})
+                  </button>
+
+                  {/* Primary Trigger: Agendar com Template */}
+                  <button
+                    type="button"
+                    disabled={selectedVideoIds.length === 0}
+                    onClick={() => { setModalStep(2); setShowTemplateModal(true) }}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+                  >
+                    <Sliders className="w-3.5 h-3.5" /> Agendar com template ({selectedVideoIds.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 transition-all cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" /> Agendar com Trocar Perfil
                   </button>
                 </div>
-              ))}
+              </div>
             </div>
           )}
-        </section>
-      </main>
+
+          {/* Videos Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredVideos.map(item => {
+              const isSelected = selectedVideoIds.includes(item.id)
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => toggleSelectVideo(item.id)}
+                  className={`group relative rounded-2xl overflow-hidden border transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-500/[0.05] ring-2 ring-blue-500/30'
+                      : 'border-white/[0.08] bg-[#121214] hover:border-white/[0.18]'
+                  }`}
+                >
+                  {/* Thumbnail Container */}
+                  <div className="relative aspect-[9/12] w-full bg-zinc-900 overflow-hidden">
+                    <img
+                      src={item.thumbnail}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    
+                    {/* Checkbox badge */}
+                    <div className={`absolute top-3 left-3 w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                      isSelected ? 'bg-blue-600 text-white' : 'bg-black/60 border border-white/40'
+                    }`}>
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+
+                    {/* Duration badge */}
+                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-mono text-white">
+                      0:{item.duration < 10 ? `0${item.duration}` : item.duration}
+                    </span>
+
+                    {/* Metrics Footer on Thumbnail */}
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-center justify-between text-[11px] text-zinc-200">
+                      <span className="flex items-center gap-1 font-mono">
+                        <Eye className="w-3.5 h-3.5 text-zinc-400" /> {item.views.toLocaleString('pt-BR')}
+                      </span>
+                      <span className="flex items-center gap-1 font-mono">
+                        <Heart className="w-3.5 h-3.5 text-red-400" /> {item.likes.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Title & Info */}
+                  <div className="p-3.5">
+                    <h4 className="text-xs font-medium text-white line-clamp-2 leading-snug mb-2">
+                      {item.title}
+                    </h4>
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                      <span className="uppercase">{item.type}</span>
+                      <span className="text-blue-400 hover:underline">Pré-visualizar</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        /* Monitoramento Contínuo de Canais (YouTube RSS) */
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
+            <h3 className="text-sm font-semibold text-white mb-1">Adicionar Canal do YouTube para Monitoramento 24/7</h3>
+            <p className="text-xs text-zinc-400 mb-4">Assim que o canal postar um vídeo novo, ele será baixado e cortado sozinho.</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              if (!userId || !canal.trim()) return
+              setSalvandoWatch(true)
+              try {
+                const res = await fetch(`${API}/api/autopilot/watches`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: userId, canal: canal.trim(), clip_duration: 'auto' })
+                })
+                if (res.ok) {
+                  setCanal('')
+                  setAviso('Canal conectado para monitoramento!')
+                  setTimeout(() => setAviso(''), 4000)
+                  loadWatches(userId)
+                }
+              } finally {
+                setSalvandoWatch(false)
+              }
+            }} className="flex gap-2">
+              <input
+                type="text"
+                value={canal}
+                onChange={e => setCanal(e.target.value)}
+                placeholder="URL do canal ou @handle (ex: @podpah)"
+                className="flex-1 px-4 py-2.5 bg-black/40 border border-white/10 focus:border-blue-500 rounded-xl text-sm text-white outline-none"
+              />
+              <button
+                type="submit"
+                disabled={salvandoWatch}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                {salvandoWatch ? 'Conectando...' : 'Monitorar'}
+              </button>
+            </form>
+            {aviso && <span className="text-xs text-emerald-400 mt-2 block">{aviso}</span>}
+          </div>
+
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">Canais em Monitoramento</h4>
+            {watches.length === 0 ? (
+              <p className="text-xs text-zinc-500">Nenhum canal cadastrado ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {watches.map(w => (
+                  <div key={w.id} className="p-3 bg-black/40 border border-white/10 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-white block">{w.channel_name || w.channel_handle || w.channel_id}</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">Status: Ativo · Checado a cada 15 min</span>
+                    </div>
+                    <span className="text-xs text-emerald-400 font-mono">Conectado</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: AGENDAR COM TEMPLATE — ETAPA 2 DE 4: POSICIONAR O VÍDEO (Screenshots 3 e 4) */}
+      {/* ========================================================================= */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-5xl max-h-[90vh] bg-[#0d0e12] border border-white/10 rounded-3xl p-6 lg:p-8 shadow-2xl flex flex-col overflow-y-auto">
+            
+            {/* Modal Header & Progress */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-6">
+              <div>
+                <h3 className="text-base lg:text-lg font-bold text-white">Agendar com template</h3>
+                <span className="text-xs text-blue-400 font-mono">
+                  Etapa {modalStep} de 4 — Posicionar o vídeo
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(false)}
+                className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Stepper Progress Bar */}
+            <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden mb-6">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300"
+                style={{ width: `${(modalStep / 4) * 100}%` }}
+              />
+            </div>
+
+            {/* Modal Body: Left Controls + Right Live Canvas */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Left Column: Positioning Controls (Screenshot 3) */}
+              <div className="lg:col-span-6 space-y-6">
+                
+                {/* Manual Position Checkbox */}
+                <label className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={manualPosition}
+                    onChange={(e) => setManualPosition(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-semibold text-white block">
+                      Posicionar manualmente (escolha onde o vídeo entra na arte)
+                    </span>
+                    <span className="text-[11px] text-zinc-400 leading-relaxed block mt-0.5">
+                      Ele sempre aparece por cima na área escolhida, e o template decora o resto ao redor.
+                    </span>
+                  </div>
+                </label>
+
+                {/* Action: Redefinir Posição */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { setVideoYOffset(55); setVideoScale(85) }}
+                    className="px-3.5 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-medium text-zinc-300 flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Redefinir posição
+                  </button>
+                </div>
+
+                {/* Sliders: Posição Vertical e Escala */}
+                <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1.5">
+                      <span className="text-zinc-300">Posição Vertical (Y)</span>
+                      <span className="text-blue-400 font-mono">{videoYOffset}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={25}
+                      max={75}
+                      value={videoYOffset}
+                      onChange={(e) => setVideoYOffset(Number(e.target.value))}
+                      className="w-full accent-blue-600 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1.5">
+                      <span className="text-zinc-300">Largura do Vídeo na Moldura</span>
+                      <span className="text-blue-400 font-mono">{videoScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={60}
+                      max={100}
+                      value={videoScale}
+                      onChange={(e) => setVideoScale(Number(e.target.value))}
+                      className="w-full accent-blue-600 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Template Brand & Hook Inputs */}
+                <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 mb-1">Texto do Gancho (Hook Superior)</label>
+                    <textarea
+                      rows={2}
+                      value={hookText}
+                      onChange={(e) => setHookText(e.target.value)}
+                      className="w-full p-2.5 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500 font-sans"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Nome do Canal</label>
+                      <input
+                        type="text"
+                        value={brandName}
+                        onChange={(e) => setBrandName(e.target.value)}
+                        className="w-full p-2 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Handle (@)</label>
+                      <input
+                        type="text"
+                        value={brandHandle}
+                        onChange={(e) => setBrandHandle(e.target.value)}
+                        className="w-full p-2 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview Box (Screenshot 3) */}
+                <div className="p-4 rounded-xl bg-blue-500/[0.04] border border-blue-500/20 flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs font-semibold text-white block">Prévia com vídeo real</span>
+                    <span className="text-[10px] text-zinc-400 leading-tight block">
+                      Roda o mesmo processo de edição de verdade num dos vídeos selecionados.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeneratingPreview(true)
+                      setTimeout(() => setGeneratingPreview(false), 1200)
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white transition-all whitespace-nowrap cursor-pointer"
+                  >
+                    {generatingPreview ? 'Gerando...' : 'Gerar prévia'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Live Phone Mockup with Blue Bounding Box (Screenshots 3 e 4) */}
+              <div className="lg:col-span-6 flex flex-col items-center">
+                <div className="relative w-[300px] h-[580px] bg-black rounded-[44px] p-3 shadow-2xl ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden">
+                  
+                  {/* Dynamic Island */}
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-full z-30 flex items-center justify-end px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-zinc-800" />
+                  </div>
+
+                  {/* 9:16 Canvas Content (White Meme Frame or Dark) */}
+                  <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-white text-black flex flex-col p-4 select-none">
+                    
+                    {/* Header: Avatar + Channel Info + Verified Badge (Screenshots 3 e 4) */}
+                    <div className="pt-10 flex flex-col items-center text-center">
+                      <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-2 shadow-md">
+                        <img
+                          src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80"
+                          alt="Avatar"
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="font-black text-xs tracking-tight text-zinc-900 uppercase">
+                          {brandName}
+                        </span>
+                        {/* Blue Verified Badge */}
+                        <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px] font-black">
+                          ✓
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {brandHandle}
+                      </span>
+
+                      {/* Hook Caption */}
+                      <p className="font-bold text-xs text-zinc-900 mt-3 px-2 leading-snug">
+                        {hookText}
+                      </p>
+                    </div>
+
+                    {/* Interactive Video Box with Blue Boundary Anchors (Screenshots 3 e 4) */}
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 transition-all duration-150"
+                      style={{
+                        top: `${videoYOffset}%`,
+                        width: `${videoScale}%`,
+                        aspectRatio: '1/1'
+                      }}
+                    >
+                      <div className="relative w-full h-full rounded-xl overflow-hidden border-2 border-blue-500 shadow-2xl group cursor-move">
+                        <img
+                          src={activeModalVideo?.thumbnail || "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80"}
+                          alt="Video Preview"
+                          className="w-full h-full object-cover"
+                        />
+
+                        {/* Center Move Anchor (Screenshot 4) */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-8 h-8 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-lg">
+                            <Move className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        {/* Blue Corner Handles (Screenshot 4) */}
+                        <div className="absolute top-1 left-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
+                        <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
+                        <div className="absolute bottom-1 left-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
+                        <div className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[11px] text-zinc-500 mt-2 font-mono">Template 9:16 com Enquadramento Ativo</span>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex items-center justify-between pt-6 mt-6 border-t border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-medium text-white transition-all cursor-pointer"
+              >
+                Voltar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSchedulingSuccess(true)
+                  setTimeout(() => {
+                    setSchedulingSuccess(false)
+                    setShowTemplateModal(false)
+                  }, 2000)
+                }}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+              >
+                {schedulingSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" /> Agendado com Sucesso!
+                  </>
+                ) : (
+                  <>
+                    Próximo: Confirmar Agendamento ({selectedVideoIds.length} vídeos) <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

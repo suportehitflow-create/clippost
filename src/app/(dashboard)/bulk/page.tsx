@@ -77,6 +77,11 @@ export default function BulkStudioPage() {
   const [urlInput, setUrlInput] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('hormozi_yellow')
   const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60'>('auto')
+  // Opcoes Anti-Algoritmo (Reels / TikTok)
+  const [speedBoost, setSpeedBoost] = useState(true)
+  const [horizontalFlip, setHorizontalFlip] = useState(false)
+  const [removeSilence, setRemoveSilence] = useState(true)
+  const [colorEnhance, setColorEnhance] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeStep, setActiveStep] = useState<'setup' | 'running' | 'results'>('setup')
   const [statusMessage, setStatusMessage] = useState('')
@@ -426,9 +431,9 @@ export default function BulkStudioPage() {
                 </Link>
                 <Link
                   href="/schedule"
-                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-zinc-300 text-xs font-medium transition-all"
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-all shadow-md shadow-purple-600/30 flex items-center gap-1.5"
                 >
-                  Ir para Agendamentos
+                  🚀 Agendar com Modo Trial Reel
                 </Link>
               </div>
             </div>
@@ -498,6 +503,63 @@ export default function BulkStudioPage() {
                   {d === 'auto' ? 'IA Auto' : `${d}s`}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 4. BLINDAGEM ANTI-ALGORITMO */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5" /> 4. Blindagem Anti-Algoritmo
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-300">
+                Instagram & TikTok
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Micro-alterações para que os vídeos sejam reconhecidos como originais sem perder qualidade.
+            </p>
+
+            <div className="space-y-2.5 text-xs">
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.06] cursor-pointer hover:border-white/10 transition-colors">
+                <span className="text-zinc-200">⚡ Micro-Aceleração (1.05x sem alterar tom)</span>
+                <input
+                  type="checkbox"
+                  checked={speedBoost}
+                  onChange={(e) => setSpeedBoost(e.target.checked)}
+                  className="rounded text-orange-500 focus:ring-0 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.06] cursor-pointer hover:border-white/10 transition-colors">
+                <span className="text-zinc-200">🪞 Espelhamento Horizontal (Flip)</span>
+                <input
+                  type="checkbox"
+                  checked={horizontalFlip}
+                  onChange={(e) => setHorizontalFlip(e.target.checked)}
+                  className="rounded text-orange-500 focus:ring-0 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.06] cursor-pointer hover:border-white/10 transition-colors">
+                <span className="text-zinc-200">✂️ Corte Inteligente de Silêncios</span>
+                <input
+                  type="checkbox"
+                  checked={removeSilence}
+                  onChange={(e) => setRemoveSilence(e.target.checked)}
+                  className="rounded text-orange-500 focus:ring-0 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.06] cursor-pointer hover:border-white/10 transition-colors">
+                <span className="text-zinc-200">🎨 Realce Sutil de Cores (+5%)</span>
+                <input
+                  type="checkbox"
+                  checked={colorEnhance}
+                  onChange={(e) => setColorEnhance(e.target.checked)}
+                  className="rounded text-orange-500 focus:ring-0 cursor-pointer"
+                />
+              </label>
             </div>
           </div>
         </div>
