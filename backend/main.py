@@ -434,6 +434,11 @@ async def instagram_list(req: InstagramListRequest):
 @app.post("/api/jobs")
 async def create_job(req: ProcessRequest):
     """Alias de /api/process-url para compatibilidade."""
+    if req.project_id:
+        try:
+            supabase.table("projects").update({"status": "processing"}).eq("id", req.project_id).execute()
+        except Exception:
+            pass
     try:
         task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration, req.project_id)
         return {"task_id": task.id, "status": "processing"}

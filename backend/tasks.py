@@ -226,19 +226,28 @@ def parse_vtt_subtitles(vtt_path: Path):
 
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None):
+    # Atualiza status imediatamente para processing para a UI avançar e não dar timeout
+    if project_id:
+        try:
+            supabase.table("projects").update({"status": "processing"}).eq("id", project_id).execute()
+        except Exception as e:
+            print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
+
     check_clip_limit(user_id)
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
 
     ydl_opts = {
-        # Exigir mp4+m4a falhava com "Requested format is not available" quando o
-        # site não oferece esse par; o merge para mp4 fica a cargo do FFmpeg.
-        'format': 'bestvideo+bestaudio/best',
-        'outtmpl': video_path,
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        'outtmpl': str(tmp_dir / "original.%(ext)s"),
         'quiet': True,
         'noplaylist': True,
         'merge_output_format': 'mp4',
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitlesformat': 'vtt',
+        'subtitleslangs': ['pt', 'pt-BR', 'pt-pt', 'en'],
     }
 
     try:
@@ -259,30 +268,46 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             )
         raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
 
-        # 3. Extrair áudio
-        subprocess.run([
-            "ffmpeg", "-y", "-i", video_path,
-            "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k", "-f", "mp3",
-            audio_path,
-        ], check=True, capture_output=True)
+        # Localiza o arquivo de vídeo final mesclado
+        mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4"))
+        if mp4_candidates:
+            video_path = str(mp4_candidates[0])
 
-        # 4. Transcrição com faster-whisper (word timestamps)
-        from faster_whisper import WhisperModel
-        model = WhisperModel("base", device="cpu", compute_type="int8")
-        # Idioma detectado automaticamente: forçar "pt" em vídeo de outro idioma
-        # gerava legendas sem sentido.
-        fw_segments, _ = model.transcribe(audio_path, word_timestamps=True)
+        # 3. Transcrição: Procura legendas nativas do YouTube (.vtt) para Modo Turbo (~15s)
+        vtt_candidates = list(tmp_dir.glob("*.vtt"))
+        transcript_data = None
+        if vtt_candidates:
+            try:
+                transcript_data = parse_vtt_subtitles(vtt_candidates[0])
+                print(f"[tasks] Modo Turbo ativo: {len(transcript_data.get('segments', []))} falas nativas extraídas")
+            except Exception as e:
+                print(f"[tasks] falha ao ler legenda nativa .vtt: {e}")
 
-        segments = []
-        words = []
-        for seg in fw_segments:
-            segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
-            if seg.words:
-                for w in seg.words:
-                    words.append({"start": w.start, "end": w.end, "word": w.word})
+        if not transcript_data or not transcript_data.get("segments"):
+            # Fallback transparente para extração de áudio + Whisper
+            subprocess.run([
+                "ffmpeg", "-y", "-i", video_path,
+                "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k", "-f", "mp3",
+                audio_path,
+            ], check=True, capture_output=True)
+
+            from faster_whisper import WhisperModel
+            model = WhisperModel("base", device="cpu", compute_type="int8")
+            fw_segments, _ = model.transcribe(audio_path, word_timestamps=True)
+
+            segments = []
+            words = []
+            for seg in fw_segments:
+                segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
+                if seg.words:
+                    for w in seg.words:
+                        words.append({"start": w.start, "end": w.end, "word": w.word})
+            transcript_data = {"segments": segments, "words": words}
 
         chapters = info.get("chapters") or []
-        transcript_data = {"segments": segments, "words": words, "chapters": chapters}
+        transcript_data["chapters"] = chapters
+        segments = transcript_data.get("segments", [])
+        words = transcript_data.get("words", [])
 
         # 5. Projeto: atualiza o que a tela de upload já criou ou cria um novo.
         # Criar sempre um novo deixava o projeto aberto pelo usuário em "pending" para sempre.

@@ -243,20 +243,18 @@ export default function ProjectClient({
             </div>
 
             {/* Intelligent Timeout / Diagnosis Banner if pending for > 45s */}
-            {elapsedSeconds >= 45 && (
+            {elapsedSeconds >= 90 && status === 'pending' && (
               <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-left max-w-3xl mx-auto">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 text-xs">
                     <p className="font-semibold text-amber-300 mb-1">
-                      O processamento está demorando mais do que o habitual ({elapsedSeconds}s)
+                      Aguardando início do processamento no servidor ({elapsedSeconds}s)
                     </p>
                     <p className="text-zinc-300 leading-relaxed mb-3">
-                      Se o status não mudar de <strong>{status}</strong>, o Worker do Celery no Fly.io pode estar em espera, escalado em 0 ou baixando o modelo de IA pela primeira vez.
+                      O Worker do Celery pode estar acordando da suspensão no Fly.io. Se demorar, verifique o status do worker:
                     </p>
                     <div className="bg-black/50 p-3 rounded-lg border border-white/10 font-mono text-[11px] text-zinc-300 space-y-1">
-                      <p className="text-zinc-500">// Comandos para checar a máquina do worker no terminal:</p>
-                      <p className="text-orange-400">fly status -a clippost-backend</p>
                       <p className="text-orange-400">fly scale count worker=1 -a clippost-backend</p>
                       <p className="text-zinc-400">fly logs -a clippost-backend</p>
                     </div>
