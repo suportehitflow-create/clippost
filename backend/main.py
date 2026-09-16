@@ -25,6 +25,8 @@ app = FastAPI(title="clipost API")
 
 FRONTEND_ORIGINS = [
     "https://clippost-three.vercel.app",
+    "https://clippost-silk.vercel.app",
+    "https://clippost.vercel.app",
     "http://localhost:3000",
     os.environ.get("FRONTEND_URL", ""),
 ]
@@ -32,6 +34,7 @@ FRONTEND_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o for o in FRONTEND_ORIGINS if o],
+    allow_origin_regex=r"https://clippost-.*\.vercel\.app|https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -396,13 +399,14 @@ async def list_projects(user_id: str):
     try:
         resp = (
             supabase.table("projects")
-            .select("id, title, source_url, platform, raw_video_url, status, created_at")
+            .select("id, title, source_url, platform, raw_video_url, status, created_at, clips(*)")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
         )
         return {"projects": resp.data or []}
-    except Exception:
+    except Exception as e:
+        print(f"[projects] erro ao buscar projetos do usuario {user_id}: {e}")
         return {"projects": []}
 
 
