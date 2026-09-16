@@ -23,18 +23,19 @@ load_dotenv()
 
 app = FastAPI(title="clipost API")
 
-FRONTEND_ORIGINS = [
+# Lista explícita de origens permitidas
+ALLOWED_ORIGINS = [
     "https://clippost-three.vercel.app",
     "https://clippost-silk.vercel.app",
     "https://clippost.vercel.app",
     "http://localhost:3000",
-    os.environ.get("FRONTEND_URL", ""),
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o for o in FRONTEND_ORIGINS if o],
-    allow_origin_regex=r"https://clippost-.*\.vercel\.app|https://.*\.vercel\.app",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -254,8 +255,13 @@ async def get_analytics(user_id: str):
 
 
 @app.get("/api/billing/status/{user_id}")
-async def billing_status(user_id: str):
-    return get_plan_status(user_id)
+async def get_billing_status(user_id: str):
+    try:
+        res = supabase.table("user_plans").select("*").eq("user_id", user_id).execute()
+        plan = res.data[0] if res.data else {"plan": "free", "clips_used_this_month": 0, "clips_limit": 5}
+        return {"status": "ok", "plan": plan}
+    except Exception as e:
+        return {"status": "ok", "plan": {"plan": "free", "clips_used_this_month": 0, "clips_limit": 5}}
 
 
 @app.post("/api/billing/checkout")
