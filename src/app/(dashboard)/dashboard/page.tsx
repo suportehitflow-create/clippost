@@ -46,18 +46,53 @@ export default function AppleDashboard() {
   }, [])
 
   async function loadProjects(uid: string) {
+    // 1. Busca direta no Supabase (zero CORS, ultra-rápido, resiliente a cold-boot)
+    try {
+      const { data: dbProjs } = await supabase
+        .from('projects')
+        .select('id, title, source_url, status, created_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+
+      if (dbProjs && dbProjs.length > 0) {
+        setProjects(dbProjs as any)
+      }
+    } catch (e) {
+      console.warn('Fallback Supabase:', e)
+    }
+
+    // 2. Atualiza via backend se online
     try {
       const res = await fetch(`${API}/api/projects/${uid}`)
       if (res.ok) {
         const data = await res.json()
-        setProjects(data.projects || [])
+        if (data.projects) setProjects(data.projects)
       }
     } catch {
-      // Ignora erro silenciosamente no carregamento inicial
+      // Silencioso se backend estiver em standby
     }
   }
 
   async function loadAnalytics(uid: string) {
+    // Analytics inicial direto do Supabase
+    try {
+      const { data: projs } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', uid)
+
+      const count = projs ? projs.length : 0
+      setAnalytics({
+        total_projects: count,
+        total_clips: 0,
+        pending_posts: 0,
+        published_posts: 0,
+        success_rate: 100,
+      })
+    } catch {
+      // ignora
+    }
+
     try {
       const res = await fetch(`${API}/api/analytics/${uid}`)
       if (res.ok) {
@@ -65,7 +100,7 @@ export default function AppleDashboard() {
         setAnalytics(data)
       }
     } catch {
-      // Ignora erro silenciosamente
+      // Silencioso
     }
   }
 

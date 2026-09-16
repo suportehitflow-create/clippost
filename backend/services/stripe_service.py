@@ -5,10 +5,18 @@ from services.db_utils import maybe_one
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
-_supabase = create_client(
-    os.environ["SUPABASE_URL"],
-    os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
+_SUPABASE_URL = (
+    os.environ.get("SUPABASE_URL")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    or "https://alntulecjshpbrhesaoo.supabase.co"
 )
+_SUPABASE_KEY = (
+    os.environ.get("SUPABASE_KEY")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    or ""
+)
+_supabase = create_client(_SUPABASE_URL, _SUPABASE_KEY)
 
 PRO_PRICE_ID = os.environ.get("STRIPE_PRO_PRICE_ID", "")
 WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")

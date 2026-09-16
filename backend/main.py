@@ -3,6 +3,7 @@ clipost Backend — FastAPI
 """
 import os
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from pydantic import BaseModel
@@ -41,10 +42,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-supabase = create_client(
-    os.environ["SUPABASE_URL"],
-    os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+    if request.method == "OPTIONS":
+        response = JSONResponse(content={"status": "ok"})
+    else:
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            response = JSONResponse(content={"detail": str(e)}, status_code=500)
+
+    # Injeta explicitamente os headers CORS em TODAS as respostas (inclusive erros 500)
+    allowed = origin if origin and ("vercel.app" in origin or "localhost" in origin) else "https://clippost-three.vercel.app"
+    response.headers["Access-Control-Allow-Origin"] = allowed
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
+@app.options("/{full_path:path}")
+async def preflight_handler(full_path: str, request: Request):
+    origin = request.headers.get("origin", "https://clippost-three.vercel.app")
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+        },
+    )
+
+SUPABASE_URL = (
+    os.environ.get("SUPABASE_URL")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    or "https://alntulecjshpbrhesaoo.supabase.co"
 )
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_KEY")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    or ""
+)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 class ProcessRequest(BaseModel):
