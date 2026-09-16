@@ -67,16 +67,24 @@ def create_vertical_clip(
         avatar_url = (brand_kit or {}).get("avatar_url", "")
 
         # --- Construção do filter_complex ---
-        # Truques de retenção: hflip + speed
-        video_transforms = "crop=ih*9/16:ih,scale=1080:1920"
-        if hflip:
-            video_transforms += ",hflip"
-        if speed and speed != 1.0:
-            video_transforms += f",setpts={round(1/speed, 4)}*PTS"
+        # Detecta se é layout educacional/código (Screen 16:9 + Fundo Desfocado 9:16) ou crop padrão
+        layout_mode = (brand_kit or {}).get("layout_mode", "crop")
+        if layout_mode in ("screen_blur", "blur_padding", "tutorial", "split_screen"):
+            filter_parts = [
+                f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"\
+                f"[0:v]scale=1080:-1[fg];"\
+                f"[bg][fg]overlay=0:(1920-overlay_h)/2[base]"
+            ]
+        else:
+            video_transforms = "crop=ih*9/16:ih,scale=1080:1920"
+            if hflip:
+                video_transforms += ",hflip"
+            if speed and speed != 1.0:
+                video_transforms += f",setpts={round(1/speed, 4)}*PTS"
 
-        filter_parts = [
-            f"[0:v]{video_transforms}[base]"
-        ]
+            filter_parts = [
+                f"[0:v]{video_transforms}[base]"
+            ]
 
         # Audio transforms
         audio_filters = []

@@ -109,6 +109,16 @@ def fetch_video_info(url: str) -> dict:
         any(k in auto_subtitles for k in ("pt", "pt-BR", "pt-pt", "en"))
     )
     subs_langs = list(set(list(subtitles.keys()) + list(auto_subtitles.keys())))[:5]
+    raw_chapters = info.get("chapters") or []
+    chapters = [
+        {
+            "title": c.get("title", ""),
+            "start_time": round(float(c.get("start_time", 0.0)), 2),
+            "end_time": round(float(c.get("end_time", 0.0)), 2),
+        }
+        for c in raw_chapters
+        if c.get("title")
+    ]
 
     return {
         "title":       info.get("title", ""),
@@ -123,6 +133,9 @@ def fetch_video_info(url: str) -> dict:
         "native_subtitle_languages": subs_langs,
         "processing_speed": "turbo_native" if has_native_subs else "whisper_standard",
         "estimated_time": "~15s (Modo Turbo: Legenda Nativa)" if has_native_subs else "1-3min (Whisper IA)",
+        "chapters": chapters,
+        "has_chapters": len(chapters) > 0,
+        "chapter_count": len(chapters),
     }
 
 

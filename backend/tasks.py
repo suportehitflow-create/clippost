@@ -273,7 +273,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 for w in seg.words:
                     words.append({"start": w.start, "end": w.end, "word": w.word})
 
-        transcript_data = {"segments": segments, "words": words}
+        chapters = info.get("chapters") or []
+        transcript_data = {"segments": segments, "words": words, "chapters": chapters}
 
         # 5. Projeto: atualiza o que a tela de upload já criou ou cria um novo.
         # Criar sempre um novo deixava o projeto aberto pelo usuário em "pending" para sempre.
@@ -293,7 +294,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             project_id = db_response.data[0]['id']
 
         # 6. AI Curator — detectar momentos virais
-        clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration)
+        clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
 
         # Brand Kit do usuário (opcional)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()

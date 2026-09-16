@@ -65,14 +65,18 @@ def _call_anthropic(prompt: str) -> str:
     return message.content[0].text.strip()
 
 
-def get_viral_clips(transcript_data: dict, clip_duration: str = "auto") -> list[dict]:
+def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters: list[dict] | None = None) -> list[dict]:
     """
     Recebe transcript_data (dict com 'segments' e 'words') e retorna
     uma lista de até 3 cortes virais com start_time, end_time, hook_title, ai_score.
+    Suporta fatiamento inteligente ancorado em Capítulos (ideal para vídeos longos/tutoriais).
     """
     segments = transcript_data.get("segments", [])
     if not segments:
         return []
+
+    if chapters is None:
+        chapters = transcript_data.get("chapters") or []
 
     duration_rule = {
         "30": "entre 25 e 35 segundos (clipes curtos)",
@@ -81,6 +85,21 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto") -> list[
     }.get(clip_duration, "entre 30 e 60 segundos")
 
     max_duration = 35 if clip_duration == "30" else 65 if clip_duration == "60" else 60
+
+
+    chapters_context = ""
+    if chapters and len(chapters) > 0:
+        chapters_context = f"\nCapítulos Oficiais do Vídeo (Use para ancorar os cortes em tópicos distintos):\n{json.dumps(chapters[:10], ensure_ascii=False)}\n"
+        sampled_segments = []
+        for ch in chapters[:8]:
+            ch_start = ch.get("start_time", 0.0)
+            ch_end = ch.get("end_time", ch_start + 300.0)
+            ch_segs = [s for s in segments if ch_start <= s.get("start", 0) <= ch_end][:15]
+            sampled_segments.extend(ch_segs)
+        if not sampled_segments:
+            sampled_segments = segments[:100]
+    else:
+        sampled_segments = segments[:100]
 
     prompt = f"""Você é um especialista em conteúdo viral para TikTok, Instagram Reels e YouTube Shorts.
 
@@ -100,8 +119,8 @@ PRIORIZE:
 
 Duração dos clipes: {duration_rule}
 
-Transcrição (com timestamps em segundos):
-{json.dumps(segments[:100], ensure_ascii=False)}
+{chapters_context}Transcrição (com timestamps em segundos):
+{json.dumps(sampled_segments, ensure_ascii=False)}
 
 Retorne ESTRITAMENTE um array JSON válido com exatamente 3 objetos, sem nenhum texto antes ou depois:
 [
