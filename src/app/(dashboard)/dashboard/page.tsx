@@ -134,6 +134,9 @@ export default function Dashboard() {
           clip<span style={{ color: 'var(--accent)' }}>ost</span>
         </span>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link href="/autopilot" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
+            Canais
+          </Link>
           <Link href="/brand-kit" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
             Brand Kit
           </Link>
