@@ -102,6 +102,13 @@ def fetch_video_info(url: str) -> dict:
     )
 
     plataforma = detect_platform(url) or info.get("extractor_key", "unknown").lower()
+    subtitles = info.get("subtitles") or {}
+    auto_subtitles = info.get("automatic_captions") or {}
+    has_native_subs = bool(
+        any(k in subtitles for k in ("pt", "pt-BR", "pt-pt", "en")) or
+        any(k in auto_subtitles for k in ("pt", "pt-BR", "pt-pt", "en"))
+    )
+    subs_langs = list(set(list(subtitles.keys()) + list(auto_subtitles.keys())))[:5]
 
     return {
         "title":       info.get("title", ""),
@@ -112,6 +119,10 @@ def fetch_video_info(url: str) -> dict:
         "formats":     formats,
         "webpage_url": info.get("webpage_url", url),
         "pipeline":    get_pipeline_config(plataforma),
+        "has_native_subtitles": has_native_subs,
+        "native_subtitle_languages": subs_langs,
+        "processing_speed": "turbo_native" if has_native_subs else "whisper_standard",
+        "estimated_time": "~15s (Modo Turbo: Legenda Nativa)" if has_native_subs else "1-3min (Whisper IA)",
     }
 
 

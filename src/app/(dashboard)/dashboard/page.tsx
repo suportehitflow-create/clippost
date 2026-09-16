@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowUpRight, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowUpRight, Clock, CheckCircle2, AlertCircle, Loader2, Zap, Smartphone, Sparkles } from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
@@ -161,6 +161,32 @@ export default function AppleDashboard() {
           ))}
         </section>
 
+        {/* 2.5 BANNER LOCALSEND / MOBILE TRANSFER */}
+        <section className="bg-gradient-to-r from-purple-950/40 via-[#141226] to-purple-950/20 border border-purple-500/25 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-sm shadow-xl">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 shadow-inner">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white">Transferência Instantânea para Celular (Estilo LocalSend)</h3>
+                <span className="text-[10px] font-semibold bg-purple-500/25 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40">P2P / Sem Cabos</span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                Aponte a câmera do seu iPhone ou Android e baixe os cortes 9:16 direto no rolo da câmera, sem depender de Google Drive ou cabos.
+              </p>
+            </div>
+          </div>
+          {projects.length > 0 && (
+            <Link
+              href={`/project/${projects[0].id}`}
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-600/30 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5" /> Enviar Último Projeto
+            </Link>
+          )}
+        </section>
+
         {/* 3. BARRA DE AÇÃO PRINCIPAL "SPOTLIGHT" */}
         <section className="bg-gradient-to-b from-[#131318] to-[#0f0f13] border border-white/[0.09] rounded-3xl p-8 shadow-2xl relative overflow-hidden">
           <div className="max-w-xl">
@@ -181,6 +207,14 @@ export default function AppleDashboard() {
                 placeholder="Cole o link do YouTube, Instagram ou TikTok..."
                 className="w-full bg-[#18181e]/90 border border-white/[0.1] rounded-2xl px-5 py-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all shadow-inner"
               />
+            </div>
+
+            {/* TURBO YT-DLP & LEGENDAS NATIVAS INDICATOR */}
+            <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-400 px-1">
+              <span className="inline-flex items-center gap-1 text-amber-400 font-medium bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 rounded-full text-[11px]">
+                <Zap className="w-3 h-3 text-amber-400 animate-pulse" /> Modo Turbo yt-dlp Ativo
+              </span>
+              <span>Extração acelerada de legendas nativas em ~15s e corte 1080p sem perda de qualidade.</span>
             </div>
 
             {error && (
