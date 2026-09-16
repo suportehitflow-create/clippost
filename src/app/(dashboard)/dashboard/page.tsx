@@ -1,20 +1,12 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ArrowUpRight, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
-
-interface Clip {
-  id: string
-  title: string
-  hook: string
-  score: number
-  storage_url: string
-  start_time: number
-  end_time: number
-  status: string
-}
 
 interface Project {
   id: string
@@ -30,333 +22,267 @@ interface Analytics {
   pending_posts: number
   published_posts: number
   success_rate: number
-  activity_last_7_days: { date: string; clips: number }[]
 }
 
-export default function Dashboard() {
+export default function AppleDashboard() {
+  const router = useRouter()
   const [url, setUrl] = useState('')
+  const [duration, setDuration] = useState<'auto' | '30' | '60'>('auto')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
-  const [activeProject, setActiveProject] = useState<string | null>(null)
-  const [clips, setClips] = useState<Clip[]>([])
-  const [polling, setPolling] = useState(false)
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
-  const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60'>('auto')
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setUserId(data.user.id)
-        fetchProjects(data.user.id)
-        fetch(`${API}/api/analytics/${data.user.id}`).then(r => r.ok ? r.json() : null).then(d => d && setAnalytics(d))
+        loadProjects(data.user.id)
+        loadAnalytics(data.user.id)
       }
     })
   }, [])
 
-  async function fetchProjects(uid: string) {
-    const res = await fetch(`${API}/api/projects/${uid}`)
-    if (res.ok) {
-      const data = await res.json()
-      setProjects(data.projects || [])
+  async function loadProjects(uid: string) {
+    try {
+      const res = await fetch(`${API}/api/projects/${uid}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProjects(data.projects || [])
+      }
+    } catch {
+      // Ignora erro silenciosamente no carregamento inicial
     }
   }
 
-  async function fetchClips(projectId: string) {
-    const res = await fetch(`${API}/api/clips/${projectId}`)
-    if (res.ok) {
-      const data = await res.json()
-      setClips(data.clips || [])
-      return data.project?.status
+  async function loadAnalytics(uid: string) {
+    try {
+      const res = await fetch(`${API}/api/analytics/${uid}`)
+      if (res.ok) {
+        const data = await res.json()
+        setAnalytics(data)
+      }
+    } catch {
+      // Ignora erro silenciosamente
     }
-    return null
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!userId || !url.trim()) return
-    setLoading(true)
-    setError('')
-    setClips([])
-    setActiveProject(null)
+    if (!url.trim()) return
 
     try {
-      const res = await fetch(`${API}/api/process-url`, {
+      setLoading(true)
+      setError(null)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      // 1. Cria o projeto no Supabase
+      const { data: project, error: dbError } = await supabase
+        .from('projects')
+        .insert({
+          user_id: user.id,
+          title: 'Importação: ' + (url.length > 40 ? url.substring(0, 40) + '...' : url),
+          source_url: url.trim(),
+          source_type: 'url',
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (dbError || !project) {
+        throw new Error(dbError?.message || 'Falha ao criar projeto')
+      }
+
+      // 2. Envia para a fila do backend
+      const res = await fetch(`${API}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, user_id: userId, clip_duration: clipDuration }),
+        body: JSON.stringify({
+          url: url.trim(),
+          user_id: user.id,
+          clip_duration: duration,
+          project_id: project.id,
+        }),
       })
-      if (!res.ok) throw new Error('Erro ao iniciar processamento')
-      setUrl('')
-      setPolling(true)
-      await fetchProjects(userId)
 
-      // poll até achar o projeto novo e ele ficar "done"
-      let attempts = 0
-      const interval = setInterval(async () => {
-        attempts++
-        const projs = await fetch(`${API}/api/projects/${userId}`).then(r => r.json())
-        const latest = projs.projects?.[0]
-        if (latest) {
-          setProjects(projs.projects)
-          setActiveProject(latest.id)
-          const status = await fetchClips(latest.id)
-          if (status === 'done' || attempts > 60) {
-            clearInterval(interval)
-            setPolling(false)
-            setLoading(false)
-          }
-        }
-      }, 5000)
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Erro ao iniciar job no servidor')
+      }
+
+      // 3. Redireciona diretamente para a tela de acompanhamento do projeto
+      router.push(`/project/${project.id}`)
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'Falha ao processar vídeo. Tente novamente.')
       setLoading(false)
     }
   }
 
-  async function selectProject(projectId: string) {
-    setActiveProject(projectId)
-    await fetchClips(projectId)
-  }
-
-  function formatDuration(start: number, end: number) {
-    return `${Math.round(end - start)}s`
-  }
+  const metrics = [
+    { label: 'Vídeos Importados', value: analytics?.total_projects ?? projects.length },
+    { label: 'Clipes Gerados', value: analytics?.total_clips ?? 0 },
+    { label: 'Agend. Pendentes', value: analytics?.pending_posts ?? 0 },
+    { label: 'Taxa de Sucesso', value: `${analytics?.success_rate ?? 0}%` },
+  ]
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'system-ui, sans-serif' }}>
-
-      {/* Header */}
-      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <span style={{ fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
-          clip<span style={{ color: 'var(--accent)' }}>ost</span>
-        </span>
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <Link href="/autopilot" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-            Canais
-          </Link>
-          <Link href="/brand-kit" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-            Brand Kit
-          </Link>
-          <Link href="/schedule" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-            Agendamentos
-          </Link>
-          <Link href="/billing" style={{ color: 'var(--muted)', padding: '0.4rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', textDecoration: 'none' }}>
-            Plano
-          </Link>
-          <button
-            onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
-            style={{ background: 'none', border: '1px solid var(--card-border)', color: 'var(--muted)', padding: '0.4rem 0.9rem', borderRadius: '0.4rem', cursor: 'pointer', fontSize: '0.85rem', marginLeft: '0.25rem' }}
-          >
-            Sair
-          </button>
-        </nav>
+    <div className="flex-1 flex flex-col min-h-screen">
+      
+      {/* 1. BARRA SUPERIOR DE CONTEXTO (Limpa, estilo Apple macOS) */}
+      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-8 bg-[#0a0a0c]/60 backdrop-blur-md sticky top-0 z-10">
+        <h1 className="text-sm font-medium text-zinc-300 tracking-wide">Visão Geral</h1>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Sistema Operacional
+          </span>
+        </div>
       </header>
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-
-        {/* Cards de Analytics */}
-        {analytics && (
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-            {[
-              { label: 'Vídeos Importados', value: analytics.total_projects, icon: '🎬' },
-              { label: 'Clipes Gerados', value: analytics.total_clips, icon: '✂️' },
-              { label: 'Agend. Pendentes', value: analytics.pending_posts, icon: '⏳' },
-              { label: 'Taxa de Sucesso', value: `${analytics.success_rate}%`, icon: '📈' },
-            ].map(card => (
-              <div key={card.label} style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', padding: '1.25rem' }}>
-                <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '0.4rem' }}>{card.icon} {card.label}</p>
-                <p style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.03em' }}>{card.value}</p>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {/* Atividade últimos 7 dias */}
-        {analytics && analytics.activity_last_7_days.length > 0 && (
-          <section style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
-              Atividade — últimos 7 dias
-            </h2>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '60px' }}>
-              {analytics.activity_last_7_days.map(d => {
-                const max = Math.max(...analytics.activity_last_7_days.map(x => x.clips), 1)
-                const pct = Math.max(8, (d.clips / max) * 100)
-                return (
-                  <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                    <div style={{ width: '100%', height: `${pct}%`, background: '#ea580c', borderRadius: '3px 3px 0 0', minHeight: 4 }} title={`${d.clips} clipes`} />
-                    <span style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>{d.date.slice(5)}</span>
-                  </div>
-                )
-              })}
+      <div className="max-w-5xl w-full mx-auto p-8 space-y-10">
+        
+        {/* 2. MÉTRICAS SUTIS (Tipografia precisa, sem emojis) */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="bg-[#121216]/60 border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm transition-all hover:border-white/[0.12] hover:bg-[#15151a]/80"
+            >
+              <p className="text-xs font-medium text-zinc-400 tracking-wider uppercase">{metric.label}</p>
+              <p className="text-3xl font-light text-white mt-2 tracking-tight">{metric.value}</p>
             </div>
-          </section>
-        )}
+          ))}
+        </section>
 
-        {/* Input de URL */}
-        <section style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 700, marginBottom: '0.4rem', letterSpacing: '-0.03em' }}>
-            Encontrar Clipes Virais
-          </h1>
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-            Cole o link de qualquer vídeo do YouTube e a IA vai identificar os melhores momentos.
-          </p>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <input
-              type="url"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              required
-              placeholder="https://youtube.com/watch?v=..."
-              style={{
-                flex: 1, minWidth: 'min(100%, 280px)', padding: '0.8rem 1rem',
-                background: 'var(--card)', border: '1px solid var(--card-border)',
-                borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none',
-              }}
-            />
-            {/* Seletor de duração */}
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              {(['auto', '30', '60'] as const).map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setClipDuration(d)}
-                  style={{
-                    padding: '0.8rem 1rem',
-                    background: clipDuration === d ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${clipDuration === d ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: '0.5rem', cursor: 'pointer',
-                    color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600,
-                    backdropFilter: 'blur(20px)',
-                  }}
+        {/* 3. BARRA DE AÇÃO PRINCIPAL "SPOTLIGHT" */}
+        <section className="bg-gradient-to-b from-[#131318] to-[#0f0f13] border border-white/[0.09] rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+          <div className="max-w-xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-white">Criar Cortes Inteligentes</h2>
+            <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed">
+              Insira o link de um vídeo longo para extrair os momentos com maior potencial de retenção.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {/* Campo de URL Integrado (Estilo Spotlight) */}
+            <div className="relative flex items-center">
+              <input
+                type="url"
+                required
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Cole o link do YouTube, Instagram ou TikTok..."
+                className="w-full bg-[#18181e]/90 border border-white/[0.1] rounded-2xl px-5 py-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all shadow-inner"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-xl">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Controles de Configuração e Botão de Ação */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
+              
+              {/* Segmented Control da Apple para Duração */}
+              <div className="flex items-center p-1 bg-[#18181e] border border-white/[0.08] rounded-xl self-start">
+                {(['auto', '30', '60'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setDuration(option)}
+                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all capitalize cursor-pointer ${
+                      duration === option
+                        ? 'bg-white/[0.12] text-white shadow-sm font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {option === 'auto' ? 'Duração Auto' : `${option}s`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Botão de Ação Primária Apple */}
+              <button
+                type="submit"
+                disabled={loading || !url.trim()}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white text-sm font-medium transition-all shadow-lg shadow-orange-600/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processando...</span>
+                  </>
+                ) : (
+                  <span>Gerar Clipes</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {/* 4. ÁREA DE PROJETOS RECENTES */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">Projetos Recentes</h3>
+            {projects.length > 0 && (
+              <Link href="/upload" className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
+                <span>Ver todos</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+
+          {projects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {projects.slice(0, 6).map((proj) => (
+                <Link
+                  key={proj.id}
+                  href={`/project/${proj.id}`}
+                  className="bg-[#121216]/60 border border-white/[0.07] hover:border-white/[0.14] rounded-2xl p-4 transition-all hover:bg-[#15151a]/80 flex items-center justify-between group"
                 >
-                  {d === 'auto' ? '🤖 Auto' : `${d}s`}
-                </button>
+                  <div className="min-w-0 pr-4">
+                    <p className="text-sm font-medium text-white truncate group-hover:text-orange-400 transition-colors">
+                      {proj.title || 'Projeto sem título'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(proj.created_at).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                      proj.status === 'done'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : proj.status === 'processing'
+                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                        : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                    }`}>
+                      {proj.status === 'done' ? 'Pronto' : proj.status === 'processing' ? 'Processando' : 'Pendente'}
+                    </span>
+                    <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
+                  </div>
+                </Link>
               ))}
             </div>
-
-            <button
-              type="submit"
-              disabled={loading || !userId}
-              style={{
-                padding: '0.8rem 1.5rem', background: 'var(--accent)', color: '#fff',
-                border: 'none', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.95rem',
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {loading ? (polling ? '⏳ Processando…' : 'Enviando…') : '🔍 Encontrar Clipes Virais'}
-            </button>
-          </form>
-          {error && <p style={{ color: 'var(--danger)', marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</p>}
-          {polling && (
-            <p style={{ color: 'var(--muted)', marginTop: '0.75rem', fontSize: '0.85rem' }}>
-              ⚙️ Baixando vídeo, transcrevendo e gerando clipes... isso pode levar alguns minutos.
-            </p>
+          ) : (
+            <div className="border border-dashed border-white/[0.08] rounded-2xl p-12 text-center bg-[#121216]/30">
+              <p className="text-sm text-zinc-400 font-normal">Nenhum clipe gerado ainda.</p>
+              <p className="text-xs text-zinc-500 mt-1">Cole uma URL acima para começar a produzir seus cortes.</p>
+            </div>
           )}
         </section>
 
-        <div className="grid items-start gap-6 md:grid-cols-[minmax(200px,260px)_1fr]">
-
-          {/* Sidebar de projetos */}
-          <aside>
-            <h2 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-              Vídeos importados
-            </h2>
-            {projects.length === 0 ? (
-              <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Nenhum vídeo ainda.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {projects.map(p => (
-                  <li key={p.id}>
-                    <button
-                      onClick={() => selectProject(p.id)}
-                      style={{
-                        width: '100%', textAlign: 'left', padding: '0.6rem 0.75rem',
-                        background: activeProject === p.id ? 'var(--card)' : 'transparent',
-                        border: activeProject === p.id ? '1px solid var(--card-border)' : '1px solid transparent',
-                        borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.title || 'Processando…'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: p.status === 'done' ? '#4ade80' : 'var(--muted)', marginTop: '0.15rem' }}>
-                        {p.status === 'done' ? '✓ Pronto' : p.status === 'processing' ? '⏳ Processando' : p.status}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </aside>
-
-          {/* Grid de clipes */}
-          <section>
-            {activeProject && clips.length === 0 && (
-              <div style={{ color: 'var(--muted)', textAlign: 'center', padding: '3rem 0' }}>
-                {polling ? '⏳ Gerando clipes…' : 'Nenhum clipe gerado ainda.'}
-              </div>
-            )}
-            {!activeProject && (
-              <div style={{ color: 'var(--muted)', textAlign: 'center', padding: '3rem 0' }}>
-                Selecione um projeto ou importe um vídeo novo.
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem' }}>
-              {clips.map(clip => (
-                <div key={clip.id} style={{
-                  background: 'var(--card)', border: '1px solid var(--card-border)',
-                  borderRadius: '0.75rem', overflow: 'hidden',
-                }}>
-                  {/* Vídeo vertical */}
-                  <div style={{ position: 'relative', paddingTop: '177.78%', background: '#000' }}>
-                    <video
-                      src={clip.storage_url}
-                      loop muted autoPlay playsInline
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    {/* Score badge */}
-                    <div style={{
-                      position: 'absolute', top: '0.5rem', right: '0.5rem',
-                      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
-                      padding: '0.2rem 0.5rem', borderRadius: '999px',
-                      fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24',
-                    }}>
-                      ⚡ {Math.round(clip.score * 100)}%
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ padding: '0.875rem' }}>
-                    <p style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '0.25rem', lineHeight: 1.3 }}>
-                      {clip.title || clip.hook}
-                    </p>
-                    <p style={{ color: 'var(--muted)', fontSize: '0.75rem', marginBottom: '0.75rem' }}>
-                      {formatDuration(clip.start_time, clip.end_time)} · {Math.round(clip.start_time)}s – {Math.round(clip.end_time)}s
-                    </p>
-                    <a
-                      href={clip.storage_url}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'block', textAlign: 'center', padding: '0.55rem',
-                        background: 'var(--accent)', color: '#fff', borderRadius: '0.4rem',
-                        fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none',
-                      }}
-                    >
-                      ⬇ Download
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </main>
+      </div>
     </div>
   )
 }

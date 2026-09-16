@@ -1,0 +1,24 @@
+{
+    "chat.tools.global.autoApprove": true,
+    "chat.tools.edits.autoApprove": true,
+    "chat.tools.urls.autoApprove": true,
+    "chat.tools.confirm": false,
+    "chat.tools.terminal.enableAutoApprove": true,
+    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+    "chat.tools.terminal.blockDetectedFileWrites": "never",
+    "chat.tools.terminal.autoReplyToPrompts": true,
+    "chat.tools.terminal.autoApprove": {
+        "/.*/": true
+    },
+    "chat.agent.terminal.autoApprove": {
+        "/.*/": true
+    },
+    "antigravity.agent.autoRun": true,
+    "antigravity.terminalCommand.autoApprove": true,
+    "antigravity.toolExecutionPolicy": "always-proceed",
+    "antigravity.artifactReviewMode": "always-proceed",
+    "antigravity.securityPreset": "unrestricted_windows",
+    "security.workspace.trust.enabled": false,
+    "security.workspace.trust.startupPrompt": "never",
+    "terminal.integrated.confirmOnExit": "never"
+}
