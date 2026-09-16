@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Novo Clipe', href: '/upload', icon: Upload },
   { label: 'Canais AutoPilot', href: '/autopilot', icon: Radio },
-  { label: 'Brand Kit', href: '/brand-kit', icon: Sparkles },
+  { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Agendamentos', href: '/schedule', icon: Calendar },
   { label: 'Assinatura', href: '/billing', icon: CreditCard },
 ]
