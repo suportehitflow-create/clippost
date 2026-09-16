@@ -15,7 +15,11 @@ import {
   Terminal,
   CheckCircle2,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Smartphone,
+  Copy,
+  Check,
+  X
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
@@ -52,6 +56,8 @@ export default function ProjectClient({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
   const [errorMessage, setErrorMessage] = useState(project.error_message || '')
+  const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
+  const [copiedUrl, setCopiedUrl] = useState(false)
 
   const isPendingOrProcessing = status === 'pending' || status === 'processing'
 
@@ -329,6 +335,16 @@ export default function ProjectClient({
                       <Edit3 className="w-3.5 h-3.5" /> Editar
                     </Link>
                     {clip.storage_url && (
+                      <button
+                        type="button"
+                        onClick={() => setQrModalClip({ title: clip.title || 'Clipe 9:16', url: clip.storage_url! })}
+                        className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-medium text-xs flex items-center justify-center transition-all cursor-pointer"
+                        title="Enviar para o Celular via QR Code (Estilo LocalSend)"
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {clip.storage_url && (
                       <a
                         href={clip.storage_url}
                         download
@@ -376,6 +392,64 @@ export default function ProjectClient({
             >
               Tentar Novamente
             </button>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ENVIAR PARA O CELULAR (ESTILO LOCALSEND) */}
+      {qrModalClip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-sm bg-[#121214] border border-white/10 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <button
+              onClick={() => setQrModalClip(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 mx-auto">
+              <Smartphone className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">Enviar para o Celular</h3>
+              <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{qrModalClip.title}</p>
+            </div>
+
+            {/* QR CODE BOX */}
+            <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-xl">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(qrModalClip.url)}`}
+                alt="QR Code"
+                className="w-44 h-44 object-contain"
+              />
+            </div>
+
+            <p className="text-[11px] text-zinc-400 leading-relaxed px-2">
+              Aponte a câmera do seu <strong>iPhone ou Android</strong> para baixar o vídeo vertical 9:16 direto no rolo da câmera sem cabo nem nuvem!
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(qrModalClip.url)
+                  setCopiedUrl(true)
+                  setTimeout(() => setCopiedUrl(false), 2000)
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedUrl ? 'Copiado!' : 'Copiar Link'}
+              </button>
+              <a
+                href={qrModalClip.url}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Abrir
+              </a>
+            </div>
           </div>
         </div>
       )}
