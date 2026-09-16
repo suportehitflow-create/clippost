@@ -17,6 +17,7 @@ from services.stripe_service import (
 )
 from services.db_utils import maybe_one
 from services.youtube_channel import resolve_channel, CanalNaoEncontrado
+from services.downloader import fetch_video_info, get_playlist_videos
 
 load_dotenv()
 
@@ -424,3 +425,55 @@ async def get_job_status(project_id: str):
         "raw_video_url": proj.data.get("raw_video_url"),
         "clips": clips.data,
     }
+
+
+class SourceInfoRequest(BaseModel):
+    url: str
+
+
+class PlaylistRequest(BaseModel):
+    url: str
+    limit: int = 50
+
+
+@app.post("/api/sources/info")
+async def source_info(req: SourceInfoRequest):
+    """
+    Retorna metadados de qualquer URL suportada pelo yt-dlp antes de criar o projeto.
+
+    Algoritmo do ReClip: seleciona o melhor bitrate por resolução para cada
+    qualidade disponível. Funciona para YouTube, TikTok, Instagram, Twitter/X,
+    Twitch, Vimeo, Reddit e 1000+ outras plataformas.
+
+    O frontend usa isso para mostrar thumbnail, duração e opções de qualidade
+    antes de o usuário confirmar o processamento.
+    """
+    try:
+        info = fetch_video_info(req.url)
+        return info
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar metadados: {str(e)}")
+
+
+@app.post("/api/sources/playlist")
+async def source_playlist(req: PlaylistRequest):
+    """
+    Lista vídeos de uma playlist, canal ou perfil sem baixar nenhum arquivo.
+
+    Suporta: playlists do YouTube, canais (@handle/videos), perfis do TikTok,
+    perfis do Instagram (público), etc.
+
+    Retorna os vídeos ordenados por visualizações (mais viral primeiro).
+    Limite máximo: 50 vídeos.
+    """
+    if req.limit > 50:
+        req.limit = 50
+    try:
+        resultado = get_playlist_videos(req.url, limit=req.limit)
+        return resultado
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar playlist: {str(e)}")
