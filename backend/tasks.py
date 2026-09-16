@@ -65,7 +65,8 @@ def check_channel_watches():
     """Canal AutoPilot: detecta vídeo novo nos canais monitorados e enfileira o corte.
 
     Roda no beat que já existe, lendo o RSS público do YouTube (sem chave de API).
-    O baseline gravado no cadastro evita clipar o vídeo antigo que está no topo do feed.
+    O baseline — definido no cadastro ou na primeira leitura que der certo — evita
+    clipar o vídeo antigo que está no topo do feed.
     """
     watches = (
         supabase.table("channel_watches").select("*").eq("is_active", True).execute().data or []
@@ -83,7 +84,25 @@ def check_channel_watches():
             )
             resp.raise_for_status()
 
-            for entry in ET.fromstring(resp.text).findall("atom:entry", RSS_NS)[:5]:
+            raiz = ET.fromstring(resp.text)
+            entradas = raiz.findall("atom:entry", RSS_NS)
+
+            # Canal cadastrado enquanto o feed estava fora: marca o vídeo atual
+            # como referência e não clipa nada neste ciclo, senão o vídeo antigo
+            # do topo do feed viraria corte.
+            if not w.get("baseline_video_id"):
+                if entradas:
+                    supabase.table("channel_watches").update({
+                        "baseline_video_id": entradas[0].findtext("yt:videoId", namespaces=RSS_NS),
+                        "channel_name": w.get("channel_name") or raiz.findtext(
+                            "atom:title", default="", namespaces=RSS_NS),
+                    }).eq("id", w["id"]).execute()
+                    print(f"[autopilot] baseline definido para {w['channel_id']}")
+                # Lista vazia em vez de continue: assim o laço abaixo não roda e
+                # o last_checked_at no fim do bloco ainda é atualizado.
+                entradas = []
+
+            for entry in entradas[:5]:
                 video_id = entry.find("yt:videoId", RSS_NS).text
                 title = entry.find("atom:title", RSS_NS).text
 

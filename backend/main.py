@@ -16,6 +16,7 @@ from services.stripe_service import (
     get_plan_status, get_billing_portal_url,
 )
 from services.db_utils import maybe_one
+from services.youtube_channel import resolve_channel, CanalNaoEncontrado
 
 load_dotenv()
 
@@ -65,6 +66,12 @@ class SchedulePostRequest(BaseModel):
 
 class ConnectRequest(BaseModel):
     user_id: str
+
+
+class WatchRequest(BaseModel):
+    user_id: str
+    canal: str  # @handle, URL do canal ou ID UC...
+    clip_duration: str = "auto"
 
 
 SCHEDULE_PLATFORMS = {"tiktok", "instagram", "youtube_shorts"}
@@ -271,6 +278,49 @@ async def list_connected_social(user_id: str):
         if a["platform"] == "youtube":
             a["platform"] = "youtube_shorts"
     return {"configured": True, "accounts": accounts}
+
+
+@app.post("/api/autopilot/watches")
+async def criar_watch(req: WatchRequest):
+    if req.clip_duration not in {"30", "60", "auto"}:
+        raise HTTPException(status_code=400, detail=f"Duração inválida: {req.clip_duration}")
+    try:
+        info = resolve_channel(req.canal)
+    except CanalNaoEncontrado as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    ja_existe = (
+        supabase.table("channel_watches").select("id")
+        .eq("user_id", req.user_id).eq("channel_id", info["channel_id"])
+        .execute().data
+    )
+    if ja_existe:
+        raise HTTPException(status_code=409, detail="Esse canal já está sendo monitorado.")
+
+    row = supabase.table("channel_watches").insert({
+        "user_id": req.user_id,
+        "channel_id": info["channel_id"],
+        "channel_handle": req.canal.strip(),
+        "channel_name": info["channel_name"],
+        "baseline_video_id": info["baseline_video_id"],
+        "clip_duration": req.clip_duration,
+    }).execute().data[0]
+    return {"watch": row, "ultimo_video": info["ultimo_video"]}
+
+
+@app.get("/api/autopilot/watches/{user_id}")
+async def listar_watches(user_id: str):
+    resp = (
+        supabase.table("channel_watches").select("*")
+        .eq("user_id", user_id).order("created_at", desc=True).execute()
+    )
+    return {"watches": resp.data or []}
+
+
+@app.delete("/api/autopilot/watches/{watch_id}")
+async def remover_watch(watch_id: str):
+    supabase.table("channel_watches").delete().eq("id", watch_id).execute()
+    return {"deleted": True}
 
 
 @app.get("/health")
