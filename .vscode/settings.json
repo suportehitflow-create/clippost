@@ -1,0 +1,10 @@
+﻿{
+    "antigravity.agent.autoRun":  true,
+    "antigravity.terminalCommand.autoApprove":  true,
+    "terminal.integrated.confirmOnExit":  "never",
+    "antigravity.toolExecutionPolicy":  "always-proceed",
+    "security.workspace.trust.enabled":  false,
+    "antigravity.artifactReviewMode":  "always-proceed",
+    "security.workspace.trust.startupPrompt":  "never",
+    "chat.tools.confirm":  false
+}
