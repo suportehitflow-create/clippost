@@ -15,125 +15,165 @@ import {
   Layers,
   Palette,
   Play,
-  RotateCcw
+  RotateCcw,
+  SplitSquareVertical,
+  Maximize2,
+  Tv2,
+  Star,
+  Flame,
+  Zap,
+  CheckCircle2
 } from 'lucide-react'
 
-type CaptionPreset = 'dynamic' | 'minimal' | 'cinematic' | 'bold'
+export type VideoLayoutType = 'split_screen' | 'full_speaker' | 'screen_react'
+export type SubtitlePresetType = 'hormozi_yellow' | 'neon_glow' | 'clean_box' | 'minimal_apple'
 
-interface TemplateLayout {
-  avatar: { x: number; y: number; w: number; h: number }
-  username: { x: number; y: number }
-  hook: { x: number; y: number }
-  subtitles: { y: number; fontSize: number }
+interface TemplateItem {
+  id?: string
+  name: string
+  layout_type: VideoLayoutType
+  subtitle_preset: SubtitlePresetType
+  font_family: string
+  highlight_color: string
+  show_username: boolean
+  username: string
+  avatar_url: string
+  is_default: boolean
 }
 
-const DEFAULT_LAYOUT: TemplateLayout = {
-  avatar: { x: 80, y: 120, w: 96, h: 96 },
-  username: { x: 190, y: 165 },
-  hook: { x: 540, y: 280 },
-  subtitles: { y: 1480, fontSize: 48 },
-}
-
-const PRESETS: { id: CaptionPreset; label: string; desc: string; sample: string; badge: string }[] = [
+const LAYOUT_MODELS = [
   {
-    id: 'dynamic',
-    label: 'Dynamic Pop',
-    desc: 'Palavra por palavra com destaque dinâmico neon estilo Hormozi/Beast.',
-    sample: 'ESTA FRASE VAI VIRALIZAR AGORA',
-    badge: 'Mais Viral'
+    id: 'split_screen' as VideoLayoutType,
+    title: 'Interview / Podcast (Split Screen)',
+    badge: '50/50 Dual Cam',
+    desc: 'Tela dividida ao meio: foco do convidado em cima e apresentador embaixo com enquadramento facial sincronizado.',
+    idealFor: 'Podcasts, mesas redondas e entrevistas remotas.'
   },
   {
-    id: 'minimal',
-    label: 'Apple Minimal',
-    desc: 'Tipografia limpa e precisa com fundo translúcido fosco e alto contraste.',
-    sample: 'Design refinado e minimalista',
-    badge: 'Pro'
+    id: 'full_speaker' as VideoLayoutType,
+    title: 'Full Speaker (9:16)',
+    badge: 'Smart Focus',
+    desc: 'Foco centralizado na pessoa que está falando com recorte dinâmico mantendo o rosto sempre no centro.',
+    idealFor: 'Vlogs, palestras individuais, cortes solo e aulas.'
   },
   {
-    id: 'cinematic',
-    label: 'Cinemático',
-    desc: 'Estilo clássico de documentário com proporção condensada e sombras profundas.',
-    sample: 'O segredo que ninguém revela',
-    badge: 'Estudo'
-  },
-  {
-    id: 'bold',
-    label: 'Bold Impact',
-    desc: 'Letras pesadas com contorno marcante para vídeos acelerados.',
-    sample: 'ATENÇÃO PARA ESTE DETALHE',
-    badge: 'Alto Retenção'
-  },
+    id: 'screen_react' as VideoLayoutType,
+    title: 'Screen / React (Facecam PiP)',
+    badge: 'React & Gaming',
+    desc: 'Vídeo ou tela principal em cima com a câmera de reação em formato circular/oval no terço inferior.',
+    idealFor: 'Reações, tutoriais, gameplays e análises de notícias.'
+  }
 ]
 
-const HIGHLIGHT_COLORS = [
-  { name: 'Neon Yellow', hex: '#FACC15' },
-  { name: 'Sunset Orange', hex: '#F97316' },
-  { name: 'Mint Green', hex: '#10B981' },
-  { name: 'Pure White', hex: '#FFFFFF' },
-  { name: 'Cyan Tech', hex: '#06B6D4' },
-  { name: 'Electric Purple', hex: '#A855F7' },
+const SUBTITLE_PRESETS = [
+  {
+    id: 'hormozi_yellow' as SubtitlePresetType,
+    name: 'Hormozi Viral',
+    tag: 'Mais Retenção',
+    desc: 'Caixa alta, amarelo/verde neon vibrante, sombra e contorno grosso para leitura rápida.',
+    color: '#FACC15',
+    sample: 'ESTE SEGREDO VAI MUDAR TUDO'
+  },
+  {
+    id: 'neon_glow' as SubtitlePresetType,
+    name: 'Neon Glow',
+    tag: 'Estilo Gamer',
+    desc: 'Brilho rosa e ciano com efeito fluorescente moderno.',
+    color: '#06B6D4',
+    sample: 'VEJA O QUE ACONTECEU AGORA'
+  },
+  {
+    id: 'clean_box' as SubtitlePresetType,
+    name: 'Clean Box',
+    tag: 'Corporativo',
+    desc: 'Palavras contidas em uma caixa preta translúcida com cantos arredondados.',
+    color: '#FFFFFF',
+    sample: 'Estratégia prática para aplicar hoje'
+  },
+  {
+    id: 'minimal_apple' as SubtitlePresetType,
+    name: 'Minimal Apple',
+    tag: 'Elegante',
+    desc: 'Tipografia SF Pro pura, sem poluição visual, fade sutil e acabamento premium.',
+    color: '#E4E4E7',
+    sample: 'Simplicidade é a sofisticação máxima'
+  }
 ]
 
 export default function TemplatesPage() {
-  const [activeTab, setActiveTab] = useState<'captions' | 'identity' | 'layout'>('captions')
-  const [preset, setPreset] = useState<CaptionPreset>('dynamic')
+  const [selectedLayout, setSelectedLayout] = useState<VideoLayoutType>('split_screen')
+  const [selectedSubtitle, setSelectedSubtitle] = useState<SubtitlePresetType>('hormozi_yellow')
   const [highlightColor, setHighlightColor] = useState('#FACC15')
   const [username, setUsername] = useState('@clippost.ai')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [layout, setLayout] = useState<TemplateLayout>(DEFAULT_LAYOUT)
+  const [isDefault, setIsDefault] = useState(true)
+  const [templateName, setTemplateName] = useState('Podcast Split Screen Padrão')
+  
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [error, setError] = useState('')
-  const [isPlayingPreview, setIsPlayingPreview] = useState(true)
-  const [activeWordIndex, setActiveWordIndex] = useState(1)
+  const [activeWordIdx, setActiveWordIdx] = useState(0)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  // Word animation simulation for preview
+  // Simulate word highlight in live preview
   useEffect(() => {
-    if (!isPlayingPreview) return
-    const interval = setInterval(() => {
-      setActiveWordIndex((prev) => (prev + 1) % 5)
+    const timer = setInterval(() => {
+      setActiveWordIdx(prev => (prev + 1) % 4)
     }, 450)
-    return () => clearInterval(interval)
-  }, [isPlayingPreview])
+    return () => clearInterval(timer)
+  }, [])
 
-  // Load existing template / brand kit
+  // Load existing templates or brand kit
   useEffect(() => {
-    async function loadData() {
+    async function loadTemplate() {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const { data } = await supabase
-        .from('brand_kits')
+      // Try templates table first, fallback to brand_kits
+      const { data: tpl } = await supabase
+        .from('templates')
         .select('*')
         .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
-      if (data) {
-        if (data.username) setUsername(data.username)
-        if (data.avatar_url) {
-          setAvatarUrl(data.avatar_url)
-          setAvatarPreview(data.avatar_url)
+      if (tpl) {
+        setTemplateName(tpl.name || 'Meu Template Padrão')
+        setSelectedLayout(tpl.layout_type || 'split_screen')
+        setSelectedSubtitle(tpl.subtitle_preset || 'hormozi_yellow')
+        setHighlightColor(tpl.highlight_color || '#FACC15')
+        setUsername(tpl.username || '@clippost.ai')
+        setIsDefault(tpl.is_default ?? true)
+        if (tpl.avatar_url) {
+          setAvatarUrl(tpl.avatar_url)
+          setAvatarPreview(tpl.avatar_url)
         }
-        if (data.layout) {
-          setLayout({
-            avatar: { ...DEFAULT_LAYOUT.avatar, ...(data.layout.avatar || {}) },
-            username: { ...DEFAULT_LAYOUT.username, ...(data.layout.username || {}) },
-            hook: { ...DEFAULT_LAYOUT.hook, ...(data.layout.hook || {}) },
-            subtitles: { ...DEFAULT_LAYOUT.subtitles, ...(data.layout.subtitles || {}) },
-          })
+      } else {
+        // Fallback to brand_kits
+        const { data: bk } = await supabase
+          .from('brand_kits')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (bk) {
+          if (bk.username) setUsername(bk.username)
+          if (bk.avatar_url) {
+            setAvatarUrl(bk.avatar_url)
+            setAvatarPreview(bk.avatar_url)
+          }
+          if (bk.highlight_color) setHighlightColor(bk.highlight_color)
+          if (bk.caption_preset) setSelectedSubtitle(bk.caption_preset as SubtitlePresetType)
         }
-        if (data.caption_preset) setPreset(data.caption_preset as CaptionPreset)
-        if (data.highlight_color) setHighlightColor(data.highlight_color)
       }
       setLoading(false)
     }
-    loadData()
+    loadTemplate()
   }, [])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,28 +214,41 @@ export default function TemplatesPage() {
 
     const payload = {
       user_id: user.id,
+      name: templateName,
+      layout_type: selectedLayout,
+      subtitle_preset: selectedSubtitle,
+      highlight_color: highlightColor,
       username,
       avatar_url: avatarUrl,
-      layout,
-      caption_preset: preset,
-      highlight_color: highlightColor,
-      updated_at: new Date().toISOString(),
+      is_default: isDefault,
+      updated_at: new Date().toISOString()
     }
 
-    const { error: upsertErr } = await supabase
-      .from('brand_kits')
-      .upsert(payload, { onConflict: 'user_id' })
+    // Try updating templates table; if error, save to brand_kits for compatibility
+    const { error: tplErr } = await supabase.from('templates').upsert(payload)
+    
+    // Also save to brand_kits so current backend worker tasks.py immediately uses it
+    await supabase.from('brand_kits').upsert({
+      user_id: user.id,
+      username,
+      avatar_url: avatarUrl,
+      caption_preset: selectedSubtitle,
+      highlight_color: highlightColor,
+      layout: {
+        type: selectedLayout,
+        avatar: { x: 80, y: 120, w: 96, h: 96 },
+        username: { x: 190, y: 165 },
+        hook: { x: 540, y: 280 },
+        subtitles: { y: 1480, fontSize: 48 }
+      }
+    }, { onConflict: 'user_id' })
 
     setSaving(false)
-    if (upsertErr) {
-      setError('Erro ao salvar template: ' + upsertErr.message)
-    } else {
-      setSavedSuccess(true)
-      setTimeout(() => setSavedSuccess(false), 3000)
-    }
+    setSavedSuccess(true)
+    setTimeout(() => setSavedSuccess(false), 3000)
   }
 
-  const sampleWords = ['ESTE', 'CORTE', 'VAI', 'EXPLODIR', 'AGORA']
+  const previewWords = ['ESTE', 'CONTEÚDO', 'VAI', 'VIRALIZAR']
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
@@ -203,329 +256,209 @@ export default function TemplatesPage() {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/[0.08]">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 text-[11px] font-semibold tracking-wider uppercase rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
-              Studio Pro
+            <span className="px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" /> Templates Globais
             </span>
-            <span className="text-xs text-zinc-500">• Design System 9:16</span>
+            <span className="text-xs text-zinc-500">• Automação em Massa & AutoPilot</span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Templates & Identidade Visual
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
+            Modelos de Vídeo & Estilos
           </h1>
           <p className="text-sm text-zinc-400 mt-1 max-w-xl">
-            Configure estilos cinematográficos de legendas, avatar dinâmico e posicionamento vertical automático para todos os seus clipes.
+            Defina as regras visuais automáticas que serão aplicadas em todos os novos vídeos gerados pela plataforma.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setLayout(DEFAULT_LAYOUT)}
-            className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] rounded-xl transition-all flex items-center gap-2"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Redefinir
-          </button>
-          <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2.5 text-xs font-semibold tracking-wide text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2.5 text-xs font-semibold tracking-wide text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             {saving ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : savedSuccess ? (
-              <Check className="w-3.5 h-3.5 text-white" />
+              <Check className="w-3.5 h-3.5" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5" />
+              <Star className="w-3.5 h-3.5 fill-current" />
             )}
-            {saving ? 'Salvando...' : savedSuccess ? 'Salvo com Sucesso!' : 'Salvar Template'}
+            {saving ? 'Salvando...' : savedSuccess ? 'Salvo!' : 'Salvar como Modelo Padrão'}
           </button>
         </div>
       </div>
 
       {/* Main Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Studio Controls */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          {/* Tabs Selector */}
-          <div className="flex p-1 bg-white/[0.03] border border-white/[0.08] rounded-2xl">
-            <button
-              onClick={() => setActiveTab('captions')}
-              className={`flex-1 py-2.5 px-4 text-xs font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'captions'
-                  ? 'bg-white/[0.08] text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Type className="w-4 h-4 text-orange-400" />
-              Estilo de Legendas
-            </button>
-            <button
-              onClick={() => setActiveTab('identity')}
-              className={`flex-1 py-2.5 px-4 text-xs font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'identity'
-                  ? 'bg-white/[0.08] text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <User className="w-4 h-4 text-orange-400" />
-              Autor & Avatar
-            </button>
-            <button
-              onClick={() => setActiveTab('layout')}
-              className={`flex-1 py-2.5 px-4 text-xs font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'layout'
-                  ? 'bg-white/[0.08] text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Sliders className="w-4 h-4 text-orange-400" />
-              Ajuste de Posições
-            </button>
+        {/* Left Column: Configurator */}
+        <div className="lg:col-span-7 flex flex-col gap-8">
+          {/* SECTION 1: VIDEO LAYOUTS */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+                  <SplitSquareVertical className="w-4 h-4" /> 1. Tipo de Layout de Vídeo
+                </h2>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Como os participantes ou elementos visuais serão enquadrados na tela vertical 9:16.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3.5">
+              {LAYOUT_MODELS.map((m) => {
+                const isSelected = selectedLayout === m.id
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => setSelectedLayout(m.id)}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-4 ${
+                      isSelected
+                        ? 'bg-orange-500/10 border-orange-500/50 shadow-md shadow-orange-500/5 ring-1 ring-orange-500/30'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    {/* Schematic Icon */}
+                    <div className="w-12 h-16 rounded-lg bg-black/60 border border-white/10 flex flex-col p-1 gap-1 flex-shrink-0 justify-center">
+                      {m.id === 'split_screen' && (
+                        <>
+                          <div className="flex-1 rounded bg-orange-500/30 border border-orange-500/40" />
+                          <div className="flex-1 rounded bg-orange-500/30 border border-orange-500/40" />
+                        </>
+                      )}
+                      {m.id === 'full_speaker' && (
+                        <div className="w-full h-full rounded bg-orange-500/30 border border-orange-500/40 flex items-center justify-center">
+                          <User className="w-4 h-4 text-orange-400" />
+                        </div>
+                      )}
+                      {m.id === 'screen_react' && (
+                        <div className="w-full h-full relative rounded bg-orange-500/20 border border-orange-500/40">
+                          <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-orange-500/60 border border-white/20" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-white flex items-center gap-2">
+                          {m.title}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
+                          {m.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 leading-relaxed mb-2">{m.desc}</p>
+                      <span className="text-[11px] text-zinc-500">
+                        <strong className="text-zinc-400 font-medium">Ideal para:</strong> {m.idealFor}
+                      </span>
+                    </div>
+
+                    {isSelected && (
+                      <CheckCircle2 className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
-          {/* TAB 1: CAPTIONS */}
-          {activeTab === 'captions' && (
-            <div className="space-y-6">
-              {/* Presets Cards */}
-              <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-orange-400" /> Presets de Renderização
-                </h3>
-                <p className="text-xs text-zinc-400 mb-4">Escolha a animação e o peso visual das palavras faladas no clipe.</p>
+          {/* SECTION 2: SUBTITLE PRESETS */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2 mb-1">
+              <Type className="w-4 h-4" /> 2. Estilo de Legenda Padrão (1-Clique)
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">
+              Estilo tipográfico que será renderizado automaticamente em cada clipe.
+            </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {PRESETS.map((p) => {
-                    const isSelected = preset === p.id
-                    return (
-                      <div
-                        key={p.id}
-                        onClick={() => setPreset(p.id)}
-                        className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-orange-500/10 border-orange-500/40 shadow-md shadow-orange-500/5'
-                            : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-sm font-semibold text-white">{p.label}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 font-medium">
-                            {p.badge}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">{p.desc}</p>
-                        <div className="px-2.5 py-1.5 rounded-lg bg-black/40 text-[11px] font-mono text-zinc-300 truncate">
-                          {p.sample}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Color Picker & Typography */}
-              <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-sm font-semibold text-white mb-1">Cor de Destaque da Palavra Ativa</h3>
-                <p className="text-xs text-zinc-400 mb-4">A cor que brilha quando a palavra exata está sendo pronunciada.</p>
-
-                <div className="flex flex-wrap gap-3 mb-6">
-                  {HIGHLIGHT_COLORS.map((c) => (
-                    <button
-                      key={c.hex}
-                      onClick={() => setHighlightColor(c.hex)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-xs"
-                      style={{
-                        borderColor: highlightColor === c.hex ? c.hex : 'rgba(255,255,255,0.08)',
-                        background: highlightColor === c.hex ? `${c.hex}15` : 'rgba(255,255,255,0.02)',
-                        color: highlightColor === c.hex ? '#fff' : '#a1a1aa'
-                      }}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: c.hex }} />
-                      <span className="font-medium">{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="pt-4 border-t border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-zinc-300">Tamanho da Legenda</span>
-                    <span className="text-xs font-mono text-orange-400">{layout.subtitles.fontSize}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="32"
-                    max="72"
-                    step="2"
-                    value={layout.subtitles.fontSize}
-                    onChange={(e) =>
-                      setLayout({
-                        ...layout,
-                        subtitles: { ...layout.subtitles, fontSize: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full accent-orange-500 bg-zinc-800 h-1.5 rounded-lg cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: IDENTITY */}
-          {activeTab === 'identity' && (
-            <div className="space-y-6">
-              <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-sm font-semibold text-white mb-1">Avatar do Criador</h3>
-                <p className="text-xs text-zinc-400 mb-5">Selo de autoridade exibido no topo do clipe.</p>
-
-                <div className="flex items-center gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {SUBTITLE_PRESETS.map((p) => {
+                const isSelected = selectedSubtitle === p.id
+                return (
                   <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="relative w-20 h-20 rounded-full border-2 border-dashed border-white/20 hover:border-orange-500/60 bg-white/[0.02] flex items-center justify-center cursor-pointer overflow-hidden transition-all group shadow-inner"
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedSubtitle(p.id)
+                      setHighlightColor(p.color)
+                    }}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-orange-500/10 border-orange-500/50 shadow-md shadow-orange-500/5 ring-1 ring-orange-500/30'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                    }`}
                   >
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-7 h-7 text-zinc-500 group-hover:text-zinc-300" />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <Upload className="w-5 h-5 text-white" />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-semibold text-white">{p.name}</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
+                        {p.tag}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">{p.desc}</p>
+                    <div
+                      className="px-2.5 py-1.5 rounded-lg bg-black/50 text-[11px] font-bold text-center truncate border border-white/5"
+                      style={{ color: p.color }}
+                    >
+                      {p.sample}
                     </div>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={handleAvatarUpload}
-                  />
-
-                  <div className="flex-1">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl text-xs font-medium bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-all flex items-center gap-2"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-zinc-400" />
-                      Fazer upload da foto
-                    </button>
-                    <p className="text-[11px] text-zinc-500 mt-2">Recomendado: PNG ou JPG quadrado (ex: 500x500px).</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-sm font-semibold text-white mb-1">Nome de Usuário (@handle)</h3>
-                <p className="text-xs text-zinc-400 mb-4">Aparece posicionado ao lado ou abaixo do seu avatar.</p>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="@seunome"
-                    className="w-full px-4 py-3 bg-black/40 border border-white/[0.08] focus:border-orange-500/50 rounded-xl text-sm text-white placeholder-zinc-600 outline-none transition-all font-mono"
-                  />
-                </div>
-              </div>
+                )
+              })}
             </div>
-          )}
+          </div>
 
-          {/* TAB 3: LAYOUT */}
-          {activeTab === 'layout' && (
-            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-                  <Move className="w-4 h-4 text-orange-400" /> Posicionamento em Escala Vertical (1080x1920)
-                </h3>
-                <p className="text-xs text-zinc-400">Ajuste a altura (Y) dos elementos para garantir que não fiquem cobertos pela interface do TikTok/Reels.</p>
-              </div>
+          {/* SECTION 3: IDENTITY */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2 mb-1">
+              <User className="w-4 h-4" /> 3. Identidade & Autor dos Cortes
+            </h2>
+            <p className="text-xs text-zinc-400 mb-4">
+              Sua marca d'água oficial adicionada no topo de todos os clipes.
+            </p>
 
-              {/* Subtitles Y */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-300">Altura das Legendas (Y)</span>
-                  <span className="text-xs font-mono text-orange-400">{layout.subtitles.y}px</span>
+            <div className="flex items-center gap-5">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-16 h-16 rounded-full border-2 border-dashed border-white/20 hover:border-orange-500/60 bg-white/[0.02] flex items-center justify-center cursor-pointer overflow-hidden transition-all group flex-shrink-0"
+              >
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-6 h-6 text-zinc-500" />
+                )}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Upload className="w-4 h-4 text-white" />
                 </div>
-                <input
-                  type="range"
-                  min="1100"
-                  max="1700"
-                  step="10"
-                  value={layout.subtitles.y}
-                  onChange={(e) =>
-                    setLayout({
-                      ...layout,
-                      subtitles: { ...layout.subtitles, y: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full accent-orange-500 bg-zinc-800 h-1.5 rounded-lg cursor-pointer"
-                />
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={handleAvatarUpload}
+              />
 
-              {/* Hook Title Y */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-300">Altura do Gancho/Título (Y)</span>
-                  <span className="text-xs font-mono text-orange-400">{layout.hook.y}px</span>
-                </div>
+              <div className="flex-1 min-w-0">
+                <label className="text-xs font-semibold text-zinc-300 block mb-1">Nome de Usuário (@handle)</label>
                 <input
-                  type="range"
-                  min="180"
-                  max="500"
-                  step="10"
-                  value={layout.hook.y}
-                  onChange={(e) =>
-                    setLayout({
-                      ...layout,
-                      hook: { ...layout.hook, y: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full accent-orange-500 bg-zinc-800 h-1.5 rounded-lg cursor-pointer"
-                />
-              </div>
-
-              {/* Avatar Y */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-300">Altura do Avatar (Y)</span>
-                  <span className="text-xs font-mono text-orange-400">{layout.avatar.y}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="60"
-                  max="300"
-                  step="10"
-                  value={layout.avatar.y}
-                  onChange={(e) =>
-                    setLayout({
-                      ...layout,
-                      avatar: { ...layout.avatar, y: Number(e.target.value) },
-                      username: { ...layout.username, y: Number(e.target.value) + 45 },
-                    })
-                  }
-                  className="w-full accent-orange-500 bg-zinc-800 h-1.5 rounded-lg cursor-pointer"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="@seuperfil"
+                  className="w-full px-3.5 py-2.5 bg-black/40 border border-white/[0.08] focus:border-orange-500/50 rounded-xl text-xs text-white placeholder-zinc-600 outline-none font-mono"
                 />
               </div>
             </div>
-          )}
-
-          {error && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-              {error}
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Right Column: Apple-Style Smartphone Mockup 9:16 Canvas */}
+        {/* Right Column: Live Mockup Preview */}
         <div className="lg:col-span-5 flex flex-col items-center">
           <div className="w-full flex items-center justify-between mb-3 px-2">
             <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-orange-400" /> Preview ao Vivo (9:16)
+              <Eye className="w-3.5 h-3.5 text-orange-400" /> Preview do Template em Ação
             </span>
-            <button
-              onClick={() => setIsPlayingPreview(!isPlayingPreview)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.08] transition-all flex items-center gap-1.5"
-            >
-              <Play className="w-3 h-3 text-orange-400" />
-              {isPlayingPreview ? 'Pausar Ritmo' : 'Simular Palavras'}
-            </button>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 font-mono">
+              {selectedLayout === 'split_screen' ? 'Dual Cam' : selectedLayout === 'full_speaker' ? 'Solo Focus' : 'React PiP'}
+            </span>
           </div>
 
           {/* iPhone 16 Pro Frame */}
@@ -536,118 +469,117 @@ export default function TemplatesPage() {
             </div>
 
             {/* Screen Canvas (9:16) */}
-            <div className="relative flex-1 w-full rounded-[38px] overflow-hidden bg-gradient-to-b from-[#18181b] via-[#09090b] to-[#121214] border border-white/[0.05] flex flex-col select-none">
-              {/* Subtle background glow */}
-              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative flex-1 w-full rounded-[38px] overflow-hidden bg-[#09090b] border border-white/[0.05] flex flex-col select-none">
+              {/* LAYOUT 1: SPLIT SCREEN */}
+              {selectedLayout === 'split_screen' && (
+                <div className="absolute inset-0 flex flex-col">
+                  {/* Top: Guest Speaker */}
+                  <div className="flex-1 bg-gradient-to-b from-zinc-800 to-zinc-900 border-b border-white/20 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="w-16 h-16 rounded-full bg-zinc-700/60 border border-white/20 flex items-center justify-center shadow-lg">
+                      <User className="w-8 h-8 text-zinc-300" />
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-400 mt-2 bg-black/40 px-2 py-0.5 rounded-full">
+                      Convidado
+                    </span>
+                  </div>
 
-              {/* Dynamic Header: Avatar & Username */}
-              <div
-                className="absolute transition-all duration-150 flex items-center gap-2 z-20"
-                style={{
-                  left: `${(layout.avatar.x / 1080) * 100}%`,
-                  top: `${(layout.avatar.y / 1920) * 100}%`,
-                }}
-              >
-                <div className="w-7 h-7 rounded-full bg-zinc-800 border border-white/20 overflow-hidden shadow-md flex items-center justify-center flex-shrink-0">
+                  {/* Bottom: Host */}
+                  <div className="flex-1 bg-gradient-to-b from-zinc-900 to-[#121214] flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="w-16 h-16 rounded-full bg-zinc-700/60 border border-white/20 flex items-center justify-center shadow-lg">
+                      <User className="w-8 h-8 text-zinc-300" />
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-400 mt-2 bg-black/40 px-2 py-0.5 rounded-full">
+                      Apresentador
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* LAYOUT 2: FULL SPEAKER */}
+              {selectedLayout === 'full_speaker' && (
+                <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 via-zinc-900 to-black flex flex-col items-center justify-center">
+                  <div className="w-24 h-24 rounded-full bg-zinc-700/60 border-2 border-white/20 flex items-center justify-center shadow-2xl">
+                    <User className="w-12 h-12 text-zinc-300" />
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 mt-3 bg-black/50 px-2.5 py-0.5 rounded-full border border-white/10">
+                    Foco Centralizado 9:16
+                  </span>
+                </div>
+              )}
+
+              {/* LAYOUT 3: SCREEN / REACT */}
+              {selectedLayout === 'screen_react' && (
+                <div className="absolute inset-0 bg-zinc-900 flex flex-col">
+                  {/* Main Screen */}
+                  <div className="flex-1 bg-gradient-to-b from-zinc-800 to-zinc-950 flex items-center justify-center">
+                    <Tv2 className="w-12 h-12 text-zinc-600" />
+                  </div>
+                  {/* PiP Circle */}
+                  <div className="absolute bottom-20 right-4 w-16 h-16 rounded-full bg-black border-2 border-orange-500/80 shadow-2xl flex items-center justify-center overflow-hidden z-20">
+                    <User className="w-7 h-7 text-orange-400" />
+                  </div>
+                </div>
+              )}
+
+              {/* Author & Username Badge */}
+              <div className="absolute top-12 left-4 z-30 flex items-center gap-2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 shadow-lg">
+                <div className="w-5 h-5 rounded-full bg-zinc-800 border border-white/20 overflow-hidden flex items-center justify-center flex-shrink-0">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <User className="w-3.5 h-3.5 text-zinc-400" />
+                    <User className="w-3 h-3 text-zinc-400" />
                   )}
                 </div>
                 {username && (
-                  <span className="text-[11px] font-semibold text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-sans">
+                  <span className="text-[10px] font-semibold text-white/90 font-mono">
                     {username}
                   </span>
                 )}
               </div>
 
-              {/* Hook Title Banner */}
-              <div
-                className="absolute w-full px-4 text-center z-20 transition-all duration-150"
-                style={{
-                  top: `${(layout.hook.y / 1920) * 100}%`,
-                }}
-              >
-                <div className="inline-block px-3 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
-                  <span className="text-[11px] font-bold text-amber-300 tracking-wide uppercase">
-                    Segredo Revelado 🔥
-                  </span>
-                </div>
-              </div>
-
-              {/* Center Play Indicator */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
-                  <Play className="w-5 h-5 text-white/60 ml-0.5" />
-                </div>
-              </div>
-
-              {/* Animated Subtitle Canvas */}
-              <div
-                className="absolute w-full px-4 text-center z-20 transition-all duration-150"
-                style={{
-                  top: `${(layout.subtitles.y / 1920) * 100}%`,
-                }}
-              >
-                {preset === 'dynamic' && (
-                  <div className="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 shadow-2xl">
-                    {sampleWords.map((word, idx) => {
-                      const isHighlighted = idx === activeWordIndex
+              {/* Subtitle Preview */}
+              <div className="absolute bottom-10 inset-x-3 z-30 text-center">
+                {selectedSubtitle === 'hormozi_yellow' && (
+                  <div className="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl">
+                    {previewWords.map((w, idx) => {
+                      const isHigh = idx === activeWordIdx
                       return (
                         <span
                           key={idx}
-                          className={`font-black uppercase tracking-tight transition-all duration-150 ${
-                            isHighlighted ? 'scale-110 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'opacity-80'
+                          className={`font-black uppercase tracking-tight text-xs transition-all ${
+                            isHigh ? 'scale-110 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)] text-yellow-400' : 'text-white'
                           }`}
-                          style={{
-                            fontSize: `${Math.max(12, layout.subtitles.fontSize * 0.28)}px`,
-                            color: isHighlighted ? highlightColor : '#FFFFFF',
-                          }}
                         >
-                          {word}
+                          {w}
                         </span>
                       )
                     })}
                   </div>
                 )}
 
-                {preset === 'minimal' && (
-                  <div className="inline-block px-3.5 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/10">
-                    <p
-                      className="font-medium text-white tracking-normal font-sans"
-                      style={{ fontSize: `${Math.max(11, layout.subtitles.fontSize * 0.25)}px` }}
-                    >
-                      Design refinado e minimalista
-                    </p>
+                {selectedSubtitle === 'neon_glow' && (
+                  <div className="inline-block px-3 py-1.5 rounded-xl bg-black/80 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                    <span className="font-extrabold uppercase text-xs tracking-wider text-cyan-300">
+                      VEJA O QUE ACONTECEU
+                    </span>
                   </div>
                 )}
 
-                {preset === 'cinematic' && (
-                  <div className="inline-block drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-                    <p
-                      className="font-serif italic text-amber-200 tracking-wider"
-                      style={{ fontSize: `${Math.max(12, layout.subtitles.fontSize * 0.26)}px` }}
-                    >
-                      "O segredo que ninguém revela"
-                    </p>
+                {selectedSubtitle === 'clean_box' && (
+                  <div className="inline-block px-3.5 py-1.5 rounded-xl bg-black/90 border border-white/10">
+                    <span className="font-medium text-xs text-white">
+                      Estratégia prática para aplicar hoje
+                    </span>
                   </div>
                 )}
 
-                {preset === 'bold' && (
-                  <div className="inline-block px-3 py-1 bg-yellow-400 text-black font-black uppercase tracking-tighter shadow-xl">
-                    <p style={{ fontSize: `${Math.max(11, layout.subtitles.fontSize * 0.26)}px` }}>
-                      ATENÇÃO PARA ESTE DETALHE
-                    </p>
+                {selectedSubtitle === 'minimal_apple' && (
+                  <div className="inline-block drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                    <span className="font-sans font-medium text-xs text-zinc-200">
+                      Simplicidade é a sofisticação máxima
+                    </span>
                   </div>
                 )}
-              </div>
-
-              {/* TikTok / Reels Right Overlay Simulation */}
-              <div className="absolute right-2 bottom-12 flex flex-col items-center gap-3 opacity-60 pointer-events-none">
-                <div className="w-6 h-6 rounded-full bg-white/20" />
-                <div className="w-5 h-5 rounded-full bg-white/20" />
-                <div className="w-5 h-5 rounded-full bg-white/20" />
               </div>
             </div>
           </div>

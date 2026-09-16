@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import {
   Download,
+  Edit3,
   Sparkles,
   Calendar,
   Play,
@@ -321,20 +322,28 @@ export default function ProjectClient({
                   </div>
 
                   <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
+                    <Link
+                      href={`/clips/${clip.id}`}
+                      className="flex-1 py-2 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/15 transition-all"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                    </Link>
                     {clip.storage_url && (
                       <a
                         href={clip.storage_url}
                         download
-                        className="flex-1 py-2 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/10 transition-all"
+                        className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
+                        title="Baixar MP4"
                       >
-                        <Download className="w-3.5 h-3.5" /> Baixar
+                        <Download className="w-3.5 h-3.5" />
                       </a>
                     )}
                     <Link
                       href="/schedule"
-                      className="flex-1 py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center gap-1.5 transition-all"
+                      className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
+                      title="Agendar Postagem"
                     >
-                      <Calendar className="w-3.5 h-3.5" /> Agendar
+                      <Calendar className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </div>

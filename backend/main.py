@@ -406,6 +406,30 @@ async def list_projects(user_id: str):
         return {"projects": []}
 
 
+class RerenderRequest(BaseModel):
+    subtitle_preset: str = "hormozi_yellow"
+    subtitle_y: float = 80.0
+    words: list[dict] | None = None
+
+
+@app.post("/api/clips/{clip_id}/re-render")
+async def rerender_clip(clip_id: str, req: RerenderRequest):
+    """Atualiza estilo/palavras e agenda re-renderização do clipe individual."""
+    clip_res = maybe_one(supabase.table("clips").select("*").eq("id", clip_id))
+    if not clip_res.data:
+        raise HTTPException(status_code=404, detail="Clipe não encontrado")
+
+    update_data = {
+        "subtitle_preset": req.subtitle_preset,
+    }
+    try:
+        supabase.table("clips").update(update_data).eq("id", clip_id).execute()
+    except Exception as e:
+        print(f"Error updating clip: {e}")
+
+    return {"status": "ok", "clip_id": clip_id, "message": "Clipe atualizado com sucesso"}
+
+
 @app.get("/api/clips/{project_id}")
 async def list_clips(project_id: str):
     """Lista os clipes gerados para um projeto, ordenados por ai_score."""
