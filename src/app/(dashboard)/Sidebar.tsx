@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
-  Upload, 
+  Upload,
+  Layers, 
   Radio, 
   Sparkles, 
   Calendar, 
@@ -17,6 +18,7 @@ import type { User } from '@supabase/supabase-js'
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Novo Clipe', href: '/upload', icon: Upload },
+  { label: 'Batch Studio', href: '/bulk', icon: Layers },
   { label: 'Canais AutoPilot', href: '/autopilot', icon: Radio },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Agendamentos', href: '/schedule', icon: Calendar },

@@ -1,213 +1,507 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  Layers,
+  Upload,
+  Link as LinkIcon,
+  Sparkles,
+  CheckCircle2,
+  Clock,
+  Download,
+  Calendar,
+  Zap,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  Play,
+  Check,
+  Film,
+  Sliders,
+  FileVideo
+} from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
-interface InstagramVideo {
+interface BatchItem {
   id: string
-  title: string
-  url: string
-  view_count: number
-  duration: number
-  platform: string
+  file?: File
+  url?: string
+  name: string
+  size?: number
+  status: 'pending' | 'uploading' | 'processing' | 'done' | 'failed'
+  progress: number
+  projectId?: string
+  clips?: any[]
+  error?: string
 }
 
-export default function BulkPage() {
+const TEMPLATE_PRESETS = [
+  {
+    id: 'hormozi_yellow',
+    name: 'Hormozi Viral',
+    tag: 'Mais Viral',
+    color: '#FACC15',
+    desc: 'Caixa alta, amarelo neon e contorno grosso para máxima retenção.'
+  },
+  {
+    id: 'minimal_apple',
+    name: 'Apple Minimal',
+    tag: 'Elegante',
+    color: '#E4E4E7',
+    desc: 'Design limpo, tipografia nítida e acabamento refinado.'
+  },
+  {
+    id: 'neon_glow',
+    name: 'Neon Glow',
+    tag: 'Gamer / Tech',
+    color: '#06B6D4',
+    desc: 'Efeito fluorescente ciano iluminado.'
+  },
+  {
+    id: 'clean_box',
+    name: 'Clean Box',
+    tag: 'Corporativo',
+    color: '#FFFFFF',
+    desc: 'Legenda dentro de caixa translúcida de alto contraste.'
+  }
+]
+
+export default function BulkStudioPage() {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(null)
-  const [isPro, setIsPro] = useState(false)
-
-  // Instagram scraper
-  const [igHandle, setIgHandle] = useState('')
-  const [igSort, setIgSort] = useState<'recent' | 'views'>('recent')
-  const [igVideos, setIgVideos] = useState<InstagramVideo[]>([])
-  const [igLoading, setIgLoading] = useState(false)
-  const [igError, setIgError] = useState('')
-
-  // Bulk URL input
-  const [bulkUrls, setBulkUrls] = useState('')
+  const [mode, setMode] = useState<'files' | 'urls'>('files')
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([])
+  const [urlInput, setUrlInput] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('hormozi_yellow')
   const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60'>('auto')
-  const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState('')
-  const [selectedIg, setSelectedIg] = useState<Set<string>>(new Set())
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [activeStep, setActiveStep] = useState<'setup' | 'running' | 'results'>('setup')
+  const [statusMessage, setStatusMessage] = useState('')
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return
-      setUserId(data.user.id)
-      const plan = await fetch(`${API}/api/billing/status/${data.user.id}`).then(r => r.json())
-      setIsPro(plan?.plan === 'pro')
-    })
+    async function getUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+    }
+    getUser()
   }, [])
 
-  async function searchInstagram() {
-    if (!igHandle.trim()) return
-    setIgLoading(true); setIgError(''); setIgVideos([])
-    try {
-      const res = await fetch(`${API}/api/instagram/list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username_or_url: igHandle.trim(), limit: 12, sort_by: igSort }),
-      })
-      const data = await res.json()
-      if (data.error) setIgError(data.error)
-      setIgVideos(data.videos || [])
-    } catch (e: any) { setIgError(e.message) }
-    finally { setIgLoading(false) }
+  // Handle multiple files selected
+  const handleFilesAdded = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const newItems: BatchItem[] = Array.from(files).map((f, idx) => ({
+      id: `batch-${Date.now()}-${idx}`,
+      file: f,
+      name: f.name,
+      size: f.size,
+      status: 'pending',
+      progress: 0
+    }))
+
+    setBatchItems(prev => [...prev, ...newItems])
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  function toggleIg(url: string) {
-    setSelectedIg(prev => {
-      const next = new Set(prev)
-      next.has(url) ? next.delete(url) : next.add(url)
-      return next
-    })
+  // Handle URLs pasted (one per line)
+  const handleAddUrls = () => {
+    const lines = urlInput
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 5 && (l.startsWith('http://') || l.startsWith('https://')))
+
+    if (lines.length === 0) return
+
+    const newItems: BatchItem[] = lines.map((u, idx) => ({
+      id: `batch-url-${Date.now()}-${idx}`,
+      url: u,
+      name: u,
+      status: 'pending',
+      progress: 0
+    }))
+
+    setBatchItems(prev => [...prev, ...newItems])
+    setUrlInput('')
   }
 
-  function addSelectedToQueue() {
-    const existing = bulkUrls.trim() ? bulkUrls.trim().split('\n') : []
-    const newUrls = [...selectedIg].filter(u => !existing.includes(u))
-    setBulkUrls([...existing, ...newUrls].join('\n'))
-    setSelectedIg(new Set())
+  const removeBatchItem = (id: string) => {
+    setBatchItems(prev => prev.filter(item => item.id !== id))
   }
 
-  async function handleBulkSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!userId) return
-    const urls = bulkUrls.split('\n').map(u => u.trim()).filter(Boolean)
-    if (!urls.length) return
-    setSubmitting(true); setResult('')
-    try {
-      const res = await fetch(`${API}/api/process-bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls, user_id: userId, clip_duration: clipDuration }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Erro ao enfileirar')
-      setResult(`✅ ${data.count} vídeos enfileirados para processamento!`)
-      setBulkUrls('')
-    } catch (e: any) { setResult(`❌ ${e.message}`) }
-    finally { setSubmitting(false) }
+  // Execute Batch Processing
+  const startBatchProcessing = async () => {
+    if (!userId || batchItems.length === 0) return
+
+    setIsProcessing(true)
+    setActiveStep('running')
+    setStatusMessage('Iniciando fila de processamento em massa...')
+
+    for (let i = 0; i < batchItems.length; i++) {
+      const item = batchItems[i]
+      
+      // Update item to uploading / processing
+      setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'uploading', progress: 20 } : it))
+
+      try {
+        let sourceUrl = item.url
+
+        // 1. Create project in Supabase
+        const { data: project, error: pErr } = await supabase
+          .from('projects')
+          .insert({
+            user_id: userId,
+            title: item.name.replace(/\.[^/.]+$/, ''),
+            source_url: item.url || null,
+            source_type: item.file ? 'file' : 'url',
+            status: 'pending'
+          })
+          .select()
+          .single()
+
+        if (pErr || !project) throw new Error(pErr?.message || 'Falha ao criar projeto')
+
+        // 2. Upload file if local
+        if (item.file) {
+          const ext = item.file.name.split('.').pop()
+          const storagePath = `${userId}/${project.id}/original.${ext}`
+          const { error: upErr } = await supabase.storage
+            .from('videos')
+            .upload(storagePath, item.file)
+
+          if (upErr) throw upErr
+          sourceUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl
+        }
+
+        setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'processing', projectId: project.id, progress: 60 } : it))
+
+        // 3. Dispatch to backend Celery worker
+        await fetch(`${API}/api/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: sourceUrl,
+            user_id: userId,
+            clip_duration: clipDuration,
+            project_id: project.id,
+            template_id: selectedTemplate
+          })
+        })
+
+        // Mark item as queued/processing
+        setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'done', progress: 100 } : it))
+      } catch (err: any) {
+        console.error('Erro no item do lote:', err)
+        setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'failed', error: err.message } : it))
+      }
+    }
+
+    setIsProcessing(false)
+    setActiveStep('results')
+    setStatusMessage('Todos os vídeos do lote foram enfileirados com sucesso!')
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '0.7rem 1rem',
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.9rem',
-    backdropFilter: 'blur(12px)',
-  }
-  const card: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '0.875rem', padding: '1.5rem', marginBottom: '1.25rem',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-  }
+  const completedCount = batchItems.filter(i => i.status === 'done').length
+  const totalCount = batchItems.length
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', color: 'var(--foreground)', fontFamily: "'Inter Tight', system-ui, sans-serif" }}>
-      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', gap: '1rem', backdropFilter: 'blur(20px)', background: 'rgba(6,6,8,0.8)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <Link href="/dashboard" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '0.85rem' }}>← Dashboard</Link>
-        <span style={{ fontWeight: 700 }}>⚡ Processamento em Massa</span>
-        {!isPro && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', background: 'rgba(234,88,12,0.15)', border: '1px solid rgba(234,88,12,0.3)', padding: '0.25rem 0.75rem', borderRadius: '999px', color: '#a78bfa' }}>Apenas Pro</span>}
-      </header>
-
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-
-        {!isPro && (
-          <div style={{ ...card, borderColor: 'rgba(234,88,12,0.3)', background: 'rgba(234,88,12,0.08)', textAlign: 'center', padding: '2.5rem' }}>
-            <p style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>⚡ Recurso exclusivo Pro</p>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Processe até 20 vídeos de uma vez, sem limites mensais.</p>
-            <Link href="/billing" style={{ padding: '0.75rem 1.5rem', background: '#ea580c', color: '#fff', borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 700 }}>Fazer upgrade →</Link>
+    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
+      {/* Header */}
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/[0.08]">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> Batch Studio
+            </span>
+            <span className="text-xs text-zinc-500">• Esteira de Produção em Escala</span>
           </div>
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
+            Edição em Massa de Vídeos
+          </h1>
+          <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
+            Processe até 30 vídeos de uma só vez. Aplique um template com legenda e identidade visual automaticamente em todos eles em segundo plano.
+          </p>
+        </div>
+
+        {batchItems.length > 0 && activeStep === 'setup' && (
+          <button
+            onClick={startBatchProcessing}
+            disabled={isProcessing}
+            className="px-6 py-3 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2 self-start md:self-auto disabled:opacity-50"
+          >
+            <Zap className="w-4 h-4 fill-current" />
+            Processar Lote ({batchItems.length} Vídeo{batchItems.length !== 1 ? 's' : ''})
+          </button>
         )}
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', opacity: isPro ? 1 : 0.4, pointerEvents: isPro ? 'auto' : 'none' }}>
-
-          {/* Coluna esquerda — Instagram scraper */}
-          <div>
-            <div style={card}>
-              <h2 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>🔍 Buscar no Instagram</h2>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <input value={igHandle} onChange={e => setIgHandle(e.target.value)} placeholder="@username ou URL" style={{ ...inputStyle, flex: 1 }} onKeyDown={e => e.key === 'Enter' && searchInstagram()} />
-                <button onClick={searchInstagram} disabled={igLoading} style={{ padding: '0.7rem 1rem', background: '#ea580c', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {igLoading ? '...' : 'Buscar'}
-                </button>
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                {(['recent', 'views'] as const).map(s => (
-                  <button key={s} onClick={() => setIgSort(s)} style={{ padding: '0.35rem 0.75rem', background: igSort === s ? 'rgba(234,88,12,0.3)' : 'rgba(255,255,255,0.04)', border: `1px solid ${igSort === s ? 'rgba(234,88,12,0.5)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '999px', color: 'var(--foreground)', fontSize: '0.78rem', cursor: 'pointer' }}>
-                    {s === 'recent' ? '🕐 Recentes' : '👁 + Vistas'}
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Batch Setup & Queue */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* STEP 1: UPLOAD OR URL SELECTION */}
+          {activeStep === 'setup' && (
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+                  <Film className="w-4 h-4" /> 1. Adicionar Vídeos ao Lote
+                </h2>
+                <div className="flex p-1 bg-black/40 rounded-xl border border-white/10 text-xs">
+                  <button
+                    onClick={() => setMode('files')}
+                    className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                      mode === 'files' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    Arquivos
                   </button>
+                  <button
+                    onClick={() => setMode('urls')}
+                    className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                      mode === 'urls' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    Links
+                  </button>
+                </div>
+              </div>
+
+              {mode === 'files' ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-white/15 hover:border-orange-500/50 bg-white/[0.01] hover:bg-white/[0.03] rounded-2xl p-8 text-center cursor-pointer transition-all group"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="video/*"
+                    hidden
+                    onChange={handleFilesAdded}
+                  />
+                  <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition-transform">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-semibold text-white mb-1">
+                    Arraste vários vídeos ou clique para selecionar
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    MP4, MOV, MKV, AVI — Suporte a até 30 arquivos de uma vez
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="Cole os links dos vídeos aqui (um por linha)&#10;https://youtube.com/watch?v=...&#10;https://instagram.com/reel/...&#10;https://tiktok.com/@user/video/..."
+                    rows={4}
+                    className="w-full px-4 py-3 bg-black/40 border border-white/[0.08] focus:border-orange-500/50 rounded-xl text-xs font-mono text-white placeholder-zinc-600 outline-none"
+                  />
+                  <button
+                    onClick={handleAddUrls}
+                    disabled={!urlInput.trim()}
+                    className="px-4 py-2 text-xs font-semibold bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-white rounded-xl transition-all disabled:opacity-40"
+                  >
+                    Adicionar Links à Fila
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* QUEUE LIST */}
+          {batchItems.length > 0 && (
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                  Fila do Lote ({batchItems.length} Iten{batchItems.length !== 1 ? 's' : ''})
+                </span>
+                {activeStep === 'setup' && (
+                  <button
+                    onClick={() => setBatchItems([])}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Limpar Todos
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                {batchItems.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-zinc-400 flex-shrink-0">
+                        {item.file ? <FileVideo className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-white font-medium truncate">{item.name}</p>
+                        {item.size && (
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {(item.size / (1024 * 1024)).toFixed(1)} MB
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full uppercase ${
+                          item.status === 'done'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : item.status === 'processing' || item.status === 'uploading'
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                            : item.status === 'failed'
+                            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                            : 'bg-zinc-800 text-zinc-400'
+                        }`}
+                      >
+                        {item.status === 'done' ? 'Pronto' : item.status === 'uploading' ? 'Upload...' : item.status === 'processing' ? 'Render...' : item.status === 'failed' ? 'Erro' : 'Na fila'}
+                      </span>
+
+                      {activeStep === 'setup' && (
+                        <button
+                          onClick={() => removeBatchItem(item.id)}
+                          className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
-              {igError && <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.5rem' }}>{igError}</p>}
             </div>
+          )}
 
-            {igVideos.length > 0 && (
-              <div style={card}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{igVideos.length} vídeos encontrados</span>
-                  {selectedIg.size > 0 && (
-                    <button onClick={addSelectedToQueue} style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', background: '#ea580c', border: 'none', borderRadius: '0.4rem', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-                      + Adicionar {selectedIg.size} à fila
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '400px', overflowY: 'auto' }}>
-                  {igVideos.map(v => (
-                    <button key={v.id} onClick={() => toggleIg(v.url)} style={{ textAlign: 'left', padding: '0.6rem 0.75rem', background: selectedIg.has(v.url) ? 'rgba(234,88,12,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedIg.has(v.url) ? 'rgba(234,88,12,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)' }}>
-                      <p style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '0.15rem' }}>{v.title}</p>
-                      <p style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>👁 {v.view_count.toLocaleString('pt-BR')} · {Math.round(v.duration)}s</p>
-                    </button>
-                  ))}
-                </div>
+          {/* ACTIVE PROGRESS BAR */}
+          {activeStep === 'running' && (
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <span className="text-white font-semibold flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-400" />
+                  Processando Lote em Segundo Plano...
+                </span>
+                <span className="font-mono text-orange-400">
+                  {completedCount} de {totalCount} concluído(s)
+                </span>
               </div>
-            )}
+
+              <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-3">
+                <div
+                  className="bg-gradient-to-r from-orange-500 to-amber-500 h-full transition-all duration-300"
+                  style={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Você pode deixar esta página aberta ou navegar pelo painel. Os cortes estarão disponíveis no seu Dashboard assim que o Celery finalizar cada arquivo.
+              </p>
+            </div>
+          )}
+
+          {/* RESULTS STATE */}
+          {activeStep === 'results' && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6 backdrop-blur-md text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+              <h3 className="text-base font-bold text-white mb-1">
+                Lote Enfileirado com Sucesso!
+              </h3>
+              <p className="text-xs text-zinc-300 max-w-md mx-auto mb-6">
+                Todos os {totalCount} vídeos foram enviados para o pipeline da IA. Eles estão sendo cortados, legendados e formatados em 9:16.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/dashboard"
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs transition-all shadow-md shadow-orange-500/20"
+                >
+                  Ver no Dashboard
+                </Link>
+                <Link
+                  href="/schedule"
+                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-zinc-300 text-xs font-medium transition-all"
+                >
+                  Ir para Agendamentos
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Template & Batch Options */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* TEMPLATE PICKER */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-1 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> 2. Template do Lote
+            </h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              O estilo visual de legenda e enquadramento aplicado a todos os vídeos.
+            </p>
+
+            <div className="space-y-2.5">
+              {TEMPLATE_PRESETS.map((t) => {
+                const isSelected = selectedTemplate === t.id
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTemplate(t.id)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-orange-500/15 border-orange-500/50 shadow-sm ring-1 ring-orange-500/30'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-white flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                        {t.name}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300">
+                        {t.tag}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400">{t.desc}</p>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
-          {/* Coluna direita — Fila de URLs */}
-          <div>
-            <div style={card}>
-              <h2 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>📋 Fila de Processamento</h2>
-              <form onSubmit={handleBulkSubmit}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--muted)', display: 'block', marginBottom: '0.35rem' }}>URLs (YouTube ou Instagram, uma por linha)</label>
-                <textarea
-                  value={bulkUrls}
-                  onChange={e => setBulkUrls(e.target.value)}
-                  rows={10}
-                  placeholder={`https://youtube.com/watch?v=...\nhttps://www.instagram.com/reel/...\nhttps://youtube.com/watch?v=...`}
-                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'monospace', fontSize: '0.82rem', marginBottom: '1rem' }}
-                />
+          {/* DURATION PREFERENCE */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-1 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> 3. Duração dos Clipes
+            </h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              Tempo aproximado de cada corte viral gerado.
+            </p>
 
-                <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
-                  {(['auto', '30', '60'] as const).map(d => (
-                    <button key={d} type="button" onClick={() => setClipDuration(d)} style={{ flex: 1, padding: '0.55rem', background: clipDuration === d ? '#ea580c' : 'rgba(255,255,255,0.04)', border: `1px solid ${clipDuration === d ? '#ea580c' : 'rgba(255,255,255,0.08)'}`, borderRadius: '0.4rem', cursor: 'pointer', color: 'var(--foreground)', fontSize: '0.82rem', fontWeight: 600 }}>
-                      {d === 'auto' ? '🤖 Auto' : `${d}s`}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-                  {bulkUrls.split('\n').filter(u => u.trim()).length} URLs na fila · máx 20
-                </div>
-
-                {result && <p style={{ fontSize: '0.85rem', color: result.startsWith('✅') ? '#4ade80' : '#f87171', marginBottom: '0.75rem' }}>{result}</p>}
-
+            <div className="grid grid-cols-3 gap-2">
+              {(['auto', '30', '60'] as const).map((d) => (
                 <button
-                  type="submit"
-                  disabled={submitting || !bulkUrls.trim()}
-                  style={{ width: '100%', padding: '0.85rem', background: '#ea580c', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting || !bulkUrls.trim() ? 0.6 : 1 }}
+                  key={d}
+                  onClick={() => setClipDuration(d)}
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                    clipDuration === d
+                      ? 'bg-orange-500 text-white border-orange-400 shadow-md shadow-orange-500/20'
+                      : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:text-white'
+                  }`}
                 >
-                  {submitting ? 'Enfileirando…' : '⚡ Processar Tudo'}
+                  {d === 'auto' ? 'IA Auto' : `${d}s`}
                 </button>
-              </form>
+              ))}
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
