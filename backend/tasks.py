@@ -157,6 +157,65 @@ def check_channel_watches():
     return {"canais": len(watches), "novos": novos}
 
 
+
+def parse_vtt_subtitles(vtt_path: Path):
+    """Lê legendas nativas do YouTube (.vtt) e extrai segments e words."""
+    segments = []
+    words = []
+    import re
+    time_pattern = re.compile(r"(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})")
+    
+    current_start = None
+    current_end = None
+    current_text = []
+
+    try:
+        with open(vtt_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        for line in lines:
+            line = line.strip()
+            m = time_pattern.search(line)
+            if m:
+                if current_start is not None and current_text:
+                    full_text = " ".join(current_text)
+                    segments.append({"start": current_start, "end": current_end, "text": full_text})
+                    text_words = full_text.split()
+                    if text_words:
+                        dur_per_word = (current_end - current_start) / len(text_words)
+                        for i, w in enumerate(text_words):
+                            words.append({
+                                "start": round(current_start + i * dur_per_word, 2),
+                                "end": round(current_start + (i + 1) * dur_per_word, 2),
+                                "word": w
+                            })
+                    current_text = []
+                
+                h1, m1, s1, ms1, h2, m2, s2, ms2 = map(int, m.groups())
+                current_start = h1 * 3600 + m1 * 60 + s1 + ms1 / 1000.0
+                current_end = h2 * 3600 + m2 * 60 + s2 + ms2 / 1000.0
+            elif current_start is not None and line and not line.startswith("WEBVTT") and not line.isdigit():
+                clean = re.sub(r"<[^>]+>", "", line).strip()
+                if clean and clean not in current_text:
+                    current_text.append(clean)
+
+        if current_start is not None and current_text:
+            full_text = " ".join(current_text)
+            segments.append({"start": current_start, "end": current_end, "text": full_text})
+            text_words = full_text.split()
+            if text_words:
+                dur_per_word = (current_end - current_start) / len(text_words)
+                for i, w in enumerate(text_words):
+                    words.append({
+                        "start": round(current_start + i * dur_per_word, 2),
+                        "end": round(current_start + (i + 1) * dur_per_word, 2),
+                        "word": w
+                    })
+    except Exception as e:
+        print(f"Erro ao analisar VTT: {e}")
+
+    return {"segments": segments, "words": words}
+
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None):
     check_clip_limit(user_id)
