@@ -405,6 +405,7 @@ async def health():
 
 @app.post("/api/process-url")
 async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
+    from tasks import process_youtube_video
     try:
         task = process_youtube_video.apply_async(
             args=[req.url, req.user_id, req.clip_duration],
@@ -419,6 +420,7 @@ async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
 
 @app.post("/api/process-bulk")
 async def process_bulk(req: BulkProcessRequest):
+    from tasks import process_bulk_videos
     """Fila de processamento em massa — apenas Pro."""
     if not req.urls:
         raise HTTPException(status_code=400, detail="Nenhuma URL fornecida")
@@ -441,6 +443,7 @@ async def instagram_list(req: InstagramListRequest):
 
 @app.post("/api/jobs")
 async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
+    from tasks import process_youtube_video
     """Alias de /api/process-url com execução híbrida (Celery + BackgroundTasks local)."""
     if req.project_id:
         try:
