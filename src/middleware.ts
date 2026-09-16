@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Verifica se o usuário ativou o modo de teste rápido de 1 clique
+  const isDemo = request.cookies.get('clippost_demo_auth')?.value === 'true'
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -29,12 +32,16 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/upload') ||
     request.nextUrl.pathname.startsWith('/project') ||
     request.nextUrl.pathname.startsWith('/schedule') ||
-    request.nextUrl.pathname.startsWith('/billing')
+    request.nextUrl.pathname.startsWith('/billing') ||
+    request.nextUrl.pathname.startsWith('/bulk') ||
+    request.nextUrl.pathname.startsWith('/autopilot') ||
+    request.nextUrl.pathname.startsWith('/templates') ||
+    request.nextUrl.pathname.startsWith('/clips')
 
-  if (!user && isProtected) {
+  if (!user && !isDemo && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  if (user && isAuth) {
+  if ((user || isDemo) && isAuth) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

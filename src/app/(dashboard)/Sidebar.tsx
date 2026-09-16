@@ -32,9 +32,13 @@ export default function Sidebar({ user }: { user: User }) {
   const router = useRouter()
   const supabase = createClient()
 
-  async function signOut() {
+    async function signOut() {
+    document.cookie = 'clippost_demo_auth=; path=/; max-age=0'
+    localStorage.removeItem('clippost_demo_auth')
+    localStorage.removeItem('clippost_demo_user_id')
+    localStorage.removeItem('clippost_demo_user_email')
     await supabase.auth.signOut()
-    router.push('/login')
+    window.location.href = '/login'
   }
 
   return (

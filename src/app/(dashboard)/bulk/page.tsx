@@ -82,6 +82,9 @@ export default function BulkStudioPage() {
   const [horizontalFlip, setHorizontalFlip] = useState(false)
   const [removeSilence, setRemoveSilence] = useState(true)
   const [colorEnhance, setColorEnhance] = useState(true)
+  const [hypitBRoll, setHypitBRoll] = useState(true)
+  const [hypitZoomPunch, setHypitZoomPunch] = useState(true)
+  const [hypitMultiVariants, setHypitMultiVariants] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeStep, setActiveStep] = useState<'setup' | 'running' | 'results'>('setup')
   const [statusMessage, setStatusMessage] = useState('')
@@ -503,6 +506,62 @@ export default function BulkStudioPage() {
                   {d === 'auto' ? 'IA Auto' : `${d}s`}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* HYPIT VIRAL ENGINE (Clonagem & B-Rolls Ancorados a Palavras) */}
+          <div className="bg-gradient-to-b from-purple-950/20 to-black/40 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Hypit Viral Engine
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+                100M Views Tech
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Tecnologia inspirada no Hypit: elementos visuais ancorados a palavras, b-rolls dinâmicos e testes A/B.
+            </p>
+
+            <div className="space-y-2.5 text-xs">
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-purple-500/20 cursor-pointer hover:border-purple-500/40 transition-colors">
+                <div>
+                  <span className="text-zinc-200 font-medium block">🎬 Inserção Automática de B-Rolls</span>
+                  <span className="text-[10px] text-zinc-500">Insere cortes visuais sobre palavras-chave de alto impacto</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={hypitBRoll}
+                  onChange={(e) => setHypitBRoll(e.target.checked)}
+                  className="rounded text-purple-600 focus:ring-0 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-purple-500/20 cursor-pointer hover:border-purple-500/40 transition-colors">
+                <div>
+                  <span className="text-zinc-200 font-medium block">🔍 Zoom Punch Dinâmico (1.15x)</span>
+                  <span className="text-[10px] text-zinc-500">Corte rápido para close nos ganchos de maior retenção</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={hypitZoomPunch}
+                  onChange={(e) => setHypitZoomPunch(e.target.checked)}
+                  className="rounded text-purple-600 focus:ring-0 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-purple-500/20 cursor-pointer hover:border-purple-500/40 transition-colors">
+                <div>
+                  <span className="text-zinc-200 font-medium block">🧬 Gerar 3 Variantes de Gancho (Teste A/B)</span>
+                  <span className="text-[10px] text-zinc-500">Cria 3 versões com começos diferentes para testar no Reels</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={hypitMultiVariants}
+                  onChange={(e) => setHypitMultiVariants(e.target.checked)}
+                  className="rounded text-purple-600 focus:ring-0 cursor-pointer"
+                />
+              </label>
             </div>
           </div>
 
