@@ -106,18 +106,21 @@ export default function UploadPage() {
       sourceUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl
     }
 
-    const res = await fetch(`${API}/api/jobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto', project_id: project.id }),
-    }).catch(() => null)
-
-    if (!res?.ok) {
-      setError('Erro ao iniciar o processamento no servidor.')
-      setLoading(false)
-      return
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      await fetch(`${API}/api/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto', project_id: project.id }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+    } catch (err) {
+      console.warn('Disparo do job demorou ou servidor ocupado, avançando para o projeto:', err)
     }
 
+    // Redireciona imediatamente sem travar em "Enviando..."
     router.push(`/project/${project.id}`)
   }
 

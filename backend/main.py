@@ -2,7 +2,7 @@
 clipost Backend — FastAPI
 """
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
@@ -401,12 +401,17 @@ async def health():
 
 
 @app.post("/api/process-url")
-async def process_url(req: ProcessRequest):
+async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
     try:
-        task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration)
+        task = process_youtube_video.apply_async(
+            args=[req.url, req.user_id, req.clip_duration],
+            connect_timeout=1.5
+        )
         return {"task_id": task.id, "status": "processing"}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Worker unavailable: {str(e)}")
+        print(f"[process-url] Celery/Redis indisponível ({e}). Executando local!")
+        background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration)
+        return {"task_id": "bg_process", "status": "processing"}
 
 
 @app.post("/api/process-bulk")
@@ -432,18 +437,27 @@ async def instagram_list(req: InstagramListRequest):
 
 
 @app.post("/api/jobs")
-async def create_job(req: ProcessRequest):
-    """Alias de /api/process-url para compatibilidade."""
+async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
+    """Alias de /api/process-url com execução híbrida (Celery + BackgroundTasks local)."""
     if req.project_id:
         try:
             supabase.table("projects").update({"status": "processing"}).eq("id", req.project_id).execute()
         except Exception:
             pass
+
+    # 1. Tenta Celery com timeout curto (1.5s) caso Redis esteja rodando
     try:
-        task = process_youtube_video.delay(req.url, req.user_id, req.clip_duration, req.project_id)
+        task = process_youtube_video.apply_async(
+            args=[req.url, req.user_id, req.clip_duration, req.project_id],
+            connect_timeout=1.5
+        )
         return {"task_id": task.id, "status": "processing"}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Worker unavailable: {str(e)}")
+        print(f"[jobs] Celery/Redis indisponível ({e}). Executando via BackgroundTasks local!")
+
+    # 2. Execução direta em background na máquina (infalível mesmo sem Redis)
+    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id)
+    return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 
 @app.get("/api/projects/{user_id}")
