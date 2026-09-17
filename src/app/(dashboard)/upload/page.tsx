@@ -69,7 +69,7 @@ export default function UploadPage() {
 
     // 2. Se backend estiver ativo, complementa formatos
     try {
-      const res = await fetch(`${API}/api/sources/info`, {
+      const res = await fetch('/api/sources/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: youtubeUrl.trim() }),
