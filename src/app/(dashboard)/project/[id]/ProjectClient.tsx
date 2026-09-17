@@ -103,15 +103,15 @@ export default function ProjectClient({
   const [adjustTab, setAdjustTab] = useState<'subtitles' | 'framing' | 'template'>('subtitles')
 
   // Configurações do Template (herdados do /templates ou padrão)
-  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'zinc'>('white')
+  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'zinc'>('dark')
   const [activeLayout, setActiveLayout] = useState<LayoutFormat>('meme_frame')
   const [activeSubtitleStyle, setActiveSubtitleStyle] = useState<string>('hormozi_orange')
   const [videoYOffset, setVideoYOffset] = useState<number>(54)
-  const [videoScale, setVideoScale] = useState<number>(88)
+  const [videoScale, setVideoScale] = useState<number>(92)
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>('4/5')
-  const [videoRounded, setVideoRounded] = useState<boolean>(true)
-  const [brandName, setBrandName] = useState('PÁGINA VIRAL')
-  const [brandHandle, setBrandHandle] = useState('@clippost_oficial')
+  const [videoRounded, setVideoRounded] = useState<boolean>(false)
+  const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
+  const [brandHandle, setBrandHandle] = useState('@humordaiguana')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
 
   // Enquadramento
@@ -494,7 +494,7 @@ export default function ProjectClient({
                   margin: '0 auto',
                 }}
                 className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md ${
-                  videoRounded ? 'rounded-2xl' : 'rounded-none'
+                  'rounded-none'
                 } ${
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
                 } flex items-center justify-center`}
