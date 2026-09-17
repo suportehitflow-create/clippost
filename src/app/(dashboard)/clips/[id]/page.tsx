@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -23,10 +23,13 @@ import {
   Zap,
   Edit3,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  Eye
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
+import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
+import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 
 type SubtitleStyle = 'hormozi_yellow' | 'neon_glow' | 'clean_box' | 'minimal_apple'
 
@@ -89,8 +92,10 @@ export default function ClipEditorPage() {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [error, setError] = useState('')
-  const ytMatch = project?.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/
-  )
+  const [viralityModalMetrics, setViralityModalMetrics] = useState<ViralityMetrics | null>(null)
+  const [smartEmojisEnabled, setSmartEmojisEnabled] = useState(true)
+
+  const ytMatch = project?.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
   const ytId = ytMatch ? ytMatch[1] : null
 
   // Editor states
@@ -124,9 +129,7 @@ export default function ClipEditorPage() {
             .eq('id', clipId)
             .maybeSingle()
           clipData = data
-        } catch {
-          // continue to fallback
-        }
+        } catch {}
       }
 
       if (!clipData) {
@@ -144,63 +147,54 @@ export default function ClipEditorPage() {
           { id: '2', word: 'MOMENTO', start: 42.3, end: 42.9 },
           { id: '3', word: 'QUE', start: 42.9, end: 43.1 },
           { id: '4', word: 'O', start: 43.1, end: 43.3 },
-          { id: '5', word: 'GOLEIRO', start: 43.3, end: 43.8 },
-          { id: '6', word: 'NÃO', start: 43.8, end: 44.1 },
-          { id: '7', word: 'ACREDITOU', start: 44.1, end: 44.8 }
+          { id: '5', word: 'SEGREDO', start: 43.3, end: 43.8 },
+          { id: '6', word: 'FOI', start: 43.8, end: 44.1 },
+          { id: '7', word: 'REVELADO', start: 44.1, end: 44.8 },
+          { id: '8', word: 'COM', start: 44.8, end: 45.1 },
+          { id: '9', word: 'MUITO', start: 45.1, end: 45.4 },
+          { id: '10', word: 'LUCRO', start: 45.4, end: 46.0 }
         ])
-        setLoading(false)
-        return
-      }
-
-      setClip(clipData)
-      if (clipData.subtitle_preset) setSelectedStyle(clipData.subtitle_preset as SubtitleStyle)
-
-      // Fetch parent project to get transcript
-      if (clipData.project_id) {
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('id', clipData.project_id)
-          .single()
-
-        if (projData) {
-          setProject(projData)
-          // Extract words matching clip start/end
-          const rawWords = projData.transcript?.words || []
-          const clipWords: WordItem[] = rawWords
-            .filter((w: any) => w.start >= clipData.start_time - 0.5 && w.end <= clipData.end_time + 0.5)
-            .map((w: any, idx: number) => ({
-              id: `w-${idx}`,
-              word: w.word || w.text || '',
-              start: w.start,
-              end: w.end
-            }))
-
-          if (clipWords.length > 0) {
-            setWords(clipWords)
-          } else {
-            // Mock sample words if transcript words not granular
-            setWords([
-              { id: 'w-1', word: 'ESTE', start: 0, end: 1 },
-              { id: 'w-2', word: 'MOMENTO', start: 1, end: 2 },
-              { id: 'w-3', word: 'É', start: 2, end: 2.5 },
-              { id: 'w-4', word: 'SIMPLESMENTE', start: 2.5, end: 3.5 },
-              { id: 'w-5', word: 'SURREAL', start: 3.5, end: 4.5 },
-            ])
-          }
+      } else {
+        setClip(clipData)
+        if (clipData.subtitle_preset && STYLES_CAROUSEL.some(s => s.id === clipData.subtitle_preset)) {
+          setSelectedStyle(clipData.subtitle_preset as SubtitleStyle)
         }
+
+        // Buscar projeto pai
+        if (clipData.project_id) {
+          try {
+            const { data: proj } = await supabase
+              .from('projects')
+              .select('*')
+              .eq('id', clipData.project_id)
+              .maybeSingle()
+            if (proj) setProject(proj)
+          } catch {}
+        }
+
+        // Simula ou mapeia palavras do clipe
+        const wordsArr: WordItem[] = [
+          { id: '1', word: 'O', start: (clipData.start_time || 0) + 0.1, end: (clipData.start_time || 0) + 0.4 },
+          { id: '2', word: 'SEGREDO', start: (clipData.start_time || 0) + 0.4, end: (clipData.start_time || 0) + 1.0 },
+          { id: '3', word: 'QUE', start: (clipData.start_time || 0) + 1.0, end: (clipData.start_time || 0) + 1.2 },
+          { id: '4', word: 'TODOS', start: (clipData.start_time || 0) + 1.2, end: (clipData.start_time || 0) + 1.6 },
+          { id: '5', word: 'ESPERAVAM', start: (clipData.start_time || 0) + 1.6, end: (clipData.start_time || 0) + 2.3 }
+        ]
+        setWords(wordsArr)
       }
 
-      // Fetch user profile username
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: bk } = await supabase
-          .from('brand_kits')
-          .select('username')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (bk?.username) setUsername(bk.username)
-      }
+      // Buscar perfil
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: bk } = await supabase
+            .from('brand_kits')
+            .select('username')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (bk?.username) setUsername(bk.username)
+        }
+      } catch {}
 
       setLoading(false)
     }
@@ -236,7 +230,6 @@ export default function ClipEditorPage() {
     setSavedSuccess(false)
 
     try {
-      // 1. Update clip record in Supabase
       await supabase
         .from('clips')
         .update({
@@ -245,13 +238,13 @@ export default function ClipEditorPage() {
         })
         .eq('id', clipId)
 
-      // 2. Call backend re-render endpoint if available
       await fetch(`/api/clips/${clipId}/re-render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subtitle_preset: selectedStyle,
           subtitle_y: subtitleY,
+          smart_emojis: smartEmojisEnabled,
           words: words.map(w => ({ word: w.word, start: w.start, end: w.end })),
         })
       }).catch(() => null)
@@ -272,6 +265,16 @@ export default function ClipEditorPage() {
 
   const activeStyleObj = STYLES_CAROUSEL.find(s => s.id === selectedStyle) || STYLES_CAROUSEL[0]
 
+  const viralityMetrics = useMemo(() => {
+    if (!clip) return null
+    return calculateViralityMetrics(
+      clip.score,
+      clip.title,
+      clip.hook,
+      (clip.end_time || 30) - (clip.start_time || 0)
+    )
+  }, [clip])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-400">
@@ -287,7 +290,7 @@ export default function ClipEditorPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-all border border-white/[0.08]"
+            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-all border border-white/[0.08] cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -299,8 +302,27 @@ export default function ClipEditorPage() {
               <span className="text-xs text-zinc-500 font-mono">
                 {clip && formatDuration(clip.end_time - clip.start_time)}
               </span>
+
+              {/* Apple Virality Pill */}
+              {viralityMetrics && (
+                <button
+                  type="button"
+                  onClick={() => setViralityModalMetrics(viralityMetrics)}
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer border ${
+                    viralityMetrics.tier === 'extreme'
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      : viralityMetrics.tier === 'high'
+                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                      : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                  }`}
+                >
+                  <span>{viralityMetrics.tier === 'extreme' ? '🔥' : '⚡'}</span>
+                  <span>{viralityMetrics.score}/100</span>
+                  <span className="text-[10px] opacity-80 uppercase tracking-wider font-semibold">({viralityMetrics.label})</span>
+                </button>
+              )}
             </div>
-            <h1 className="text-lg lg:text-xl font-bold text-white leading-snug break-words">
+            <h1 className="text-lg lg:text-xl font-bold text-white leading-snug break-words mt-1">
               {clip?.title || 'Editor de Clipe'}
             </h1>
           </div>
@@ -314,7 +336,7 @@ export default function ClipEditorPage() {
               className="px-4 py-2 text-xs font-semibold text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-purple-950/40"
             >
               <Smartphone className="w-3.5 h-3.5" />
-              Enviar para Celular
+              Celular
             </button>
           )}
           {clip?.storage_url && (
@@ -330,12 +352,12 @@ export default function ClipEditorPage() {
           <button
             onClick={handleSaveAndRerender}
             disabled={saving}
-            className="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {saving ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : savedSuccess ? (
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-3.5 h-3.5 text-emerald-300" />
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
@@ -390,7 +412,7 @@ export default function ClipEditorPage() {
                 </div>
               )}
 
-              {/* Dynamic Caption Overlay */}
+              {/* Dynamic Caption Overlay com Emojis Inteligentes */}
               <div
                 className="absolute inset-x-3 text-center z-20 pointer-events-none transition-all duration-150"
                 style={{ top: `${subtitleY}%` }}
@@ -403,7 +425,20 @@ export default function ClipEditorPage() {
                     className={`text-xs ${activeStyleObj.font}`}
                     style={{ color: activeStyleObj.accentColor }}
                   >
-                    {activeWord ? activeWord.word : (words[0]?.word || 'LEGENDA DINÂMICA')}
+                    {(() => {
+                      const rawWord = activeWord ? activeWord.word : (words[0]?.word || 'LEGENDA DINÂMICA')
+                      const formatted = formatSubtitleWord(rawWord, smartEmojisEnabled)
+                      return (
+                        <span className="inline-flex items-center justify-center gap-1.5">
+                          <span>{formatted.displayWord}</span>
+                          {formatted.emoji && (
+                            <span className="text-base select-none animate-bounce inline-block">
+                              {formatted.emoji}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                   </span>
                 </div>
               </div>
@@ -411,7 +446,7 @@ export default function ClipEditorPage() {
               {/* Play/Pause Center Button Overlay */}
               <button
                 onClick={togglePlay}
-                className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white/90 hover:scale-105 transition-transform"
+                className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white/90 hover:scale-105 transition-transform cursor-pointer"
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </button>
@@ -431,7 +466,7 @@ export default function ClipEditorPage() {
                   <button
                     key={st.id}
                     onClick={() => setSelectedStyle(st.id)}
-                    className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                    className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 cursor-pointer ${
                       isCurrent
                         ? 'bg-orange-500/15 border-orange-500/50 shadow-md ring-1 ring-orange-500/40'
                         : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
@@ -444,7 +479,7 @@ export default function ClipEditorPage() {
                       className="w-full py-1 rounded bg-black/50 text-[10px] font-bold uppercase truncate"
                       style={{ color: st.accentColor }}
                     >
-                      Aa
+                      Aa ⚡
                     </div>
                   </button>
                 )
@@ -453,8 +488,130 @@ export default function ClipEditorPage() {
           </div>
         </div>
 
-        {/* Right: Word-by-word Transcript Editor & Layout Controls */}
+        {/* Right: Virality Card, Subtitles Controls & Word-by-word Transcript */}
         <div className="lg:col-span-6 flex flex-col gap-6">
+
+          {/* Virality Score Card Apple Pro */}
+          {viralityMetrics && (
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-5 backdrop-blur-md space-y-4 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                    <Zap className="w-4 h-4 fill-current" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Virality Score da IA
+                    </h3>
+                    <span className="text-[10px] text-zinc-400 font-mono">
+                      Algoritmo de Retenção & Engajamento
+                    </span>
+                  </div>
+                </div>
+
+                <div className={`px-3 py-1 rounded-full border text-xs font-black flex items-center gap-1.5 ${
+                  viralityMetrics.tier === 'extreme'
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                    : viralityMetrics.tier === 'high'
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                }`}>
+                  <span>{viralityMetrics.tier === 'extreme' ? '🔥' : '⚡'}</span>
+                  <span>{viralityMetrics.score}/100</span>
+                  <span className="text-[10px] opacity-80 uppercase tracking-wider font-semibold">({viralityMetrics.label})</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                  <span>{viralityMetrics.headline}</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  {viralityMetrics.reason}
+                </p>
+              </div>
+
+              {/* 3 Sinais do Algoritmo */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400">🪝 Gancho</span>
+                    <span className="font-mono font-bold text-emerald-400">{viralityMetrics.hookScore}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${viralityMetrics.hookScore}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400">💬 Envio</span>
+                    <span className="font-mono font-bold text-amber-400">{viralityMetrics.engagementScore}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${viralityMetrics.engagementScore}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400">⏱️ Retenção</span>
+                    <span className="font-mono font-bold text-orange-400">{viralityMetrics.retentionScore}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 rounded-full" style={{ width: `${viralityMetrics.retentionScore}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViralityModalMetrics(viralityMetrics)}
+                className="w-full py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-orange-400" /> Ver Diagnóstico Completo da IA
+              </button>
+            </div>
+          )}
+
+          {/* Emojis Inteligentes Toggle Padrão iOS */}
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-5 backdrop-blur-md space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">✨</span>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    Emojis Inteligentes Automáticos
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      PADRÃO APPLE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Insere emojis dinâmicos (💰, 🤫, 🚨, 🤯, 🔥) no ritmo da fala.
+                  </p>
+                </div>
+              </div>
+
+              {/* iOS Switch Toggle */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smartEmojisEnabled}
+                onClick={() => setSmartEmojisEnabled(!smartEmojisEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  smartEmojisEnabled ? 'bg-orange-500' : 'bg-zinc-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    smartEmojisEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Transcript Word-by-Word Editor */}
           <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 backdrop-blur-md">
             <div className="flex items-center justify-between mb-4">
@@ -463,7 +620,7 @@ export default function ClipEditorPage() {
                   <Edit3 className="w-4 h-4 text-orange-400" /> Edição de Palavras do Transcrito
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Clique em qualquer palavra para corrigir erros da IA ou pontuação.
+                  Clique em qualquer palavra para corrigir texto ou pontuação.
                 </p>
               </div>
             </div>
@@ -473,6 +630,7 @@ export default function ClipEditorPage() {
               {words.map((item) => {
                 const isEditing = editingWordId === item.id
                 const isCurrent = activeWord?.id === item.id
+                const smartEmoji = smartEmojisEnabled ? getSmartEmojiForWord(item.word) : null
 
                 return isEditing ? (
                   <div key={item.id} className="flex items-center gap-1">
@@ -501,13 +659,16 @@ export default function ClipEditorPage() {
                       setEditingWordId(item.id)
                       setEditWordText(item.word)
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all border ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all border flex items-center gap-1 cursor-pointer ${
                       isCurrent
                         ? 'bg-orange-500 text-white border-orange-400 font-bold scale-105 shadow-md shadow-orange-500/20'
                         : 'bg-white/[0.04] text-zinc-300 border-white/[0.08] hover:bg-white/[0.08] hover:text-white'
                     }`}
                   >
-                    {item.word}
+                    <span>{item.word}</span>
+                    {smartEmoji && (
+                      <span className="text-xs select-none">{smartEmoji}</span>
+                    )}
                   </button>
                 )
               })}
@@ -544,7 +705,7 @@ export default function ClipEditorPage() {
               <span className="text-xs text-zinc-300 font-medium">Exibir @username no topo</span>
               <button
                 onClick={() => setShowAuthor(!showAuthor)}
-                className={`w-10 h-6 rounded-full transition-colors relative ${
+                className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer ${
                   showAuthor ? 'bg-orange-500' : 'bg-zinc-800'
                 }`}
               >
@@ -558,6 +719,92 @@ export default function ClipEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* MODAL APPLE HIG VIRALITY SCORE (MOTIVO COMPLETO) */}
+      {viralityModalMetrics && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141418] border border-white/[0.12] rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative text-zinc-100 ring-1 ring-white/10">
+            <button
+              onClick={() => setViralityModalMetrics(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header com Score Ring */}
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg border ${
+                viralityModalMetrics.tier === 'extreme'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : viralityModalMetrics.tier === 'high'
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+              }`}>
+                {viralityModalMetrics.score}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-mono tracking-widest text-orange-400 font-bold">
+                    Diagnóstico de Viralidade
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300 font-semibold border border-white/[0.08]">
+                    {viralityModalMetrics.label}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white mt-0.5">
+                  {viralityModalMetrics.headline}
+                </h3>
+              </div>
+            </div>
+
+            {/* O Motivo Principal (IA Reason) */}
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-2">
+              <div className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-orange-400" />
+                <span>Por que este corte tem alta probabilidade de viralizar:</span>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                {viralityModalMetrics.reason}
+              </p>
+            </div>
+
+            {/* As 3 Métricas Detalhadas */}
+            <div className="space-y-2.5">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
+                Sinais do Algoritmo:
+              </span>
+              {viralityModalMetrics.keyFactors.map((kf, i) => (
+                <div key={i} className="p-3 rounded-xl bg-black/40 border border-white/[0.05] flex items-start gap-3">
+                  <span className="text-lg select-none">{kf.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-white">{kf.title}</div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{kf.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Dica de Ação */}
+            <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center gap-3">
+              <span className="text-xl">💡</span>
+              <div className="text-xs text-orange-200">
+                <span className="font-bold text-orange-400">Dica Tática de Postagem: </span>
+                {viralityModalMetrics.actionTip}
+              </div>
+            </div>
+
+            {/* Fechar */}
+            <button
+              type="button"
+              onClick={() => setViralityModalMetrics(null)}
+              className="w-full py-2.5 rounded-xl bg-white text-zinc-950 font-bold text-xs hover:bg-zinc-200 transition-all cursor-pointer shadow-md"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: ENVIAR PARA O CELULAR (ESTILO LOCALSEND) */}
       {showMobileQr && clip?.storage_url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -578,7 +825,6 @@ export default function ClipEditorPage() {
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed break-words">{clip.title}</p>
             </div>
 
-            {/* QR CODE BOX */}
             <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-xl">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(clip.storage_url)}`}
@@ -588,7 +834,7 @@ export default function ClipEditorPage() {
             </div>
 
             <p className="text-[11px] text-zinc-400 leading-relaxed px-2">
-              Aponte a câmera do seu <strong>iPhone ou Android</strong> para salvar o vídeo 9:16 direto na sua galeria sem passar pelo computador!
+              Aponte a câmera do seu <strong>iPhone ou Android</strong> para salvar o vídeo 9:16 direto na sua galeria!
             </p>
 
             <div className="flex gap-2 pt-2">
@@ -599,18 +845,19 @@ export default function ClipEditorPage() {
                   setCopiedUrl(true)
                   setTimeout(() => setCopiedUrl(false), 2000)
                 }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-semibold text-zinc-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedUrl ? 'Copiado!' : 'Copiar Link'}
+                {copiedUrl ? 'Link Copiado' : 'Copiar Link'}
               </button>
               <a
                 href={clip.storage_url}
                 target="_blank"
                 rel="noreferrer"
-                className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-xs font-semibold text-purple-300 flex items-center justify-center gap-1.5 transition-all"
               >
-                <ExternalLink className="w-3.5 h-3.5" /> Abrir
+                <ExternalLink className="w-3.5 h-3.5" />
+                Abrir
               </a>
             </div>
           </div>

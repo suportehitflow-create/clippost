@@ -36,6 +36,8 @@ import {
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
+import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 
 type Project = {
   id: string
@@ -74,7 +76,7 @@ const SUBTITLE_STYLES = [
   { id: 'neon_cyan', name: 'Neon Cyan', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', inactiveColor: '#a5f3fc', inactiveBg: 'rgba(0,0,0,0.6)', border: 'border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.8)]', font: 'font-black uppercase' },
   { id: 'neon_magenta', name: 'Neon Magenta', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', inactiveColor: '#fbcfe8', inactiveBg: 'rgba(0,0,0,0.6)', border: 'border-pink-500 shadow-[0_0_12px_rgba(236,72,153,0.8)]', font: 'font-black uppercase' },
   { id: 'clean_white_box', name: 'Clean White Box', activeColor: '#09090b', activeBg: '#ffffff', inactiveColor: '#ffffff', inactiveBg: 'rgba(24,24,27,0.9)', border: 'border-white/20', font: 'font-bold' },
-  { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', inactiveColor: '#ffffff', inactiveBg: '#27272a', border: 'border-zinc-700', font: 'font-bold' },
+  { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', inactiveColor: '#ffffff', inactiveBg: 'rgba(24,24,27,0.9)', border: 'border-zinc-700', font: 'font-bold' },
 ]
 
 export default function ProjectClient({
@@ -91,6 +93,7 @@ export default function ProjectClient({
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [viralityModalMetrics, setViralityModalMetrics] = useState<ViralityMetrics | null>(null)
 
   // CONFIGURAÇÃO DO TEMPLATE INTEGRADO (vindo de /templates ou customizado)
   const [activeLayout, setActiveLayout] = useState<LayoutFormat>('meme_frame')
@@ -106,9 +109,10 @@ export default function ProjectClient({
   const [cropPanX, setCropPanX] = useState<number>(50) // 0% (esquerda) a 100% (direita)
   const [cropZoom, setCropZoom] = useState<number>(100) // 100% a 250%
 
-  // Posicionamento da Legenda e Corte de Silêncio
+  // Posicionamento da Legenda e Emojis Automáticos
   const [subtitleY, setSubtitleY] = useState(74)
   const [silenceCut, setSilenceCut] = useState(true)
+  const [smartEmojisEnabled, setSmartEmojisEnabled] = useState(true)
 
   // Reprodução Sincronizada
   const [isPlaying, setIsPlaying] = useState(false)
@@ -159,7 +163,6 @@ export default function ProjectClient({
 
   // GERAÇÃO DINÂMICA DE CORTES INTELIGENTES PARA QUALQUER VÍDEO
   useEffect(() => {
-    // 1. Tenta buscar cortes reais salvos no Supabase
     async function checkDbClips() {
       try {
         const { data } = await supabase
@@ -175,7 +178,6 @@ export default function ProjectClient({
         }
       } catch {}
 
-      // 2. Se não houver cortes, gera cortes adaptados contextualmente ao TÍTULO DO VÍDEO
       if (clips.length === 0) {
         const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
         const cleanTitle = (project.title || 'Vídeo').replace(/[|–—_-]/g, ' ').trim()
@@ -206,10 +208,10 @@ export default function ProjectClient({
           },
           {
             id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0003`,
-            title: `A Parte Mais Polêmica e Comentada`,
-            hook: `O momento exato em que a conversa subiu de tom e gerou debate imediato nos comentários!`,
-            start_time: 195,
-            end_time: 242,
+            title: `O Segredo Que Ninguém Te Conta Explicado em Segundos`,
+            hook: `Preste muita atenção nesta explicação rápida que simplifica tudo o que você precisa saber.`,
+            start_time: 210,
+            end_time: 252,
             score: 0.88,
             storage_url: null,
             status: 'ready',
@@ -217,33 +219,33 @@ export default function ProjectClient({
           },
           {
             id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0004`,
-            title: `A Virada Inesperada: Ninguém Imaginava Esse Desfecho`,
-            hook: `Preste atenção no que acontece aqui: uma reviravolta completa que surpreendeu a todos!`,
-            start_time: 285,
-            end_time: 330,
-            score: 0.82,
+            title: `A Dica de Ouro Que Vale Muito Dinheiro e Tempo`,
+            hook: `Se você aplicar exatamente essa dica a partir de hoje, seus resultados serão impressionantes!`,
+            start_time: 330,
+            end_time: 374,
+            score: 0.83,
             storage_url: null,
             status: 'ready',
             subtitle_preset: activeSubtitleStyle
           },
           {
             id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0005`,
-            title: `Dica de Ouro e Estratégia Prática Revelada`,
-            hook: `Se você aplicar apenas essa lição nos próximos dias, o resultado vai ser totalmente diferente!`,
-            start_time: 420,
-            end_time: 468,
-            score: 0.75,
+            title: `O Maior Erro Que Todos Cometem Sem Perceber`,
+            hook: `Pare agora de fazer isso se você quiser ter sucesso e não perder seu tempo!`,
+            start_time: 460,
+            end_time: 502,
+            score: 0.77,
             storage_url: null,
             status: 'ready',
             subtitle_preset: activeSubtitleStyle
           },
           {
             id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0006`,
-            title: `A Discussão Mais Intensa e Reação Espontânea`,
-            hook: `A sinceridade desse momento foi tanta que até quem estava gravando ficou sem reação!`,
-            start_time: 590,
-            end_time: 638,
-            score: 0.67,
+            title: `A Virada de Chave: Como Fazer o Inacreditável`,
+            hook: `Foi exatamente a partir deste segundo que tudo ficou claro e sem nenhuma dúvida!`,
+            start_time: 600,
+            end_time: 645,
+            score: 0.69,
             storage_url: null,
             status: 'ready',
             subtitle_preset: activeSubtitleStyle
@@ -275,7 +277,6 @@ export default function ProjectClient({
         setClips(dynamicClips)
         setStatus('done')
 
-        // Tenta persistir no Supabase
         try {
           await supabase.from('projects').update({ status: 'done' }).eq('id', project.id)
         } catch {}
@@ -340,9 +341,20 @@ export default function ProjectClient({
     }
   }
 
-  // Motor de Legendas Sincronizadas
+  // Duração do Corte Ativo
   const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
 
+  // Cálculo Apple-Standard Virality Score do Corte Ativo
+  const activeVirality = useMemo(() => {
+    return calculateViralityMetrics(
+      activeClip.score,
+      activeClip.title,
+      activeClip.hook,
+      clipDuration
+    )
+  }, [activeClip.score, activeClip.title, activeClip.hook, clipDuration])
+
+  // Motor de Legendas Sincronizadas
   const timingWords = useMemo<WordTiming[]>(() => {
     const rawText = (activeClip.hook ? activeClip.hook + ' ' : '') + activeClip.title
     const cleanWords = rawText
@@ -428,7 +440,7 @@ export default function ProjectClient({
           </div>
         </div>
 
-        {/* Título do Projeto Sem Truncamento / Sem line-clamp */}
+        {/* Título do Projeto Sem Truncamento */}
         <div className="bg-white/[0.02] border border-white/[0.08] p-4 rounded-2xl">
           <p className="text-[11px] font-mono text-orange-400 uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
             <Zap className="w-3 h-3 fill-current" /> Vídeo em Edição
@@ -439,7 +451,7 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO RÁPIDA DE CORTES (Corte 1 ao 8) */}
+      {/* BARRA DE NAVEGAÇÃO RÁPIDA DE CORTES (Corte 1 ao 8 com Virality Pills Apple) */}
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5 uppercase tracking-wide">
@@ -453,6 +465,7 @@ export default function ProjectClient({
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
           {clips.map((clip, idx) => {
             const isSelected = selectedClipIndex === idx
+            const vm = calculateViralityMetrics(clip.score, clip.title, clip.hook, clip.end_time - clip.start_time)
             return (
               <button
                 key={clip.id || idx}
@@ -464,10 +477,10 @@ export default function ProjectClient({
                 }`}
               >
                 <span>Corte #{idx + 1}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                  isSelected ? 'bg-black/30 text-yellow-300' : 'bg-orange-500/10 text-orange-400'
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold flex items-center gap-1 ${
+                  isSelected ? 'bg-black/30 text-yellow-300' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
                 }`}>
-                  {Math.round(clip.score * 100)}%
+                  {vm.tier === 'extreme' ? '🔥' : '⚡'} {vm.score}
                 </span>
                 <span className="text-[10px] opacity-70 font-mono">
                   {formatDuration(clip.end_time - clip.start_time)}
@@ -478,28 +491,28 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* STUDIO PRINCIPAL 9:16: O VÍDEO É EXIBIDO EXATAMENTE NO TEMPLATE ESCOLHIDO */}
+      {/* STUDIO PRINCIPAL 9:16 */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* COLUNA ESQUERDA: SMARTPHONE 9:16 COM O TEMPLATE DE /templates */}
         <div className="lg:col-span-6 flex flex-col items-center">
           
-          {/* MOLDURA DO SMARTPHONE */}
+          {/* MOLDURA DO SMARTPHONE iPHONE 16 PRO */}
           <div className="relative w-full max-w-[340px] h-[610px] bg-black rounded-[44px] p-3 shadow-2xl shadow-black ring-1 ring-white/15 border-4 border-zinc-800 flex flex-col overflow-hidden">
             
-            {/* Dynamic Island Notchtrip */}
+            {/* Dynamic Island */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-40 border border-zinc-800 flex items-center justify-end px-2">
               <div className="w-2 h-2 rounded-full bg-zinc-900 border border-zinc-700" />
             </div>
 
-            {/* SCREEN CANVAS: RENDERIZA O TEMPLATE REAL CRIADO PELO USUÁRIO */}
+            {/* SCREEN CANVAS: TEMPLATE REAL DO USUÁRIO */}
             {activeLayout === 'meme_frame' ? (
-              // TEMPLATE MOLDURA VIRAL (Meme / Hook no Topo + Vídeo Encaixado na Posição Exata)
+              // TEMPLATE MOLDURA VIRAL (Meme)
               <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-white text-black flex flex-col select-none">
                 
-                {/* TOPO DA MOLDURA: Avatar + Nome da Página + Verificado + Gancho */}
+                {/* TOPO DA MOLDURA: Avatar + Nome + Verificado + Título */}
                 <div className="pt-8 px-4 flex flex-col items-center text-center">
-                  <div className="w-13 h-13 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-1.5 shadow-md">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border border-zinc-300 p-0.5 mb-1.5 shadow-sm">
                     <img
                       src={avatarUrl}
                       alt="Avatar"
@@ -519,80 +532,82 @@ export default function ProjectClient({
                     {brandHandle}
                   </span>
 
-                  {/* Texto do Gancho Viral do Corte */}
-                  <p className="font-bold text-xs text-zinc-900 mt-2 px-1 leading-snug break-words">
-                    {activeClip.hook || activeClip.title}
-                  </p>
+                  <h2 className="text-xs font-black leading-snug text-zinc-900 uppercase tracking-tight mt-2 max-w-[280px]">
+                    {activeClip.title}
+                  </h2>
                 </div>
 
-                {/* VÍDEO POSICIONADO EXATAMENTE CONFORME OS SELETORES DO TEMPLATE */}
+                {/* VÍDEO ENCAIXADO NA POSIÇÃO ESCOLHIDA */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 rounded-2xl overflow-hidden shadow-2xl bg-black border border-black/20 transition-all duration-150 flex items-center justify-center"
+                  className="absolute inset-x-0 mx-auto overflow-hidden bg-black transition-all flex items-center justify-center rounded-xl"
                   style={{
                     top: `${videoYOffset}%`,
+                    transform: 'translateY(-50%)',
                     width: `${videoScale}%`,
                     aspectRatio: '16/9'
                   }}
                 >
-                  {/* VÍDEO DO CORTE COM ENQUADRAMENTO / PAN / CROP DINÂMICO */}
-                  {activeClip.storage_url ? (
-                    <video
-                      ref={videoRef}
-                      src={activeClip.storage_url}
-                      className="w-full h-full object-cover"
-                      playsInline
-                      loop
-                      onTimeUpdate={(e) => setPlaybackTime(e.currentTarget.currentTime)}
+                  {ytId ? (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
+                      title={activeClip.title}
+                      className="border-0 pointer-events-auto"
+                      style={{
+                        width: `${cropZoom}%`,
+                        height: `${cropZoom}%`,
+                        transform: `translateX(${(50 - cropPanX) * 0.8}%)`,
+                        transition: 'transform 0.15s ease-out'
+                      }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
                     />
-                  ) : ytId ? (
-                    <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
-                      <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
-                        title={activeClip.title}
-                        className="border-0 pointer-events-auto"
-                        style={{
-                          width: `${cropZoom}%`,
-                          height: `${cropZoom}%`,
-                          transform: `translateX(${(50 - cropPanX) * 0.7}%)`,
-                          transition: 'transform 0.15s ease-out'
-                        }}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
                   ) : (
-                    <div className="text-zinc-500 text-xs flex items-center gap-1">
-                      <Play className="w-4 h-4" /> Vídeo do Corte
+                    <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-500 text-xs font-mono">
+                      Prévia 16:9
                     </div>
                   )}
+                </div>
 
-                  {/* LEGENDA DINÂMICA DENTRO DO VÍDEO */}
+                {/* LEGENDA DINÂMICA INTEGRADA NO TEMPLATE COM EMOJIS INTELIGENTES */}
+                <div
+                  className="absolute inset-x-3 text-center pointer-events-none z-30"
+                  style={{ top: `${subtitleY}%` }}
+                >
                   <div
-                    className="absolute inset-x-2 text-center pointer-events-none transition-all duration-100 z-30"
-                    style={{ bottom: '8%' }}
+                    className={`inline-block px-3 py-1.5 rounded-xl border shadow-lg ${activeSubStyle.border} ${activeSubStyle.font}`}
+                    style={{
+                      backgroundColor: activeSubStyle.activeBg,
+                      color: activeSubStyle.activeColor
+                    }}
                   >
-                    <div
-                      className={`inline-block px-2.5 py-1 rounded-lg text-xs ${activeSubStyle.font} ${activeSubStyle.border}`}
-                      style={{
-                        backgroundColor: activeSubStyle.activeBg,
-                        color: activeSubStyle.activeColor
-                      }}
-                    >
-                      {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
-                    </div>
+                    {(() => {
+                      const currentWord = timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'
+                      const formatted = formatSubtitleWord(currentWord, smartEmojisEnabled)
+                      return (
+                        <span className="inline-flex items-center justify-center gap-1.5">
+                          <span>{formatted.displayWord}</span>
+                          {formatted.emoji && (
+                            <span className="text-base select-none animate-bounce inline-block">
+                              {formatted.emoji}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
 
                 {/* RODAPÉ DO TEMPLATE MEME */}
                 <div className="absolute bottom-3 inset-x-4 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
                   <span>Clipost ⚡ 9:16</span>
-                  <span className="font-bold text-orange-600">VIRAL {Math.round(activeClip.score * 100)}%</span>
+                  <span className="font-extrabold text-orange-600 flex items-center gap-1">
+                    {activeVirality.tier === 'extreme' ? '🔥' : '⚡'} VIRAL {activeVirality.score}%
+                  </span>
                 </div>
               </div>
             ) : activeLayout === 'split_screen' ? (
-              // TEMPLATE SPLIT SCREEN (50/50 - Duplo Falante / Podcast)
+              // TEMPLATE SPLIT SCREEN (50/50)
               <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-black flex flex-col select-none">
-                {/* Falante 1 (Topo) */}
                 <div className="relative w-full h-1/2 overflow-hidden border-b-2 border-orange-500">
                   {ytId && (
                     <iframe
@@ -604,7 +619,6 @@ export default function ProjectClient({
                     Falante 1
                   </span>
                 </div>
-                {/* Falante 2 (Base) */}
                 <div className="relative w-full h-1/2 overflow-hidden">
                   {ytId && (
                     <iframe
@@ -616,15 +630,31 @@ export default function ProjectClient({
                     Falante 2
                   </span>
                 </div>
-                {/* Legenda Central no Split */}
+                {/* Legenda Central no Split com Emojis */}
                 <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center pointer-events-none z-30">
-                  <span className={`px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`} style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}>
-                    {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
+                  <span
+                    className={`inline-block px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`}
+                    style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}
+                  >
+                    {(() => {
+                      const currentWord = timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'
+                      const formatted = formatSubtitleWord(currentWord, smartEmojisEnabled)
+                      return (
+                        <span className="inline-flex items-center justify-center gap-1.5">
+                          <span>{formatted.displayWord}</span>
+                          {formatted.emoji && (
+                            <span className="text-base select-none animate-bounce inline-block">
+                              {formatted.emoji}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                   </span>
                 </div>
               </div>
             ) : (
-              // TEMPLATE FULL 9:16 SOLO FOCUS (Preenchimento Total)
+              // TEMPLATE FULL 9:16 SOLO FOCUS
               <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-black flex items-center justify-center select-none">
                 {ytId && (
                   <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
@@ -650,16 +680,32 @@ export default function ProjectClient({
                   </div>
                   <span className="text-[10px] font-mono text-white font-medium">{brandHandle}</span>
                 </div>
-                {/* Legenda */}
+                {/* Legenda com Emojis */}
                 <div className="absolute inset-x-3 text-center pointer-events-none z-30" style={{ top: `${subtitleY}%` }}>
-                  <span className={`px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`} style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}>
-                    {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
+                  <span
+                    className={`inline-block px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`}
+                    style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}
+                  >
+                    {(() => {
+                      const currentWord = timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'
+                      const formatted = formatSubtitleWord(currentWord, smartEmojisEnabled)
+                      return (
+                        <span className="inline-flex items-center justify-center gap-1.5">
+                          <span>{formatted.displayWord}</span>
+                          {formatted.emoji && (
+                            <span className="text-base select-none animate-bounce inline-block">
+                              {formatted.emoji}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                   </span>
                 </div>
               </div>
             )}
 
-            {/* BARRA DE CONTROLE: PLAY/PAUSE E SCRUB DA LEGENDA */}
+            {/* BARRA DE CONTROLE DE PLAYBACK */}
             <div className="mt-2 pt-2 border-t border-white/[0.08] flex items-center justify-between gap-3 px-1">
               <button
                 onClick={togglePlayback}
@@ -716,23 +762,198 @@ export default function ProjectClient({
           </div>
         </div>
 
-        {/* COLUNA DIREITA: ENQUADRAMENTO DA IA, POSIÇÃO DO TEMPLATE E AÇÕES */}
+        {/* COLUNA DIREITA: VIRALITY SCORE, EMOJIS, ENQUADRAMENTO E EXPORTAÇÃO */}
         <div className="lg:col-span-6 space-y-5">
           
-          {/* CARD 1: ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA */}
+          {/* CARD 1: VIRALITY SCORE APPLE PRO (NOTA DE VIRALIDADE COM MOTIVO) */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-36 h-36 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                  <Zap className="w-4 h-4 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    Virality Score da IA
+                  </h3>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    Métricas Padrão TikTok & Reels
+                  </span>
+                </div>
+              </div>
+
+              {/* Apple Score Pill */}
+              <div className={`px-3 py-1 rounded-full border text-xs font-black flex items-center gap-1.5 ${
+                activeVirality.tier === 'extreme'
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/20'
+                  : activeVirality.tier === 'high'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/20'
+                  : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+              }`}>
+                <span>{activeVirality.tier === 'extreme' ? '🔥' : activeVirality.tier === 'high' ? '⚡' : '✨'}</span>
+                <span>{activeVirality.score}/100</span>
+                <span className="text-[10px] opacity-80 uppercase tracking-wider font-semibold">({activeVirality.label})</span>
+              </div>
+            </div>
+
+            {/* Headline & Motivo da Viralidade */}
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200">
+                <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                <span>{activeVirality.headline}</span>
+              </div>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {activeVirality.reason}
+              </p>
+            </div>
+
+            {/* 3 Sinais do Algoritmo (Apple Progress Bars) */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400 flex items-center gap-1">🪝 Gancho</span>
+                  <span className="font-mono font-bold text-emerald-400">{activeVirality.hookScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${activeVirality.hookScore}%` }} />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400 flex items-center gap-1">💬 Envio</span>
+                  <span className="font-mono font-bold text-amber-400">{activeVirality.engagementScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${activeVirality.engagementScore}%` }} />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400 flex items-center gap-1">⏱️ Retenção</span>
+                  <span className="font-mono font-bold text-orange-400">{activeVirality.retentionScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-500 rounded-full transition-all duration-500" style={{ width: `${activeVirality.retentionScore}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Botão de Ver Diagnóstico Completo */}
+            <button
+              type="button"
+              onClick={() => setViralityModalMetrics(activeVirality)}
+              className="w-full py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-orange-400" /> Ver Diagnóstico Completo da IA
+            </button>
+          </div>
+
+          {/* CARD 2: LEGENDAS & EMOJIS INTELIGENTES (PADRÃO APPLE) */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Move className="w-4 h-4 text-orange-400" /> Enquadramento da Imagem & Detecção de Rosto
+                <Type className="w-4 h-4 text-orange-400" /> Legendas & Emojis Automáticos
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                Padrão Apple
+              </span>
+            </div>
+
+            {/* Toggle iOS para Emojis Inteligentes */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.08]">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">✨</span>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    Emojis Inteligentes Automáticos
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      ATIVO
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Insere emojis contextuais (💰, 🤫, 🚨, 🤯, 🔥) no ritmo da fala.
+                  </p>
+                </div>
+              </div>
+
+              {/* iOS Switch Toggle */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smartEmojisEnabled}
+                onClick={() => setSmartEmojisEnabled(!smartEmojisEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  smartEmojisEnabled ? 'bg-orange-500' : 'bg-zinc-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    smartEmojisEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Presets Rápidos de Legendas */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Estilo Visual da Legenda</span>
+                <span className="text-orange-400 font-semibold">{activeSubStyle.name}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {SUBTITLE_STYLES.map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => setActiveSubtitleStyle(st.id)}
+                    className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      activeSubtitleStyle === st.id
+                        ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
+                        : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    <div className="text-[11px] truncate">{st.name}</div>
+                    <div
+                      className="w-full py-0.5 mt-1 rounded text-[10px] font-black uppercase truncate"
+                      style={{ backgroundColor: st.activeBg, color: st.activeColor }}
+                    >
+                      Aa ⚡
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Slider Posição Vertical da Legenda */}
+            <div>
+              <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                <span>Posição Vertical da Legenda (Y)</span>
+                <span className="text-orange-400 font-mono">{subtitleY}%</span>
+              </div>
+              <input
+                type="range"
+                min={50}
+                max={88}
+                value={subtitleY}
+                onChange={(e) => setSubtitleY(Number(e.target.value))}
+                className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+              />
+            </div>
+          </div>
+
+          {/* CARD 3: ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Move className="w-4 h-4 text-orange-400" /> Enquadramento & Detecção de Rosto
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 IA Auto-Crop
               </span>
             </div>
-
-            <p className="text-xs text-zinc-400">
-              Ajuste onde a IA corta a imagem para manter o falante ou a ação principal centralizada no vídeo vertical.
-            </p>
 
             {/* Presets de Foco da IA */}
             <div className="grid grid-cols-4 gap-2">
@@ -775,11 +996,6 @@ export default function ProjectClient({
                   }}
                   className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
-                  <span>Esquerda (0%)</span>
-                  <span>Centro (50%)</span>
-                  <span>Direita (100%)</span>
-                </div>
               </div>
 
               <div>
@@ -799,7 +1015,7 @@ export default function ProjectClient({
             </div>
           </div>
 
-          {/* CARD 2: MODELO DO TEMPLATE (Meme Frame vs Split vs Full) */}
+          {/* CARD 4: MODELO DO TEMPLATE (Meme Frame vs Split vs Full) */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -836,7 +1052,7 @@ export default function ProjectClient({
               ))}
             </div>
 
-            {/* Ajustes de Posição do Vídeo na Moldura Viral */}
+            {/* Ajustes de Posição do Vídeo na Moldura */}
             {activeLayout === 'meme_frame' && (
               <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
                 <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
@@ -883,7 +1099,7 @@ export default function ProjectClient({
             )}
           </div>
 
-          {/* CARD 3: DETALHES DO CORTE E EXPORTAÇÃO */}
+          {/* CARD 5: DETALHES DO CORTE E EXPORTAÇÃO */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -896,7 +1112,7 @@ export default function ProjectClient({
               </div>
 
               <div className="flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                <Zap className="w-3 h-3 fill-current" /> {Math.round(activeClip.score * 100)}% Viral
+                <Zap className="w-3 h-3 fill-current" /> {activeVirality.score}% Viral
               </div>
             </div>
 
@@ -943,7 +1159,7 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* GALERIA DOS CORTES ENCONTRADOS */}
+      {/* GALERIA DOS CORTES ENCONTRADOS COM VIRALITY SCORE E MOTIVO */}
       <div className="max-w-7xl mx-auto pt-6 border-t border-white/[0.08] space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -951,7 +1167,7 @@ export default function ProjectClient({
               <Layers className="w-4 h-4 text-orange-400" /> Todos os {clips.length} Cortes Disponíveis
             </h2>
             <p className="text-xs text-zinc-400">
-              Clique em qualquer corte abaixo para abrir e editar no Studio 9:16 acima.
+              Cada corte possui pontuação de viralidade calculada pela IA. Clique para carregar no Studio ou clique em "Motivo" para ver a análise completa.
             </p>
           </div>
         </div>
@@ -959,6 +1175,7 @@ export default function ProjectClient({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {clips.map((clip, index) => {
             const isSelected = selectedClipIndex === index
+            const clipVirality = calculateViralityMetrics(clip.score, clip.title, clip.hook, clip.end_time - clip.start_time)
             return (
               <div
                 key={clip.id || index}
@@ -985,8 +1202,16 @@ export default function ProjectClient({
                     </div>
                   )}
 
-                  <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow">
-                    <Zap className="w-2.5 h-2.5 fill-current" /> {Math.round(clip.score * 100)}%
+                  {/* Apple Virality Pill na Thumbnail */}
+                  <div className={`absolute top-2 left-2 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md border ${
+                    clipVirality.tier === 'extreme'
+                      ? 'bg-emerald-500/90 text-white border-emerald-400/50'
+                      : clipVirality.tier === 'high'
+                      ? 'bg-amber-500/90 text-white border-amber-400/50'
+                      : 'bg-blue-600/90 text-white border-blue-400/50'
+                  }`}>
+                    <span>{clipVirality.tier === 'extreme' ? '🔥' : '⚡'}</span>
+                    <span>{clipVirality.score}/100</span>
                   </div>
 
                   <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300 border border-white/10">
@@ -1010,6 +1235,18 @@ export default function ProjectClient({
                         "{clip.hook}"
                       </p>
                     )}
+
+                    {/* Botão de Ver Motivo do Score */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setViralityModalMetrics(clipVirality)
+                      }}
+                      className="mt-2.5 text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" /> Ver Motivo do Score ({clipVirality.label})
+                    </button>
                   </div>
 
                   <button
@@ -1029,6 +1266,91 @@ export default function ProjectClient({
           })}
         </div>
       </div>
+
+      {/* MODAL APPLE HIG VIRALITY SCORE (MOTIVO COMPLETO) */}
+      {viralityModalMetrics && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141418] border border-white/[0.12] rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl relative text-zinc-100 ring-1 ring-white/10">
+            <button
+              onClick={() => setViralityModalMetrics(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header com Score Ring */}
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg border ${
+                viralityModalMetrics.tier === 'extreme'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : viralityModalMetrics.tier === 'high'
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+              }`}>
+                {viralityModalMetrics.score}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-mono tracking-widest text-orange-400 font-bold">
+                    Diagnóstico de Viralidade
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300 font-semibold border border-white/[0.08]">
+                    {viralityModalMetrics.label}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white mt-0.5">
+                  {viralityModalMetrics.headline}
+                </h3>
+              </div>
+            </div>
+
+            {/* O Motivo Principal (IA Reason) */}
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-2">
+              <div className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-orange-400" />
+                <span>Por que este corte tem alta probabilidade de viralizar:</span>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                {viralityModalMetrics.reason}
+              </p>
+            </div>
+
+            {/* As 3 Métricas Detalhadas */}
+            <div className="space-y-2.5">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
+                Sinais do Algoritmo:
+              </span>
+              {viralityModalMetrics.keyFactors.map((kf, i) => (
+                <div key={i} className="p-3 rounded-xl bg-black/40 border border-white/[0.05] flex items-start gap-3">
+                  <span className="text-lg select-none">{kf.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-white">{kf.title}</div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{kf.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Dica de Ação */}
+            <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center gap-3">
+              <span className="text-xl">💡</span>
+              <div className="text-xs text-orange-200">
+                <span className="font-bold text-orange-400">Dica Tática de Postagem: </span>
+                {viralityModalMetrics.actionTip}
+              </div>
+            </div>
+
+            {/* Fechar */}
+            <button
+              type="button"
+              onClick={() => setViralityModalMetrics(null)}
+              className="w-full py-2.5 rounded-xl bg-white text-zinc-950 font-bold text-xs hover:bg-zinc-200 transition-all cursor-pointer shadow-md"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL QR CODE CELULAR */}
       {qrModalClip && (
