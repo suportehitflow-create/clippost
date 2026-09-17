@@ -6,8 +6,8 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'clipost — Turn Videos Into Viral Clips',
-  description: 'AI-powered video clipping and social media scheduling. Transform any video into viral short-form content in minutes.',
+  title: 'Clip Pro — A Plataforma Definitiva para Clipadores',
+  description: 'Do silêncio ao viral em 3 passos. Mineração de YouTube e Instagram, cortes com IA, reenquadramento inteligente, edição em massa com Brand Kit e agendamento automático.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

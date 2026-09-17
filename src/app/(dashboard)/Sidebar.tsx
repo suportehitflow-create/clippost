@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
   { label: 'Edição em Massa', href: '/bulk', icon: Layers },
-  { label: 'Templates', href: '/templates', icon: Sparkles },
+  { label: 'Brand Kit & Templates', href: '/templates', icon: Sparkles },
   { label: 'Autopilot', href: '/autopilot', icon: Zap },
   { label: 'Agendamentos', href: '/schedule', icon: Calendar },
 ]
@@ -46,7 +46,7 @@ export default function Sidebar({ user }: { user: User }) {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-orange-600 to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/20">
             <Scissors className="w-4 h-4 text-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-white">ClipPost</span>
+          <span className="text-base font-bold tracking-tight text-white">Clip Pro</span>
         </Link>
 
         {/* Lista de Navegação */}
