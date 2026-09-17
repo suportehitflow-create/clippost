@@ -507,6 +507,69 @@ export default function TemplatesPage() {
     window.addEventListener('touchend', onBottomUp)
   }
 
+  // Redimensionamento Lateral Direito (Puxar para o lado para mudar a largura / proporção horizontal)
+  const startResizeRight = (clientX: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    setIsResizingVideo(true)
+    const startX = clientX
+    const initW = videoWidth
+
+    const onRightMove = (ev: MouseEvent | TouchEvent) => {
+      if (!phoneRef.current) return
+      const curX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX
+      const w = phoneRef.current.clientWidth
+      const deltaX = curX - startX
+      const deltaW = (deltaX / w) * 100 * 2
+      const newW = Math.max(25, Math.min(100, Math.round(initW + deltaW)))
+      setVideoWidth(newW)
+    }
+
+    const onRightUp = () => {
+      setIsResizingVideo(false)
+      window.removeEventListener('mousemove', onRightMove)
+      window.removeEventListener('mouseup', onRightUp)
+      window.removeEventListener('touchmove', onRightMove)
+      window.removeEventListener('touchend', onRightUp)
+    }
+
+    window.addEventListener('mousemove', onRightMove)
+    window.addEventListener('mouseup', onRightUp)
+    window.addEventListener('touchmove', onRightMove)
+    window.addEventListener('touchend', onRightUp)
+  }
+
+  // Redimensionamento Lateral Esquerdo
+  const startResizeLeft = (clientX: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    setIsResizingVideo(true)
+    const startX = clientX
+    const initW = videoWidth
+
+    const onLeftMove = (ev: MouseEvent | TouchEvent) => {
+      if (!phoneRef.current) return
+      const curX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX
+      const w = phoneRef.current.clientWidth
+      const deltaX = startX - curX
+      const deltaW = (deltaX / w) * 100 * 2
+      const newW = Math.max(25, Math.min(100, Math.round(initW + deltaW)))
+      setVideoWidth(newW)
+    }
+
+    const onLeftUp = () => {
+      setIsResizingVideo(false)
+      window.removeEventListener('mousemove', onLeftMove)
+      window.removeEventListener('mouseup', onLeftUp)
+      window.removeEventListener('touchmove', onLeftMove)
+      window.removeEventListener('touchend', onLeftUp)
+    }
+
+    window.addEventListener('mousemove', onLeftMove)
+    window.addEventListener('mouseup', onLeftUp)
+    window.addEventListener('touchmove', onLeftMove)
+    window.addEventListener('touchend', onLeftUp)
+  }
+
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -1197,6 +1260,25 @@ export default function TemplatesPage() {
                   className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ns-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
                 >
                   <div className="w-6 h-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                </div>
+
+                {/* ALÇAS LATERAIS NO MEIO (DIREITA E ESQUERDA): PUXAR PARA O LADO ALTERA A PROPORÇÃO LATERAL / LARGURA */}
+                <div
+                  onMouseDown={(e) => startResizeRight(e.clientX, e)}
+                  onTouchStart={(e) => startResizeRight(e.touches[0].clientX, e)}
+                  title="Puxar para alterar a largura do vídeo (proporção lateral)"
+                  className="absolute -right-3 top-1/2 -translate-y-1/2 w-3.5 h-14 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ew-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                >
+                  <div className="h-6 w-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                </div>
+
+                <div
+                  onMouseDown={(e) => startResizeLeft(e.clientX, e)}
+                  onTouchStart={(e) => startResizeLeft(e.touches[0].clientX, e)}
+                  title="Puxar para alterar a largura do vídeo (proporção lateral)"
+                  className="absolute -left-3 top-1/2 -translate-y-1/2 w-3.5 h-14 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ew-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                >
+                  <div className="h-6 w-1 bg-zinc-700 rounded-full group-hover:bg-black" />
                 </div>
 
                 {/* 4 Cantos para Escala Proporcional Suave */}
