@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi import Request
-from tasks import process_youtube_video, process_bulk_videos
 from supabase import create_client
 from services import upload_post
 from services.stripe_service import (

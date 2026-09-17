@@ -4,6 +4,10 @@ primary_region = "gru"
 [build]
   dockerfile = "Dockerfile"
 
+[deploy]
+  strategy = "immediate"
+  max_unavailable = 1
+
 [env]
   PORT = "8000"
   STORAGE_BUCKET = "videos"
@@ -23,10 +27,10 @@ primary_region = "gru"
   processes = ["app"]
 
   [[http_service.checks]]
-    grace_period = "10s"
+    grace_period = "30s"
     interval = "30s"
     method = "GET"
-    timeout = "5s"
+    timeout = "10s"
     path = "/health"
 
 [[vm]]

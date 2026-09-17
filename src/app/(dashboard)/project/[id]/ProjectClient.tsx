@@ -123,6 +123,20 @@ export default function ProjectClient({
   const handleManualCheck = async () => {
     setIsRetrying(true)
     try {
+      // 1. Re-dispara o job no backend caso tenha caído
+      if (project.source_url) {
+        fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: project.source_url,
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            clip_duration: 'auto',
+            project_id: project.id,
+          }),
+        }).catch(() => null)
+      }
+
       const { data: dbProj } = await supabase
         .from('projects')
         .select('status, error_message')
