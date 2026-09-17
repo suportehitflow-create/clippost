@@ -1012,7 +1012,16 @@ export default function TemplatesPage() {
               onClick={centerAllElementsHorizontally}
               className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
             >
-              <Crosshair className="w-3.5 h-3.5 text-cyan-400" /> Centralizar Tudo no Meio
+              <Crosshair className="w-3.5 h-3.5 text-cyan-400" /> Centralizar Horizontal (50%)
+            </button>
+
+            <button
+              type="button"
+              onClick={centerVideoBoth}
+              title="Centraliza o quadro do vídeo no centro exato horizontal e vertical (X: 50%, Y: 50%)"
+              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <Crosshair className="w-3.5 h-3.5 text-orange-400" /> Centralizar Vídeo (Meio X e Y)
             </button>
 
             <button
