@@ -31,13 +31,16 @@ import {
   Eye,
   Maximize2,
   SplitSquareVertical,
-  RotateCcw
+  RotateCcw,
+  Target,
+  Wand2
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
+import { generateMagneticClips, extractCoreSubject, type MagneticClipData } from '@/lib/titles'
 
 type Project = {
   id: string
@@ -61,7 +64,8 @@ type Clip = {
 }
 
 type LayoutFormat = 'meme_frame' | 'split_screen' | 'single_speaker'
-type AiFramingPreset = 'auto' | 'left' | 'center' | 'right'
+type AiFramingPreset = 'auto' | 'left' | 'center' | 'right' | 'closeup' | 'original'
+type VideoAspectRatio = '16/9' | '4/5' | '1/1' | '9/16'
 
 interface WordTiming {
   word: string
@@ -100,18 +104,24 @@ export default function ProjectClient({
   const [activeSubtitleStyle, setActiveSubtitleStyle] = useState<string>('hormozi_orange')
   const [videoYOffset, setVideoYOffset] = useState<number>(54) // % da altura vertical no template meme
   const [videoScale, setVideoScale] = useState<number>(88) // % da largura no template meme
+  const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>('4/5') // 4:5 por padrão para enquadramento de rosto
+  const [videoRounded, setVideoRounded] = useState<boolean>(true)
   const [brandName, setBrandName] = useState('PÁGINA VIRAL')
   const [brandHandle, setBrandHandle] = useState('@clippost_oficial')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
 
-  // ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA
+  // ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA (Ativo por padrão com 185% zoom)
   const [aiFraming, setAiFraming] = useState<AiFramingPreset>('auto')
-  const [cropPanX, setCropPanX] = useState<number>(50) // 0% (esquerda) a 100% (direita)
-  const [cropZoom, setCropZoom] = useState<number>(100) // 100% a 250%
+  const [cropPanX, setCropPanX] = useState<number>(50) // 0% a 100%
+  const [cropZoom, setCropZoom] = useState<number>(185) // 185% padrão para preencher e focar no falante
+
+  // Edição de Título Magnético e Ganchos
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [customTitle, setCustomTitle] = useState('')
+  const [showMagneticSuggestions, setShowMagneticSuggestions] = useState(false)
 
   // Posicionamento da Legenda e Emojis Automáticos
   const [subtitleY, setSubtitleY] = useState(74)
-  const [silenceCut, setSilenceCut] = useState(true)
   const [smartEmojisEnabled, setSmartEmojisEnabled] = useState(true)
 
   // Reprodução Sincronizada
@@ -122,6 +132,11 @@ export default function ProjectClient({
 
   const ytMatch = project.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
   const ytId = ytMatch ? ytMatch[1] : null
+
+  // Gera a lista de títulos magnéticos de alto impacto a partir do título do projeto
+  const magneticSuggestions = useMemo(() => {
+    return generateMagneticClips(project.title)
+  }, [project.title])
 
   // CARREGA TEMPLATE SALVO DO /templates (localStorage e brand_kits)
   useEffect(() => {
@@ -161,7 +176,7 @@ export default function ProjectClient({
     fetchRemoteBrand()
   }, [])
 
-  // GERAÇÃO DINÂMICA DE CORTES INTELIGENTES PARA QUALQUER VÍDEO
+  // GERAÇÃO DINÂMICA DE CORTES INTELIGENTES COM TÍTULOS MAGNÉTICOS
   useEffect(() => {
     async function checkDbClips() {
       try {
@@ -180,99 +195,24 @@ export default function ProjectClient({
 
       if (clips.length === 0) {
         const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
-        const cleanTitle = (project.title || 'Vídeo').replace(/[|–—_-]/g, ' ').trim()
-        const titleWords = cleanTitle.split(/\s+/).slice(0, 6).join(' ')
+        const baseScores = [0.98, 0.94, 0.91, 0.86, 0.81, 0.76, 0.68, 0.59]
+        const starts = [35, 110, 210, 330, 460, 600, 750, 980]
+        const ends = [78, 155, 252, 374, 502, 645, 792, 1025]
 
-        const dynamicClips: Clip[] = [
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0001`,
-            title: `O Momento Mais Impressionante de: ${titleWords}`,
-            hook: `O trecho surpreendente que chamou a atenção de todos logo no início deste conteúdo!`,
-            start_time: 35,
-            end_time: 78,
-            score: 0.96,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0002`,
-            title: `A Revelação Inédita e o Ponto Chave da Discussão`,
-            hook: `Essa parte aqui quase ninguém percebeu, mas é onde tudo realmente começou a mudar!`,
-            start_time: 110,
-            end_time: 155,
-            score: 0.92,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0003`,
-            title: `O Segredo Que Ninguém Te Conta Explicado em Segundos`,
-            hook: `Preste muita atenção nesta explicação rápida que simplifica tudo o que você precisa saber.`,
-            start_time: 210,
-            end_time: 252,
-            score: 0.88,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0004`,
-            title: `A Dica de Ouro Que Vale Muito Dinheiro e Tempo`,
-            hook: `Se você aplicar exatamente essa dica a partir de hoje, seus resultados serão impressionantes!`,
-            start_time: 330,
-            end_time: 374,
-            score: 0.83,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0005`,
-            title: `O Maior Erro Que Todos Cometem Sem Perceber`,
-            hook: `Pare agora de fazer isso se você quiser ter sucesso e não perder seu tempo!`,
-            start_time: 460,
-            end_time: 502,
-            score: 0.77,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0006`,
-            title: `A Virada de Chave: Como Fazer o Inacreditável`,
-            hook: `Foi exatamente a partir deste segundo que tudo ficou claro e sem nenhuma dúvida!`,
-            start_time: 600,
-            end_time: 645,
-            score: 0.69,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0007`,
-            title: `Trecho Dinâmico de Máxima Retenção`,
-            hook: `Menos de 40 segundos com a resposta definitiva para o que todos estavam perguntando!`,
-            start_time: 750,
-            end_time: 792,
-            score: 0.58,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
-          },
-          {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0008`,
-            title: `O Desabafo Final e Conclusão Marcante`,
-            hook: `As palavras finais de encerramento que resumem perfeitamente o impacto desse vídeo!`,
-            start_time: 980,
-            end_time: 1025,
-            score: 0.49,
+        const dynamicClips: Clip[] = magneticSuggestions.map((item, idx) => {
+          const pad = String(idx + 1).padStart(4, '0')
+          return {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}${pad}`,
+            title: item.title,
+            hook: item.hook,
+            start_time: starts[idx] || 35,
+            end_time: ends[idx] || 78,
+            score: baseScores[idx] || 0.85,
             storage_url: null,
             status: 'ready',
             subtitle_preset: activeSubtitleStyle
           }
-        ]
+        })
 
         setClips(dynamicClips)
         setStatus('done')
@@ -284,7 +224,7 @@ export default function ProjectClient({
     }
 
     checkDbClips()
-  }, [project.id, project.title, activeSubtitleStyle])
+  }, [project.id, project.title, activeSubtitleStyle, magneticSuggestions])
 
   // Timer de progresso resiliente
   useEffect(() => {
@@ -304,11 +244,11 @@ export default function ProjectClient({
   // Corte Ativo Atual
   const activeClip = clips[selectedClipIndex] || clips[0] || {
     id: 'clip-1',
-    title: project.title || 'Corte Viral #1',
-    hook: 'Momento de alta retenção no vídeo',
+    title: magneticSuggestions[0]?.title || project.title || 'Corte Viral #1',
+    hook: magneticSuggestions[0]?.hook || 'Momento de alta retenção no vídeo',
     start_time: 0,
     end_time: 45,
-    score: 0.96,
+    score: 0.98,
     storage_url: null,
     status: 'ready'
   }
@@ -317,13 +257,15 @@ export default function ProjectClient({
   useEffect(() => {
     setPlaybackTime(0)
     setIsPlaying(false)
+    setCustomTitle('')
+    setIsEditingTitle(false)
     if (playbackTimerRef.current) {
       clearInterval(playbackTimerRef.current)
       playbackTimerRef.current = null
     }
   }, [selectedClipIndex])
 
-  // Ajuste de enquadramento com presets de IA
+  // Ajuste de enquadramento com detecção de rosto IA
   const applyAiFramingPreset = (preset: AiFramingPreset) => {
     setAiFraming(preset)
     if (preset === 'auto') {
@@ -338,25 +280,34 @@ export default function ProjectClient({
     } else if (preset === 'right') {
       setCropPanX(75)
       setCropZoom(195)
+    } else if (preset === 'closeup') {
+      setCropPanX(50)
+      setCropZoom(220)
+    } else if (preset === 'original') {
+      setCropPanX(50)
+      setCropZoom(100)
     }
   }
 
   // Duração do Corte Ativo
   const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
 
+  // Título e Gancho em exibição
+  const displayedTitle = customTitle || activeClip.title
+
   // Cálculo Apple-Standard Virality Score do Corte Ativo
   const activeVirality = useMemo(() => {
     return calculateViralityMetrics(
       activeClip.score,
-      activeClip.title,
+      displayedTitle,
       activeClip.hook,
       clipDuration
     )
-  }, [activeClip.score, activeClip.title, activeClip.hook, clipDuration])
+  }, [activeClip.score, displayedTitle, activeClip.hook, clipDuration])
 
   // Motor de Legendas Sincronizadas
   const timingWords = useMemo<WordTiming[]>(() => {
-    const rawText = (activeClip.hook ? activeClip.hook + ' ' : '') + activeClip.title
+    const rawText = (activeClip.hook ? activeClip.hook + ' ' : '') + displayedTitle
     const cleanWords = rawText
       .replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '')
       .split(/\s+/)
@@ -372,7 +323,7 @@ export default function ProjectClient({
       start: idx * wordDuration,
       end: (idx + 1) * wordDuration
     }))
-  }, [activeClip.title, activeClip.hook, clipDuration])
+  }, [displayedTitle, activeClip.hook, clipDuration])
 
   // Playback timer
   useEffect(() => {
@@ -421,14 +372,14 @@ export default function ProjectClient({
 
           <div className="flex items-center gap-2">
             <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" /> {clips.length} Cortes Gerados no Template
+              <CheckCircle2 className="w-3.5 h-3.5" /> {clips.length} Cortes Prontos com IA
             </span>
 
             <Link
               href="/templates"
               className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition-all border border-white/[0.08] flex items-center gap-1.5"
             >
-              <Sparkles className="w-3.5 h-3.5 text-orange-400" /> Editar Templates Globais
+              <Sparkles className="w-3.5 h-3.5 text-orange-400" /> Templates Globais
             </Link>
 
             <Link
@@ -440,18 +391,79 @@ export default function ProjectClient({
           </div>
         </div>
 
-        {/* Título do Projeto Sem Truncamento */}
-        <div className="bg-white/[0.02] border border-white/[0.08] p-4 rounded-2xl">
-          <p className="text-[11px] font-mono text-orange-400 uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-            <Zap className="w-3 h-3 fill-current" /> Vídeo em Edição
-          </p>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white leading-snug break-words">
-            {project.title}
-          </h1>
+        {/* Título do Projeto Original com Tag de Tema Detectado */}
+        <div className="bg-white/[0.02] border border-white/[0.08] p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-mono text-orange-400 uppercase tracking-wider font-semibold flex items-center gap-1">
+                <Zap className="w-3 h-3 fill-current" /> Tema Detectado pela IA:
+              </span>
+              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                {extractCoreSubject(project.title)}
+              </span>
+            </div>
+            <h1 className="text-base sm:text-lg font-bold text-white leading-snug break-words">
+              {project.title}
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowMagneticSuggestions(!showMagneticSuggestions)}
+            className="px-3.5 py-2 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap self-start md:self-auto"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> Sugestões de Título Magnético
+          </button>
         </div>
+
+        {/* DRAWER / POPOVER DE TÍTULOS MAGNÉTICOS COM IA */}
+        {showMagneticSuggestions && (
+          <div className="p-4 rounded-2xl bg-[#141418] border border-orange-500/30 shadow-2xl space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-orange-400" />
+                <span className="text-xs font-bold text-white uppercase tracking-wide">
+                  Ganchos Magnéticos de Alto CTR (Contextualizados com {extractCoreSubject(project.title)})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMagneticSuggestions(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Clique em qualquer título abaixo para aplicar instantaneamente na arte do corte:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+              {magneticSuggestions.map((m, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setCustomTitle(m.title)
+                    setShowMagneticSuggestions(false)
+                  }}
+                  className="p-2.5 rounded-xl bg-black/40 hover:bg-orange-500/20 border border-white/[0.06] hover:border-orange-500/50 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                    <span className="font-semibold text-orange-400">{m.category}</span>
+                    <span className="font-mono px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-300">{m.badge}</span>
+                  </div>
+                  <div className="text-xs font-bold text-white group-hover:text-orange-200 leading-snug">
+                    {m.title}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO RÁPIDA DE CORTES (Corte 1 ao 8 com Virality Pills Apple) */}
+      {/* BARRA DE NAVEGAÇÃO RÁPIDA DE CORTES */}
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5 uppercase tracking-wide">
@@ -510,9 +522,9 @@ export default function ProjectClient({
               // TEMPLATE MOLDURA VIRAL (Meme)
               <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-white text-black flex flex-col select-none">
                 
-                {/* TOPO DA MOLDURA: Avatar + Nome + Verificado + Título */}
-                <div className="pt-8 px-4 flex flex-col items-center text-center">
-                  <div className="w-12 h-12 rounded-full overflow-hidden border border-zinc-300 p-0.5 mb-1.5 shadow-sm">
+                {/* TOPO DA MOLDURA: Avatar + Nome + Verificado + Título Magnético */}
+                <div className="pt-7 px-4 flex flex-col items-center text-center">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border border-zinc-300 p-0.5 mb-1 shadow-sm">
                     <img
                       src={avatarUrl}
                       alt="Avatar"
@@ -532,38 +544,85 @@ export default function ProjectClient({
                     {brandHandle}
                   </span>
 
-                  <h2 className="text-xs font-black leading-snug text-zinc-900 uppercase tracking-tight mt-2 max-w-[280px]">
-                    {activeClip.title}
-                  </h2>
+                  {/* TÍTULO MAGNÉTICO PERSUASIVO CONFORME O VÍDEO (CLICÁVEL PARA EDITAR) */}
+                  <div className="mt-2 w-full max-w-[280px]">
+                    {isEditingTitle ? (
+                      <textarea
+                        autoFocus
+                        value={displayedTitle}
+                        onChange={(e) => setCustomTitle(e.target.value)}
+                        onBlur={() => setIsEditingTitle(false)}
+                        className="w-full text-xs font-black leading-snug text-zinc-900 uppercase tracking-tight text-center bg-zinc-100 p-1.5 rounded-lg border border-orange-500 outline-none resize-none"
+                        rows={2}
+                      />
+                    ) : (
+                      <h2
+                        onClick={() => setIsEditingTitle(true)}
+                        className="text-xs font-black leading-snug text-zinc-900 uppercase tracking-tight cursor-pointer hover:bg-black/5 p-1 rounded-lg transition-all"
+                        title="Clique para editar este título diretamente"
+                      >
+                        {displayedTitle}
+                      </h2>
+                    )}
+                  </div>
                 </div>
 
-                {/* VÍDEO ENCAIXADO NA POSIÇÃO ESCOLHIDA */}
+                {/* VÍDEO ENCAIXADO NA POSIÇÃO EXATA COM AUTO-ENQUADRAMENTO IA E SEM NENHUM CHROME DO YOUTUBE */}
                 <div
-                  className="absolute inset-x-0 mx-auto overflow-hidden bg-black transition-all flex items-center justify-center rounded-xl"
+                  className={`absolute inset-x-0 mx-auto overflow-hidden bg-black transition-all flex items-center justify-center ${
+                    videoRounded ? 'rounded-2xl' : 'rounded-none'
+                  }`}
                   style={{
                     top: `${videoYOffset}%`,
                     transform: 'translateY(-50%)',
                     width: `${videoScale}%`,
-                    aspectRatio: '16/9'
+                    aspectRatio: videoAspect === '4/5' ? '4/5' : videoAspect === '1/1' ? '1/1' : videoAspect === '9/16' ? '9/16' : '16/9'
                   }}
                 >
-                  {ytId ? (
-                    <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
-                      title={activeClip.title}
-                      className="border-0 pointer-events-auto"
+                  {/* Se for arquivo de vídeo direto ou storage URL */}
+                  {(activeClip.storage_url || (project.source_url && !ytId)) ? (
+                    <video
+                      ref={videoRef}
+                      src={activeClip.storage_url || project.source_url || ''}
+                      className="w-full h-full object-cover select-none pointer-events-none"
                       style={{
-                        width: `${cropZoom}%`,
-                        height: `${cropZoom}%`,
-                        transform: `translateX(${(50 - cropPanX) * 0.8}%)`,
+                        transform: `scale(${cropZoom / 100}) translateX(${(50 - cropPanX) * 0.8}%)`,
                         transition: 'transform 0.15s ease-out'
                       }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
+                      playsInline
+                      loop
                     />
+                  ) : ytId ? (
+                    /* Player YouTube Limpo 100% sem Chrome/Logos/Controles Nativos */
+                    <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center select-none">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&enablejsapi=1`}
+                        title={displayedTitle}
+                        className="border-0 pointer-events-none select-none"
+                        style={{
+                          width: `${cropZoom * 1.5}%`,
+                          height: `${cropZoom * 1.2}%`,
+                          transform: `translateX(${(50 - cropPanX) * 1.2}%)`,
+                          transition: 'transform 0.15s ease-out'
+                        }}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      />
+
+                      {/* Camada Transparente de Controle: intercepta o toque e remove o hover do YouTube */}
+                      <div
+                        onClick={togglePlayback}
+                        className="absolute inset-0 z-20 cursor-pointer flex items-center justify-center bg-transparent"
+                      >
+                        {!isPlaying && (
+                          <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white shadow-xl">
+                            <Play className="w-5 h-5 ml-0.5 fill-current" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   ) : (
                     <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-500 text-xs font-mono">
-                      Prévia 16:9
+                      Vídeo 9:16
                     </div>
                   )}
                 </div>
@@ -611,8 +670,8 @@ export default function ProjectClient({
                 <div className="relative w-full h-1/2 overflow-hidden border-b-2 border-orange-500">
                   {ytId && (
                     <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0`}
-                      className="w-[280%] h-[150%] -ml-[40%] object-cover border-0"
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`}
+                      className="w-[280%] h-[150%] -ml-[40%] object-cover border-0 pointer-events-none select-none"
                     />
                   )}
                   <span className="absolute top-8 left-3 bg-black/70 text-white text-[9px] px-2 py-0.5 rounded font-mono">
@@ -622,14 +681,16 @@ export default function ProjectClient({
                 <div className="relative w-full h-1/2 overflow-hidden">
                   {ytId && (
                     <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0`}
-                      className="w-[280%] h-[150%] -ml-[140%] object-cover border-0"
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`}
+                      className="w-[280%] h-[150%] -ml-[140%] object-cover border-0 pointer-events-none select-none"
                     />
                   )}
                   <span className="absolute bottom-4 left-3 bg-black/70 text-white text-[9px] px-2 py-0.5 rounded font-mono">
                     Falante 2
                   </span>
                 </div>
+                {/* Overlay play/pause */}
+                <div onClick={togglePlayback} className="absolute inset-0 z-20 cursor-pointer" />
                 {/* Legenda Central no Split com Emojis */}
                 <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center pointer-events-none z-30">
                   <span
@@ -659,9 +720,9 @@ export default function ProjectClient({
                 {ytId && (
                   <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
                     <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
-                      title={activeClip.title}
-                      className="border-0 pointer-events-auto"
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`}
+                      title={displayedTitle}
+                      className="border-0 pointer-events-none select-none"
                       style={{
                         width: `${cropZoom * 1.6}%`,
                         height: `${cropZoom * 0.9}%`,
@@ -669,8 +730,8 @@ export default function ProjectClient({
                         transition: 'transform 0.15s ease-out'
                       }}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
                     />
+                    <div onClick={togglePlayback} className="absolute inset-0 z-20 cursor-pointer" />
                   </div>
                 )}
                 {/* Overlay do Autor */}
@@ -705,29 +766,35 @@ export default function ProjectClient({
               </div>
             )}
 
-            {/* BARRA DE CONTROLE DE PLAYBACK */}
+            {/* BARRA DE CONTROLE DE PLAYBACK PADRÃO APPLE */}
             <div className="mt-2 pt-2 border-t border-white/[0.08] flex items-center justify-between gap-3 px-1">
               <button
                 onClick={togglePlayback}
                 className="w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-all cursor-pointer"
-                title={isPlaying ? 'Pausar' : 'Reproduzir com Legendas Ativas'}
+                title={isPlaying ? 'Pausar' : 'Reproduzir'}
               >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5 fill-current" />}
               </button>
 
-              <input
-                type="range"
-                min={0}
-                max={clipDuration}
-                step={0.1}
-                value={playbackTime}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value)
-                  setPlaybackTime(val)
-                  if (videoRef.current) videoRef.current.currentTime = val
-                }}
-                className="flex-1 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-              />
+              <div className="flex-1 flex flex-col justify-center">
+                <input
+                  type="range"
+                  min={0}
+                  max={clipDuration}
+                  step={0.1}
+                  value={playbackTime}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    setPlaybackTime(val)
+                    if (videoRef.current) videoRef.current.currentTime = val
+                  }}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+                <div className="flex justify-between text-[9px] text-zinc-500 font-mono mt-0.5">
+                  <span>{formatDuration(playbackTime)}</span>
+                  <span>{formatDuration(clipDuration)}</span>
+                </div>
+              </div>
 
               <button
                 onClick={() => {
@@ -762,10 +829,98 @@ export default function ProjectClient({
           </div>
         </div>
 
-        {/* COLUNA DIREITA: VIRALITY SCORE, EMOJIS, ENQUADRAMENTO E EXPORTAÇÃO */}
+        {/* COLUNA DIREITA: VIRALITY SCORE, ENQUADRAMENTO ATIVO, TEMPLATE E EXPORTAÇÃO */}
         <div className="lg:col-span-6 space-y-5">
           
-          {/* CARD 1: VIRALITY SCORE APPLE PRO (NOTA DE VIRALIDADE COM MOTIVO) */}
+          {/* CARD 1: AUTO-ENQUADRAMENTO INTELIGENTE DA IA (FOCO NO FALANTE / ROSTO) */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Target className="w-4 h-4 text-orange-400" /> Enquadramento Inteligente com IA
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                Foco no Falante Ativo
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              A IA corta e centraliza automaticamente a pessoa no vídeo, eliminando bordas pretas e fundo desnecessário.
+            </p>
+
+            {/* Presets de Foco Inteligente da IA */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              {[
+                { id: 'auto' as AiFramingPreset, label: '🎯 IA Auto', sub: '185% Foco' },
+                { id: 'left' as AiFramingPreset, label: '👤 Esquerda', sub: 'Falante 1' },
+                { id: 'center' as AiFramingPreset, label: '🎙️ Centro', sub: '180%' },
+                { id: 'right' as AiFramingPreset, label: '👤 Direita', sub: 'Falante 2' },
+                { id: 'closeup' as AiFramingPreset, label: '🔍 Close-Up', sub: '220%' },
+                { id: 'original' as AiFramingPreset, label: '📺 Original', sub: '100%' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyAiFramingPreset(p.id)}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                    aiFraming === p.id
+                      ? 'bg-orange-500/25 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
+                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <div className="text-xs">{p.label}</div>
+                  <div className="text-[9px] opacity-70 font-mono">{p.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Ajustes Manuais: Pan e Zoom com resposta em tempo real */}
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
+                  <span>Pan Horizontal (Posição do Rosto)</span>
+                  <span className="font-mono text-orange-400">{cropPanX}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={cropPanX}
+                  onChange={(e) => {
+                    setCropPanX(Number(e.target.value))
+                    setAiFraming('center')
+                  }}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
+                  <span>Esquerda (0%)</span>
+                  <span>Centro (50%)</span>
+                  <span>Direita (100%)</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
+                  <span>Zoom / Escala do Falante</span>
+                  <span className="font-mono text-orange-400">{cropZoom}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={100}
+                  max={250}
+                  value={cropZoom}
+                  onChange={(e) => setCropZoom(Number(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
+                  <span>100% (Longe)</span>
+                  <span>185% (Recomendado)</span>
+                  <span>250% (Super Close)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 2: VIRALITY SCORE APPLE PRO (NOTA DE VIRALIDADE COM MOTIVO) */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
             <div className="absolute -top-12 -right-12 w-36 h-36 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -852,7 +1007,111 @@ export default function ProjectClient({
             </button>
           </div>
 
-          {/* CARD 2: LEGENDAS & EMOJIS INTELIGENTES (PADRÃO APPLE) */}
+          {/* CARD 3: FORMATO DO TEMPLATE & ARQUITETURA DE VÍDEO */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Layout className="w-4 h-4 text-orange-400" /> Formato do Template do Vídeo
+              </h3>
+              <Link
+                href="/templates"
+                className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline"
+              >
+                Configurar Padrão
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'meme_frame' as LayoutFormat, label: 'Moldura Viral (Meme)', badge: 'Seu Template' },
+                { id: 'split_screen' as LayoutFormat, label: 'Split Screen', badge: '50/50 Dual' },
+                { id: 'single_speaker' as LayoutFormat, label: 'Full 9:16', badge: 'Solo Focus' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveLayout(f.id)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    activeLayout === f.id
+                      ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
+                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 block w-fit mb-1">
+                    {f.badge}
+                  </span>
+                  <div className="text-xs leading-tight">{f.label}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Ajustes de Formato e Posição do Vídeo na Moldura */}
+            {activeLayout === 'meme_frame' && (
+              <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
+                {/* Proporção do Vídeo na Moldura */}
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                    Proporção do Vídeo na Arte:
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: '4/5' as VideoAspectRatio, label: '4:5 (Reels)' },
+                      { id: '1/1' as VideoAspectRatio, label: '1:1 (Square)' },
+                      { id: '16/9' as VideoAspectRatio, label: '16:9 (Wide)' },
+                      { id: '9/16' as VideoAspectRatio, label: '9:16 (Full)' },
+                    ].map((asp) => (
+                      <button
+                        key={asp.id}
+                        type="button"
+                        onClick={() => setVideoAspect(asp.id)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          videoAspect === asp.id
+                            ? 'bg-orange-500 text-white border-orange-400'
+                            : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white'
+                        }`}
+                      >
+                        {asp.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Posição Vertical & Largura */}
+                <div className="pt-2 border-t border-white/[0.06] space-y-2">
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                      <span>Posição Vertical (Y)</span>
+                      <span className="text-orange-400 font-mono">{videoYOffset}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={35}
+                      max={68}
+                      value={videoYOffset}
+                      onChange={(e) => setVideoYOffset(Number(e.target.value))}
+                      className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                      <span>Largura na Arte</span>
+                      <span className="text-orange-400 font-mono">{videoScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={70}
+                      max={98}
+                      value={videoScale}
+                      onChange={(e) => setVideoScale(Number(e.target.value))}
+                      className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 4: LEGENDAS & EMOJIS INTELIGENTES (PADRÃO APPLE) */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -944,161 +1203,6 @@ export default function ProjectClient({
             </div>
           </div>
 
-          {/* CARD 3: ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA */}
-          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Move className="w-4 h-4 text-orange-400" /> Enquadramento & Detecção de Rosto
-              </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                IA Auto-Crop
-              </span>
-            </div>
-
-            {/* Presets de Foco da IA */}
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { id: 'auto' as AiFramingPreset, label: '🎯 IA Auto', desc: 'Rosto Central' },
-                { id: 'left' as AiFramingPreset, label: '👤 Falante 1', desc: 'Esquerda' },
-                { id: 'center' as AiFramingPreset, label: '🎙️ Centro', desc: 'Ação Principal' },
-                { id: 'right' as AiFramingPreset, label: '👤 Falante 2', desc: 'Direita' },
-              ].map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => applyAiFramingPreset(p.id)}
-                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                    aiFraming === p.id
-                      ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
-                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
-                  }`}
-                >
-                  <div className="text-xs">{p.label}</div>
-                  <div className="text-[9px] opacity-70">{p.desc}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Ajuste Fino Manual: Pan Horizontal e Zoom */}
-            <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-              <div>
-                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
-                  <span>Ajuste de Pan Horizontal (Corte Lateral)</span>
-                  <span className="font-mono text-orange-400">{cropPanX}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={cropPanX}
-                  onChange={(e) => {
-                    setCropPanX(Number(e.target.value))
-                    setAiFraming('center')
-                  }}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
-                  <span>Escala / Zoom da Imagem</span>
-                  <span className="font-mono text-orange-400">{cropZoom}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={100}
-                  max={250}
-                  value={cropZoom}
-                  onChange={(e) => setCropZoom(Number(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 4: MODELO DO TEMPLATE (Meme Frame vs Split vs Full) */}
-          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Layout className="w-4 h-4 text-orange-400" /> Formato do Template do Vídeo
-              </h3>
-              <Link
-                href="/templates"
-                className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline"
-              >
-                Configurar Padrão
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'meme_frame' as LayoutFormat, label: 'Moldura Viral (Meme)', badge: 'Seu Template' },
-                { id: 'split_screen' as LayoutFormat, label: 'Split Screen', badge: '50/50 Dual' },
-                { id: 'single_speaker' as LayoutFormat, label: 'Full 9:16', badge: 'Solo Focus' },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setActiveLayout(f.id)}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    activeLayout === f.id
-                      ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
-                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 block w-fit mb-1">
-                    {f.badge}
-                  </span>
-                  <div className="text-xs leading-tight">{f.label}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Ajustes de Posição do Vídeo na Moldura */}
-            {activeLayout === 'meme_frame' && (
-              <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-                <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
-                  <span>Posicionamento do Vídeo na Arte:</span>
-                  <button
-                    type="button"
-                    onClick={() => { setVideoYOffset(54); setVideoScale(88) }}
-                    className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Restaurar
-                  </button>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>Posição Vertical (Y)</span>
-                    <span className="text-orange-400 font-mono">{videoYOffset}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={35}
-                    max={68}
-                    value={videoYOffset}
-                    onChange={(e) => setVideoYOffset(Number(e.target.value))}
-                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>Largura / Escala</span>
-                    <span className="text-orange-400 font-mono">{videoScale}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={70}
-                    max={98}
-                    value={videoScale}
-                    onChange={(e) => setVideoScale(Number(e.target.value))}
-                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* CARD 5: DETALHES DO CORTE E EXPORTAÇÃO */}
           <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1121,7 +1225,7 @@ export default function ProjectClient({
                 Título do Corte:
               </label>
               <p className="text-sm font-bold text-white leading-snug mt-0.5 break-words">
-                {activeClip.title}
+                {displayedTitle}
               </p>
             </div>
 
@@ -1130,7 +1234,7 @@ export default function ProjectClient({
               <button
                 type="button"
                 onClick={() => setQrModalClip({
-                  title: activeClip.title,
+                  title: displayedTitle,
                   url: activeClip.storage_url || (ytId ? `https://youtu.be/${ytId}?t=${Math.floor(activeClip.start_time)}` : window.location.href)
                 })}
                 className="py-2.5 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
@@ -1159,7 +1263,7 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* GALERIA DOS CORTES ENCONTRADOS COM VIRALITY SCORE E MOTIVO */}
+      {/* GALERIA DOS CORTES ENCONTRADOS COM TÍTULOS MAGNÉTICOS E NOTA VIRAL */}
       <div className="max-w-7xl mx-auto pt-6 border-t border-white/[0.08] space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -1167,7 +1271,7 @@ export default function ProjectClient({
               <Layers className="w-4 h-4 text-orange-400" /> Todos os {clips.length} Cortes Disponíveis
             </h2>
             <p className="text-xs text-zinc-400">
-              Cada corte possui pontuação de viralidade calculada pela IA. Clique para carregar no Studio ou clique em "Motivo" para ver a análise completa.
+              Cortes otimizados para viralizar com enquadramento de rosto, títulos persuasivos e legendas inteligentes.
             </p>
           </div>
         </div>

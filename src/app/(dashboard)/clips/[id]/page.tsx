@@ -388,9 +388,9 @@ export default function ClipEditorPage() {
                 ytId ? (
                 <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
                   <iframe
-                    src={'https://www.youtube-nocookie.com/embed/' + ytId + '?start=' + Math.floor(clip.start_time || 0) + '&end=' + Math.floor(clip.end_time || 30) + '&autoplay=0&controls=1&modestbranding=1&rel=0'}
+                    src={'https://www.youtube-nocookie.com/embed/' + ytId + '?start=' + Math.floor(clip.start_time || 0) + '&end=' + Math.floor(clip.end_time || 30) + '&autoplay=0&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1'}
                     title={clip.title || 'Corte 9:16'}
-                    className="w-[330%] h-[120%] -ml-[115%] object-cover border-0"
+                    className="w-[330%] h-[120%] -ml-[115%] object-cover border-0 pointer-events-none select-none"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
