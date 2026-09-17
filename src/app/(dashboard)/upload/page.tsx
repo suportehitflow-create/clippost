@@ -63,7 +63,7 @@ export default function CreateClipsPage() {
           user_id: user.id,
           title: videoTitle,
           source_url: activeTab === 'link' ? url.trim() : null,
-          source_type: activeTab,
+          source_type: activeTab === 'link' ? 'url' : 'file',
           status: 'processing',
         })
         .select()
