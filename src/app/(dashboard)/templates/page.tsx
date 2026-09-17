@@ -94,7 +94,7 @@ const TEMPLATE_PRESETS = [
     videoHeight: 48,
   }
 ]
-type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'safezone' | 'background' | null
+type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'background' | null
 
 // Renderizador Oficial de Emojis Nativos Apple iOS (Emojipedia / Apple Assets)
 function AppleEmojiText({ text, className }: { text: string; className?: string }) {
@@ -749,21 +749,6 @@ export default function TemplatesPage() {
             <span className="text-[9px] font-semibold tracking-tight">Legenda</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTool(activeTool === 'safezone' ? null : 'safezone')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer relative ${
-              activeTool === 'safezone'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            <ShieldCheck className="w-5 h-5" />
-            <span className="text-[9px] font-semibold tracking-tight">Safe Zone</span>
-            {instagramDecal && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
 
           <button
             type="button"
@@ -790,7 +775,6 @@ export default function TemplatesPage() {
                 {activeTool === 'text' && 'Tipografia & Ganchos'}
                 {activeTool === 'brand' && 'Foto & Identidade'}
                 {activeTool === 'subtitles' && 'Estilos de Legenda'}
-                {activeTool === 'safezone' && 'Decalque Safe Zone Reels'}
                 {activeTool === 'background' && 'Cor de Fundo do Template'}
               </h2>
               <button
@@ -821,7 +805,35 @@ export default function TemplatesPage() {
                     </span>
                   </button>
                 ))}
+
+                {/* PÍLULA SAFEZONE DENTRO DE MODELOS */}
+                <div className="pt-2 border-t border-white/[0.08]">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                        instagramDecal ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-500'
+                      }`}>
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Decalque Safe Zone</span>
+                        <span className="text-[10px] text-zinc-400">Guia de segurança 9:16</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInstagramDecal(!instagramDecal)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
+                        instagramDecal
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
+                          : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
+                      }`}
+                    >
+                      {instagramDecal ? 'LIGADO' : 'DESLIGADO'}
+                    </button>
+                  </div>
               </div>
+                </div>
             )}
 
             {/* ABA 2: TIPOGRAFIA */}
@@ -1189,31 +1201,6 @@ export default function TemplatesPage() {
                       </div>
                     </button>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* ABA 5: SAFE ZONE REELS */}
-            {activeTool === 'safezone' && (
-              <div className="space-y-4 text-xs leading-relaxed">
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white">Decalque Safe Zone:</span>
-                    <button
-                      type="button"
-                      onClick={() => setInstagramDecal(!instagramDecal)}
-                      className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                        instagramDecal
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
-                          : 'bg-white/10 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      {instagramDecal ? 'LIGADO' : 'DESLIGADO'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Exibe a região inferior sombreada para evitar que a legenda fique escondida pela interface do Reels.
-                  </p>
                 </div>
               </div>
             )}
