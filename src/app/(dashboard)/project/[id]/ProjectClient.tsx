@@ -160,6 +160,7 @@ export default function ProjectClient({
   const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 78 })
   const [brandAlign, setBrandAlign] = useState<'center' | 'left' | 'right'>('center')
   const [brandLayout, setBrandLayout] = useState<'row' | 'stacked'>('row')
+  const [showVerifiedBadge, setShowVerifiedBadge] = useState<boolean>(true)
   const [fontFamily, setFontFamily] = useState<string>('Inter')
   const [fontSize, setFontSize] = useState<number>(14)
   const [titleColor, setTitleColor] = useState<string>('#ffffff')
@@ -229,6 +230,7 @@ export default function ProjectClient({
           if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
           if (c.brandAlign) setBrandAlign(c.brandAlign)
           if (c.brandLayout) setBrandLayout(c.brandLayout)
+          if (c.showVerifiedBadge !== undefined) setShowVerifiedBadge(c.showVerifiedBadge)
           if (c.fontFamily) setFontFamily(c.fontFamily)
           if (c.fontSize) setFontSize(c.fontSize)
           if (c.titleColor) setTitleColor(c.titleColor)
@@ -610,7 +612,9 @@ export default function ProjectClient({
                   }`}>
                     {brandName}
                   </span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white text-[7px] flex items-center justify-center">✓</span>
+                  {showVerifiedBadge && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white text-[7px] flex items-center justify-center">✓</span>
+                  )}
                 </div>
                 <span className={`text-[9px] font-medium ${
                   templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'

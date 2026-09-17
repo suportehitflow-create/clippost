@@ -85,6 +85,7 @@ const TEMPLATE_PRESETS = [
     bg: 'dark',
     brandName: 'Nome da Página',
     brandHandle: '@nomedapagina',
+    showVerifiedBadge: true,
     title: 'ASSIM QUE SEU TITULO APARECERA NO VIDEOS',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
@@ -159,6 +160,7 @@ export default function TemplatesPage() {
   const [brandHandle, setBrandHandle] = useState('@nomedapagina')
   const [brandAlign, setBrandAlign] = useState<'left' | 'center' | 'right'>('center')
   const [brandLayout, setBrandLayout] = useState<'inline' | 'stacked'>('inline')
+  const [showVerifiedBadge, setShowVerifiedBadge] = useState<boolean>(true)
   const DEFAULT_BRAND_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
   const [titleText, setTitleText] = useState('AQUI QUE O SEU TITULO VAI ESTAR POSICIONADO NO VÍDEO')
@@ -209,6 +211,7 @@ export default function TemplatesPage() {
         if (p.config) {
           const c = p.config
           if (c.templateBg) setTemplateBg(c.templateBg)
+          if (c.showVerifiedBadge !== undefined) setShowVerifiedBadge(c.showVerifiedBadge)
           if (c.brandName && c.brandName !== 'HUMOR DA IGUANA') setBrandName(c.brandName)
           else setBrandName('Nome da Página')
           if (c.brandHandle && c.brandHandle !== '@humordaiguana') setBrandHandle(c.brandHandle)
@@ -247,6 +250,7 @@ export default function TemplatesPage() {
             if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
             else setBrandName('Nome da Página')
             if (cfg.templateBg) setTemplateBg(cfg.templateBg)
+            if (cfg.showVerifiedBadge !== undefined) setShowVerifiedBadge(cfg.showVerifiedBadge)
             if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
             if (cfg.fontSize) setFontSize(cfg.fontSize)
             if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
@@ -326,6 +330,7 @@ export default function TemplatesPage() {
     setTemplateBg(preset.bg as any)
     setBrandName(preset.brandName)
     setBrandHandle(preset.brandHandle)
+    setShowVerifiedBadge(preset.showVerifiedBadge !== false)
     setTitleText(preset.title)
     setFontFamily(preset.font)
     setFontSize(preset.fontSize)
@@ -621,6 +626,7 @@ export default function TemplatesPage() {
         brandHandle,
         brandAlign,
         brandLayout,
+        showVerifiedBadge,
         templateBg,
         subtitle_preset: selectedSubtitle,
         fontFamily,
@@ -1162,6 +1168,19 @@ export default function TemplatesPage() {
                   </div>
                 </div>
 
+                {/* TOGGLE SELO DE VERIFICADO */}
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-zinc-400 font-medium text-xs">Selo de Verificado:</label>
+                      <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </div>
+                    <LiquidToggle checked={showVerifiedBadge} onChange={setShowVerifiedBadge} activeColor="indigo" />
+                  </div>
+                </div>
+
                 {/* DISPOSIÇÃO DO PERFIL (LADO A LADO VS EMPILHADO) */}
                 <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
                   <div className="flex items-center justify-between">
@@ -1424,9 +1443,11 @@ export default function TemplatesPage() {
                       }`}>
                         {brandName}
                       </span>
-                      <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
+                      {showVerifiedBadge && (
+                        <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                      )}
                     </div>
                     <span className={`text-[10px] font-medium truncate ${
                       templateBg === 'white' ? 'text-zinc-600' : 'text-zinc-400'
