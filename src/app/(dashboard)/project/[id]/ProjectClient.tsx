@@ -146,8 +146,8 @@ export default function ProjectClient({
   const [videoScale, setVideoScale] = useState<number>(96)
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>('4/5')
   const [videoRounded, setVideoRounded] = useState<boolean>(false)
-  const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
-  const [brandHandle, setBrandHandle] = useState('@humordaiguana')
+  const [brandName, setBrandName] = useState('Nome da Página')
+  const [brandHandle, setBrandHandle] = useState('@nomedapagina')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
 
   // Dimensões e Coordenadas do Template
@@ -210,8 +210,10 @@ export default function ProjectClient({
         if (parsed.config) {
           const c = parsed.config
           if (c.templateBg) setTemplateBg(c.templateBg)
-          if (c.brandName) setBrandName(c.brandName)
-          if (c.brandHandle) setBrandHandle(c.brandHandle)
+          if (c.brandName && c.brandName !== 'HUMOR DA IGUANA') setBrandName(c.brandName)
+          else setBrandName('Nome da Página')
+          if (c.brandHandle && c.brandHandle !== '@humordaiguana') setBrandHandle(c.brandHandle)
+          else setBrandHandle('@nomedapagina')
           if (c.videoWidth) {
             setVideoWidth(c.videoWidth)
             setVideoScale(c.videoWidth)
@@ -240,11 +242,13 @@ export default function ProjectClient({
         if (!user) return
         const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
         if (bk) {
-          if (bk.username) setBrandHandle(bk.username)
+          if (bk.username && bk.username !== '@humordaiguana') setBrandHandle(bk.username)
+          else setBrandHandle('@nomedapagina')
           if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
           if (bk.layout_config) {
             const cfg = bk.layout_config
-            if (cfg.brandName) setBrandName(cfg.brandName)
+            if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
+            else setBrandName('Nome da Página')
             if (cfg.templateBg) setTemplateBg(cfg.templateBg)
             if (cfg.subtitle_preset) setActiveSubtitleStyle(cfg.subtitle_preset)
             if (cfg.videoWidth) {

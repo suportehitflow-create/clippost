@@ -83,8 +83,8 @@ const TEMPLATE_PRESETS = [
     id: 'corte_padrao',
     name: 'CORTE PADRÃO',
     bg: 'dark',
-    brandName: 'HUMOR DA IGUANA',
-    brandHandle: '@humordaiguana',
+    brandName: 'Nome da Página',
+    brandHandle: '@nomedapagina',
     title: 'ASSIM QUE SEU TITULO APARECERA NO VIDEOS',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
@@ -207,8 +207,10 @@ export default function TemplatesPage() {
         if (p.config) {
           const c = p.config
           if (c.templateBg) setTemplateBg(c.templateBg)
-          if (c.brandName) setBrandName(c.brandName)
-          if (c.brandHandle) setBrandHandle(c.brandHandle)
+          if (c.brandName && c.brandName !== 'HUMOR DA IGUANA') setBrandName(c.brandName)
+          else setBrandName('Nome da Página')
+          if (c.brandHandle && c.brandHandle !== '@humordaiguana') setBrandHandle(c.brandHandle)
+          else setBrandHandle('@nomedapagina')
           if (c.titleText && !c.titleText.includes('arrependimento') && !c.titleText.includes('É assim que')) {
             setTitleText(c.titleText)
           } else {
@@ -235,10 +237,12 @@ export default function TemplatesPage() {
         const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
         if (bk) {
           if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
-          if (bk.username) setBrandHandle(bk.username)
+          if (bk.username && bk.username !== '@humordaiguana') setBrandHandle(bk.username)
+          else setBrandHandle('@nomedapagina')
           if (bk.layout_config) {
             const cfg = bk.layout_config
-            if (cfg.brandName) setBrandName(cfg.brandName)
+            if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
+            else setBrandName('Nome da Página')
             if (cfg.templateBg) setTemplateBg(cfg.templateBg)
             if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
             if (cfg.fontSize) setFontSize(cfg.fontSize)
@@ -654,13 +658,6 @@ export default function TemplatesPage() {
   // Upload de Foto
   const handleBrandAlign = (align: 'left' | 'center' | 'right') => {
     setBrandAlign(align)
-    if (align === 'left') {
-      setHeaderPos({ x: 26, y: headerPos.y || 16 })
-    } else if (align === 'center') {
-      setHeaderPos({ x: 50, y: headerPos.y || 16 })
-    } else {
-      setHeaderPos({ x: 74, y: headerPos.y || 16 })
-    }
   }
 
   const handleBrandLayout = (layout: 'inline' | 'stacked') => {
@@ -1000,43 +997,47 @@ export default function TemplatesPage() {
                     )}
                   </div>
 
-                  {/* TOGGLE CAPS LOCK */}
-                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                  {/* TOGGLE CAPS LOCK (BOTÕES COMPACTOS AA / Aa) */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
                     <div className="flex items-center justify-between">
                       <label className="text-zinc-400 font-medium text-xs">Formatação de Caixa:</label>
+                      <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">{titleCapsLock ? 'AA' : 'Aa'}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-2 p-1 rounded-xl bg-white/[0.03] border border-white/[0.08] gap-1">
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(true)}
-                        className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
+                        className={`py-2 rounded-lg text-xs font-mono font-black transition-all cursor-pointer flex items-center justify-center ${
                           titleCapsLock
-                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm'
-                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                         }`}
-                        title="Tudo em Maiúsculas"
+                        title="Tudo em Maiúsculas (AA)"
                       >
-                        <span className="font-mono text-sm font-black">AA</span>
+                        AA
                       </button>
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(false)}
-                        className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
+                        className={`py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center ${
                           !titleCapsLock
-                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm'
-                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                            : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                         }`}
-                        title="Caixa Normal"
+                        title="Normal (Aa)"
                       >
-                        <span className="font-mono text-sm font-bold">Aa</span>
+                        Aa
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-zinc-400 font-medium">Alinhamento:</label>
-                  <div className="grid grid-cols-3 gap-1.5">
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Alinhamento do Texto:</label>
+                    <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">{textAlign}</span>
+                  </div>
+                  <div className="grid grid-cols-3 p-1 rounded-xl bg-white/[0.03] border border-white/[0.08] gap-1">
                     {[
                       { id: 'left', icon: AlignLeft, label: 'Esquerda' },
                       { id: 'center', icon: AlignCenter, label: 'Centro' },
@@ -1048,13 +1049,15 @@ export default function TemplatesPage() {
                           key={a.id}
                           type="button"
                           onClick={() => setTextAlign(a.id as any)}
-                          className={`py-1.5 rounded-lg flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                          className={`py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                             textAlign === a.id
-                              ? 'bg-[#6366f1]/20 text-[#6366f1] border-[#6366f1]/40'
-                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white'
+                              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                           }`}
+                          title={a.label}
                         >
                           <Icon className="w-3.5 h-3.5" />
+                          <span>{a.label}</span>
                         </button>
                       )
                     })}
@@ -1113,7 +1116,7 @@ export default function TemplatesPage() {
                     <label className="text-zinc-400 font-medium text-xs">Alinhamento do Perfil:</label>
                     <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">{brandAlign}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 p-1 rounded-xl bg-white/[0.03] border border-white/[0.08] gap-1">
                     {[
                       { id: 'left', icon: AlignLeft, label: 'Esquerda' },
                       { id: 'center', icon: AlignCenter, label: 'Centro' },
@@ -1125,14 +1128,15 @@ export default function TemplatesPage() {
                           key={a.id}
                           type="button"
                           onClick={() => handleBrandAlign(a.id as any)}
-                          className={`py-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                          className={`py-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                             brandAlign === a.id
-                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent font-bold'
-                              : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                           }`}
+                          title={a.label}
                         >
-                          <Icon className="w-4 h-4" />
-                          <span className="text-[11px] font-semibold">{a.label}</span>
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{a.label}</span>
                         </button>
                       )
                     })}
@@ -1141,29 +1145,32 @@ export default function TemplatesPage() {
 
                 {/* DISPOSIÇÃO DO PERFIL (LADO A LADO VS EMPILHADO) */}
                 <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
-                  <label className="text-zinc-400 font-medium text-xs">Disposição do Perfil:</label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Disposição do Perfil:</label>
+                    <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">{brandLayout === 'inline' ? 'Lado a Lado' : 'Empilhado'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 p-1 rounded-xl bg-white/[0.03] border border-white/[0.08] gap-1">
                     <button
                       type="button"
                       onClick={() => handleBrandLayout('inline')}
-                      className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center ${
                         brandLayout === 'inline'
-                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
-                      <span>Lado a Lado</span>
+                      Lado a Lado
                     </button>
                     <button
                       type="button"
                       onClick={() => handleBrandLayout('stacked')}
-                      className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center ${
                         brandLayout === 'stacked'
-                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
-                      <span>Empilhado</span>
+                      Empilhado
                     </button>
                   </div>
                 </div>
@@ -1225,6 +1232,11 @@ export default function TemplatesPage() {
                         onClick={() => {
                           setTemplateBg(b.id as any)
                           setCustomBgImage(null)
+                          if (b.id === 'white') {
+                            if (titleColor.toLowerCase() === '#ffffff') setTitleColor('#000000')
+                          } else {
+                            if (titleColor.toLowerCase() === '#000000') setTitleColor('#ffffff')
+                          }
                         }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
                           templateBg === b.id && !customBgImage
@@ -1322,20 +1334,24 @@ export default function TemplatesPage() {
                   : 'bg-black text-white'
               }`}
             >
-              {/* STATUS BAR DO IPHONE (9:41 + SINAL, WI-FI, BATERIA - SEM DYNAMIC ISLAND) */}
-              <div className="absolute top-0 left-0 right-0 h-10 px-6 pt-2.5 flex items-center justify-between z-50 pointer-events-none text-white select-none">
-                <span className="text-[12px] font-bold tracking-tight text-white/95 drop-shadow">9:41</span>
+              {/* STATUS BAR DO IPHONE (9:41 + SINAL, WI-FI, BATERIA - ADAPTAÇÃO DINÂMICA) */}
+              <div className={`absolute top-0 left-0 right-0 h-10 px-6 pt-2.5 flex items-center justify-between z-50 pointer-events-none select-none transition-colors ${
+                templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+              }`}>
+                <span className="text-[12px] font-bold tracking-tight">9:41</span>
 
-                <div className="flex items-center gap-1.5 text-white/95 drop-shadow">
+                <div className="flex items-center gap-1.5">
                   <div className="flex items-end gap-0.5 h-2.5">
-                    <div className="w-[2px] h-1 bg-white rounded-xs" />
-                    <div className="w-[2px] h-1.5 bg-white rounded-xs" />
-                    <div className="w-[2px] h-2 bg-white rounded-xs" />
-                    <div className="w-[2px] h-2.5 bg-white rounded-xs" />
+                    <div className={`w-[2px] h-1 rounded-xs ${templateBg === 'white' ? 'bg-zinc-950' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-1.5 rounded-xs ${templateBg === 'white' ? 'bg-zinc-950' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-2 rounded-xs ${templateBg === 'white' ? 'bg-zinc-950' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-2.5 rounded-xs ${templateBg === 'white' ? 'bg-zinc-950' : 'bg-white'}`} />
                   </div>
                   <Wifi className="w-3.5 h-3.5 stroke-[2.4]" />
-                  <div className="w-5 h-2.5 rounded-[4px] border border-white/80 p-0.5 flex items-center">
-                    <div className="w-3 h-full bg-white rounded-[2px]" />
+                  <div className={`w-5 h-2.5 rounded-[4px] border p-0.5 flex items-center ${
+                    templateBg === 'white' ? 'border-zinc-900' : 'border-white/80'
+                  }`}>
+                    <div className={`w-3 h-full rounded-[2px] ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                   </div>
                 </div>
               </div>
@@ -1358,37 +1374,47 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* 1 & 2. PERFIL DO CANAL UNIFICADO (FOTO + NOME + ARROBA) */}
+              {/* 1 & 2. PERFIL DO CANAL UNIFICADO (FOTO + NOME + ARROBA — NUNCA CORTA) */}
               <div
                 onMouseDown={(e) => startDrag2D('header', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('header', e.touches[0].clientX, e.touches[0].clientY, e)}
                 style={{
-                  left: `${headerPos.x}%`,
                   top: `${headerPos.y}%`,
-                  transform: 'translate(-50%, -50%)'
                 }}
-                className={`absolute cursor-grab active:cursor-grabbing z-30 flex items-center gap-2.5 select-none transition-[gap] ${
-                  draggingTarget === 'header' ? 'ring-2 ring-[#6366f1] rounded-2xl p-1.5 bg-white/5' : ''
+                className={`absolute left-5 right-5 -translate-y-1/2 z-30 flex items-center select-none cursor-grab active:cursor-grabbing transition-all ${
+                  brandAlign === 'left' ? 'justify-start' : brandAlign === 'right' ? 'justify-end' : 'justify-center'
                 } ${
-                  brandLayout === 'stacked' ? 'flex-col justify-center' : 'flex-row'
+                  draggingTarget === 'header' ? 'ring-2 ring-[#6366f1] rounded-2xl p-1 bg-indigo-500/10' : ''
                 }`}
-                title="Arraste o perfil para reposicionar livremente"
+                title="Arraste o perfil para reposicionar verticalmente"
               >
-                <div className="w-11 h-11 rounded-full border-2 border-white/60 overflow-hidden shadow-md bg-zinc-900 shrink-0">
-                  <img
-                    src={avatarUrl}
-                    alt={brandName}
-                    className="w-full h-full object-cover pointer-events-none"
-                  />
-                </div>
-                <div className={`flex flex-col ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold tracking-tight text-inherit">{brandName}</span>
-                    <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
+                <div className={`flex items-center gap-2.5 max-w-full ${brandLayout === 'stacked' ? 'flex-col text-center' : 'flex-row'}`}>
+                  <div className={`w-10 h-10 rounded-full border-2 overflow-hidden shadow-md shrink-0 ${
+                    templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/60 bg-zinc-900'
+                  }`}>
+                    <img
+                      src={avatarUrl}
+                      alt={brandName}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-medium">{brandHandle}</span>
+                  <div className={`flex flex-col min-w-0 ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-xs font-bold tracking-tight truncate ${
+                        templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+                      }`}>
+                        {brandName}
+                      </span>
+                      <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </div>
+                    <span className={`text-[10px] font-medium truncate ${
+                      templateBg === 'white' ? 'text-zinc-600' : 'text-zinc-400'
+                    }`}>
+                      {brandHandle}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1403,7 +1429,7 @@ export default function TemplatesPage() {
                   width: '88%',
                   fontFamily: fontFamily,
                   fontSize: `${fontSize}px`,
-                  color: titleColor,
+                  color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
                   textAlign: textAlign,
                   textTransform: titleCapsLock ? 'uppercase' : 'none',
                   textShadow: titleStroke !== 'none'
@@ -1484,7 +1510,7 @@ export default function TemplatesPage() {
                   onMouseDown={(e) => startDrag2D('video', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startDrag2D('video', e.touches[0].clientX, e.touches[0].clientY, e)}
                   className={`w-full h-full rounded-2xl overflow-hidden bg-black/90 shadow-xl relative cursor-grab active:cursor-grabbing border-2 ${
-                    draggingTarget === 'video' ? 'border-[#6366f1] ring-4 ring-[#6366f1]/30' : 'border-white/40 group-hover:border-indigo-400/80'
+                    draggingTarget === 'video' ? 'border-[#6366f1] ring-4 ring-[#6366f1]/30' : templateBg === 'white' ? 'border-zinc-300 group-hover:border-indigo-400/80' : 'border-white/40 group-hover:border-indigo-400/80'
                   } transition-colors`}
                 >
                   <img

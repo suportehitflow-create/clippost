@@ -27,7 +27,7 @@ const NAV_ITEMS = [
 
 /**
  * Bencho Vertical Magnifying Dock (https://bencho.dev/?c=dock&theme=dark)
- * Floating vertical Apple-grade glass dock positioned at the upper-left.
+ * Floating vertical Apple-grade glass dock positioned vertically centered on the left.
  * Features:
  * - Raised cosine fisheye glyph scaling (--d distance tracking)
  * - Steady running dot indicator (.gdock-dot)
@@ -55,18 +55,18 @@ export default function Sidebar({ user }: { user: User }) {
       {/* Spacer para o fluxo normal de páginas */}
       <div className="w-16 sm:w-20 shrink-0 select-none pointer-events-none" aria-hidden="true" />
 
-      {/* Bencho Floating Vertical Dock */}
+      {/* Bencho Floating Vertical Dock - Centralizado no meio na esquerda */}
       <nav
         aria-label="Dock"
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
-        className="fixed top-5 left-5 z-50 flex flex-col items-center py-2.5 px-1.5 rounded-[24px] bg-[#0c0c0f]/80 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] gap-1 select-none"
+        className="fixed left-3 sm:left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center py-3 px-1.5 rounded-[26px] bg-[#0c0c0f]/85 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] gap-1.5 select-none"
       >
         {/* Logo / Home */}
         <Link
           href="/dashboard"
           title="Clipost"
-          className="w-11 h-11 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity mb-1"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity mb-0.5 cursor-pointer"
         >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
             <Scissors className="w-4 h-4 text-white" />
@@ -86,8 +86,10 @@ export default function Sidebar({ user }: { user: User }) {
               key={item.href}
               href={item.href}
               ref={registerItem(index)}
-              className={`gdock-item group relative w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                active ? 'opacity-100' : 'opacity-50 hover:opacity-100'
+              className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                active
+                  ? 'bg-indigo-600/20 text-white shadow-sm ring-1 ring-indigo-500/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.05] opacity-70 hover:opacity-100'
               }`}
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
@@ -100,9 +102,9 @@ export default function Sidebar({ user }: { user: User }) {
               />
 
               {/* Bencho Glyph with raised cosine magnification */}
-              <span className="gdock-glyph flex items-center justify-center text-white">
+              <span className="gdock-glyph flex items-center justify-center">
                 <Icon
-                  className={`w-5 h-5 transition-colors ${
+                  className={`w-4 h-4 transition-colors ${
                     active ? 'text-indigo-400' : 'text-zinc-300 group-hover:text-white'
                   }`}
                 />
@@ -122,7 +124,7 @@ export default function Sidebar({ user }: { user: User }) {
         <button
           type="button"
           onClick={signOut}
-          className="gdock-item group relative w-11 h-11 rounded-xl flex items-center justify-center text-zinc-400 hover:text-red-400 opacity-50 hover:opacity-100 transition-all cursor-pointer"
+          className="gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10 transition-all cursor-pointer"
           aria-label="Encerrar sessão"
         >
           <span className="gdock-glyph flex items-center justify-center">
