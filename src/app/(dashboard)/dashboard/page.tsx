@@ -46,61 +46,43 @@ export default function AppleDashboard() {
   }, [])
 
   async function loadProjects(uid: string) {
-    // 1. Busca direta no Supabase (zero CORS, ultra-rápido, resiliente a cold-boot)
+    // Busca direta e instantânea no Supabase (zero CORS, zero 502, 100% resiliente)
     try {
-      const { data: dbProjs } = await supabase
+      const { data: dbProjs, error } = await supabase
         .from('projects')
         .select('id, title, source_url, status, created_at')
         .eq('user_id', uid)
         .order('created_at', { ascending: false })
 
-      if (dbProjs && dbProjs.length > 0) {
+      if (dbProjs) {
         setProjects(dbProjs as any)
       }
     } catch (e) {
-      console.warn('Fallback Supabase:', e)
-    }
-
-    // 2. Atualiza via backend se online
-    try {
-      const res = await fetch(`${API}/api/projects/${uid}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.projects) setProjects(data.projects)
-      }
-    } catch {
-      // Silencioso se backend estiver em standby
+      console.warn('Supabase projects fetch:', e)
     }
   }
 
   async function loadAnalytics(uid: string) {
-    // Analytics inicial direto do Supabase
     try {
-      const { data: projs } = await supabase
+      const { count: projsCount } = await supabase
         .from('projects')
-        .select('id')
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', uid)
 
-      const count = projs ? projs.length : 0
+      const { count: clipsCount } = await supabase
+        .from('clips')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', uid)
+
       setAnalytics({
-        total_projects: count,
-        total_clips: 0,
+        total_projects: projsCount || 0,
+        total_clips: clipsCount || 0,
         pending_posts: 0,
         published_posts: 0,
         success_rate: 100,
       })
-    } catch {
-      // ignora
-    }
-
-    try {
-      const res = await fetch(`${API}/api/analytics/${uid}`)
-      if (res.ok) {
-        const data = await res.json()
-        setAnalytics(data)
-      }
-    } catch {
-      // Silencioso
+    } catch (e) {
+      console.warn('Supabase analytics fetch:', e)
     }
   }
 
@@ -126,7 +108,7 @@ export default function AppleDashboard() {
           title: 'Importação: ' + (url.length > 40 ? url.substring(0, 40) + '...' : url),
           source_url: url.trim(),
           source_type: 'url',
-          status: 'pending',
+          status: 'processing',
         })
         .select()
         .single()
@@ -136,7 +118,7 @@ export default function AppleDashboard() {
       }
 
       // 2. Envia para a fila do backend
-      const res = await fetch(`${API}/api/jobs`, {
+      const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

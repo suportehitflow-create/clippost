@@ -195,7 +195,7 @@ export default function BulkStudioPage() {
         setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'processing', projectId: project.id, progress: 60 } : it))
 
         // 3. Dispatch to backend Celery worker
-        await fetch(`${API}/api/jobs`, {
+        await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
