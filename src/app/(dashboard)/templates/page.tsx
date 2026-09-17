@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Sparkles,
-  Sliders,
   Type,
   User,
   Move,
@@ -14,21 +13,17 @@ import {
   Eye,
   Layers,
   Palette,
-  Play,
   RotateCcw,
-  SplitSquareVertical,
-  Maximize2,
-  Tv2,
-  Star,
-  Flame,
-  Zap,
   CheckCircle2,
-  AlertCircle
+  Camera,
+  Sliders,
+  Maximize2,
+  Zap,
+  Info
 } from 'lucide-react'
 
-export type VideoLayoutType = 'single_speaker' | 'split_screen' | 'screen_react' | 'meme_frame'
+export type VideoLayoutType = 'meme_frame' | 'split_screen' | 'single_speaker' | 'screen_react'
 
-// 18+ Subtitle Styles (matching Screenshot 5)
 export interface SubtitlePreset {
   id: string
   name: string
@@ -79,45 +74,35 @@ const SUBTITLE_PRESETS_18: SubtitlePreset[] = [
     sampleText: 'HEY THERE'
   },
   {
-    id: 'electric_green',
-    name: 'Electric Green',
-    tag: 'Crypto / Fin',
+    id: 'neon_green',
+    name: 'Neon Green',
+    tag: 'Finanças / Crypto',
     badgeColor: '#22c55e',
     textColor: '#4ade80',
-    glow: '0 0 10px rgba(34,197,94,0.7)',
+    glow: '0 0 12px rgba(34,197,94,0.8)',
     sampleText: 'HEY THERE'
   },
   {
-    id: 'clean_white_box',
-    name: 'Clean White Box',
-    tag: 'Corporativo',
-    badgeColor: '#ffffff',
-    textColor: '#09090b',
-    bgColor: '#ffffff',
-    sampleText: 'Hey there'
-  },
-  {
-    id: 'dark_box',
-    name: 'Dark Box',
-    tag: 'Minimalista',
-    badgeColor: '#27272a',
+    id: 'karaoke_active',
+    name: 'Karaoke Active',
+    tag: 'Dinâmico',
+    badgeColor: '#eab308',
     textColor: '#ffffff',
-    bgColor: '#18181b',
-    borderColor: '#3f3f46',
-    sampleText: 'Hey there'
+    bgColor: '#22c55e',
+    sampleText: 'PALAVRA ATIVA'
   },
   {
-    id: 'two_tone_purple',
-    name: 'Two Tone Purple',
-    tag: 'Moderno',
-    badgeColor: '#a855f7',
-    textColor: '#c084fc',
+    id: 'two_tone_red',
+    name: 'Two Tone Red',
+    tag: 'Atenção Total',
+    badgeColor: '#ef4444',
+    textColor: '#f87171',
     sampleText: 'TO GET STARTED'
   },
   {
     id: 'two_tone_orange',
-    name: 'Two Tone Sunset',
-    tag: 'Energia',
+    name: 'Two Tone Orange',
+    tag: 'Podcast',
     badgeColor: '#f97316',
     textColor: '#fb923c',
     sampleText: 'TO GET STARTED'
@@ -194,296 +179,421 @@ const SUBTITLE_PRESETS_18: SubtitlePreset[] = [
     badgeColor: '#f43f5e',
     textColor: '#fb7185',
     sampleText: 'VEJA O VÍDEO'
+  },
+  {
+    id: 'minimal_dark',
+    name: 'Minimal Dark',
+    tag: 'Discreto',
+    badgeColor: '#71717a',
+    textColor: '#f4f4f5',
+    bgColor: 'rgba(0,0,0,0.7)',
+    sampleText: 'SUBTÍTULO'
   }
+]
+
+const AVATAR_PRESETS = [
+  { label: 'Gatinho Meme', url: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80' },
+  { label: 'Podcast Host', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80' },
+  { label: 'Gamer Pro', url: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=200&auto=format&fit=crop&q=80' },
+  { label: 'Influencer', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80' },
+]
+
+const HOOK_PRESETS = [
+  'Meu maior arrependimento foi não ter seguido essa página antes 😭😭',
+  'Você não vai acreditar no que ele falou no final desse podcast... 🤯',
+  'Pare de cometer esse erro imediatamente se você quer ter resultados! 🚨',
+  'Esse segredo nunca foi revelado em nenhum lugar antes 🤫',
 ]
 
 export default function TemplatesPageEnhanced() {
   const supabase = createClient()
 
-  // Layout & Positioning (Screenshots 3 e 4)
+  // Layout & Positioning
   const [selectedLayout, setSelectedLayout] = useState<VideoLayoutType>('meme_frame')
   const [selectedSubtitle, setSelectedSubtitle] = useState<string>('hormozi_orange')
+  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gradient'>('white')
   
   // Interactive Frame Positioning
-  const [videoYOffset, setVideoYOffset] = useState<number>(55) // % from top
-  const [videoScale, setVideoScale] = useState<number>(85) // % width
+  const [videoYOffset, setVideoYOffset] = useState<number>(50) // % from top
+  const [videoScale, setVideoScale] = useState<number>(88) // % width
   const [hookText, setHookText] = useState('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
   const [brandName, setBrandName] = useState('HUMOR DO BICHANO')
   const [brandHandle, setBrandHandle] = useState('@humordobichano')
-  const [avatarPreview, setAvatarPreview] = useState<string | null>('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
-  const [isDefault, setIsDefault] = useState(true)
+  const [hasVerified, setHasVerified] = useState(true)
+  const [avatarPreview, setAvatarPreview] = useState<string>('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
 
-  const [loading, setLoading] = useState(false)
+  // Dragging & Interaction State
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
-  const [activeWordIdx, setActiveWordIdx] = useState(0)
 
+  const phoneScreenRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragStartYRef = useRef<number>(0)
+  const initialYOffsetRef = useRef<number>(50)
+  const dragStartXRef = useRef<number>(0)
+  const initialScaleRef = useRef<number>(88)
 
-  // Live word simulation in preview
+  // Load saved template
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('clippost_active_template');
+      const saved = localStorage.getItem('clippost_active_template')
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.layout) setSelectedLayout(parsed.layout);
-        if (parsed.subtitle_preset) setSelectedSubtitle(parsed.subtitle_preset);
-        if (parsed.config?.videoYOffset) setVideoYOffset(parsed.config.videoYOffset);
-        if (parsed.config?.videoScale) setVideoScale(parsed.config.videoScale);
-        if (parsed.config?.hookText) setHookText(parsed.config.hookText);
-        if (parsed.config?.brandName) setBrandName(parsed.config.brandName);
-        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle);
+        const parsed = JSON.parse(saved)
+        if (parsed.layout) setSelectedLayout(parsed.layout)
+        if (parsed.subtitle_preset) setSelectedSubtitle(parsed.subtitle_preset)
+        if (parsed.config?.videoYOffset !== undefined) setVideoYOffset(parsed.config.videoYOffset)
+        if (parsed.config?.videoScale !== undefined) setVideoScale(parsed.config.videoScale)
+        if (parsed.config?.hookText) setHookText(parsed.config.hookText)
+        if (parsed.config?.brandName) setBrandName(parsed.config.brandName)
+        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle)
+        if (parsed.config?.hasVerified !== undefined) setHasVerified(parsed.config.hasVerified)
+        if (parsed.config?.templateBg) setTemplateBg(parsed.config.templateBg)
+        if (parsed.avatar_url) setAvatarPreview(parsed.avatar_url)
       }
     } catch {}
 
     async function loadRemote() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle();
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
         if (bk?.layout_config) {
-          const cfg = bk.layout_config;
-          if (cfg.layout) setSelectedLayout(cfg.layout);
-          if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset);
-          if (cfg.videoYOffset) setVideoYOffset(cfg.videoYOffset);
-          if (cfg.videoScale) setVideoScale(cfg.videoScale);
-          if (cfg.hookText) setHookText(cfg.hookText);
-          if (cfg.brandName) setBrandName(cfg.brandName);
-          if (bk.username) setBrandHandle(bk.username);
+          const cfg = bk.layout_config
+          if (cfg.layout) setSelectedLayout(cfg.layout)
+          if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
+          if (cfg.videoYOffset !== undefined) setVideoYOffset(cfg.videoYOffset)
+          if (cfg.videoScale !== undefined) setVideoScale(cfg.videoScale)
+          if (cfg.hookText) setHookText(cfg.hookText)
+          if (cfg.brandName) setBrandName(cfg.brandName)
+          if (cfg.hasVerified !== undefined) setHasVerified(cfg.hasVerified)
+          if (cfg.templateBg) setTemplateBg(cfg.templateBg)
+          if (bk.username) setBrandHandle(bk.username)
+          if (bk.avatar_url) setAvatarPreview(bk.avatar_url)
         }
       } catch {}
     }
-    loadRemote();
-
-    const timer = setInterval(() => {
-      setActiveWordIdx(prev => (prev + 1) % 4);
-    }, 450);
-    return () => clearInterval(timer);
+    loadRemote()
   }, [])
 
-  const handleSave = async () => {
-    setSaving(true);
+  // Auto-persist to localStorage on changes
+  const persistTemplate = useCallback((overrides: any = {}) => {
+    const payload = {
+      name: 'Template 9:16 Personalizado',
+      layout: selectedLayout,
+      subtitle_preset: selectedSubtitle,
+      avatar_url: avatarPreview,
+      config: {
+        videoYOffset,
+        videoScale,
+        hookText,
+        brandName,
+        brandHandle,
+        hasVerified,
+        templateBg,
+        ...overrides
+      }
+    }
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      localStorage.setItem('clippost_active_template', JSON.stringify(payload))
+    } catch {}
+  }, [selectedLayout, selectedSubtitle, avatarPreview, videoYOffset, videoScale, hookText, brandName, brandHandle, hasVerified, templateBg])
 
-      const payload = {
-        name: 'Template Meme & Posicionamento 9:16',
-        layout: selectedLayout,
-        layout_type: selectedLayout,
-        subtitle_preset: selectedSubtitle,
-        username: brandHandle,
-        avatar_url: avatarPreview,
-        is_default: isDefault,
-        config: {
-          videoYOffset,
-          videoScale,
-          hookText,
-          brandName,
-          brandHandle
-        },
-        updated_at: new Date().toISOString()
-      };
+  useEffect(() => {
+    persistTemplate()
+  }, [persistTemplate])
 
-      // 1. Sempre salva localmente
-      try {
-        localStorage.setItem('clippost_active_template', JSON.stringify(payload));
-        window.dispatchEvent(new Event('clippost_template_updated'));
-      } catch (err) {}
-
-      // 2. Salva em brand_kits no Supabase
+  // Explicit Save
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      persistTemplate()
+      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('brand_kits').upsert({
           user_id: user.id,
+          name: 'Template 9:16',
           username: brandHandle,
           avatar_url: avatarPreview,
+          is_default: true,
           layout_config: {
-            ...payload.config,
             layout: selectedLayout,
-            subtitle_preset: selectedSubtitle
-          },
-          updated_at: new Date().toISOString()
-        });
-
-        // 3. Tenta tabela templates se existir
-        await supabase.from('templates').upsert({
-          user_id: user.id,
-          ...payload
-        });
+            subtitle_preset: selectedSubtitle,
+            videoYOffset,
+            videoScale,
+            hookText,
+            brandName,
+            hasVerified,
+            templateBg
+          }
+        })
       }
-
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
     } catch (e) {
-      console.warn('Erro ao salvar template:', e);
+      console.error(e)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
-  const activeSubPreset = SUBTITLE_PRESETS_18.find(s => s.id === selectedSubtitle) || SUBTITLE_PRESETS_18[0]
+  // File Upload for Avatar
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          const url = ev.target.result as string
+          setAvatarPreview(url)
+          persistTemplate({ avatar_url: url })
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // --- DRAG LOGIC FOR POSITIONING VIDEO ON SCREEN ---
+  const handleStartDrag = (clientY: number) => {
+    setIsDragging(true)
+    dragStartYRef.current = clientY
+    initialYOffsetRef.current = videoYOffset
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!phoneScreenRef.current) return
+      const screenH = phoneScreenRef.current.clientHeight
+      const deltaY = e.clientY - dragStartYRef.current
+      const deltaPercent = (deltaY / screenH) * 100
+      const newY = Math.max(15, Math.min(75, initialYOffsetRef.current + deltaPercent))
+      setVideoYOffset(Math.round(newY))
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!phoneScreenRef.current || !e.touches[0]) return
+      const screenH = phoneScreenRef.current.clientHeight
+      const deltaY = e.touches[0].clientY - dragStartYRef.current
+      const deltaPercent = (deltaY / screenH) * 100
+      const newY = Math.max(15, Math.min(75, initialYOffsetRef.current + deltaPercent))
+      setVideoYOffset(Math.round(newY))
+    }
+
+    const handleStop = () => {
+      setIsDragging(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleStop)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleStop)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleStop)
+    window.addEventListener('touchmove', handleTouchMove)
+    window.addEventListener('touchend', handleStop)
+  }
+
+  // --- RESIZE LOGIC FOR CORNER HANDLES ---
+  const handleStartResize = (clientX: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsResizing(true)
+    dragStartXRef.current = clientX
+    initialScaleRef.current = videoScale
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!phoneScreenRef.current) return
+      const screenW = phoneScreenRef.current.clientWidth
+      const deltaX = ev.clientX - dragStartXRef.current
+      const deltaPercent = (deltaX / screenW) * 100
+      const newScale = Math.max(55, Math.min(98, initialScaleRef.current + deltaPercent))
+      setVideoScale(Math.round(newScale))
+    }
+
+    const handleStop = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleStop)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleStop)
+  }
+
+  // Current Subtitle Preset Info
+  const activeSubPreset = SUBTITLE_PRESETS_18.find(p => p.id === selectedSubtitle) || SUBTITLE_PRESETS_18[0]
+
+  // Cycle Subtitle Style on direct click
+  const cycleNextSubtitle = () => {
+    const currentIdx = SUBTITLE_PRESETS_18.findIndex(p => p.id === selectedSubtitle)
+    const nextIdx = (currentIdx + 1) % SUBTITLE_PRESETS_18.length
+    setSelectedSubtitle(SUBTITLE_PRESETS_18[nextIdx].id)
+  }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
-      
-      {/* Top Header */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/[0.08]">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+      {/* Hidden file input for Avatar */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handleAvatarUpload}
+        className="hidden"
+      />
+
+      {/* HEADER PRINCIPAL */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
         <div>
-          <span className="px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 inline-flex items-center gap-1 mb-1.5">
-            <Sparkles className="w-3 h-3" /> Templates Globais & Enquadramento
-          </span>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
-            Modelos de Vídeo, Posição & Legendas
-          </h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
-            Configure a área exata onde o vídeo entra na arte 9:16 e selecione entre 18+ estilos de legendas virais calibradas para alta retenção.
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+              <Sparkles className="w-6 h-6 text-orange-500" />
+              Templates 9:16 Interativo
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold">
+              100% Interativo
+            </span>
+          </div>
+          <p className="text-sm text-zinc-400 mt-1">
+            Arraste o vídeo diretamente na tela do celular, clique nos textos para editar e escolha a legenda ideal.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-medium text-xs transition-all shadow-lg shadow-orange-500/20 active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-        >
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          {savedSuccess ? 'Salvo como Padrão!' : 'Salvar como Padrão'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setVideoYOffset(50)
+              setVideoScale(88)
+              setHookText('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
+              setBrandName('HUMOR DO BICHANO')
+              setBrandHandle('@humordobichano')
+              setHasVerified(true)
+              setSelectedSubtitle('hormozi_orange')
+              setTemplateBg('white')
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Restaurar Padrão
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95"
+          >
+            {saving ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : savedSuccess ? (
+              <CheckCircle2 className="w-4 h-4 text-white" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            {savedSuccess ? 'Template Salvo!' : 'Salvar Template'}
+          </button>
+        </div>
       </div>
 
-      {/* Main Grid: Left Controls (7 cols) + Right Live Phone (5 cols) */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* PAINEL PRINCIPAL: CONTROLES À ESQUERDA + CELULAR INTERATIVO À DIREITA */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Column: Layouts, Posicionamento e Legendas */}
-        <div className="lg:col-span-7 space-y-8">
-
-          {/* SECTION 1: LAYOUT SELECTION */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-white mb-1">1. Formato do Template</h2>
-            <p className="text-xs text-zinc-400 mb-4">Escolha a moldura de exibição para o vídeo vertical 9:16.</p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { id: 'meme_frame' as VideoLayoutType, title: 'Moldura Viral (Meme/Hook)', badge: 'Mais Usado', desc: 'Avatar, nome da página e texto em cima com o vídeo encaixado.' },
-                { id: 'split_screen' as VideoLayoutType, title: 'Split Screen (50/50)', badge: 'Podcasts', desc: 'Tela dividida entre convidado e entrevistador com rastreamento.' },
-                { id: 'single_speaker' as VideoLayoutType, title: 'Full 9:16 Sem Borda', badge: 'Solo Focus', desc: 'Preenchimento total da tela vertical mantendo o rosto no centro.' }
-              ].map(lay => {
-                const isSelected = selectedLayout === lay.id
-                return (
-                  <button
-                    key={lay.id}
-                    type="button"
-                    onClick={() => setSelectedLayout(lay.id)}
-                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-orange-500/[0.08] border-orange-500/50 shadow-md ring-1 ring-orange-500/30'
-                        : 'bg-black/30 border-white/[0.06] hover:bg-white/[0.03]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 block w-fit mb-2">
-                      {lay.badge}
-                    </span>
-                    <h3 className="text-xs font-bold text-white mb-1">{lay.title}</h3>
-                    <p className="text-[11px] text-zinc-400 leading-snug">{lay.desc}</p>
-                  </button>
-                )
-              })}
+        {/* COLUNA ESQUERDA: PRESETS RÁPIDOS & CONTROLES */}
+        <div className="lg:col-span-6 space-y-6">
+          
+          {/* GUIA DE INTERAÇÃO DIRETA */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 flex items-start gap-3">
+            <Zap className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <span className="font-semibold text-white block">Tudo é editável diretamente no celular ao lado:</span>
+              <p className="text-zinc-300 leading-relaxed">
+                • <strong className="text-orange-400">Arraste o vídeo</strong> para cima ou para baixo para posicionar.<br />
+                • <strong className="text-orange-400">Clique na foto</strong> para enviar qualquer foto do seu computador.<br />
+                • <strong className="text-orange-400">Clique no título ou no texto</strong> para digitar seu próprio conteúdo.<br />
+                • <strong className="text-orange-400">Clique na legenda</strong> para trocar de estilo instantaneamente.
+              </p>
             </div>
           </div>
 
-          {/* SECTION 2: ENQUADRAMENTO E POSICIONAMENTO MANUAL (Screenshots 3 e 4) */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm space-y-4">
+          {/* 1. SELEÇÃO DE LAYOUT VIRAL */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Layers className="w-4 h-4 text-orange-400" />
+                1. Formato do Template
+              </h2>
+              <span className="text-[11px] text-zinc-400">Padrão: Meme Frame</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              {[
+                { id: 'meme_frame', name: 'Meme Frame', desc: 'Foto + Título + Vídeo Flutuante' },
+                { id: 'single_speaker', name: 'Tela Cheia 9:16', desc: 'Vídeo preenchendo o fundo' },
+                { id: 'split_screen', name: 'Tela Dividida', desc: 'Duas câmeras ou gameplay embaixo' },
+                { id: 'screen_react', name: 'Reação / React', desc: 'Vídeo principal com react no topo' },
+              ].map(layout => (
+                <button
+                  key={layout.id}
+                  type="button"
+                  onClick={() => setSelectedLayout(layout.id as VideoLayoutType)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    selectedLayout === layout.id
+                      ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30'
+                      : 'border-white/[0.08] bg-[#16161a] hover:border-white/20'
+                  }`}
+                >
+                  <span className={`text-xs font-bold block ${selectedLayout === layout.id ? 'text-orange-400' : 'text-white'}`}>
+                    {layout.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 mt-0.5 block line-clamp-1">
+                    {layout.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. COR DE FUNDO DO MEME */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Palette className="w-4 h-4 text-orange-400" />
+              2. Fundo da Moldura
+            </h2>
+            <div className="flex gap-2.5">
+              {[
+                { id: 'white', label: 'Branco Viral (Meme Twitter/Insta)', bg: 'bg-white text-black border-zinc-300' },
+                { id: 'dark', label: 'Dark / OLED Black', bg: 'bg-zinc-950 text-white border-zinc-700' },
+                { id: 'gradient', label: 'Cinza Moderno', bg: 'bg-zinc-800 text-zinc-100 border-zinc-600' },
+              ].map(b => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setTemplateBg(b.id as any)}
+                  className={`flex-1 p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    templateBg === b.id
+                      ? 'border-orange-500 ring-2 ring-orange-500/40'
+                      : 'border-white/10 hover:border-white/30'
+                  } ${b.bg}`}
+                >
+                  {templateBg === b.id && <Check className="w-3.5 h-3.5" />}
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. CATÁLOGO DE 18 ESTILOS DE LEGENDAS VIRAIS */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-white">2. Posicionamento do Vídeo na Arte</h2>
-                <p className="text-xs text-zinc-400">Arraste os seletores para definir onde o vídeo entra na tela.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setVideoYOffset(55); setVideoScale(85) }}
-                className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs text-zinc-300 flex items-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Redefinir posição
-              </button>
-            </div>
-
-            <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-4">
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1.5">
-                  <span className="text-zinc-300">Posição Vertical (Y)</span>
-                  <span className="text-orange-400 font-mono">{videoYOffset}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={30}
-                  max={70}
-                  value={videoYOffset}
-                  onChange={e => setVideoYOffset(Number(e.target.value))}
-                  className="w-full accent-orange-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1.5">
-                  <span className="text-zinc-300">Largura / Escala</span>
-                  <span className="text-orange-400 font-mono">{videoScale}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={60}
-                  max={100}
-                  value={videoScale}
-                  onChange={e => setVideoScale(Number(e.target.value))}
-                  className="w-full accent-orange-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            {/* Identidade Visual da Moldura (Avatar, Nome, Gancho) */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-400 mb-1">Texto do Gancho (Hook)</label>
-                <textarea
-                  rows={2}
-                  value={hookText}
-                  onChange={e => setHookText(e.target.value)}
-                  className="w-full p-2.5 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-orange-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">Nome da Página</label>
-                  <input
-                    type="text"
-                    value={brandName}
-                    onChange={e => setBrandName(e.target.value)}
-                    className="w-full p-2 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">@ Handle</label>
-                  <input
-                    type="text"
-                    value={brandHandle}
-                    onChange={e => setBrandHandle(e.target.value)}
-                    className="w-full p-2 bg-black/60 border border-white/10 rounded-lg text-xs text-white outline-none font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 3: 18+ ESTILOS DE LEGENDAS VIRAIS (Screenshot 5) */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-white">3. Estilos de Legendas Dinâmicas</h2>
-                <p className="text-xs text-zinc-400">Clique em qualquer estilo para aplicar instantaneamente na prévia ao vivo.</p>
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Type className="w-4 h-4 text-orange-400" />
+                  3. Escolha o Estilo de Legenda
+                </h2>
+                <p className="text-xs text-zinc-400">Clique em qualquer estilo para aplicar imediatamente na tela ao lado.</p>
               </div>
               <span className="text-xs text-orange-400 font-mono font-bold">18 Presets</span>
             </div>
 
-            {/* Grid 3x6 (Screenshot 5) */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto p-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1 pr-2">
               {SUBTITLE_PRESETS_18.map(sub => {
                 const isSelected = selectedSubtitle === sub.id
                 return (
@@ -491,15 +601,14 @@ export default function TemplatesPageEnhanced() {
                     key={sub.id}
                     type="button"
                     onClick={() => setSelectedSubtitle(sub.id)}
-                    className={`relative p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-center items-center min-h-[72px] ${
+                    className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-center items-center min-h-[64px] ${
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-500/[0.08] ring-2 ring-emerald-500/40'
+                        ? 'border-orange-500 bg-orange-500/[0.12] ring-2 ring-orange-500/40 scale-[1.02]'
                         : 'border-white/[0.08] bg-[#16161a] hover:border-white/20'
                     }`}
                   >
-                    {/* Visual Button Display */}
                     <div
-                      className="px-2.5 py-1 rounded-md text-xs font-black tracking-tight uppercase"
+                      className="px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-tight"
                       style={{
                         backgroundColor: sub.bgColor || 'transparent',
                         color: sub.textColor,
@@ -509,7 +618,6 @@ export default function TemplatesPageEnhanced() {
                     >
                       {sub.sampleText}
                     </div>
-
                     <span className="text-[10px] text-zinc-400 mt-1 font-mono">
                       {sub.name}
                     </span>
@@ -518,106 +626,276 @@ export default function TemplatesPageEnhanced() {
               })}
             </div>
           </div>
+
+          {/* AJUSTES MANUAIS POR SLIDERS (OPCIONAL) */}
+          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-orange-400" />
+              Ajuste Fino por Sliders
+            </h2>
+
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                  <span>Posição Vertical do Vídeo</span>
+                  <span className="font-mono text-orange-400">{videoYOffset}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="15"
+                  max="75"
+                  value={videoYOffset}
+                  onChange={e => setVideoYOffset(Number(e.target.value))}
+                  className="w-full accent-orange-500 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                  <span>Tamanho / Zoom do Vídeo</span>
+                  <span className="font-mono text-orange-400">{videoScale}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="55"
+                  max="98"
+                  value={videoScale}
+                  onChange={e => setVideoScale(Number(e.target.value))}
+                  className="w-full accent-orange-500 cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Live Phone Mockup with Blue Bounding Box (Screenshots 3 e 4) */}
-        <div className="lg:col-span-5 flex flex-col items-center">
-          <div className="w-full flex items-center justify-between mb-3 px-2">
-            <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-orange-400" /> Prévia do Template 9:16
+        {/* COLUNA DIREITA: CELULAR INTERATIVO COM EDIÇÃO DIRETA */}
+        <div className="lg:col-span-6 flex flex-col items-center">
+          
+          <div className="w-full max-w-[340px] flex items-center justify-between mb-3 px-2">
+            <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-orange-400" />
+              Editor WYSIWYG ao Vivo
             </span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 font-mono">
-              Interativo
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 font-mono font-semibold">
+              Arraste & Clique
             </span>
           </div>
 
-          {/* iPhone 16 Pro Frame */}
-          <div className="relative w-[300px] h-[580px] bg-black rounded-[44px] p-3 shadow-2xl ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden">
+          {/* MOCKUP DO IPHONE */}
+          <div className="relative w-[340px] h-[660px] bg-black rounded-[48px] p-3 shadow-2xl ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden">
             
             {/* Dynamic Island */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-full z-30 flex items-center justify-end px-2">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-full z-40 flex items-center justify-end px-2 pointer-events-none">
               <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-zinc-800" />
             </div>
 
-            {/* Screen Canvas (9:16) */}
-            <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-white text-black flex flex-col p-4 select-none">
+            {/* SCREEN CANVAS (9:16) */}
+            <div
+              ref={phoneScreenRef}
+              className={`relative flex-1 w-full rounded-[38px] overflow-hidden flex flex-col p-4 select-none transition-colors duration-200 ${
+                templateBg === 'white'
+                  ? 'bg-white text-zinc-900'
+                  : templateBg === 'dark'
+                  ? 'bg-black text-white'
+                  : 'bg-gradient-to-b from-zinc-900 via-zinc-900 to-black text-white'
+              }`}
+            >
               
-              {/* Header: Avatar + Channel Info + Verified Badge (Screenshots 3 e 4) */}
-              <div className="pt-8 flex flex-col items-center text-center">
-                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-1.5 shadow-md">
+              {/* HEADER INTERATIVO: FOTO + TÍTULO + HANDLE + HOOK */}
+              <div className="pt-6 flex flex-col items-center text-center relative z-20">
+                
+                {/* AVATAR CLICÁVEL COM UPLOAD */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group relative w-16 h-16 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-2 shadow-lg cursor-pointer hover:ring-2 hover:ring-orange-500 transition-all"
+                  title="Clique para trocar foto de perfil"
+                >
                   <img
-                    src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80"
+                    src={avatarPreview}
                     alt="Avatar"
                     className="w-full h-full object-cover rounded-full"
                   />
-                </div>
-                
-                <div className="flex items-center justify-center gap-1">
-                  <span className="font-black text-xs tracking-tight text-zinc-900 uppercase">
-                    {brandName}
-                  </span>
-                  <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px] font-black">
-                    ✓
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity rounded-full">
+                    <Camera className="w-4 h-4 mb-0.5" />
+                    <span className="text-[8px] font-bold uppercase">Trocar</span>
                   </div>
                 </div>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {brandHandle}
-                </span>
 
-                {/* Hook Caption */}
-                <p className="font-bold text-xs text-zinc-900 mt-2 px-2 leading-snug">
-                  {hookText}
-                </p>
+                {/* TÍTULO EDITÁVEL INLINE + SELO DE VERIFICADO */}
+                <div className="flex items-center justify-center gap-1.5 w-full px-2">
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={e => setBrandName(e.target.value)}
+                    placeholder="NOME DA PÁGINA"
+                    className={`font-black text-xs tracking-tight uppercase text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 max-w-[200px] transition-all ${
+                      templateBg === 'white' ? 'text-zinc-900' : 'text-white'
+                    }`}
+                  />
+                  
+                  {/* SELO DE VERIFICADO CLICÁVEL */}
+                  <button
+                    type="button"
+                    onClick={() => setHasVerified(!hasVerified)}
+                    title={hasVerified ? 'Selo de verificado ativo (clique para desativar)' : 'Sem selo (clique para ativar)'}
+                    className="cursor-pointer hover:scale-120 active:scale-95 transition-transform shrink-0"
+                  >
+                    {hasVerified ? (
+                      <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-black shadow-sm">
+                        ✓
+                      </div>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border border-dashed border-zinc-400 text-zinc-400 flex items-center justify-center text-[8px] opacity-40 hover:opacity-100">
+                        +
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* @HANDLE EDITÁVEL INLINE */}
+                <input
+                  type="text"
+                  value={brandHandle}
+                  onChange={e => setBrandHandle(e.target.value)}
+                  placeholder="@seucanal"
+                  className={`text-[10px] font-mono text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 max-w-[180px] transition-all ${
+                    templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
+                  }`}
+                />
+
+                {/* HOOK CAPTION EDITÁVEL INLINE */}
+                <textarea
+                  value={hookText}
+                  onChange={e => setHookText(e.target.value)}
+                  placeholder="Digite sua chamada viral aqui..."
+                  rows={2}
+                  className={`font-bold text-xs text-center bg-transparent border border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded-lg p-1.5 mt-2 w-full resize-none transition-all leading-snug ${
+                    templateBg === 'white' ? 'text-zinc-900' : 'text-zinc-100'
+                  }`}
+                />
               </div>
 
-              {/* Video Box with Blue Boundary Anchors (Screenshots 3 e 4) */}
+              {/* VÍDEO ARRASTÁVEL INTERATIVO (DRAGGABLE & RESIZABLE) */}
               <div
-                className="absolute left-1/2 -translate-x-1/2 transition-all duration-150"
+                onMouseDown={(e) => handleStartDrag(e.clientY)}
+                onTouchStart={(e) => handleStartDrag(e.touches[0].clientY)}
+                className={`absolute left-1/2 -translate-x-1/2 select-none group ${
+                  isDragging ? 'cursor-grabbing scale-[1.01]' : 'cursor-grab'
+                }`}
                 style={{
                   top: `${videoYOffset}%`,
                   width: `${videoScale}%`,
-                  aspectRatio: '1/1'
+                  aspectRatio: '1/1',
+                  transition: isDragging ? 'none' : 'box-shadow 0.2s',
+                  zIndex: 30
                 }}
               >
-                <div className="relative w-full h-full rounded-xl overflow-hidden border-2 border-blue-500 shadow-2xl group cursor-move">
+                {/* Bounding Box com borda azul e handles */}
+                <div className={`relative w-full h-full rounded-2xl overflow-hidden border-2 shadow-2xl ${
+                  isDragging ? 'border-orange-500 ring-4 ring-orange-500/30' : 'border-blue-500 hover:border-orange-400'
+                }`}>
+                  
+                  {/* Imagem de preview do vídeo */}
                   <img
                     src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80"
                     alt="Video Preview"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover pointer-events-none"
                   />
 
-                  {/* Center Move Anchor (Screenshot 4) */}
+                  {/* Âncora Central de Movimento */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-8 h-8 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-lg">
-                      <Move className="w-4 h-4" />
+                    <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xl transition-all ${
+                      isDragging
+                        ? 'bg-orange-600 text-white scale-110 shadow-orange-500/40'
+                        : 'bg-blue-600/90 text-white group-hover:bg-orange-600'
+                    }`}>
+                      <Move className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold font-mono tracking-tight">
+                        {isDragging ? `Y: ${videoYOffset}%` : 'Arraste Aqui'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Corner Handles */}
-                  <div className="absolute top-1 left-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
-                  <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
-                  <div className="absolute bottom-1 left-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
-                  <div className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-sm border border-white" />
+                  {/* Corner Handles de Redimensionamento */}
+                  <div className="absolute top-1.5 left-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
+                  <div className="absolute top-1.5 right-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
+                  <div className="absolute bottom-1.5 left-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
+                  
+                  {/* Resize Handle Interativo no canto inferior direito */}
+                  <div
+                    onMouseDown={(e) => handleStartResize(e.clientX, e)}
+                    className="absolute bottom-1 right-1 w-4 h-4 bg-orange-500 rounded-sm border-2 border-white shadow-lg cursor-nwse-resize z-40 hover:scale-125 transition-transform"
+                    title="Arraste para redimensionar o vídeo"
+                  />
+
+                  {/* LEGENDA DINÂMICA DENTRO DO VÍDEO (CLICÁVEL E INTERATIVA) */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      cycleNextSubtitle()
+                    }}
+                    className="absolute bottom-3 inset-x-2 flex flex-col items-center cursor-pointer group/sub z-40"
+                    title="Clique para trocar o estilo da legenda!"
+                  >
+                    <div
+                      className="px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-tight shadow-xl transition-all hover:scale-105 active:scale-95 text-center"
+                      style={{
+                        backgroundColor: activeSubPreset.bgColor || 'rgba(0,0,0,0.85)',
+                        color: activeSubPreset.textColor,
+                        border: activeSubPreset.borderColor ? `1px solid ${activeSubPreset.borderColor}` : 'none',
+                        boxShadow: activeSubPreset.glow || '0 4px 12px rgba(0,0,0,0.6)'
+                      }}
+                    >
+                      {activeSubPreset.sampleText}
+                    </div>
+
+                    <span className="text-[8px] font-mono text-white/90 bg-black/70 px-1.5 py-0.5 rounded mt-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                      Estilo: {activeSubPreset.name} (Clique para mudar)
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Dynamic Live Subtitle Preview in Canvas (Screenshot 5) */}
-              <div className="absolute bottom-6 inset-x-3 z-30 text-center pointer-events-none">
-                <div
-                  className="inline-block px-3 py-1.5 rounded-lg font-black text-xs uppercase tracking-tight shadow-xl"
-                  style={{
-                    backgroundColor: activeSubPreset.bgColor || 'rgba(0,0,0,0.85)',
-                    color: activeSubPreset.textColor,
-                    border: activeSubPreset.borderColor ? `1px solid ${activeSubPreset.borderColor}` : 'none',
-                    boxShadow: activeSubPreset.glow || '0 4px 12px rgba(0,0,0,0.5)'
-                  }}
-                >
-                  {activeSubPreset.sampleText}
-                </div>
-              </div>
             </div>
           </div>
-          <span className="text-[11px] text-zinc-500 mt-2 font-mono">Mockup 9:16 Full HD (1080x1920)</span>
+
+          {/* DICAS DE CONTROLE RÁPIDO DO CELULAR */}
+          <div className="w-full max-w-[340px] mt-4 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+              <span>Sugestões de Hooks Virais:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {HOOK_PRESETS.map((h, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setHookText(h)}
+                  className="p-1.5 rounded-lg bg-[#16161a] border border-white/[0.08] hover:border-orange-500/40 text-[10px] text-zinc-300 hover:text-white truncate text-left transition-colors cursor-pointer"
+                  title={h}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-2">
+              <span>Avatares Rápidos:</span>
+            </div>
+            <div className="flex gap-2">
+              {AVATAR_PRESETS.map((av, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setAvatarPreview(av.url)}
+                  className="flex-1 p-1 rounded-lg bg-[#16161a] border border-white/[0.08] hover:border-orange-500/50 text-[10px] text-zinc-300 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                >
+                  <img src={av.url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  <span className="truncate">{av.label.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

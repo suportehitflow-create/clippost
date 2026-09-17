@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
   { label: 'Edição em Massa', href: '/bulk', icon: Layers },
-  { label: 'Brand Kit & Templates', href: '/templates', icon: Sparkles },
+  { label: 'Templates 9:16', href: '/templates', icon: Sparkles },
   { label: 'Autopilot', href: '/autopilot', icon: Zap },
   { label: 'Agendamentos', href: '/schedule', icon: Calendar },
 ]
