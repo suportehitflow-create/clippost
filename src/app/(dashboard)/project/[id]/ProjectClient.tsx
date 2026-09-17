@@ -5,6 +5,8 @@ import {
   Download,
   Edit3,
   Scissors,
+  Trash2,
+  Loader2,
   Sparkles,
   Calendar,
   Play,
@@ -37,6 +39,7 @@ import {
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
@@ -91,6 +94,26 @@ export default function ProjectClient({
   clips: Clip[]
 }) {
   const supabase = createClient()
+  const router = useRouter()
+  const [isDeletingProject, setIsDeletingProject] = useState(false)
+
+  const handleDeleteThisProject = async () => {
+    if (!confirm('Deseja realmente excluir permanentemente este projeto e todos os seus cortes? Esta ação não pode ser desfeita.')) return
+    setIsDeletingProject(true)
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) {
+        await supabase.from('clips').delete().eq('project_id', project.id)
+        const { error: sbErr } = await supabase.from('projects').delete().eq('id', project.id)
+        if (sbErr) throw new Error(data.error || sbErr.message)
+      }
+      router.push('/dashboard')
+    } catch (err: any) {
+      alert(`Não foi possível excluir o projeto: ${err.message || 'Erro de permissão ou conexão'}`)
+      setIsDeletingProject(false)
+    }
+  }
   const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -388,6 +411,21 @@ export default function ProjectClient({
             >
               <Scissors className="w-3.5 h-3.5" /> Novo Vídeo
             </Link>
+
+            <button
+              type="button"
+              onClick={handleDeleteThisProject}
+              disabled={isDeletingProject}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all border border-red-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Excluir este projeto permanentemente"
+            >
+              {isDeletingProject ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              <span>Excluir</span>
+            </button>
           </div>
         </div>
 

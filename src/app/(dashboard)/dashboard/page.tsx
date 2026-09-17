@@ -62,20 +62,31 @@ export default function CleanDashboard() {
   async function handleDeleteProject(id: string, e: React.MouseEvent) {
     e.stopPropagation()
     e.preventDefault()
-    if (!confirm('Deseja realmente excluir este projeto e seus cortes?')) return
+    if (!confirm('Deseja realmente excluir permanentemente este projeto e todos os seus cortes?')) return
 
     setDeletingId(id)
     try {
-      // 1. Remove clipes associados
-      await supabase.from('clips').delete().eq('project_id', id)
-      // 2. Remove o projeto
-      const { error } = await supabase.from('projects').delete().eq('id', id)
-      if (!error) {
-        setProjects(prev => prev.filter(p => p.id !== id))
-        setTotalClips(prev => Math.max(0, prev - 3))
+      // 1. Exclusão segura via API server-side (remove posts agendados, storage e registro no DB)
+      const res = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok || data.error) {
+        console.warn('API de exclusão retornou aviso, tentando fallback direto Supabase...', data.error)
+        await supabase.from('clips').delete().eq('project_id', id)
+        const { error: sbErr } = await supabase.from('projects').delete().eq('id', id)
+        if (sbErr) {
+          throw new Error(data.error || sbErr.message || 'Falha ao remover do banco de dados.')
+        }
       }
-    } catch (err) {
+
+      // Sucesso definitivo: remove da interface
+      setProjects(prev => prev.filter(p => p.id !== id))
+      setTotalClips(prev => Math.max(0, prev - 3))
+    } catch (err: any) {
       console.error('Erro ao excluir projeto:', err)
+      alert(`Não foi possível excluir o projeto: ${err.message || 'Erro inesperado'}`)
     } finally {
       setDeletingId(null)
     }
