@@ -158,8 +158,11 @@ export default function TemplatesPage() {
   // Tipografia
   const [fontFamily, setFontFamily] = useState(FONT_OPTIONS[0].family)
   const [fontSize, setFontSize] = useState(14)
+  const [titleColor, setTitleColor] = useState<string>('#ffffff')
+  const [titleStroke, setTitleStroke] = useState<'none' | 'thin' | 'medium' | 'thick'>('none')
+  const [titleStrokeColor, setTitleStrokeColor] = useState<string>('#000000')
+  const [titleCapsLock, setTitleCapsLock] = useState<boolean>(true)
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center')
-  const [titleColor, setTitleColor] = useState<string>('auto') // 'auto' | '#ffffff' | '#000000' | '#f59e0b'
 
   // Presets de Legenda
   const [selectedSubtitle, setSelectedSubtitle] = useState('hormozi_yellow')
@@ -822,66 +825,173 @@ export default function TemplatesPage() {
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-zinc-400 font-medium text-xs">Tamanho da Fonte (11 a 18):</label>
-                    <span className="font-mono text-xs text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{fontSize}px</span>
-                  </div>
-
-                  {/* Seletor Numérico com Botões [-] [ Número ] [+] */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFontSize(f => Math.max(11, f - 1))}
-                      disabled={fontSize <= 11}
-                      className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
-                      title="Diminuir fonte (mínimo 11)"
-                    >
-                      -
-                    </button>
-                    <div className="flex-1 relative">
-                      <input
-                        type="number"
-                        min={11}
-                        max={18}
-                        value={fontSize}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10)
-                          if (!isNaN(val)) {
-                            setFontSize(Math.max(11, Math.min(18, val)))
-                          }
-                        }}
-                        className="w-full h-9 bg-zinc-900 border border-white/10 focus:border-indigo-500 rounded-xl text-center text-sm font-bold text-white outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-mono pointer-events-none">px</span>
+                <div className="space-y-4">
+                  {/* TAMANHO DA FONTE (APENAS CONTROLE + E -) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-400 font-medium text-xs">Tamanho da Fonte (11 a 18):</label>
+                      <span className="font-mono text-xs text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{fontSize}px</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setFontSize(f => Math.min(18, f + 1))}
-                      disabled={fontSize >= 18}
-                      className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
-                      title="Aumentar fonte (máximo 18)"
-                    >
-                      +
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFontSize(f => Math.max(11, f - 1))}
+                        disabled={fontSize <= 11}
+                        className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95 text-base"
+                        title="Diminuir fonte (mínimo 11)"
+                      >
+                        -
+                      </button>
+                      <div className="flex-1 relative">
+                        <input
+                          type="number"
+                          min={11}
+                          max={18}
+                          value={fontSize}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10)
+                            if (!isNaN(val)) {
+                              setFontSize(Math.max(11, Math.min(18, val)))
+                            }
+                          }}
+                          className="w-full h-9 bg-zinc-900 border border-white/10 focus:border-indigo-500 rounded-xl text-center text-sm font-bold text-white outline-none"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-mono pointer-events-none">px</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFontSize(f => Math.min(18, f + 1))}
+                        disabled={fontSize >= 18}
+                        className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95 text-base"
+                        title="Aumentar fonte (máximo 18)"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Seleção Direta dos Números Permitidos (11 a 18) */}
-                  <div className="grid grid-cols-8 gap-1 pt-1">
-                    {[11, 12, 13, 14, 15, 16, 17, 18].map((size) => (
+                  {/* COR DA LETRA */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-400 font-medium text-xs">Cor da Letra:</label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: titleColor }} />
+                        <span className="font-mono text-[10px] text-zinc-400 uppercase">{titleColor}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[
+                        { label: 'Branco', color: '#ffffff' },
+                        { label: 'Preto', color: '#000000' },
+                        { label: 'Amarelo', color: '#facc15' },
+                        { label: 'Ciano', color: '#06b6d4' },
+                        { label: 'Laranja', color: '#fb923c' },
+                        { label: 'Verde', color: '#4ade80' },
+                        { label: 'Rosa', color: '#ec4899' },
+                      ].map((c) => (
+                        <button
+                          key={c.color}
+                          type="button"
+                          onClick={() => setTitleColor(c.color)}
+                          title={c.label}
+                          className={`w-6 h-6 rounded-lg border transition-transform cursor-pointer ${
+                            titleColor.toLowerCase() === c.color.toLowerCase()
+                              ? 'scale-110 ring-2 ring-indigo-500 border-white'
+                              : 'border-white/20 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c.color }}
+                        />
+                      ))}
+                      <label className="w-6 h-6 rounded-lg border border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:border-indigo-400 text-zinc-400 text-[10px]" title="Cor personalizada">
+                        +
+                        <input
+                          type="color"
+                          value={titleColor.startsWith('#') ? titleColor : '#ffffff'}
+                          onChange={(e) => setTitleColor(e.target.value)}
+                          className="sr-only"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* FUNÇÃO DE BORDA DO TEXTO (CONTORNO) */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-400 font-medium text-xs">Borda do Texto (Contorno):</label>
+                      <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">
+                        {titleStroke === 'none' ? 'Sem Borda' : titleStroke}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { id: 'none', label: 'Sem' },
+                        { id: 'thin', label: '1px' },
+                        { id: 'medium', label: '2px' },
+                        { id: 'thick', label: '3px' },
+                      ].map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setTitleStroke(s.id as any)}
+                          className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            titleStroke === s.id
+                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                              : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                    {titleStroke !== 'none' && (
+                      <div className="flex items-center gap-1.5 pt-1.5">
+                        <span className="text-[10px] text-zinc-400">Cor da Borda:</span>
+                        {['#000000', '#ffffff', '#ef4444', '#facc15'].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setTitleStrokeColor(color)}
+                            className={`w-5 h-5 rounded-md border transition-all ${
+                              titleStrokeColor === color ? 'ring-2 ring-indigo-500 scale-110 border-white' : 'border-white/20'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* TOGGLE CAPS LOCK */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-400 font-medium text-xs">Formatação de Caixa:</label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
                       <button
-                        key={size}
                         type="button"
-                        onClick={() => setFontSize(size)}
-                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          fontSize === size
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 scale-105 ring-1 ring-white/30'
-                            : 'bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-white/5'
+                        onClick={() => setTitleCapsLock(true)}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          titleCapsLock
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20'
+                            : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
                         }`}
                       >
-                        {size}
+                        <span className="font-mono text-sm">AA</span>
+                        <span>MAIÚSCULAS</span>
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setTitleCapsLock(false)}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          !titleCapsLock
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20'
+                            : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
+                        }`}
+                      >
+                        <span className="font-mono text-sm">Aa</span>
+                        <span>Normal</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1116,12 +1226,13 @@ export default function TemplatesPage() {
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative bg-zinc-950 rounded-[46px] p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 ring-1 ring-white/15 overflow-hidden"
+            className="relative bg-zinc-950 rounded-[44px] p-2 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 ring-1 ring-white/15 overflow-hidden flex flex-col items-center"
           >
             {/* CANVAS INTERNO DO TEMPLATE */}
             <div
               ref={phoneRef}
-              className={`relative w-[315px] sm:w-[333px] aspect-[9/16] rounded-[36px] overflow-hidden transition-colors ${
+              style={{ width: "324px", height: "576px", aspectRatio: "9 / 16" }}
+              className={`relative rounded-[36px] overflow-hidden transition-colors bg-black ${
                 templateBg === 'white'
                   ? 'bg-white text-zinc-950'
                   : templateBg === 'gray'
@@ -1131,6 +1242,8 @@ export default function TemplatesPage() {
             >
               
               {/* LINHA GUIA MAGNÉTICA HORIZONTAL (CENTRO X: 50%) */}
+              {/* CAMADA BASE ESCURA: IMPEDE QUE O BRANCO DO TOPO VAZE NO CORPO DO VÍDEO OU NA BASE */}
+              <div className="absolute top-[32%] bottom-0 left-0 right-0 bg-black pointer-events-none" />
               {snapActiveX && (
                 <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-50 pointer-events-none flex items-center justify-center">
                   <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-8">
@@ -1208,9 +1321,12 @@ export default function TemplatesPage() {
                     fontFamily: fontFamily,
                     fontSize: `${fontSize}px`,
                     textAlign: textAlign,
+                    color: titleColor,
+                    WebkitTextStroke: titleStroke === 'thin' ? `1px ${titleStrokeColor}` : titleStroke === 'medium' ? `2px ${titleStrokeColor}` : titleStroke === 'thick' ? `3px ${titleStrokeColor}` : undefined,
+                    textShadow: titleStroke !== 'none' ? `0 0 2px ${titleStrokeColor}` : undefined,
                   }}
-                  className={`w-full font-bold leading-snug uppercase tracking-tight ${
-                    templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+                  className={`w-full font-bold leading-snug tracking-tight select-none ${
+                    titleCapsLock ? 'uppercase' : 'normal-case'
                   }`}
                 >
                   {titleText}
@@ -1342,9 +1458,9 @@ export default function TemplatesPage() {
               {instagramDecal && (
                 <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[40px]">
                   {/* Zona Morta Inferior (21%) */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20" />
-
-                  {/* Coluna Direita Escurecida onde ficam os botões do Reels (SEM ÍCONES) */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-gradient-to-t from-black via-black/95 to-black/85 border-t border-dashed border-white/20 flex flex-col justify-end pb-3 px-4 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest text-center">Área Segura de Legendas (Reels 9:16)</span>
+                  </div>
                   <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/65 backdrop-blur-[0.5px] border-l border-t border-dashed border-white/20 rounded-tl-xl" />
                 </div>
               )}
