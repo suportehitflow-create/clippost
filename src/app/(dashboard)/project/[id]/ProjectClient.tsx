@@ -474,7 +474,7 @@ export default function ProjectClient({
             href="/templates"
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition-all border border-white/[0.08] hidden md:flex items-center gap-1.5"
           >
-            <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             <span>Templates</span>
           </Link>
 
@@ -801,7 +801,7 @@ export default function ProjectClient({
                 target="_blank"
                 rel="noopener noreferrer"
                 download={!!activeClip.storage_url}
-                className="py-2.5 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/20"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Baixar Vídeo</span>
@@ -847,35 +847,26 @@ export default function ProjectClient({
             {showAdjustments && (
               <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-4 animate-in fade-in duration-150">
                 
-                {/* Abas dos Ajustes */}
-                <div className="flex items-center gap-2 pb-2 border-b border-white/[0.06]">
-                  <button
-                    type="button"
-                    onClick={() => setAdjustTab('subtitles')}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                      adjustTab === 'subtitles' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Legendas
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdjustTab('framing')}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                      adjustTab === 'framing' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Enquadramento
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdjustTab('template')}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                      adjustTab === 'template' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Template
-                  </button>
+                {/* Abas dos Ajustes (Segmented Pills) */}
+                <div className="flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.08] gap-1">
+                  {[
+                    { id: 'subtitles', label: 'Legendas' },
+                    { id: 'framing', label: 'Enquadramento & IA' },
+                    { id: 'template', label: 'Template & Layout' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setAdjustTab(tab.id as any)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        adjustTab === tab.id
+                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                          : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Conteúdo da Aba: Legendas */}
@@ -1019,7 +1010,7 @@ export default function ProjectClient({
                   <div className="space-y-3 text-xs">
                     <div className="space-y-1.5">
                       <span className="text-zinc-400">Layout do Template:</span>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         {[
                           { id: 'meme_frame', label: 'Meme Frame' },
                           { id: 'split_screen', label: 'Split Screen' },
@@ -1029,10 +1020,10 @@ export default function ProjectClient({
                             key={lay.id}
                             type="button"
                             onClick={() => setActiveLayout(lay.id as LayoutFormat)}
-                            className={`p-2 rounded-lg text-center transition-all cursor-pointer text-[11px] font-medium border ${
+                            className={`py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer text-[11px] font-semibold border ${
                               activeLayout === lay.id
-                                ? 'border-orange-500/40 bg-orange-500/10 text-orange-400'
-                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200'
+                                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                                : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                             }`}
                           >
                             {lay.label}
@@ -1041,16 +1032,21 @@ export default function ProjectClient({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-zinc-400">Bordas Arredondadas:</span>
+                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Bordas Arredondadas no Vídeo</span>
+                        <span className="text-[10px] text-zinc-400">Suaviza as bordas do recorte de vídeo</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setVideoRounded(!videoRounded)}
-                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                          videoRounded ? 'bg-white/10 text-white' : 'bg-white/[0.05] text-zinc-500'
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
+                          videoRounded
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
+                            : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
                         }`}
                       >
-                        {videoRounded ? 'Arredondada' : 'Quadrada'}
+                        {videoRounded ? 'LIGADO' : 'DESLIGADO'}
                       </button>
                     </div>
                   </div>
@@ -1065,7 +1061,7 @@ export default function ProjectClient({
           <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-orange-400" />
+                <Layers className="w-4 h-4 text-indigo-400" />
                 <h3 className="text-sm font-bold text-white">
                   Lista de Cortes em Lote ({clips.length})
                 </h3>
@@ -1073,7 +1069,7 @@ export default function ProjectClient({
               <button
                 type="button"
                 onClick={handleDownloadAll}
-                className="text-xs text-orange-400 hover:text-orange-300 font-semibold flex items-center gap-1 cursor-pointer"
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Baixar Todos</span>
@@ -1103,7 +1099,7 @@ export default function ProjectClient({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                        isCurrent ? 'bg-orange-500 text-white' : 'bg-white/[0.06] text-zinc-400'
+                        isCurrent ? 'bg-[#6366f1] text-white shadow-sm shadow-[#6366f1]/30' : 'bg-white/[0.06] text-zinc-400'
                       }`}>
                         #{i + 1}
                       </span>

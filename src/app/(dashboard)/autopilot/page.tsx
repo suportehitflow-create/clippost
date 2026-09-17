@@ -216,28 +216,30 @@ export default function AutoPilotPage() {
         </div>
       </div>
 
-      {/* Mode Navigation: Mineração vs YouTube RSS */}
-      <div className="max-w-7xl mx-auto flex items-center gap-3 mb-8">
-        <button
-          onClick={() => setActiveTab('profile_miner')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'profile_miner'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
-          }`}
-        >
-          <Film className="w-3.5 h-3.5" /> Mineração de Perfis Virais (Instagram / TikTok)
-        </button>
-        <button
-          onClick={() => setActiveTab('channel_watch')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'channel_watch'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
-          }`}
-        >
-          <Radio className="w-3.5 h-3.5" /> Monitoramento Contínuo (YouTube RSS)
-        </button>
+      {/* Mode Navigation: Mineração vs YouTube RSS (Segmented Pills) */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="inline-flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.08] gap-1">
+          <button
+            onClick={() => setActiveTab('profile_miner')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+              activeTab === 'profile_miner'
+                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5" /> <span>Mineração de Perfis Virais</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('channel_watch')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+              activeTab === 'channel_watch'
+                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" /> <span>Monitoramento Contínuo (YouTube RSS)</span>
+          </button>
+        </div>
       </div>
 
       {activeTab === 'profile_miner' ? (
@@ -284,15 +286,15 @@ export default function AutoPilotPage() {
                 <p className="text-xs text-zinc-400">A busca pela nuvem é instantânea e dispensa cookies locais.</p>
               </div>
 
-              {/* Toggle Buttons */}
-              <div className="inline-flex p-1 rounded-xl bg-black/50 border border-white/10">
+              {/* Toggle Buttons (Segmented Pills) */}
+              <div className="inline-flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.08] gap-1">
                 <button
                   type="button"
                   onClick={() => setSearchMethod('cloud')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                     searchMethod === 'cloud'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-zinc-400 hover:text-white'
+                      ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                      : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
                   }`}
                 >
                   Sem extensão (Nuvem)
@@ -300,10 +302,10 @@ export default function AutoPilotPage() {
                 <button
                   type="button"
                   onClick={() => setSearchMethod('extension')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                     searchMethod === 'extension'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-zinc-400 hover:text-white'
+                      ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                      : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
                   }`}
                 >
                   Com a extensão do navegador
@@ -413,17 +415,17 @@ export default function AutoPilotPage() {
               {/* Subtabs & Actions Bar (Screenshot 3) */}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-4">
                 
-                {/* Content Filter Tabs */}
-                <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10">
+                {/* Content Filter Tabs (Segmented Pills) */}
+                <div className="inline-flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.08] gap-1">
                   {(['all', 'reel', 'post', 'carousel'] as const).map(tab => (
                     <button
                       key={tab}
                       type="button"
                       onClick={() => setFilterType(tab)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer border ${
                         filterType === tab
-                          ? 'bg-white/10 text-white'
-                          : 'text-zinc-400 hover:text-white'
+                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                          : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
                       }`}
                     >
                       {tab === 'all' ? 'Todos' : tab === 'reel' ? 'Reels' : tab === 'post' ? 'Posts' : 'Carrossel'}

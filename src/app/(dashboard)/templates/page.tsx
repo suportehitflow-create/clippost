@@ -988,10 +988,10 @@ export default function TemplatesPage() {
                           key={s.id}
                           type="button"
                           onClick={() => setTitleStroke(s.id as any)}
-                          className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          className={`py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                             titleStroke === s.id
-                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
-                              : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
+                              ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                           }`}
                         >
                           {s.label}
@@ -1025,25 +1025,25 @@ export default function TemplatesPage() {
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(true)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           titleCapsLock
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20'
-                            : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
+                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                         }`}
                       >
-                        <span className="font-mono text-sm">AA</span>
+                        <span className="font-mono text-xs font-bold">AA</span>
                         <span>MAIÚSCULAS</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(false)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           !titleCapsLock
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20'
-                            : 'bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-white border border-white/[0.06]'
+                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                         }`}
                       >
-                        <span className="font-mono text-sm">Aa</span>
+                        <span className="font-mono text-xs font-bold">Aa</span>
                         <span>Normal</span>
                       </button>
                     </div>
@@ -1171,10 +1171,10 @@ export default function TemplatesPage() {
                     <button
                       type="button"
                       onClick={() => handleBrandLayout('inline')}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                      className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         brandLayout === 'inline'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent'
-                          : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                       }`}
                     >
                       <span>Lado a Lado</span>
@@ -1182,10 +1182,10 @@ export default function TemplatesPage() {
                     <button
                       type="button"
                       onClick={() => handleBrandLayout('stacked')}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                      className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         brandLayout === 'stacked'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent'
-                          : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                       }`}
                     >
                       <span>Empilhado</span>
@@ -1236,11 +1236,11 @@ export default function TemplatesPage() {
               <div className="space-y-4 text-xs">
                 <div className="space-y-2">
                   <span className="text-zinc-400 font-medium">Cor da Tela do Template:</span>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {[
-                      { id: 'dark', label: 'Preto Puro', bg: 'bg-black text-white border-white/20' },
-                      { id: 'white', label: 'Branco Neve', bg: 'bg-white text-zinc-900 border-zinc-300' },
-                      { id: 'gray', label: 'Grafite', bg: 'bg-zinc-800 text-white border-white/20' }
+                      { id: 'dark', label: 'Preto Puro', dot: 'bg-black border border-white/40' },
+                      { id: 'white', label: 'Branco Neve', dot: 'bg-white border border-zinc-300' },
+                      { id: 'gray', label: 'Grafite', dot: 'bg-zinc-800 border border-white/30' }
                     ].map(b => (
                       <button
                         key={b.id}
@@ -1249,14 +1249,14 @@ export default function TemplatesPage() {
                           setTemplateBg(b.id as any)
                           setCustomBgImage(null)
                         }}
-                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${b.bg} ${
-                          templateBg === b.id && !customBgImage ? 'ring-2 ring-indigo-500 shadow-[0_0_16px_rgba(99,102,241,0.35)] scale-105' : 'opacity-70 hover:opacity-100 border-white/10'
+                        className={`py-2.5 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-semibold ${
+                          templateBg === b.id && !customBgImage
+                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                         }`}
                       >
-                        <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center">
-                          {templateBg === b.id && !customBgImage && <Check className="w-3 h-3" />}
-                        </div>
-                        <span className="text-[11px] font-semibold">{b.label}</span>
+                        <span className={`w-3 h-3 rounded-full shrink-0 ${b.dot}`} />
+                        <span>{b.label}</span>
                       </button>
                     ))}
                   </div>

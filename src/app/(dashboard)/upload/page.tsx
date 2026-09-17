@@ -120,24 +120,30 @@ export default function CreateClipsPage() {
         </div>
 
         {/* Alternador Link / Arquivo */}
-        <div className="flex p-1 bg-white/[0.03] border border-white/[0.08] rounded-xl max-w-xs mx-auto">
+        <div className="flex p-1 bg-white/[0.02] border border-white/[0.08] rounded-xl max-w-sm mx-auto gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('link')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === 'link' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-zinc-400 hover:text-white'
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+              activeTab === 'link'
+                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
             }`}
           >
-            Por Link (URL)
+            <Link2 className="w-3.5 h-3.5" />
+            <span>Por Link (URL)</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('file')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === 'file' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-zinc-400 hover:text-white'
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+              activeTab === 'file'
+                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
             }`}
           >
-            Upload de Arquivo
+            <UploadCloud className="w-3.5 h-3.5" />
+            <span>Upload de Arquivo</span>
           </button>
         </div>
 
@@ -162,7 +168,7 @@ export default function CreateClipsPage() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-[#6366f1] transition-colors"
                 />
               </div>
             </div>
@@ -171,7 +177,7 @@ export default function CreateClipsPage() {
               <label className="text-xs font-medium text-zinc-300">Arquivo de Vídeo (MP4, MOV)</label>
               <div
                 onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-white/[0.12] hover:border-orange-500/50 rounded-2xl p-8 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.03]"
+                className="border-2 border-dashed border-white/[0.12] hover:border-[#6366f1]/50 rounded-2xl p-8 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.03]"
               >
                 <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
                 <p className="text-xs font-semibold text-white">
@@ -192,15 +198,20 @@ export default function CreateClipsPage() {
           {/* Configurações de Duração dos Cortes & Áudio */}
           <div className="space-y-4 pt-4 border-t border-white/[0.08]">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-orange-400" /> Duração dos Cortes
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos Cortes:
+                </label>
+                <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">
+                  {clipDuration === 'auto' ? 'IA Automático' : `${clipDuration}s`}
+                </span>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: '30', label: '30s', desc: 'Até 45s (Reels rápidos)' },
-                  { id: '60', label: '1 minuto', desc: '45s a 60s (Padrão viral)' },
-                  { id: '90', label: 'Mais de 1 min', desc: '60s a 120s+ (Histórias)' },
-                  { id: 'auto', label: 'Automático', desc: 'IA escolhe o melhor tempo' },
+                  { id: 'auto', label: '⚡ IA Auto', desc: 'Tempo ideal dinâmico' },
+                  { id: '30', label: '30s', desc: 'Reels rápidos (CTR alto)' },
+                  { id: '60', label: '60s', desc: 'Padrão viral completo' },
+                  { id: '90', label: '90s+', desc: 'Histórias e contexto' },
                 ].map(opt => (
                   <button
                     key={opt.id}
@@ -208,11 +219,11 @@ export default function CreateClipsPage() {
                     onClick={() => setClipDuration(opt.id as any)}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                       clipDuration === opt.id
-                        ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30'
-                        : 'border-white/[0.08] bg-[#121216] hover:border-white/20'
+                        ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                        : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                     }`}
                   >
-                    <span className={`text-xs font-bold block ${clipDuration === opt.id ? 'text-orange-400' : 'text-white'}`}>
+                    <span className={`text-xs font-bold block ${clipDuration === opt.id ? 'text-white' : 'text-zinc-200'}`}>
                       {opt.label}
                     </span>
                     <span className="text-[10px] text-zinc-500 mt-0.5 block leading-tight">
@@ -225,20 +236,30 @@ export default function CreateClipsPage() {
 
             {/* Toggle de Silêncio */}
             <div className="pt-2">
-              <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={removeSilence}
-                  onChange={(e) => setRemoveSilence(e.target.checked)}
-                  className="rounded border-white/20 text-orange-500 focus:ring-0 w-4 h-4 accent-orange-500"
-                />
-                <div className="flex-1">
-                  <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                    <VolumeX className="w-3.5 h-3.5 text-zinc-400" /> Remover pausas longas e silêncios
-                  </span>
-                  <p className="text-[11px] text-zinc-500">Aumenta o ritmo e a retenção do corte para prender a atenção.</p>
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                    removeSilence ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-500'
+                  }`}>
+                    <VolumeX className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-white block">Remover pausas longas e silêncios</span>
+                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo e retenção do corte para prender a atenção</span>
+                  </div>
                 </div>
-              </label>
+                <button
+                  type="button"
+                  onClick={() => setRemoveSilence(!removeSilence)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
+                    removeSilence
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
+                      : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
+                  }`}
+                >
+                  {removeSilence ? 'LIGADO' : 'DESLIGADO'}
+                </button>
+              </div>
             </div>
           </div>
 
