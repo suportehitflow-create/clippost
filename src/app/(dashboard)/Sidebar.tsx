@@ -15,6 +15,7 @@ import {
   PanelLeft
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useVerticalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
@@ -34,6 +35,9 @@ export default function Sidebar({ user }: { user: User }) {
   const isEditorPage = pathname.startsWith('/templates') || pathname.startsWith('/project/')
   const [collapsed, setCollapsed] = useState(isEditorPage)
 
+  // Bencho / macOS Fisheye Dock Physics
+  const { registerItem, onMouseMove, onMouseLeave } = useVerticalFisheyeDock(3.0)
+
   async function signOut() {
     document.cookie = 'clippost_demo_auth=; path=/; max-age=0'
     localStorage.removeItem('clippost_demo_auth')
@@ -45,25 +49,21 @@ export default function Sidebar({ user }: { user: User }) {
 
   return (
     <aside
-      className={`border-r border-white/[0.08] bg-[#0c0c0f] flex flex-col justify-between flex-shrink-0 sticky top-0 h-screen transition-[width,padding] duration-200 ease-out z-40 ${
-        collapsed ? 'w-16 p-2.5' : 'w-60 p-5'
-      }`}
+      className={"border-r border-white/[0.08] bg-[#0c0c0f]/85 backdrop-blur-2xl flex flex-col justify-between flex-shrink-0 sticky top-0 h-screen transition-[width,padding] duration-200 ease-out z-40 shadow-[4px_0_24px_rgba(0,0,0,0.5)] " + (collapsed ? "w-16 p-2" : "w-60 p-4")}
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Header com Logo e Botão de Recolher */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 px-1">
           <Link
             href="/dashboard"
-            className={`flex items-center gap-2.5 transition-opacity hover:opacity-90 ${
-              collapsed ? 'justify-center w-full' : 'px-1'
-            }`}
+            className={"flex items-center gap-2.5 transition-opacity hover:opacity-90 " + (collapsed ? "justify-center w-full" : "")}
             title="Clipost"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md flex-shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0 ring-1 ring-white/20">
               <Scissors className="w-4 h-4 text-white" />
             </div>
             {!collapsed && (
-              <span className="text-base font-bold tracking-tight text-white">Clipost</span>
+              <span className="text-base font-bold tracking-tight text-white font-mono">Clipost</span>
             )}
           </Link>
 
@@ -85,7 +85,7 @@ export default function Sidebar({ user }: { user: User }) {
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className="p-2 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-colors cursor-pointer"
+              className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-colors cursor-pointer"
               title="Expandir menu lateral"
             >
               <PanelLeft className="w-4 h-4" />
@@ -93,9 +93,13 @@ export default function Sidebar({ user }: { user: User }) {
           </div>
         )}
 
-        {/* Navegação */}
-        <nav className="space-y-1">
-          {NAV_ITEMS.map((item) => {
+        {/* Navegação Vertical Fisheye Dock (macOS / Bencho Style) */}
+        <nav
+          className="space-y-1.5 py-1"
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
+        >
+          {NAV_ITEMS.map((item, index) => {
             const Icon = item.icon
             const active =
               pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
@@ -103,23 +107,41 @@ export default function Sidebar({ user }: { user: User }) {
               <Link
                 key={item.href}
                 href={item.href}
+                ref={registerItem(index)}
                 title={item.label}
-                className={`flex items-center gap-3 py-2.5 text-sm font-medium rounded-xl transition-colors group relative ${
-                  collapsed ? 'justify-center px-0' : 'px-3'
-                } ${
-                  active
-                    ? 'bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                }`}
+                className={
+                  "gdock-item group relative flex items-center py-2 text-sm font-medium rounded-xl transition-colors " +
+                  (collapsed ? "justify-center px-0 h-10 w-full " : "px-3 h-10 ") +
+                  (active
+                    ? "bg-indigo-500/10 text-indigo-300 font-semibold border border-indigo-500/20 "
+                    : "text-zinc-400 hover:text-white hover:bg-white/[0.03] ")
+                }
               >
-                <Icon
-                  className={`w-4 h-4 flex-shrink-0 ${
-                    active ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-white'
-                  }`}
-                />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                {/* Running active dot indicador (macOS dock style) */}
+                {active && (
+                  <span
+                    className={
+                      "absolute left-0.5 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)] transition-all " +
+                      (collapsed ? "w-1 h-3 -left-0.5" : "w-1 h-4")
+                    }
+                  />
+                )}
 
-                {/* Tooltip flutuante instantâneo */}
+                {/* Glyph magnifies with raised cosine curve; button remains stable */}
+                <div className="gdock-glyph flex items-center justify-center shrink-0">
+                  <Icon
+                    className={
+                      "w-4 h-4 transition-colors " +
+                      (active ? "text-indigo-400" : "text-zinc-400 group-hover:text-white")
+                    }
+                  />
+                </div>
+
+                {!collapsed && (
+                  <span className="ml-3 truncate tracking-tight">{item.label}</span>
+                )}
+
+                {/* Tooltip flutuante instantâneo no modo recolhido */}
                 {collapsed && (
                   <span className="absolute left-full ml-3 px-2 py-1 bg-[#18181b] text-white text-xs rounded-md shadow-2xl border border-white/10 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
                     {item.label}
@@ -152,10 +174,12 @@ export default function Sidebar({ user }: { user: User }) {
             <button
               type="button"
               onClick={signOut}
-              className="p-2 text-zinc-400 hover:text-red-400 hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer group relative"
+              className="gdock-item p-2 text-zinc-400 hover:text-red-400 hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer group relative"
               title="Encerrar sessão"
             >
-              <LogOut className="w-4 h-4" />
+              <div className="gdock-glyph flex items-center justify-center">
+                <LogOut className="w-4 h-4" />
+              </div>
               <span className="absolute left-full ml-3 px-2 py-1 bg-[#18181b] text-white text-xs rounded-md shadow-2xl border border-white/10 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
                 Encerrar sessão
               </span>

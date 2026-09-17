@@ -1,6 +1,7 @@
 'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
+import { useVerticalFisheyeDock } from '@/components/ui/FisheyeDock'
 import { useState, useRef, useEffect } from 'react'
 import {
   Type,
@@ -134,6 +135,7 @@ export default function TemplatesPage() {
 
   // Canva-Style Active Side Panel
   const [activeTool, setActiveTool] = useState<ActiveTool>('templates')
+  const railDock = useVerticalFisheyeDock(3.0)
 
   // Cores de fundo do template
   const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray' | 'obsidian' | 'midnight'>('dark')
@@ -722,71 +724,104 @@ export default function TemplatesPage() {
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* BARRA DE FERRAMENTAS LATERAL (CANVA SIDEBAR) */}
-        <aside className="w-16 sm:w-[72px] bg-[#0e0e11] border-r border-white/[0.08] flex flex-col items-center py-3 gap-1 z-20 shrink-0 select-none">
+        <aside
+          onMouseMove={railDock.onMouseMove}
+          onMouseLeave={railDock.onMouseLeave}
+          className="w-16 sm:w-[72px] bg-[#0c0c0f]/90 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col items-center py-3 gap-1.5 z-20 shrink-0 select-none shadow-[4px_0_24px_rgba(0,0,0,0.4)]"
+        >
           
           <button
             type="button"
+            ref={railDock.registerItem(0)}
             onClick={() => setActiveTool(activeTool === 'templates' ? null : 'templates')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
               activeTool === 'templates'
                 ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <LayoutTemplate className="w-5 h-5" />
+            {activeTool === 'templates' && (
+              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+            )}
+            <div className="gdock-glyph flex items-center justify-center">
+              <LayoutTemplate className="w-5 h-5" />
+            </div>
             <span className="text-[9px] font-semibold tracking-tight">Modelos</span>
           </button>
 
           <button
             type="button"
+            ref={railDock.registerItem(1)}
             onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
               activeTool === 'text'
                 ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <Type className="w-5 h-5" />
+            {activeTool === 'text' && (
+              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+            )}
+            <div className="gdock-glyph flex items-center justify-center">
+              <Type className="w-5 h-5" />
+            </div>
             <span className="text-[9px] font-semibold tracking-tight">Texto</span>
           </button>
 
           <button
             type="button"
+            ref={railDock.registerItem(2)}
             onClick={() => setActiveTool(activeTool === 'brand' ? null : 'brand')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
               activeTool === 'brand'
                 ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <User className="w-5 h-5" />
+            {activeTool === 'brand' && (
+              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+            )}
+            <div className="gdock-glyph flex items-center justify-center">
+              <User className="w-5 h-5" />
+            </div>
             <span className="text-[9px] font-semibold tracking-tight">Perfil</span>
           </button>
 
           <button
             type="button"
+            ref={railDock.registerItem(3)}
             onClick={() => setActiveTool(activeTool === 'subtitles' ? null : 'subtitles')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
               activeTool === 'subtitles'
                 ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <Sparkles className="w-5 h-5" />
+            {activeTool === 'subtitles' && (
+              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+            )}
+            <div className="gdock-glyph flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
             <span className="text-[9px] font-semibold tracking-tight">Legenda</span>
           </button>
 
-
           <button
             type="button"
+            ref={railDock.registerItem(4)}
             onClick={() => setActiveTool(activeTool === 'background' ? null : 'background')}
-            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
               activeTool === 'background'
                 ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <Palette className="w-5 h-5" />
+            {activeTool === 'background' && (
+              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
+            )}
+            <div className="gdock-glyph flex items-center justify-center">
+              <Palette className="w-5 h-5" />
+            </div>
             <span className="text-[9px] font-semibold tracking-tight">Fundo</span>
           </button>
 
