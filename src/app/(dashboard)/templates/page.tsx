@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   Music,
   Camera,
+  Wifi,
   Home,
   Search,
   ShoppingBag,
@@ -1312,20 +1313,32 @@ export default function TemplatesPage() {
         {/* ÁREA CENTRAL DO WORKSPACE (CANVA CANVAS COM ZOOM E ESPAÇO LIVRE) */}
         <main className="flex-1 bg-[#090b0e] overflow-auto flex flex-col items-center justify-center p-4 sm:p-8 relative">
           
-          {/* MOCKUP DO CANVA ARTBOARD (9:16 COM ELEVAÇÃO E PROPORÇÕES PERFEITAS) */}
+          {/* MOCKUP DO IPHONE 18 PRO (CORPO DE TITÂNIO, BOTÕES LATERAIS, DYNAMIC ISLAND E STATUS BAR) */}
           <div
             style={{
               transform: `scale(${canvasZoom / 100})`,
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative bg-zinc-950 rounded-[44px] p-2 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 ring-1 ring-white/15 overflow-hidden flex flex-col items-center"
+            className="relative p-[10px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[54px] shadow-[0_30px_90px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.8)] ring-1 ring-white/20 shrink-0 select-none my-auto"
           >
-            {/* CANVAS INTERNO DO TEMPLATE */}
+            {/* BOTÕES LATERAIS FÍSICOS DO IPHONE 18 (TITÂNIO 3D) */}
+            {/* Botão de Ação (topo esquerdo) */}
+            <div className="absolute -left-[4px] top-[110px] w-[4px] h-[26px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            {/* Volume + */}
+            <div className="absolute -left-[4px] top-[152px] w-[4px] h-[48px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            {/* Volume - */}
+            <div className="absolute -left-[4px] top-[212px] w-[4px] h-[48px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            {/* Botão Liga/Desliga / Siri (lado direito) */}
+            <div className="absolute -right-[4px] top-[170px] w-[4px] h-[68px] bg-zinc-600 rounded-r-sm shadow-sm" />
+            {/* Botão Camera Control (iPhone 16/18) */}
+            <div className="absolute -right-[4px] top-[440px] w-[4px] h-[48px] bg-zinc-600/80 rounded-r-sm ring-1 ring-white/10" />
+
+            {/* TELA OLED DO IPHONE 18 (PROPORÇÃO REAL 19.5:9 -> 324 x 702 px) */}
             <div
               ref={phoneRef}
-              style={{ width: "324px", height: "576px", aspectRatio: "9 / 16" }}
-              className={`relative rounded-[36px] overflow-hidden transition-colors ${
+              style={{ width: "324px", height: "702px", aspectRatio: "9 / 19.5" }}
+              className={`relative rounded-[44px] overflow-hidden transition-colors ${
                 templateBg === 'white'
                   ? 'bg-white text-zinc-950'
                   : templateBg === 'gray'
@@ -1333,6 +1346,36 @@ export default function TemplatesPage() {
                   : 'bg-black text-white'
               }`}
             >
+              {/* STATUS BAR DO IPHONE (HORÁRIO + DYNAMIC ISLAND + BATERIA/SINAL) */}
+              <div className="absolute top-0 left-0 right-0 h-11 px-6 pt-2.5 flex items-center justify-between z-50 pointer-events-none text-white select-none">
+                {/* Horário */}
+                <span className="text-[12px] font-bold tracking-tight text-white/95">9:41</span>
+
+                {/* Dynamic Island com Câmera e Face ID */}
+                <div className="w-[100px] h-[27px] bg-black rounded-full ring-1 ring-white/15 shadow-md flex items-center justify-between px-2.5 pointer-events-auto">
+                  {/* Face ID Dot */}
+                  <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 ring-1 ring-white/5" />
+                  {/* Lente Frontal com Reflexo */}
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#0d1630] ring-1 ring-[#1e3a8a]/40 flex items-center justify-center">
+                    <div className="w-1 h-1 rounded-full bg-blue-400/50" />
+                  </div>
+                </div>
+
+                {/* Ícones de Sistema (Sinal, 5G/Wi-Fi, Bateria) */}
+                <div className="flex items-center gap-1.5 text-white/95">
+                  <div className="flex items-end gap-0.5 h-2.5">
+                    <div className="w-[2px] h-1 bg-white rounded-xs" />
+                    <div className="w-[2px] h-1.5 bg-white rounded-xs" />
+                    <div className="w-[2px] h-2 bg-white rounded-xs" />
+                    <div className="w-[2px] h-2.5 bg-white rounded-xs" />
+                  </div>
+                  <Wifi className="w-3.5 h-3.5 stroke-[2.4]" />
+                  <div className="w-5 h-2.5 rounded-[4px] border border-white/80 p-0.5 flex items-center">
+                    <div className="w-3 h-full bg-white rounded-[2px]" />
+                  </div>
+                </div>
+              </div>
+
               {/* Imagem de Fundo Personalizada (se selecionada) */}
               {customBgImage && (
                 <img
@@ -1345,7 +1388,7 @@ export default function TemplatesPage() {
               {/* LINHA GUIA MAGNÉTICA HORIZONTAL (CENTRO X: 50%) */}
               {snapActiveX && (
                 <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-50 pointer-events-none flex items-center justify-center">
-                  <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-8">
+                  <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-12">
                     Centro X 50%
                   </span>
                 </div>
@@ -1368,64 +1411,58 @@ export default function TemplatesPage() {
                 title="Arraste o perfil (foto, nome e arroba) para reposicionar livremente"
               >
                 <div className="w-11 h-11 rounded-full border-2 border-white/60 overflow-hidden shadow-lg bg-zinc-900 shrink-0">
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover pointer-events-none" />
+                  <img
+                    src={avatarUrl}
+                    alt={brandName}
+                    className="w-full h-full object-cover pointer-events-none"
+                  />
                 </div>
-                <div className={`flex flex-col ${brandAlign === 'center' && brandLayout === 'stacked' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+                <div className={`flex flex-col ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
                   <div className="flex items-center gap-1">
-                    <span className={`text-[12px] font-black uppercase tracking-wide ${
-                      templateBg === 'white' ? 'text-zinc-950' : 'text-white'
-                    }`}
-                    >
-                      {brandName}
-                    </span>
-                    <span className="w-3 h-3 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold">
-                      ✓
-                    </span>
+                    <span className="text-xs font-bold tracking-tight drop-shadow">{brandName}</span>
+                    <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
                   </div>
-                  <span className={`text-[10px] font-medium font-mono ${
-                    templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
-                  }`}
-                  >
-                    {brandHandle}
-                  </span>
+                  <span className="text-[10px] text-zinc-400 font-medium">{brandHandle}</span>
                 </div>
               </div>
 
-              {/* 3. TÍTULO / GANCHO COM FONTE E TAMANHO NATIVOS (MÓVEL) */}
+              {/* 3. TÍTULO / GANCHO COM PERSONALIZAÇÃO DE TIPOGRAFIA */}
               <div
                 onMouseDown={(e) => startDrag2D('title', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('title', e.touches[0].clientX, e.touches[0].clientY, e)}
                 style={{
                   left: `${titlePos.x}%`,
                   top: `${titlePos.y}%`,
-                  transform: 'translate(-50%, -50%)'
+                  transform: 'translate(-50%, -50%)',
+                  width: '88%',
+                  fontFamily: fontFamily,
+                  fontSize: `${fontSize}px`,
+                  color: titleColor,
+                  textAlign: textAlign,
+                  textTransform: titleCapsLock ? 'uppercase' : 'none',
+                  textShadow: titleStroke !== 'none'
+                    ? titleStroke === 'thin'
+                      ? `-1px -1px 0 ${titleStrokeColor}, 1px -1px 0 ${titleStrokeColor}, -1px 1px 0 ${titleStrokeColor}, 1px 1px 0 ${titleStrokeColor}`
+                      : titleStroke === 'medium'
+                      ? `-2px -2px 0 ${titleStrokeColor}, 2px -2px 0 ${titleStrokeColor}, -2px 2px 0 ${titleStrokeColor}, 2px 2px 0 ${titleStrokeColor}`
+                      : `-3px -3px 0 ${titleStrokeColor}, 3px -3px 0 ${titleStrokeColor}, -3px 3px 0 ${titleStrokeColor}, 3px 3px 0 ${titleStrokeColor}`
+                    : '0 2px 8px rgba(0,0,0,0.85)',
+                  WebkitTextStroke: titleStroke !== 'none'
+                    ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '1.5px' : '2px'} ${titleStrokeColor}`
+                    : 'none'
                 }}
-                className={`absolute w-full px-5 cursor-grab active:cursor-grabbing z-30 select-none ${
-                  draggingTarget === 'title' ? 'ring-1 ring-[#6366f1]/50 rounded-lg py-1' : ''
+                className={`absolute cursor-grab active:cursor-grabbing z-30 font-black leading-tight tracking-tight select-none ${
+                  draggingTarget === 'title' ? 'ring-2 ring-[#6366f1] rounded-xl p-1 bg-white/5' : ''
                 }`}
-                title="Arraste o título para reposicionar"
+                title="Arraste o título para posicionar livremente"
               >
-                <h2
-                  style={{
-                    fontFamily: fontFamily,
-                    fontSize: `${fontSize}px`,
-                    textAlign: textAlign,
-                    color: titleColor,
-                    WebkitTextStroke: titleStroke === 'thin' ? `1px ${titleStrokeColor}` : titleStroke === 'medium' ? `2px ${titleStrokeColor}` : titleStroke === 'thick' ? `3px ${titleStrokeColor}` : undefined,
-                    textShadow: titleStroke !== 'none' ? `0 0 2px ${titleStrokeColor}` : undefined,
-                  }}
-                  className={`w-full font-bold leading-snug tracking-tight select-none ${
-                    titleCapsLock ? 'uppercase' : 'normal-case'
-                  }`}
-                >
-                  {titleText}
-                </h2>
+                {titleText}
               </div>
 
-              {/* 4. VÍDEO RETANGULAR/QUADRADO COM REDIMENSIONAMENTO LIVRE 2D (CANVA STYLE) */}
+              {/* 4. QUADRO DO VÍDEO (RESIZABLE COM ALÇAS SUPERIOR, INFERIOR E LATERAIS) */}
               <div
-                onMouseDown={(e) => startDrag2D('video', e.clientX, e.clientY, e)}
-                onTouchStart={(e) => startDrag2D('video', e.touches[0].clientX, e.touches[0].clientY, e)}
                 style={{
                   left: `${videoPos.x}%`,
                   top: `${videoPos.y}%`,
@@ -1433,90 +1470,72 @@ export default function TemplatesPage() {
                   height: `${videoHeight}%`,
                   transform: 'translate(-50%, -50%)'
                 }}
-                className={`absolute cursor-grab active:cursor-grabbing z-20 group select-none shadow-2xl ${
-                  draggingTarget === 'video' ? 'ring-2 ring-[#6366f1]' : ''
-                }`}
-                title="Arraste para mover. Use as alças para ajustar largura e altura livremente."
+                className="absolute z-20 group"
               >
-                <div className="w-full h-full overflow-hidden bg-black flex items-center justify-center relative border border-white/10">
-                  <img
-                    src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80"
-                    alt="Preview"
-                    className="w-full h-full object-cover pointer-events-none select-none"
-                  />
-                  <div className="absolute inset-0 bg-black/10 pointer-events-none" />
-                </div>
-
-                {/* ALÇA NA LINHA DE CIMA NO MEIO: PUXAR PARA CIMA AUMENTA A ALTURA E ALTERA A PROPORÇÃO */}
+                {/* ALÇA SUPERIOR DE REDIMENSIONAMENTO VERTICAL */}
                 <div
                   onMouseDown={(e) => startResizeTop(e.clientY, e)}
                   onTouchStart={(e) => startResizeTop(e.touches[0].clientY, e)}
-                  title="Puxar para cima para aumentar a altura do vídeo (altera a proporção)"
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ns-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                  className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-5 flex items-center justify-center cursor-ns-resize z-40 group/top"
+                  title="Arrastar borda superior para redimensionar vídeo"
                 >
-                  <div className="w-6 h-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                  <div className="w-9 h-1.5 bg-white rounded-full shadow-md group-hover/top:scale-110 group-hover/top:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* ALÇA NA LINHA DE BAIXO NO MEIO: PUXAR PARA BAIXO AUMENTA A ALTURA */}
+                {/* ALÇA INFERIOR DE REDIMENSIONAMENTO VERTICAL */}
                 <div
                   onMouseDown={(e) => startResizeBottom(e.clientY, e)}
                   onTouchStart={(e) => startResizeBottom(e.touches[0].clientY, e)}
-                  title="Puxar para baixo para ajustar a altura"
-                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ns-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-5 flex items-center justify-center cursor-ns-resize z-40 group/bottom"
+                  title="Arrastar borda inferior para redimensionar vídeo"
                 >
-                  <div className="w-6 h-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                  <div className="w-9 h-1.5 bg-white rounded-full shadow-md group-hover/bottom:scale-110 group-hover/bottom:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* ALÇAS LATERAIS NO MEIO (DIREITA E ESQUERDA): PUXAR PARA O LADO ALTERA A PROPORÇÃO LATERAL / LARGURA */}
-                <div
-                  onMouseDown={(e) => startResizeRight(e.clientX, e)}
-                  onTouchStart={(e) => startResizeRight(e.touches[0].clientX, e)}
-                  title="Puxar para alterar a largura do vídeo (proporção lateral)"
-                  className="absolute -right-3 top-1/2 -translate-y-1/2 w-3.5 h-14 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ew-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
-                >
-                  <div className="h-6 w-1 bg-zinc-700 rounded-full group-hover:bg-black" />
-                </div>
-
+                {/* ALÇA LATERAL ESQUERDA DE PROPORÇÃO */}
                 <div
                   onMouseDown={(e) => startResizeLeft(e.clientX, e)}
                   onTouchStart={(e) => startResizeLeft(e.touches[0].clientX, e)}
-                  title="Puxar para alterar a largura do vídeo (proporção lateral)"
-                  className="absolute -left-3 top-1/2 -translate-y-1/2 w-3.5 h-14 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ew-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                  className="absolute -left-3 top-1/2 -translate-y-1/2 h-16 w-5 flex items-center justify-center cursor-ew-resize z-40 group/left"
+                  title="Arrastar borda esquerda para largura do vídeo"
                 >
-                  <div className="h-6 w-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                  <div className="h-9 w-1.5 bg-white rounded-full shadow-md group-hover/left:scale-110 group-hover/left:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* 4 Cantos para Escala Proporcional Suave */}
+                {/* ALÇA LATERAL DIREITA DE PROPORÇÃO */}
                 <div
-                  onMouseDown={(e) => startResizeVideo('tl', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('tl', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar Canto Superior Esquerdo"
-                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
-                />
+                  onMouseDown={(e) => startResizeRight(e.clientX, e)}
+                  onTouchStart={(e) => startResizeRight(e.touches[0].clientX, e)}
+                  className="absolute -right-3 top-1/2 -translate-y-1/2 h-16 w-5 flex items-center justify-center cursor-ew-resize z-40 group/right"
+                  title="Arrastar borda direita para largura do vídeo"
+                >
+                  <div className="h-9 w-1.5 bg-white rounded-full shadow-md group-hover/right:scale-110 group-hover/right:bg-indigo-400 transition-all border border-black/30" />
+                </div>
 
+                {/* CONTAINER VISUAL DO VÍDEO COM CONTROLES */}
                 <div
-                  onMouseDown={(e) => startResizeVideo('tr', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('tr', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar Canto Superior Direito"
-                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
-                />
-
-                <div
-                  onMouseDown={(e) => startResizeVideo('bl', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('bl', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar Canto Inferior Esquerdo"
-                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
-                />
-
-                <div
-                  onMouseDown={(e) => startResizeVideo('br', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('br', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar Canto Inferior Direito"
-                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
-                />
+                  onMouseDown={(e) => startDrag2D('video', e.clientX, e.clientY, e)}
+                  onTouchStart={(e) => startDrag2D('video', e.touches[0].clientX, e.touches[0].clientY, e)}
+                  className={`w-full h-full rounded-2xl overflow-hidden bg-black/90 shadow-2xl relative cursor-grab active:cursor-grabbing border-2 ${
+                    draggingTarget === 'video' ? 'border-[#6366f1] ring-4 ring-[#6366f1]/30' : 'border-white/40 group-hover:border-indigo-400/80'
+                  } transition-colors`}
+                  title="Arraste o centro do vídeo para mover; use as alças superior, inferior e laterais para redimensionar"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80"
+                    alt="Vídeo Preview"
+                    className="w-full h-full object-cover pointer-events-none opacity-85"
+                  />
+                  
+                  {/* 4 Handles nos cantos indicando redimensionamento */}
+                  <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
+                  <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
+                  <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
+                  <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
+                </div>
               </div>
 
-              {/* 5. LEGENDA INDEPENDENTE: 'SUA LEGENDA APARECERÁ AQUI' */}
+              {/* 5. ÁREA DAS LEGENDAS DINÂMICAS */}
               <div
                 onMouseDown={(e) => startDrag2D('subtitle', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('subtitle', e.touches[0].clientX, e.touches[0].clientY, e)}
@@ -1525,8 +1544,8 @@ export default function TemplatesPage() {
                   top: `${subtitlePos.y}%`,
                   transform: 'translate(-50%, -50%)'
                 }}
-                className={`absolute cursor-grab active:cursor-grabbing z-40 flex flex-col items-center select-none ${
-                  draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-[#6366f1] rounded-lg' : ''
+                className={`absolute cursor-grab active:cursor-grabbing z-30 select-none ${
+                  draggingTarget === 'subtitle' ? 'ring-2 ring-[#6366f1] rounded-xl p-1 bg-white/5' : ''
                 }`}
                 title="Arraste a legenda para posicionar"
               >
@@ -1543,19 +1562,87 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE SAFE ZONE: PARTE DE BAIXO + COLUNA DIREITA ESCURECIDA (SEM ÍCONES) */}
+              {/* 6. DECALQUE REELS COMPLETO E TRANSLÚCIDO (OVERLAY REALISTA DO INSTAGRAM / TIKTOK) */}
               {instagramDecal && (
-                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[40px]">
-                  {/* Zona Morta Inferior (21%) */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-gradient-to-t from-black via-black/95 to-black/85 border-t border-dashed border-white/20 flex flex-col justify-end pb-3 px-4 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest text-center">Área Segura de Legendas (Reels 9:16)</span>
+                <div className="absolute inset-0 pointer-events-none z-40 select-none overflow-hidden rounded-[44px]">
+                  {/* Gradiente suave inferior para legibilidade (o template permanece 100% visível) */}
+                  <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none" />
+
+                  {/* TOPO: Header "Reels" + Ícone de Câmera */}
+                  <div className="absolute top-12 left-5 right-5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                    <span className="font-bold text-base tracking-tight">Reels</span>
+                    <Camera className="w-5 h-5 opacity-90" />
                   </div>
-                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/65 backdrop-blur-[0.5px] border-l border-t border-dashed border-white/20 rounded-tl-xl" />
+
+                  {/* COLUNA LATERAL DIREITA: ÍCONES REAIS DO INSTAGRAM */}
+                  <div className="absolute right-3 bottom-18 flex flex-col items-center gap-4 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                    {/* Curtir */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Heart className="w-6 h-6 stroke-[2.2] fill-transparent" />
+                      <span className="text-[10px] font-bold">142K</span>
+                    </div>
+
+                    {/* Comentários */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <MessageCircle className="w-6 h-6 stroke-[2.2]" />
+                      <span className="text-[10px] font-bold">1.8K</span>
+                    </div>
+
+                    {/* Compartilhar */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Send className="w-5 h-5 stroke-[2.2]" />
+                      <span className="text-[10px] font-bold">48K</span>
+                    </div>
+
+                    {/* Mais Opções */}
+                    <div className="flex flex-col items-center">
+                      <MoreHorizontal className="w-5 h-5" />
+                    </div>
+
+                    {/* Disco de Áudio Giratório */}
+                    <div className="w-7 h-7 rounded-full bg-zinc-900 border border-white/60 shadow-lg flex items-center justify-center overflow-hidden animate-[spin_8s_linear_infinite] mt-1">
+                      <img src={avatarUrl} alt="Áudio" className="w-full h-full object-cover opacity-80" />
+                    </div>
+                  </div>
+
+                  {/* RODAPÉ DO REELS: PERFIL, LEGENDA E FAIXA DE ÁUDIO */}
+                  <div className="absolute bottom-6 left-4 right-16 flex flex-col gap-1.5 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+                    {/* Linha do Perfil */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full ring-1 ring-white/50 overflow-hidden shrink-0">
+                        <img src={avatarUrl} alt="Canal" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-xs font-bold tracking-tight truncate max-w-[120px]">
+                        {brandHandle.startsWith('@') ? brandHandle : `@${brandHandle}`}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full border border-white/60 text-[9px] font-bold bg-white/10 backdrop-blur-xs">
+                        Seguir
+                      </span>
+                    </div>
+
+                    {/* Descrição / Legenda do Post */}
+                    <p className="text-[11px] leading-snug line-clamp-2 text-zinc-100 font-medium">
+                      {titleText ? (titleText.length > 55 ? titleText.slice(0, 55) + '...' : titleText) : 'Assim que o seu vídeo vai aparecer nos Reels e Stories'} 🔥
+                    </p>
+
+                    {/* Tag de Áudio Original */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-300 font-medium">
+                      <Music className="w-3 h-3 text-white shrink-0" />
+                      <span className="truncate">Áudio original • {brandName || 'Clipost'}</span>
+                    </div>
+                  </div>
+
+                  {/* GUIA DA ÁREA SEGURA DE LEGENDAS (DELIMITADOR DINÂMICO) */}
+                  <div className="absolute left-0 right-0 bottom-[146px] border-t border-dashed border-amber-400/50 flex items-center justify-center">
+                    <span className="bg-amber-400/90 text-black text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-md tracking-wider -translate-y-1/2">
+                      Zona Segura de Legendas
+                    </span>
+                  </div>
                 </div>
               )}
 
-              {/* HOME BAR DO IPHONE */}
-              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-zinc-400/40 rounded-full pointer-events-none z-50" />
+              {/* BARRA HOME DO IPHONE 18 */}
+              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
             </div>
           </div>
 
@@ -1566,7 +1653,7 @@ export default function TemplatesPage() {
       {/* 3. BARRA INFERIOR PADRÃO CANVA (ZOOM, CONTROLE DE ESCALA E DIMENSÕES) */}
       <footer className="h-10 bg-[#0e0e11] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between text-xs text-zinc-400 z-30 shrink-0">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[11px] text-zinc-400">1080 × 1920 px (9:16 Reels)</span>
+          <span className="font-mono text-[11px] text-zinc-400">iPhone 18 Pro (19.5:9 Display) • 1080 × 1920 px</span>
           <div className="h-3 w-px bg-white/10" />
           <span className="text-[11px] flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${instagramDecal ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
