@@ -73,64 +73,28 @@ const FONT_OPTIONS = [
   { id: 'montserrat', name: 'Montserrat (Viral)', family: "Montserrat, sans-serif" },
 ]
 
-// Modelos prontos de 1-Clique (Baseados em referências virais de alto engajamento)
+// Modelo Único Padrão
 const TEMPLATE_PRESETS = [
   {
-    id: 'humor_da_iguana',
-    name: 'Humor da Iguana (Viral Preto)',
+    id: 'corte_padrao',
+    name: 'CORTE PADRÃO',
+    description: 'Layout otimizado com fundo preto, proporção 9:16 e safe zone calculada para Reels.',
     bg: 'dark',
     brandName: 'HUMOR DA IGUANA',
     brandHandle: '@humordaiguana',
     title: 'Meu maior arrependimento foi não ter seguido essa página antes 😂😂😂',
-    font: "'Instagram Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif",
+    font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
     subtitle: 'hormozi_yellow',
     avatarPos: { x: 50, y: 8 },
     headerPos: { x: 50, y: 16 },
     titlePos: { x: 50, y: 24 },
     videoPos: { x: 50, y: 52 },
-    subtitlePos: { x: 50, y: 75 },
+    subtitlePos: { x: 50, y: 74 },
     videoWidth: 92,
     videoHeight: 48,
-  },
-  {
-    id: 'humor_do_bichano',
-    name: 'Meme Clássico Branco',
-    bg: 'white',
-    brandName: 'HUMOR DO BICHANO',
-    brandHandle: '@humordobichano',
-    title: 'É assim que o seu título vai aparecer no template quando você fizer um corte 🔥',
-    font: "system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
-    fontSize: 14,
-    subtitle: 'hormozi_orange',
-    avatarPos: { x: 50, y: 8 },
-    headerPos: { x: 50, y: 16 },
-    titlePos: { x: 50, y: 24 },
-    videoPos: { x: 50, y: 52 },
-    subtitlePos: { x: 50, y: 75 },
-    videoWidth: 92,
-    videoHeight: 48,
-  },
-  {
-    id: 'podcast_split',
-    name: 'Podcast & Dark Clean',
-    bg: 'dark',
-    brandName: 'CORTES PRO PODCAST',
-    brandHandle: '@cortespro',
-    title: 'A LIÇÃO DE 1 MILHÃO DE REAIS QUE NINGUÉM TE CONTA 🧠💸',
-    font: "Impact, 'Anton', sans-serif",
-    fontSize: 15,
-    subtitle: 'clean_white',
-    avatarPos: { x: 50, y: 8 },
-    headerPos: { x: 50, y: 15 },
-    titlePos: { x: 50, y: 23 },
-    videoPos: { x: 50, y: 52 },
-    subtitlePos: { x: 50, y: 75 },
-    videoWidth: 94,
-    videoHeight: 50,
   }
 ]
-
 type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'safezone' | 'background' | null
 
 export default function TemplatesPage() {
@@ -141,6 +105,7 @@ export default function TemplatesPage() {
 
   // Cores de fundo do template
   const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray'>('dark')
+  const [customBgImage, setCustomBgImage] = useState<string | null>(null)
 
   // Posições Livres 2D (Eixos X e Y em porcentagem 0-100)
   const [avatarPos, setAvatarPos] = useState<{ x: number, y: number }>({ x: 50, y: 8 })
@@ -304,6 +269,18 @@ export default function TemplatesPage() {
   }
 
   // Auto-Enquadramento dos Elementos na Safe Zone Reels (1080x1440)
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCustomBgImage(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   const autoAlignSafeZone = () => {
     setAvatarPos({ x: 50, y: 8 })
     setHeaderPos({ x: 50, y: 16 })
@@ -864,73 +841,95 @@ export default function TemplatesPage() {
                     <button
                       type="button"
                       onClick={() => setInstagramDecal(!instagramDecal)}
-                      className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
                         instagramDecal
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                          : 'bg-white/10 text-zinc-400'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                          : 'bg-white/10 text-zinc-400 hover:text-white'
                       }`}
                     >
                       {instagramDecal ? 'LIGADO' : 'DESLIGADO'}
                     </button>
                   </div>
                   <p className="text-[11px] text-zinc-400">
-                    Exibe a região escura translúcida (Zonas Mortas de 420px no topo e rodapé) e a Área Segura de 1080x1440.
+                    Exibe a região inferior sombreada para evitar que a legenda fique escondida pela interface do Reels.
                   </p>
                 </div>
-
-                <div className="space-y-2 text-[11px] text-zinc-400">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40">
-                    <span>Área Total Reels:</span>
-                    <strong className="font-mono text-white">1080 × 1920 (9:16)</strong>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40">
-                    <span>Área Segura Central:</span>
-                    <strong className="font-mono text-emerald-400">1080 × 1440 px</strong>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40">
-                    <span>Zonas Mortas (Evite Texto):</span>
-                    <strong className="font-mono text-red-400">420px Topo / Rodapé</strong>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={autoAlignSafeZone}
-                  className="w-full py-2.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-                >
-                  <Crosshair className="w-3.5 h-3.5" /> Enquadrar na Área Segura
-                </button>
               </div>
             )}
 
-            {/* ABA 6: COR DE FUNDO */}
+            {/* ABA 6: COR DE FUNDO & UPLOAD PERSONALIZADO */}
             {activeTool === 'background' && (
-              <div className="space-y-3 text-xs">
-                <span className="text-zinc-400">Cor da Tela do Template:</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'dark', label: 'Preto Puro', bg: 'bg-black text-white border-white/20' },
-                    { id: 'white', label: 'Branco Neve', bg: 'bg-white text-zinc-900 border-zinc-300' },
-                    { id: 'gray', label: 'Grafite', bg: 'bg-zinc-800 text-white border-white/20' }
-                  ].map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => setTemplateBg(b.id as any)}
-                      className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${b.bg} ${
-                        templateBg === b.id ? 'ring-2 ring-orange-500 scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center">
-                        {templateBg === b.id && <Check className="w-3 h-3" />}
+              <div className="space-y-4 text-xs">
+                <div className="space-y-2">
+                  <span className="text-zinc-400 font-medium">Cor da Tela do Template:</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'dark', label: 'Preto Puro', bg: 'bg-black text-white border-white/20' },
+                      { id: 'white', label: 'Branco Neve', bg: 'bg-white text-zinc-900 border-zinc-300' },
+                      { id: 'gray', label: 'Grafite', bg: 'bg-zinc-800 text-white border-white/20' }
+                    ].map(b => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => {
+                          setTemplateBg(b.id as any)
+                          setCustomBgImage(null)
+                        }}
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${b.bg} ${
+                          templateBg === b.id && !customBgImage ? 'ring-2 ring-orange-500 scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center">
+                          {templateBg === b.id && !customBgImage && <Check className="w-3 h-3" />}
+                        </div>
+                        <span className="text-[11px] font-semibold">{b.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Upload de Fundo Personalizado */}
+                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+                  <span className="text-zinc-400 font-medium">Fundo Personalizável (Upload):</span>
+                  
+                  {customBgImage ? (
+                    <div className="space-y-2">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-orange-500/40 shadow-inner">
+                        <img src={customBgImage} alt="Fundo Personalizado" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">Fundo Ativo</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-bold">{b.label}</span>
-                    </button>
-                  ))}
+                      <div className="flex gap-2">
+                        <label className="flex-1 py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/10 text-white font-medium text-center cursor-pointer transition-colors text-xs flex items-center justify-center gap-1.5">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Trocar Imagem</span>
+                          <input type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCustomBgImage(null)}
+                          className="py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-medium text-xs cursor-pointer transition-colors"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-orange-500/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
+                      <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-semibold text-white text-xs">Fazer Upload de Imagem de Fundo</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">PNG, JPG ou WebP (proporção 9:16 recomendada)</p>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
+                    </label>
+                  )}
                 </div>
               </div>
             )}
-
           </div>
         )}
 
@@ -1131,63 +1130,9 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE OFICIAL REELS SAFE ZONE (1080x1920 COM ZONAS MORTAS E ÁREA SEGURA 1080x1440) */}
+              {/* 6. DECALQUE SAFE ZONE: APENAS A PARTE DE BAIXO TRANSLÚCIDA (SEM ÍCONES, SEM BARRAS, SEM TEXTO) */}
               {instagramDecal && (
-                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[38px]">
-                  
-                  {/* ZONA MORTA SUPERIOR 420px (21%) */}
-                  <div className="absolute top-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-b border-dashed border-red-500/40 p-2.5 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-white/80 text-[10px] font-mono">
-                      <span>9:41 • 5G</span>
-                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
-                        Zona Morta (Topo 420px)
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-white/70 text-[11px] font-bold">
-                      <span>Reels</span>
-                      <Camera className="w-3.5 h-3.5 opacity-70" />
-                    </div>
-                  </div>
-
-                  {/* ÁREA SEGURA CENTRAL 1080x1440 (GRID VIEW) */}
-                  <div className="absolute top-[21%] bottom-[21%] left-0 right-0 pointer-events-none z-30">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-px bg-cyan-400/60" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-px bg-cyan-400/60" />
-                    <div className="absolute top-2 left-3 bg-black/60 px-1.5 py-0.5 rounded text-[8px] font-mono text-emerald-400 font-bold border border-emerald-500/30">
-                      Área Segura Reels (1080x1440)
-                    </div>
-                  </div>
-
-                  {/* RECORTE LATERAL DIREITO (BOTÕES REELS) */}
-                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/75 backdrop-blur-[1px] border-l border-t border-dashed border-red-500/40 rounded-tl-xl flex flex-col items-center justify-around py-2 text-white/80">
-                    <Heart className="w-4 h-4 text-white/70" />
-                    <MessageCircle className="w-4 h-4 text-white/70" />
-                    <Send className="w-4 h-4 text-white/70" />
-                    <MoreHorizontal className="w-4 h-4 text-white/70" />
-                    <div className="w-5 h-5 rounded-full border border-white/60 bg-zinc-900 flex items-center justify-center">
-                      <Music className="w-2.5 h-2.5 text-white animate-spin" />
-                    </div>
-                  </div>
-
-                  {/* ZONA MORTA INFERIOR 420px (21%) */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-t border-dashed border-red-500/40 p-2.5 flex flex-col justify-between">
-                    <div className="text-center pt-0.5">
-                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/30">
-                        Zona Morta (Rodapé 420px)
-                      </span>
-                    </div>
-                    <div className="h-7 bg-black/50 border-t border-white/10 flex items-center justify-around px-3 text-white/70">
-                      <Home className="w-3 h-3" />
-                      <Search className="w-3 h-3" />
-                      <Film className="w-3 h-3 text-white" />
-                      <ShoppingBag className="w-3 h-3" />
-                      <div className="w-3 h-3 rounded-full border border-white/60 overflow-hidden">
-                        <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20 pointer-events-none z-40 rounded-b-[38px] transition-opacity" />
               )}
 
               {/* HOME BAR DO IPHONE */}
