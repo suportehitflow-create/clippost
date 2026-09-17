@@ -897,47 +897,61 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE OFICIAL DO INSTAGRAM REELS (REGIÃO TRANSLÚCIDA LIMPA SEM ESCRITAS) */}
+              {/* 6. DECALQUE OFICIAL REELS (MÁSCARA TRANSLÚCIDA 1080x1920 COM ZONAS MORTAS E ÁREA SEGURA 1080x1440) */}
               {instagramDecal && (
-                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-200 flex flex-col justify-between overflow-hidden rounded-[44px]">
+                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-200 overflow-hidden rounded-[44px]">
                   
-                  {/* REGIÃO TRANSLÚCIDA SUPERIOR (STATUS + HEADER REELS) */}
-                  <div className="h-20 bg-gradient-to-b from-black/75 via-black/40 to-transparent pt-2 px-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-white/90 text-xs font-semibold drop-shadow">
-                      <span className="font-mono text-[11px] font-bold">9:41</span>
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                        <span>5G</span>
-                        <div className="w-4 h-2 rounded-sm border border-white/80 p-0.5 flex items-center">
-                          <div className="w-full h-full bg-white rounded-2xs" />
-                        </div>
-                      </div>
+                  {/* ZONA MORTA SUPERIOR (TOPO 420px • ~21% DA TELA) */}
+                  <div className="absolute top-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-b border-dashed border-red-500/40 p-2.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-white/80 text-[10px] font-mono">
+                      <span>9:41 • 5G</span>
+                      <span className="text-[9px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
+                        Zona Morta (Topo 420px)
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-white/90 pb-1">
-                      <span className="text-xs font-black tracking-tight drop-shadow">Reels</span>
-                      <Camera className="w-4 h-4 opacity-80" />
+                    <div className="flex items-center justify-between text-white/70 text-[11px] font-bold">
+                      <span>Reels</span>
+                      <Camera className="w-3.5 h-3.5 opacity-70" />
                     </div>
                   </div>
 
-                  {/* ÍCONES MINIMALISTAS DA LATERAL DIREITA (SEM TEXTOS POLUÍDOS) */}
-                  <div className="absolute right-3 bottom-24 flex flex-col items-center gap-3.5 text-white/85 drop-shadow-md">
-                    <Heart className="w-5 h-5" />
-                    <MessageCircle className="w-5 h-5" />
-                    <Send className="w-5 h-5" />
-                    <MoreHorizontal className="w-5 h-5" />
-                    <div className="w-6 h-6 rounded-lg border border-white/70 bg-black/60 overflow-hidden flex items-center justify-center">
-                      <Music className="w-3 h-3 text-white animate-spin" />
+                  {/* ÁREA SEGURA CENTRAL (1080x1440 / GRID VIEW) COM MIRA DE CENTRO */}
+                  <div className="absolute top-[21%] bottom-[21%] left-0 right-0 pointer-events-none z-30">
+                    {/* Linhas de Mira Central (Crosshair) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-px bg-cyan-400/60" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-px bg-cyan-400/60" />
+                    
+                    {/* Badge da Área Central Segura */}
+                    <div className="absolute top-2 left-3 bg-black/60 px-2 py-0.5 rounded text-[8px] font-mono text-emerald-400 font-bold border border-emerald-500/30">
+                      Área Segura (Grid View 1080x1440)
                     </div>
                   </div>
 
-                  {/* REGIÃO TRANSLÚCIDA INFERIOR (ÁREA DE LEGENDA DO REELS + BARRA DE ABAS) */}
-                  <div className="h-28 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex flex-col justify-end">
+                  {/* RECORTE LATERAL DIREITO (BOTÕES DE AÇÃO REELS) */}
+                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/75 backdrop-blur-[1px] border-l border-t border-dashed border-red-500/40 rounded-tl-xl flex flex-col items-center justify-around py-2 text-white/80">
+                    <Heart className="w-4 h-4 text-white/70" />
+                    <MessageCircle className="w-4 h-4 text-white/70" />
+                    <Send className="w-4 h-4 text-white/70" />
+                    <MoreHorizontal className="w-4 h-4 text-white/70" />
+                    <div className="w-5 h-5 rounded-full border border-white/60 bg-zinc-900 flex items-center justify-center">
+                      <Music className="w-2.5 h-2.5 text-white animate-spin" />
+                    </div>
+                  </div>
+
+                  {/* ZONA MORTA INFERIOR (RODAPÉ 420px • ~21% DA TELA) */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-t border-dashed border-red-500/40 p-2.5 flex flex-col justify-between">
+                    <div className="text-center pt-0.5">
+                      <span className="text-[9px] uppercase font-extrabold text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/30">
+                        Zona Morta (Rodapé 420px)
+                      </span>
+                    </div>
                     {/* Barra de Navegação Inferior Nativas do Instagram */}
-                    <div className="h-10 bg-black/70 backdrop-blur-sm border-t border-white/10 flex items-center justify-around px-4 text-white/80">
-                      <Home className="w-4 h-4 opacity-80" />
-                      <Search className="w-4 h-4 opacity-80" />
-                      <Film className="w-4 h-4 opacity-95 text-white" />
-                      <ShoppingBag className="w-4 h-4 opacity-80" />
-                      <div className="w-4 h-4 rounded-full border border-white/60 overflow-hidden">
+                    <div className="h-8 bg-black/50 border-t border-white/10 flex items-center justify-around px-3 text-white/70">
+                      <Home className="w-3.5 h-3.5" />
+                      <Search className="w-3.5 h-3.5" />
+                      <Film className="w-3.5 h-3.5 text-white" />
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <div className="w-3.5 h-3.5 rounded-full border border-white/60 overflow-hidden">
                         <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
                       </div>
                     </div>

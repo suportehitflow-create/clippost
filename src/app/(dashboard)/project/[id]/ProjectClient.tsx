@@ -129,6 +129,7 @@ export default function ProjectClient({
 
   // Reprodução
   const [isPlaying, setIsPlaying] = useState(false)
+  const [showReelsSafeZone, setShowReelsSafeZone] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -567,6 +568,48 @@ export default function ProjectClient({
                 <span className="text-orange-500 font-bold font-sans">🔥 VIRAL {Math.round(activeClip.score * 100)}%</span>
               </div>
 
+              {/* DECALQUE OFICIAL REELS SAFE ZONE (1080x1920 COM ZONAS MORTAS E ÁREA SEGURA 1080x1440) */}
+              {showReelsSafeZone && (
+                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[40px]">
+                  {/* ZONA MORTA SUPERIOR 420px (21%) */}
+                  <div className="absolute top-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-b border-dashed border-red-500/40 p-2 flex flex-col justify-between">
+                    <div className="flex items-center justify-between text-white/80 text-[10px] font-mono">
+                      <span>9:41 • 5G</span>
+                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1 py-0.5 rounded border border-red-500/30">
+                        Zona Morta (Topo 420px)
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-white/70 font-bold">Reels</div>
+                  </div>
+
+                  {/* ÁREA SEGURA CENTRAL 1080x1440 */}
+                  <div className="absolute top-[21%] bottom-[21%] left-0 right-0 pointer-events-none z-30">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-px bg-cyan-400/60" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-px bg-cyan-400/60" />
+                    <div className="absolute top-2 left-3 bg-black/60 px-1.5 py-0.5 rounded text-[8px] font-mono text-emerald-400 font-bold border border-emerald-500/30">
+                      Área Segura Reels (1080x1440)
+                    </div>
+                  </div>
+
+                  {/* RECORTE LATERAL DIREITO (BOTÕES REELS) */}
+                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/75 backdrop-blur-[1px] border-l border-t border-dashed border-red-500/40 rounded-tl-xl flex flex-col items-center justify-around py-2 text-white/80">
+                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
+                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
+                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
+                  </div>
+
+                  {/* ZONA MORTA INFERIOR 420px (21%) */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-t border-dashed border-red-500/40 p-2 flex flex-col justify-between">
+                    <div className="text-center">
+                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
+                        Zona Morta (Rodapé 420px)
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-zinc-500 text-center">Legendas e Barra de Abas do Feed</div>
+                  </div>
+                </div>
+              )}
+
               {/* BARRA HOME DO IPHONE */}
               <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full z-30 ${
                 templateBg === 'white' ? 'bg-zinc-300' : 'bg-white/30'
@@ -574,8 +617,22 @@ export default function ProjectClient({
             </div>
           </div>
 
+          {/* CONTROLES DE REPRODUÇÃO & DECALQUE REELS */}
+          <div className="w-[290px] sm:w-[320px] mt-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowReelsSafeZone(!showReelsSafeZone)}
+              className="w-full py-1 px-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white flex items-center justify-between transition-all cursor-pointer"
+            >
+              <span>Decalque Safe Zone Reels (1080x1440):</span>
+              <strong className={`font-mono font-bold ${showReelsSafeZone ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                {showReelsSafeZone ? 'LIGADO' : 'DESLIGADO'}
+              </strong>
+            </button>
+          </div>
+
           {/* CONTROLES DE REPRODUÇÃO (MINIMALISTA) */}
-          <div className="w-[290px] sm:w-[320px] mt-3 flex items-center justify-between bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-xl text-xs text-zinc-400">
+          <div className="w-[290px] sm:w-[320px] mt-2 flex items-center justify-between bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-xl text-xs text-zinc-400">
             <button
               type="button"
               onClick={() => {
