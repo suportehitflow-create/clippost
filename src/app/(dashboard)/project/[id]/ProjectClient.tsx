@@ -752,7 +752,7 @@ export default function ProjectClient({
                       Área Segura (Reels 9:16)
                     </span>
                   </div>
-                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/55 border-l border-t border-dashed border-white/20 rounded-tl-xl" />
+                  
                 </div>
               )}
 
@@ -773,44 +773,7 @@ export default function ProjectClient({
             </button>
           </div>
 
-          {/* CONTROLES DE REPRODUÇÃO (MINIMALISTA) */}
-          <div className="w-[290px] sm:w-[320px] mt-2 flex items-center justify-between bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-xl text-xs text-zinc-400">
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedClipIndex > 0) setSelectedClipIndex(prev => prev - 1)
-              }}
-              disabled={selectedClipIndex === 0}
-              className="p-1 hover:text-white disabled:opacity-30 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={togglePlayback}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium transition-all cursor-pointer"
-            >
-              {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{isPlaying ? 'Pausar' : 'Reproduzir'}</span>
-            </button>
-
-            <span className="font-mono text-[11px] text-zinc-400">
-              {formatDuration(Math.floor(playbackTime))} / {formatDuration(Math.floor(clipDuration))}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedClipIndex < clips.length - 1) setSelectedClipIndex(prev => prev + 1)
-              }}
-              disabled={selectedClipIndex >= clips.length - 1}
-              className="p-1 hover:text-white disabled:opacity-30 cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
-        </div>
 
         {/* COLUNA DIREITA (7 COLUNAS): VISÃO EM LOTE, EXPORTAÇÃO E AJUSTES OPCIONAIS */}
         <div className="lg:col-span-7 space-y-4">
@@ -979,18 +942,7 @@ export default function ProjectClient({
                         activeColor="indigo"
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-zinc-400">Emojis Automáticos:</span>
-                      <button
-                        type="button"
-                        onClick={() => setSmartEmojisEnabled(!smartEmojisEnabled)}
-                        className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                          smartEmojisEnabled ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-white/[0.05] text-zinc-500'
-                        }`}
-                      >
-                        {smartEmojisEnabled ? 'Ativo 🔥' : 'Desligado'}
-                      </button>
-                    </div>
+                    
 
                     <div className="space-y-1.5">
                       <span className="text-zinc-400">Estilo de Legenda:</span>
@@ -1014,154 +966,81 @@ export default function ProjectClient({
                   </div>
                 )}
 
-                {/* Conteúdo da Aba: Enquadramento */}
+                {/* Conteúdo da Aba: Enquadramento (100% Automático via IA) */}
                 {adjustTab === 'framing' && (
-                  <div className="space-y-4 text-xs">
-                    {/* CARD DA IA SMART FRAMING */}
-                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#6366f1]/10 to-purple-500/5 border border-[#6366f1]/20 space-y-2">
+                  <div className="space-y-3.5 text-xs">
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/40 via-[#121026]/60 to-purple-950/30 border border-indigo-500/20 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-[#6366f1]/20 flex items-center justify-center text-[#6366f1]">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
                             <Sparkles className="w-4 h-4" />
                           </div>
-                          <div>
-                            <span className="font-bold text-white block">IA Smart Framing</span>
-                            <span className="text-[10px] text-zinc-400">Rastreamento de Falante & Foco</span>
-                          </div>
+                          <span className="font-bold text-white block">IA Auto-Tracking (100% Automatizado)</span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          {cropPanX === 50 ? 'Âncora Central' : `${cropPanX}% Acompanhando`}
+                        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Calibrado
                         </span>
                       </div>
                       <p className="text-[11px] text-zinc-300 leading-relaxed">
-                        O vídeo bruto é enquadrado no tamanho definido no template (<strong>{videoWidth}% × {videoHeight}%</strong>). A IA prioriza o centro como âncora principal e acompanha o sujeito quando ele sai do meio para nunca cortar nada de importante.
+                        A Inteligência Artificial analisa o vídeo bruto e calibra o enquadramento dinamicamente. O rosto e os movimentos do falante principal são acompanhados e centralizados de forma 100% autônoma, sem necessidade de ajustes manuais.
                       </p>
-                    </div>
-
-                    {/* SELEÇÃO DE FOCO */}
-                    <div className="space-y-1.5">
-                      <span className="text-zinc-400 font-medium">Modo de Enquadramento:</span>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { id: 'auto', label: '🤖 IA Auto', pan: 50 },
-                          { id: 'center', label: '🎯 Centro', pan: 50 },
-                          { id: 'left', label: '👤 Esquerda', pan: 35 },
-                          { id: 'right', label: '👤 Direita', pan: 65 },
-                        ].map(pos => (
-                          <button
-                            key={pos.id}
-                            type="button"
-                            onClick={() => {
-                              setAiFraming(pos.id as AiFramingPreset)
-                              setCropPanX(pos.pan)
-                            }}
-                            className={`p-2 rounded-xl text-center transition-all cursor-pointer text-[11px] font-semibold border ${
-                              aiFraming === pos.id
-                                ? 'border-[#6366f1] bg-[#6366f1]/20 text-white shadow-sm shadow-[#6366f1]/20'
-                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
-                            }`}
-                          >
-                            {pos.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* SWEEP STEPPER DE PAN HORIZONTAL (TAP FOR ONE, HOLD TO SWEEP) */}
-                    <div className="space-y-2 pt-1 border-t border-white/[0.06]">
-                      <SweepStepper
-                        label="Posição do Foco (Pan Horizontal):"
-                        value={cropPanX}
-                        onChange={(val) => {
-                          setCropPanX(val)
-                          setAiFraming('original')
-                        }}
-                        min={15}
-                        max={85}
-                        step={1}
-                        unit="%"
-                        formatValue={(v) => `${v}% ${v === 50 ? '(Centro)' : v < 50 ? '(Esq)' : '(Dir)'}`}
-                      />
-                      <div className="flex justify-between text-[10px] text-zinc-500 font-mono px-1">
-                        <span>← Esquerda (15%)</span>
-                        <span className="text-zinc-400 cursor-pointer hover:text-white" onClick={() => { setCropPanX(50); setAiFraming('original'); }}>Centro (50%)</span>
-                        <span>Direita (85%) →</span>
-                      </div>
                     </div>
 
                     {/* TOGGLE SAFE ZONE REELS */}
                     <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
                       <div>
-                        <span className="text-xs font-semibold text-white block">Decalque Safe Zone Reels</span>
-                        <span className="text-[10px] text-zinc-400">Exibe margens de segurança para Stories e Reels</span>
+                        <span className="text-xs font-semibold text-white block">Decalque Safe Zone (Reels 9:16)</span>
+                        <span className="text-[10px] text-zinc-400">Exibe margens de segurança na base do vídeo</span>
                       </div>
                       <LiquidToggle
                         checked={showReelsSafeZone}
                         onChange={setShowReelsSafeZone}
-                        activeLabel="LIGADO"
-                        inactiveLabel="DESLIGADO"
-                        activeColor="emerald"
+                        activeColor="indigo"
                       />
                     </div>
 
-                    {/* DIMENSÕES HERDADAS DO TEMPLATE */}
+                    {/* LINK DIRETO PARA TEMPLATE */}
                     <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <span className="text-zinc-300 font-medium block">Tamanho no Template:</span>
+                        <span className="text-zinc-300 font-medium block">Dimensões & Posição:</span>
                         <span className="text-[10px] text-zinc-500 font-mono">
-                          {videoWidth}% L × {videoHeight}% A • Posição Y: {videoPos.y}%
+                          Definido no Template ({videoWidth}% × {videoHeight}%)
                         </span>
                       </div>
                       <Link
                         href="/templates"
-                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white/[0.05] hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 transition-colors flex items-center gap-1.5"
+                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center gap-1.5"
                       >
-                        <Sparkles className="w-3 h-3 text-indigo-400" />
-                        <span>Ajustar Template</span>
+                        <Sparkles className="w-3 h-3" />
+                        <span>Editar no Template</span>
                       </Link>
                     </div>
                   </div>
                 )}
 
-                {/* Conteúdo da Aba: Template */}
+                {/* Conteúdo da Aba: Template (Herdado do Editor de Templates) */}
                 {adjustTab === 'template' && (
                   <div className="space-y-3 text-xs">
-                    <div className="space-y-1.5">
-                      <span className="text-zinc-400">Layout do Template:</span>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[
-                          { id: 'meme_frame', label: 'Meme Frame' },
-                          { id: 'split_screen', label: 'Split Screen' },
-                          { id: 'single_speaker', label: 'Full 9:16' }
-                        ].map(lay => (
-                          <button
-                            key={lay.id}
-                            type="button"
-                            onClick={() => setActiveLayout(lay.id as LayoutFormat)}
-                            className={`py-2 px-2.5 rounded-lg text-center transition-all cursor-pointer text-[11px] font-semibold border ${
-                              activeLayout === lay.id
-                                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
-                                : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
-                            }`}
-                          >
-                            {lay.label}
-                          </button>
-                        ))}
+                    <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">Template do Canal</span>
+                        <span className="text-[10px] text-indigo-400 font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                          {templateBg === 'white' ? 'Fundo Branco' : 'Fundo Escuro'}
+                        </span>
                       </div>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
-                      <div>
-                        <span className="text-xs font-semibold text-white block">Bordas Arredondadas no Vídeo</span>
-                        <span className="text-[10px] text-zinc-400">Suaviza as bordas do recorte de vídeo</span>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        O design, cores, bordas e alinhamentos são gerenciados no Editor de Templates para manter consistência em todos os seus cortes.
+                      </p>
+                      <div className="pt-1">
+                        <Link
+                          href="/templates"
+                          className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/10 flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Abrir Editor Completo de Templates</span>
+                        </Link>
                       </div>
-                      <LiquidToggle
-                        checked={videoRounded}
-                        onChange={setVideoRounded}
-                        activeLabel="ARREDONDADA"
-                        inactiveLabel="QUADRADA"
-                        activeColor="indigo"
-                      />
                     </div>
                   </div>
                 )}

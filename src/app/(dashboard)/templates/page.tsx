@@ -33,6 +33,7 @@ import {
   User,
   LayoutTemplate,
   ShieldCheck,
+  Play,
   Undo2,
   Redo2,
   ZoomIn,
@@ -153,6 +154,7 @@ export default function TemplatesPage() {
   // Dimensões livres do vídeo (Largura e Altura em % do canvas)
   const [videoWidth, setVideoWidth] = useState(92)
   const [videoHeight, setVideoHeight] = useState(48)
+  const [videoRounded, setVideoRounded] = useState<boolean>(true)
   const [videoAspect, setVideoAspect] = useState<'9:16' | '4:5' | '1:1' | '16:9'>('9:16')
 
   // Conteúdo textual e identidade
@@ -226,6 +228,7 @@ export default function TemplatesPage() {
           if (c.textAlign) setTextAlign(c.textAlign)
           if (c.videoWidth) setVideoWidth(c.videoWidth)
           if (c.videoHeight) setVideoHeight(c.videoHeight)
+          if (c.videoRounded !== undefined) setVideoRounded(c.videoRounded)
           if (c.avatarPos) setAvatarPos(c.avatarPos)
           if (c.headerPos) setHeaderPos(c.headerPos)
           if (c.titlePos) setTitlePos(c.titlePos)
@@ -256,6 +259,7 @@ export default function TemplatesPage() {
             if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
             if (cfg.videoWidth) setVideoWidth(cfg.videoWidth)
             if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
+            if (cfg.videoRounded !== undefined) setVideoRounded(cfg.videoRounded)
             if (cfg.videoPos) setVideoPos(cfg.videoPos)
             if (cfg.headerPos) setHeaderPos(cfg.headerPos)
             if (cfg.titlePos) setTitlePos(cfg.titlePos)
@@ -638,6 +642,7 @@ export default function TemplatesPage() {
         titleCapsLock,
         videoWidth,
         videoHeight,
+        videoRounded,
         avatarPos,
         headerPos,
         titlePos,
@@ -1554,15 +1559,18 @@ export default function TemplatesPage() {
                 <div
                   onMouseDown={(e) => startDrag2D('video', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startDrag2D('video', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  className={`w-full h-full rounded-2xl overflow-hidden bg-black/90 shadow-xl relative cursor-grab active:cursor-grabbing border-2 ${
+                  className={`w-full h-full ${videoRounded ? 'rounded-2xl' : 'rounded-none'} overflow-hidden bg-black/90 shadow-xl relative cursor-grab active:cursor-grabbing border-2 ${
                     draggingTarget === 'video' ? 'border-[#6366f1] ring-4 ring-[#6366f1]/30' : templateBg === 'white' ? 'border-zinc-300 group-hover:border-indigo-400/80' : 'border-white/40 group-hover:border-indigo-400/80'
                   } transition-colors`}
                 >
-                  <img
-                    src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80"
-                    alt="Vídeo Preview"
-                    className="w-full h-full object-cover pointer-events-none opacity-90"
-                  />
+                  <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center relative overflow-hidden select-none">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.25),transparent_70%)]" />
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl shadow-indigo-500/40 ring-1 ring-white/20 mb-2 z-10">
+                      <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-200 tracking-wider uppercase z-10 drop-shadow">Prévia do Vídeo</span>
+                    <span className="text-[9px] font-mono text-indigo-300/80 z-10">Área Dinâmica do Corte</span>
+                  </div>
                   
                   <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
                   <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />

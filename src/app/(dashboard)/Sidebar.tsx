@@ -9,9 +9,8 @@ import {
   Sparkles,
   Zap,
   Calendar,
-  LogOut
+  Settings
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useHorizontalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
 
@@ -35,19 +34,9 @@ const NAV_ITEMS = [
  */
 export default function Sidebar({ user }: { user: User }) {
   const pathname = usePathname()
-  const supabase = createClient()
 
   // Bencho Fisheye Dock Physics (Horizontal)
   const { registerItem, onMouseMove, onMouseLeave } = useHorizontalFisheyeDock(2.8)
-
-  async function signOut() {
-    document.cookie = 'clippost_demo_auth=; path=/; max-age=0'
-    localStorage.removeItem('clippost_demo_auth')
-    localStorage.removeItem('clippost_demo_user_id')
-    localStorage.removeItem('clippost_demo_user_email')
-    await supabase.auth.signOut()
-    window.location.href = '/login'
-  }
 
   return (
     <nav
@@ -114,20 +103,34 @@ export default function Sidebar({ user }: { user: User }) {
 
       <div className="w-px h-6 bg-white/10 mx-0.5" />
 
-      {/* Sign Out Button */}
-      <button
-        type="button"
-        onClick={signOut}
-        className="gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10 transition-all cursor-pointer"
-        aria-label="Encerrar sessão"
+      {/* Ajustes da Conta */}
+      <Link
+        href="/settings"
+        ref={registerItem(NAV_ITEMS.length)}
+        className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+          pathname === '/settings'
+            ? 'bg-indigo-600/20 text-white shadow-sm ring-1 ring-indigo-500/30'
+            : 'text-zinc-400 hover:text-white hover:bg-white/[0.05] opacity-70 hover:opacity-100'
+        }`}
+        aria-label="Ajustes"
+        aria-current={pathname === '/settings' ? 'page' : undefined}
       >
+        <span
+          className={`gdock-dot absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#6366f1] shadow-[0_0_6px_rgba(99,102,241,0.9)] transition-all ${
+            pathname === '/settings' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+          }`}
+        />
         <span className="gdock-glyph flex items-center justify-center">
-          <LogOut className="w-4 h-4" />
+          <Settings
+            className={`w-4 h-4 transition-colors ${
+              pathname === '/settings' ? 'text-indigo-400' : 'text-zinc-300 group-hover:text-white'
+            }`}
+          />
         </span>
         <span className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-[#18181b] text-white font-mono text-[9px] uppercase tracking-wider shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
-          Encerrar sessão
+          Ajustes
         </span>
-      </button>
+      </Link>
     </nav>
   )
 }
