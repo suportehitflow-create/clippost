@@ -1,5 +1,6 @@
 """
-FFmpeg Engine — corte 9:16 + Brand Kit overlay + legendas virais.
+FFmpeg Engine — renderização de clipes verticais (9:16).
+Integrado com os Modelos/Templates e com IA Smart Framing (Active Speaker & Focus Tracking).
 """
 import os
 import shutil
@@ -11,7 +12,6 @@ from pathlib import Path
 
 
 def _download_avatar(url: str, dest_dir: str) -> str | None:
-    """Baixa avatar para arquivo local (FFmpeg precisa de arquivo local)."""
     if not url:
         return None
     try:
@@ -32,126 +32,181 @@ def create_vertical_clip(
     brand_kit: dict | None = None,
     subtitle_file: str | None = None,
     hook_title: str | None = None,
-    hflip: bool = True,
+    hflip: bool = False,
     remove_silence: bool = False,
     speed: float = 1.0,
 ) -> str:
     """
-    Renderiza um clipe vertical 9:16 com:
-    - Crop centralizado 9:16
-    - Avatar overlay (se brand_kit fornecido)
-    - Username e hook_title via drawtext
-    - Legendas queimadas (.srt ou .ass)
-
-    brand_kit estrutura esperada:
-    {
-        "avatar_url": "https://...",
-        "username": "@usuario",
-        "layout_config": {
-            "avatar":   {"x": 40,  "y": 60,  "w": 120, "h": 120},
-            "hook":     {"x": 540, "y": 1600},
-            "username": {"x": 180, "y": 95}
-        }
-    }
+    Renderiza clipe vertical 9:16 (1080x1920) 100% integrado com o template:
+    - O vídeo bruto é recortado na proporção e dimensões exatas definidas no template.
+    - IA Smart Framing: centraliza no foco/falante (com âncora prioritária no centro).
+    - Canvas com cor de fundo do template (dark, white, zinc).
+    - Avatar, nome da marca e gancho/título posicionados conforme configurado no template.
+    - Legendas queimadas (.ass ou .srt).
     """
     duration = round(end - start, 3)
     tmp_dir = tempfile.mkdtemp(prefix="clippost_engine_")
 
     try:
         layout = (brand_kit or {}).get("layout_config", {})
-        avatar_cfg = layout.get("avatar", {"x": 40, "y": 60, "w": 120, "h": 120})
-        hook_cfg = layout.get("hook", {"x": 540, "y": 1600})
-        user_cfg = layout.get("username", {"x": 180, "y": 95})
-
         username = (brand_kit or {}).get("username", "")
         avatar_url = (brand_kit or {}).get("avatar_url", "")
 
-        # --- Construção do filter_complex ---
-        # Detecta se é layout educacional/código (Screen 16:9 + Fundo Desfocado 9:16) ou crop padrão
-        layout_mode = (brand_kit or {}).get("layout_mode", "crop")
-        if layout_mode in ("screen_blur", "blur_padding", "tutorial", "split_screen"):
-            filter_parts = [
-                f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"\
-                f"[0:v]scale=1080:-1[fg];"\
-                f"[bg][fg]overlay=0:(1920-overlay_h)/2[base]"
-            ]
+        # 1. Dimensões do quadrado/retângulo de vídeo do template
+        video_w_pct = float(layout.get("videoWidth", 96))
+        video_h_pct = float(layout.get("videoHeight", 48))
+        video_pos = layout.get("videoPos", {"x": 50, "y": 55})
+        video_pos_x = float(video_pos.get("x", 50))
+        video_pos_y = float(video_pos.get("y", 55))
+
+        target_w = int(round(1080 * (video_w_pct / 100.0)))
+        target_h = int(round(1920 * (video_h_pct / 100.0)))
+        # Garante dimensões pares para codecs x264
+        target_w = max(200, min(1080, target_w - (target_w % 2)))
+        target_h = max(200, min(1920, target_h - (target_h % 2)))
+
+        box_x = int(round(1080 * (video_pos_x / 100.0) - (target_w / 2.0)))
+        box_y = int(round(1920 * (video_pos_y / 100.0) - (target_h / 2.0)))
+        box_x = max(0, min(1080 - target_w, box_x))
+        box_y = max(0, min(1920 - target_h, box_y))
+        box_x -= (box_x % 2)
+        box_y -= (box_y % 2)
+
+        # 2. IA Smart Framing: Identifica o foco do vídeo bruto
+        # O centro (50%) é a âncora prioritária principal; se o falante estiver deslocado, a IA acompanha.
+        manual_pan = layout.get("cropPanX") or layout.get("manualPanX")
+        try:
+            from services.smart_framing import detect_smart_focus
+            target_aspect = target_w / float(target_h)
+            focal_x_pct, (crop_x, crop_y, crop_w, crop_h) = detect_smart_focus(
+                input_video, start, duration, target_aspect=target_aspect, manual_pan_pct=manual_pan
+            )
+            print(f"[ffmpeg_engine] IA Smart Framing: focal={focal_x_pct}%, crop=({crop_w}x{crop_h} at {crop_x},{crop_y}) -> target=({target_w}x{target_h})")
+        except Exception as sf_err:
+            print(f"[ffmpeg_engine] smart_framing aviso ({sf_err}), usando centralizado padrão")
+            crop_w = int(round(1080 * (target_w / float(target_h))))
+            crop_h = 1080
+            crop_x = max(0, (1920 - crop_w) // 2)
+            crop_y = 0
+
+        # 3. Cor de fundo do Template
+        template_bg = layout.get("templateBg", "dark")
+        if template_bg == "white":
+            bg_color = "white"
+        elif template_bg in ("zinc", "gray"):
+            bg_color = "0x18181b"
         else:
-            video_transforms = "crop=ih*9/16:ih,scale=1080:1920"
-            if hflip:
-                video_transforms += ",hflip"
-            if speed and speed != 1.0:
-                video_transforms += f",setpts={round(1/speed, 4)}*PTS"
+            bg_color = "black"
 
-            filter_parts = [
-                f"[0:v]{video_transforms}[base]"
-            ]
+        # Transformações adicionais do vídeo (hflip, speed)
+        vbox_filters = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}", f"scale={target_w}:{target_h}"]
+        if hflip:
+            vbox_filters.append("hflip")
+        if speed and speed != 1.0:
+            vbox_filters.append(f"setpts={round(1/speed, 4)}*PTS")
 
-        # Audio transforms
+        filter_parts = [
+            f"color=c={bg_color}:s=1080x1920:d={duration}[bg]",
+            f"[0:v]{','.join(vbox_filters)}[vbox]",
+            f"[bg][vbox]overlay={box_x}:{box_y}[base]"
+        ]
+
+        # 4. Áudio transforms
         audio_filters = []
         if remove_silence:
-            # Encurta só o áudio: o vídeo não acompanha e a fala sai da boca.
-            # Desligado por padrão até existir corte de silêncio sincronizado.
-            audio_filters.append(
-                "silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-50dB"
-            )
+            audio_filters.append("silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-50dB")
         if speed and speed != 1.0:
             audio_filters.append(f"atempo={min(2.0, speed)}")
         audio_filters += _edge_fades(duration / (speed or 1.0))
         filter_parts.append(f"[0:a]{','.join(audio_filters)}[aout]")
         audio_map = "[aout]"
         last_video = "[base]"
+
         input_files = [
             "-ss", str(start), "-t", str(duration), "-i", input_video,
         ]
         input_count = 1
 
-        # Avatar overlay
+        # 5. Header: Perfil da Marca (Avatar + Nome + @handle)
+        header_pos = layout.get("headerPos", {"x": 50, "y": 16})
+        hy_pct = float(header_pos.get("y", 16))
+        hx_pct = float(header_pos.get("x", 50))
+        header_center_y = int(round(1920 * (hy_pct / 100.0)))
+
         avatar_local = None
         if avatar_url:
             avatar_local = _download_avatar(avatar_url, tmp_dir)
 
+        brand_name = layout.get("brandName") or "HUMOR DA IGUANA"
+        display_user = brand_name
+        brand_handle = username or layout.get("brandHandle") or "@humordaiguana"
+
         if avatar_local and os.path.exists(avatar_local):
-            aw = avatar_cfg.get("w", 120)
-            ah = avatar_cfg.get("h", 120)
-            ax = avatar_cfg.get("x", 40)
-            ay = avatar_cfg.get("y", 60)
+            aw, ah = 96, 96
+            ax = int(round(1080 * (hx_pct / 100.0) - 220)) if hx_pct > 35 else int(round(1080 * 0.08))
+            ay = header_center_y - 48
             input_files += ["-i", avatar_local]
-            filter_parts.append(
-                f"[{input_count}:v]scale={aw}:{ah}[avatar]"
-            )
-            filter_parts.append(
-                f"{last_video}[avatar]overlay={ax}:{ay}[withavatar]"
-            )
+            filter_parts.append(f"[{input_count}:v]scale={aw}:{ah}[avatar]")
+            filter_parts.append(f"{last_video}[avatar]overlay={ax}:{ay}[withavatar]")
             last_video = "[withavatar]"
             input_count += 1
+            user_text_x = ax + aw + 24
+            user_text_y = header_center_y - 28
+            handle_text_y = header_center_y + 12
+        else:
+            user_text_x = int(round(1080 * (hx_pct / 100.0)))
+            user_text_y = header_center_y - 20
+            handle_text_y = header_center_y + 16
 
-        # Drawtext: username
+        # Drawtext: Nome da marca e arroba
         text_filters = []
-        if username:
-            safe_user = username.replace("'", "\\'").replace(":", "\\:")
-            ux = user_cfg.get("x", 180)
-            uy = user_cfg.get("y", 95)
-            text_filters.append(
-                f"drawtext=text='{safe_user}':fontcolor=white:fontsize=48:"
-                f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"borderw=3:bordercolor=black:x={ux}-text_w/2:y={uy}"
-            )
+        user_color = "black" if template_bg == "white" else "white"
+        handle_color = "0x71717a" if template_bg == "white" else "0xa1a1aa"
 
-        # Drawtext: hook title — o drawtext não quebra linha, então um gancho de
-        # 50+ caracteres saía cortado nas duas bordas do vídeo 1080px.
-        if hook_title:
-            hy = hook_cfg.get("y", 1600)
-            lines = textwrap.wrap(hook_title, width=24)[:3]
-            fontsize = 56 if len(lines) == 1 else 48
-            line_h = int(fontsize * 1.25)
-            top = hy - (len(lines) - 1) * line_h
+        safe_user = display_user.replace("'", "\'").replace(":", "\:")
+        safe_handle = brand_handle.replace("'", "\'").replace(":", "\:")
+
+        text_filters.append(
+            f"drawtext=text='{safe_user}':fontcolor={user_color}:fontsize=34:"
+            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+            f"x={user_text_x}:y={user_text_y}"
+        )
+        text_filters.append(
+            f"drawtext=text='{safe_handle}':fontcolor={handle_color}:fontsize=26:"
+            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
+            f"x={user_text_x}:y={handle_text_y}"
+        )
+
+        # 6. Gancho / Título do vídeo
+        title_pos = layout.get("titlePos", {"x": 50, "y": 25})
+        title_y_pct = float(title_pos.get("y", 25))
+        target_title_y = int(round(1920 * (title_y_pct / 100.0)))
+
+        displayed_title = hook_title or layout.get("titleText")
+        if displayed_title:
+            title_color_hex = layout.get("titleColor", "#ffffff")
+            title_color = "white" if title_color_hex == "#ffffff" else "black" if title_color_hex == "#000000" else f"0x{title_color_hex.replace('#', '')}"
+
+            font_size = int(layout.get("fontSize", 15) * 3.2)
+            font_size = max(38, min(68, font_size))
+
+            is_caps = layout.get("titleCapsLock", True)
+            clean_title = displayed_title.upper() if is_caps else displayed_title
+
+            lines = textwrap.wrap(clean_title, width=24)[:3]
+            line_h = int(font_size * 1.25)
+            top_y = target_title_y - int((len(lines) * line_h) / 2)
+
+            border_w = 4 if template_bg != "white" else 0
+            border_color = "black" if template_bg != "white" else "white"
+
             for n, line in enumerate(lines):
                 safe_line = (line.replace("\\", "\\\\").replace("'", "’")
                              .replace(":", "\\:").replace("%", "\\%"))
                 text_filters.append(
-                    f"drawtext=text='{safe_line}':fontcolor=yellow:fontsize={fontsize}:"
+                    f"drawtext=text='{safe_line}':fontcolor={title_color}:fontsize={font_size}:"
                     f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                    f"borderw=4:bordercolor=black:x=(w-text_w)/2:y={top + n * line_h}"
+                    f"borderw={border_w}:bordercolor={border_color}:x=(w-text_w)/2:y={top_y + n * line_h}"
                 )
 
         if text_filters:
@@ -159,7 +214,7 @@ def create_vertical_clip(
             filter_parts.append(f"{last_video}{combined}[textout]")
             last_video = "[textout]"
 
-        # Subtitles
+        # 7. Subtitles / Legendas Queimadas
         if subtitle_file and os.path.exists(subtitle_file):
             ext = Path(subtitle_file).suffix.lower()
             safe_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
@@ -187,8 +242,7 @@ def create_vertical_clip(
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            # fallback: renderização simples sem brand kit
-            print(f"[ffmpeg_engine] filter_complex falhou, tentando fallback:\n{result.stderr[-800:]}")
+            print(f"[ffmpeg_engine] filter_complex falhou, tentando fallback simples:\n{result.stderr[-800:]}")
             _simple_render(input_video, output_video, start, duration)
 
     finally:

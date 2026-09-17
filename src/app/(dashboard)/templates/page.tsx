@@ -238,6 +238,19 @@ export default function TemplatesPage() {
             if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
             if (cfg.fontSize) setFontSize(cfg.fontSize)
             if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
+            if (cfg.videoWidth) setVideoWidth(cfg.videoWidth)
+            if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
+            if (cfg.videoPos) setVideoPos(cfg.videoPos)
+            if (cfg.headerPos) setHeaderPos(cfg.headerPos)
+            if (cfg.titlePos) setTitlePos(cfg.titlePos)
+            if (cfg.subtitlePos) setSubtitlePos(cfg.subtitlePos)
+            if (cfg.brandAlign) setBrandAlign(cfg.brandAlign)
+            if (cfg.brandLayout) setBrandLayout(cfg.brandLayout)
+            if (cfg.titleColor) setTitleColor(cfg.titleColor)
+            if (cfg.titleStroke) setTitleStroke(cfg.titleStroke)
+            if (cfg.titleStrokeColor) setTitleStrokeColor(cfg.titleStrokeColor)
+            if (cfg.titleCapsLock !== undefined) setTitleCapsLock(cfg.titleCapsLock)
+            if (cfg.textAlign) setTextAlign(cfg.textAlign)
           }
         }
       } catch {}
@@ -263,10 +276,16 @@ export default function TemplatesPage() {
         videoHeight,
         brandName,
         brandHandle,
+        brandAlign,
+        brandLayout,
         titleText,
         fontFamily,
         fontSize,
         textAlign,
+        titleColor,
+        titleStroke,
+        titleStrokeColor,
+        titleCapsLock,
         videoScale: videoWidth,
       }
     }
@@ -586,11 +605,18 @@ export default function TemplatesPage() {
           username: brandHandle,
           layout_config: {
             brandName,
+            brandHandle,
+            brandAlign,
+            brandLayout,
             templateBg,
             subtitle_preset: selectedSubtitle,
             fontFamily,
             fontSize,
             textAlign,
+            titleColor,
+            titleStroke,
+            titleStrokeColor,
+            titleCapsLock,
             videoWidth,
             videoHeight,
             avatarPos,

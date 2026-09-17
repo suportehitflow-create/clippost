@@ -106,7 +106,7 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
         fd, output_path = tempfile.mkstemp(suffix=".ass", prefix="clippost_sub_")
         os.close(fd)
 
-    header = """\
+    header = f"""\
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -115,7 +115,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Viral,Arial Black,88,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,80,80,120,1
+Style: Viral,Arial Black,88,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,80,80,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

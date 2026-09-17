@@ -39,6 +39,39 @@ import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 import { generateMagneticClips, extractCoreSubject, type MagneticClipData } from '@/lib/titles'
 
+
+// Renderizador Oficial de Emojis Nativos Apple iOS
+function AppleEmojiText({ text, className }: { text: string; className?: string }) {
+  if (!text) return null
+  const emojiRegex = /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u
+  const parts = text.split(emojiRegex)
+
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        if (emojiRegex.test(part)) {
+          const codePoints = Array.from(part)
+            .map(c => c.codePointAt(0)!.toString(16))
+            .filter(c => c !== 'fe0f')
+          const hex = codePoints.join('-').toLowerCase()
+          return (
+            <img
+              key={i}
+              src={`https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/${hex}.png`}
+              alt={part}
+              className="inline-block w-[1.15em] h-[1.15em] align-[-0.18em] mx-[1px] select-none pointer-events-none"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none'
+              }}
+            />
+          )
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </span>
+  )
+}
+
 type Project = {
   id: string
   title: string
@@ -107,12 +140,29 @@ export default function ProjectClient({
   const [activeLayout, setActiveLayout] = useState<LayoutFormat>('meme_frame')
   const [activeSubtitleStyle, setActiveSubtitleStyle] = useState<string>('hormozi_orange')
   const [videoYOffset, setVideoYOffset] = useState<number>(54)
-  const [videoScale, setVideoScale] = useState<number>(92)
+  const [videoScale, setVideoScale] = useState<number>(96)
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>('4/5')
   const [videoRounded, setVideoRounded] = useState<boolean>(false)
   const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
   const [brandHandle, setBrandHandle] = useState('@humordaiguana')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
+
+  // Dimensões e Coordenadas do Template
+  const [videoWidth, setVideoWidth] = useState<number>(96)
+  const [videoHeight, setVideoHeight] = useState<number>(48)
+  const [videoPos, setVideoPos] = useState<{ x: number; y: number }>({ x: 50, y: 55 })
+  const [headerPos, setHeaderPos] = useState<{ x: number; y: number }>({ x: 50, y: 16 })
+  const [titlePos, setTitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 25 })
+  const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 78 })
+  const [brandAlign, setBrandAlign] = useState<'center' | 'left' | 'right'>('center')
+  const [brandLayout, setBrandLayout] = useState<'row' | 'stacked'>('row')
+  const [fontFamily, setFontFamily] = useState<string>('Inter')
+  const [fontSize, setFontSize] = useState<number>(14)
+  const [titleColor, setTitleColor] = useState<string>('#ffffff')
+  const [titleStroke, setTitleStroke] = useState<string>('none')
+  const [titleStrokeColor, setTitleStrokeColor] = useState<string>('#000000')
+  const [titleCapsLock, setTitleCapsLock] = useState<boolean>(true)
+  const [textAlign, setTextAlign] = useState<'center' | 'left' | 'right'>('center')
 
   // Enquadramento
   const [aiFraming, setAiFraming] = useState<AiFramingPreset>('auto')
@@ -142,7 +192,7 @@ export default function ProjectClient({
     return generateMagneticClips(project.title)
   }, [project.title])
 
-  // Carrega template salvo
+  // Carrega template salvo integrado 100%
   useEffect(() => {
     try {
       const saved = localStorage.getItem('clippost_active_template')
@@ -150,13 +200,33 @@ export default function ProjectClient({
         const parsed = JSON.parse(saved)
         if (parsed.layout) setActiveLayout(parsed.layout)
         if (parsed.subtitle_preset) setActiveSubtitleStyle(parsed.subtitle_preset)
-        if (parsed.config?.videoYOffset) setVideoYOffset(parsed.config.videoYOffset)
-        if (parsed.config?.videoScale) setVideoScale(parsed.config.videoScale)
-        if (parsed.config?.brandName) setBrandName(parsed.config.brandName)
-        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle)
         if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url)
         if (parsed.template_bg) setTemplateBg(parsed.template_bg)
-        else if (parsed.config?.templateBg) setTemplateBg(parsed.config.templateBg)
+        
+        if (parsed.config) {
+          const c = parsed.config
+          if (c.templateBg) setTemplateBg(c.templateBg)
+          if (c.brandName) setBrandName(c.brandName)
+          if (c.brandHandle) setBrandHandle(c.brandHandle)
+          if (c.videoWidth) {
+            setVideoWidth(c.videoWidth)
+            setVideoScale(c.videoWidth)
+          }
+          if (c.videoHeight) setVideoHeight(c.videoHeight)
+          if (c.videoPos) setVideoPos(c.videoPos)
+          if (c.headerPos) setHeaderPos(c.headerPos)
+          if (c.titlePos) setTitlePos(c.titlePos)
+          if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
+          if (c.brandAlign) setBrandAlign(c.brandAlign)
+          if (c.brandLayout) setBrandLayout(c.brandLayout)
+          if (c.fontFamily) setFontFamily(c.fontFamily)
+          if (c.fontSize) setFontSize(c.fontSize)
+          if (c.titleColor) setTitleColor(c.titleColor)
+          if (c.titleStroke) setTitleStroke(c.titleStroke)
+          if (c.titleStrokeColor) setTitleStrokeColor(c.titleStrokeColor)
+          if (c.titleCapsLock !== undefined) setTitleCapsLock(c.titleCapsLock)
+          if (c.textAlign) setTextAlign(c.textAlign)
+        }
       }
     } catch {}
 
@@ -170,11 +240,27 @@ export default function ProjectClient({
           if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
           if (bk.layout_config) {
             const cfg = bk.layout_config
-            if (cfg.layout) setActiveLayout(cfg.layout)
-            if (cfg.subtitle_preset) setActiveSubtitleStyle(cfg.subtitle_preset)
-            if (cfg.videoYOffset) setVideoYOffset(cfg.videoYOffset)
-            if (cfg.videoScale) setVideoScale(cfg.videoScale)
             if (cfg.brandName) setBrandName(cfg.brandName)
+            if (cfg.templateBg) setTemplateBg(cfg.templateBg)
+            if (cfg.subtitle_preset) setActiveSubtitleStyle(cfg.subtitle_preset)
+            if (cfg.videoWidth) {
+              setVideoWidth(cfg.videoWidth)
+              setVideoScale(cfg.videoWidth)
+            }
+            if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
+            if (cfg.videoPos) setVideoPos(cfg.videoPos)
+            if (cfg.headerPos) setHeaderPos(cfg.headerPos)
+            if (cfg.titlePos) setTitlePos(cfg.titlePos)
+            if (cfg.subtitlePos) setSubtitlePos(cfg.subtitlePos)
+            if (cfg.brandAlign) setBrandAlign(cfg.brandAlign)
+            if (cfg.brandLayout) setBrandLayout(cfg.brandLayout)
+            if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
+            if (cfg.fontSize) setFontSize(cfg.fontSize)
+            if (cfg.titleColor) setTitleColor(cfg.titleColor)
+            if (cfg.titleStroke) setTitleStroke(cfg.titleStroke)
+            if (cfg.titleStrokeColor) setTitleStrokeColor(cfg.titleStrokeColor)
+            if (cfg.titleCapsLock !== undefined) setTitleCapsLock(cfg.titleCapsLock)
+            if (cfg.textAlign) setTextAlign(cfg.textAlign)
           }
         }
       } catch {}
@@ -450,7 +536,7 @@ export default function ProjectClient({
         <div className="lg:col-span-5 flex flex-col items-center">
           
           {/* MOCKUP DO IPHONE 16 PRO (MATTE, ZERO NEON GLOW) */}
-          <div className="relative w-[290px] sm:w-[320px] aspect-[9/19] bg-black rounded-[48px] p-2.5 shadow-2xl border border-white/[0.12] overflow-hidden flex flex-col">
+          <div className="relative w-[300px] sm:w-[324px] aspect-[9/16] bg-zinc-950 rounded-[44px] p-2 ring-1 ring-white/15 shadow-2xl border border-white/[0.12] overflow-hidden flex flex-col">
             
             {/* CANVAS 9:16 INTERNO INTEGRADO AO TEMPLATE */}
             <div className={`relative flex-1 w-full rounded-[40px] overflow-hidden flex flex-col justify-between transition-colors ${
@@ -832,29 +918,49 @@ export default function ProjectClient({
 
                 {/* Conteúdo da Aba: Enquadramento */}
                 {adjustTab === 'framing' && (
-                  <div className="space-y-3 text-xs">
+                  <div className="space-y-4 text-xs">
+                    {/* CARD DA IA SMART FRAMING */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#6366f1]/10 to-purple-500/5 border border-[#6366f1]/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-[#6366f1]/20 flex items-center justify-center text-[#6366f1]">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-white block">IA Smart Framing</span>
+                            <span className="text-[10px] text-zinc-400">Rastreamento de Falante & Foco</span>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          {cropPanX === 50 ? 'Âncora Central' : `${cropPanX}% Acompanhando`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 leading-relaxed">
+                        O vídeo bruto é enquadrado no tamanho definido no template (<strong>{videoWidth}% × {videoHeight}%</strong>). A IA prioriza o centro como âncora principal e acompanha o sujeito quando ele sai do meio para nunca cortar nada de importante.
+                      </p>
+                    </div>
+
+                    {/* SELEÇÃO DE FOCO */}
                     <div className="space-y-1.5">
-                      <span className="text-zinc-400">Foco do Enquadramento (IA):</span>
+                      <span className="text-zinc-400 font-medium">Modo de Enquadramento:</span>
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { id: 'auto', label: 'Auto Falante' },
-                          { id: 'left', label: 'Esquerda' },
-                          { id: 'center', label: 'Centro' },
-                          { id: 'right', label: 'Direita' }
+                          { id: 'auto', label: '🤖 IA Auto', pan: 50 },
+                          { id: 'center', label: '🎯 Centro', pan: 50 },
+                          { id: 'left', label: '👤 Esquerda', pan: 35 },
+                          { id: 'right', label: '👤 Direita', pan: 65 },
                         ].map(pos => (
                           <button
                             key={pos.id}
                             type="button"
                             onClick={() => {
                               setAiFraming(pos.id as AiFramingPreset)
-                              if (pos.id === 'left') setCropPanX(25)
-                              else if (pos.id === 'right') setCropPanX(75)
-                              else setCropPanX(50)
+                              setCropPanX(pos.pan)
                             }}
-                            className={`p-2 rounded-lg text-center transition-all cursor-pointer text-[11px] font-medium border ${
+                            className={`p-2 rounded-xl text-center transition-all cursor-pointer text-[11px] font-semibold border ${
                               aiFraming === pos.id
-                                ? 'border-orange-500/40 bg-orange-500/10 text-orange-400'
-                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200'
+                                ? 'border-[#6366f1] bg-[#6366f1]/20 text-white shadow-sm shadow-[#6366f1]/20'
+                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
                             }`}
                           >
                             {pos.label}
@@ -863,19 +969,47 @@ export default function ProjectClient({
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-zinc-400">
-                        <span>Zoom da Imagem:</span>
-                        <span className="font-mono">{cropZoom}%</span>
+                    {/* SLIDER DE PAN HORIZONTAL */}
+                    <div className="space-y-2 pt-1 border-t border-white/[0.06]">
+                      <div className="flex justify-between items-center text-zinc-400">
+                        <span className="font-medium">Posição do Foco (Pan Horizontal):</span>
+                        <span className="font-mono text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                          {cropPanX}% {cropPanX === 50 ? '(Centro)' : cropPanX < 50 ? '(Esquerda)' : '(Direita)'}
+                        </span>
                       </div>
                       <input
                         type="range"
-                        min={100}
-                        max={260}
-                        value={cropZoom}
-                        onChange={(e) => setCropZoom(Number(e.target.value))}
-                        className="w-full accent-orange-500 cursor-pointer"
+                        min={15}
+                        max={85}
+                        value={cropPanX}
+                        onChange={(e) => {
+                          setCropPanX(Number(e.target.value))
+                          setAiFraming('original')
+                        }}
+                        className="w-full accent-[#6366f1] cursor-pointer"
                       />
+                      <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                        <span>← Esquerda (15%)</span>
+                        <span className="text-zinc-400">Centro (50%)</span>
+                        <span>Direita (85%) →</span>
+                      </div>
+                    </div>
+
+                    {/* DIMENSÕES HERDADAS DO TEMPLATE */}
+                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <span className="text-zinc-300 font-medium block">Tamanho no Template:</span>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {videoWidth}% L × {videoHeight}% A • Posição Y: {videoPos.y}%
+                        </span>
+                      </div>
+                      <Link
+                        href="/templates"
+                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white/[0.05] hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 transition-colors flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-400" />
+                        <span>Ajustar Template</span>
+                      </Link>
                     </div>
                   </div>
                 )}

@@ -348,9 +348,12 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 end = min(end, float(video_duration))
             if end - start < 1:
                 continue
+            sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
+            margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
             subtitle_file = generate_ass(
                 segments, str(tmp_dir / f"subtitles_{i}.ass"),
                 clip_start=start, clip_end=end, words=words,
+                margin_v=margin_v,
             )
             try:
                 create_vertical_clip(
