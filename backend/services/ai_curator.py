@@ -17,7 +17,7 @@ import httpx
 # Os modelos ":free" da OpenRouter foram testados e devolvem 429 ja na primeira
 # chamada quando a conta nao tem creditos, entao nao servem como padrao.
 BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
-MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-3.6-flash")
+MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-1.5-flash")
 # Modelos de raciocinio gastam centenas de tokens "pensando" antes de responder.
 # Com 1024 o JSON voltava cortado no meio do segundo objeto (finish_reason=length).
 MAX_TOKENS = int(os.environ.get("AI_CURATOR_MAX_TOKENS", "4096"))
