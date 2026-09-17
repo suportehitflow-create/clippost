@@ -106,7 +106,7 @@ export default function TemplatesPage() {
 
   // NOVO: DECALQUE DO INSTAGRAM REELS (SAFE ZONES)
   // 'off' | 'semi' (40% de opacidade) | 'full' (100% de opacidade)
-  const [instagramDecal, setInstagramDecal] = useState<'off' | 'semi' | 'full'>('semi')
+  const [instagramDecal, setInstagramDecal] = useState<boolean>(true)
 
   // NOVO: LINHAS GUIA E CENTRALIZAÇÃO MAGNÉTICA (SNAPPING)
   const [snapActiveX, setSnapActiveX] = useState(false)
@@ -500,37 +500,21 @@ export default function TemplatesPage() {
           {/* NOVO: DECALQUE DO INSTAGRAM REELS (SAFE ZONE OVERLAY) */}
           <button
             type="button"
-            onClick={() => {
-              setInstagramDecal(prev => prev === 'off' ? 'semi' : prev === 'semi' ? 'full' : 'off')
-            }}
-            title={
-              instagramDecal === 'full'
-                ? 'Decalque Instagram: 100% Visível (clique para Ocultar)'
-                : instagramDecal === 'semi'
-                ? 'Decalque Instagram: Semitransparente (clique para 100%)'
-                : 'Decalque Instagram: Desligado (clique para Ligar Safe Zones)'
-            }
+            onClick={() => setInstagramDecal(prev => !prev)}
+            title={instagramDecal ? 'Decalque Instagram: Ligado (clique para Desligar)' : 'Decalque Instagram: Desligado (clique para Ligar)'}
             className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              instagramDecal !== 'off'
+              instagramDecal
                 ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 text-white shadow-md shadow-pink-500/30'
                 : 'bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10'
             }`}
           >
             <Film className="w-4 h-4" />
-            {instagramDecal !== 'off' && (
+            {instagramDecal && (
               <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black" />
             )}
           </button>
 
-          {/* NOVO: CENTRALIZAR TUDO NO MEIO (IMÃ / SNAPPING CENTRAL) */}
-          <button
-            type="button"
-            onClick={centerAllElementsHorizontally}
-            title="Centralizar Todos os Elementos no Meio Horizontal (X: 50%)"
-            className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-cyan-500/20 hover:text-cyan-300 text-zinc-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer group"
-          >
-            <Crosshair className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          </button>
+
 
           {/* BORDA DO VÍDEO: ARREDONDADA VS QUADRADA */}
           <button
@@ -900,99 +884,115 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE OFICIAL DO INSTAGRAM REELS (SAFE ZONE OVERLAY) */}
-              {instagramDecal !== 'off' && (
+              {/* 6. DECALQUE OFICIAL DO INSTAGRAM REELS (DINÂMICO CONFORME COR DO FUNDO) */}
+              {instagramDecal && (
                 <div
-                  className={`absolute inset-0 pointer-events-none z-45 transition-opacity duration-200 flex flex-col justify-between ${
-                    instagramDecal === 'semi' ? 'opacity-45' : 'opacity-95'
+                  className={`absolute inset-0 pointer-events-none z-45 transition-all duration-200 flex flex-col justify-between ${
+                    templateBg === 'white' ? 'text-zinc-950' : 'text-white'
                   }`}
                 >
                   {/* Topo do Reels: Horário, Notch e 'Reels' Header */}
-                  <div className="pt-2 px-4 flex items-center justify-between text-white text-xs font-semibold drop-shadow">
-                    <span className="font-mono text-[11px]">9:41</span>
-                    <div className="flex items-center gap-1.5 text-[10px]">
+                  <div className="pt-2 px-4 flex items-center justify-between text-xs font-semibold">
+                    <span className="font-mono text-[11px] font-bold">9:41</span>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold">
                       <span>5G</span>
-                      <div className="w-4 h-2 rounded-sm border border-white p-0.5 flex items-center">
-                        <div className="w-full h-full bg-white rounded-2xs" />
+                      <div className={`w-4 h-2 rounded-sm border p-0.5 flex items-center ${templateBg === 'white' ? 'border-zinc-900' : 'border-white'}`}>
+                        <div className={`w-full h-full rounded-2xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 px-4 flex items-center justify-between text-white drop-shadow">
+                  <div className="pt-3 px-4 flex items-center justify-between">
                     <span className="text-sm font-black tracking-tight">Reels</span>
-                    <Camera className="w-5 h-5 text-white" />
+                    <Camera className="w-5 h-5" />
                   </div>
 
-                  {/* Meio: Área Segura (Safe Zone) Pontilhada */}
-                  <div className="flex-1 mx-3 my-2 border border-dashed border-white/25 rounded-2xl flex items-start justify-end p-2 pointer-events-none">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/50 text-white/80 border border-white/10">
-                      Área Segura (Safe Zone)
-                    </span>
-                  </div>
+                  {/* Meio: Área Segura Pontilhada Discreta (Sem texto que atrapalhe) */}
+                  <div className={`flex-1 mx-3 my-2 border border-dashed rounded-2xl pointer-events-none ${
+                    templateBg === 'white' ? 'border-zinc-900/20' : 'border-white/20'
+                  }`} />
 
                   {/* Coluna Lateral Direita: Like, Comentário, Enviar, Opções, Áudio */}
-                  <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3.5 text-white drop-shadow-md">
+                  <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3.5">
                     {/* Like */}
                     <div className="flex flex-col items-center">
-                      <Heart className="w-6 h-6 text-white" />
+                      <Heart className="w-6 h-6" />
                       <span className="text-[10px] font-bold mt-0.5">107,1 K</span>
                     </div>
 
                     {/* Comentário */}
                     <div className="flex flex-col items-center">
-                      <MessageCircle className="w-6 h-6 text-white" />
+                      <MessageCircle className="w-6 h-6" />
                       <span className="text-[10px] font-bold mt-0.5">1.842</span>
                     </div>
 
                     {/* Compartilhar */}
                     <div className="flex flex-col items-center">
-                      <Send className="w-5 h-5 text-white" />
+                      <Send className="w-5 h-5" />
                       <span className="text-[10px] font-bold mt-0.5">Share</span>
                     </div>
 
                     {/* Mais Opções */}
-                    <MoreHorizontal className="w-5 h-5 text-white" />
+                    <MoreHorizontal className="w-5 h-5" />
 
                     {/* Disco de Áudio */}
-                    <div className="w-7 h-7 rounded-lg border-2 border-white/80 bg-zinc-900 overflow-hidden flex items-center justify-center mt-1">
-                      <Music className="w-3.5 h-3.5 text-white animate-spin" />
+                    <div className={`w-7 h-7 rounded-lg border-2 overflow-hidden flex items-center justify-center mt-1 ${
+                      templateBg === 'white' ? 'border-zinc-900 bg-zinc-100 text-zinc-900' : 'border-white/80 bg-zinc-900 text-white'
+                    }`}>
+                      <Music className="w-3.5 h-3.5 animate-spin" />
                     </div>
                   </div>
 
                   {/* Rodapé do Instagram: Perfil, Legenda e Áudio */}
-                  <div className="pb-12 pl-4 pr-16 space-y-1.5 text-white drop-shadow-md">
+                  <div className="pb-12 pl-4 pr-16 space-y-1.5">
                     {/* Perfil e Botão Seguir */}
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/40 overflow-hidden">
+                      <div className={`w-7 h-7 rounded-full border overflow-hidden ${
+                        templateBg === 'white' ? 'border-zinc-900/30 bg-zinc-200' : 'border-white/40 bg-white/20'
+                      }`}>
                         <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                       </div>
                       <span className="text-xs font-bold">{brandHandle}</span>
-                      <span className="px-2 py-0.5 rounded-full border border-white/60 text-[9px] font-bold bg-white/10">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                        templateBg === 'white'
+                          ? 'border-zinc-900/40 bg-zinc-900/10 text-zinc-900'
+                          : 'border-white/60 bg-white/10 text-white'
+                      }`}>
                         Seguir
                       </span>
                     </div>
 
                     {/* Descrição do Post */}
-                    <p className="text-[11px] leading-tight text-white/90 line-clamp-2">
+                    <p className={`text-[11px] leading-tight line-clamp-2 font-medium ${
+                      templateBg === 'white' ? 'text-zinc-800' : 'text-white/90'
+                    }`}>
                       É assim que o seu vídeo e legenda são vistos no feed do Instagram Reels 🔥 #viral #cortes
                     </p>
 
                     {/* Tag de Áudio Original */}
-                    <div className="flex items-center gap-1.5 text-[10px] text-white/80">
+                    <div className={`flex items-center gap-1.5 text-[10px] font-medium ${
+                      templateBg === 'white' ? 'text-zinc-600' : 'text-white/80'
+                    }`}>
                       <Music className="w-3 h-3" />
                       <span>Áudio original • {brandHandle}</span>
                     </div>
                   </div>
 
                   {/* Barra de Navegação Inferior do Instagram */}
-                  <div className="h-10 bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-around px-4 text-white">
+                  <div className={`h-10 backdrop-blur-md border-t flex items-center justify-around px-4 ${
+                    templateBg === 'white'
+                      ? 'bg-white/95 text-zinc-900 border-zinc-200/80 shadow-md'
+                      : 'bg-black/85 text-white border-white/10'
+                  }`}>
                     <Home className="w-5 h-5 opacity-90" />
                     <Search className="w-5 h-5 opacity-90" />
                     <div className="w-5 h-5 flex items-center justify-center">
-                      <Film className="w-5 h-5 text-white" />
+                      <Film className="w-5 h-5" />
                     </div>
                     <ShoppingBag className="w-5 h-5 opacity-90" />
-                    <div className="w-5 h-5 rounded-full border border-white overflow-hidden">
+                    <div className={`w-5 h-5 rounded-full border overflow-hidden ${
+                      templateBg === 'white' ? 'border-zinc-900' : 'border-white'
+                    }`}>
                       <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
                     </div>
                   </div>
@@ -1005,34 +1005,17 @@ export default function TemplatesPage() {
             </div>
           </div>
 
-          {/* DICA DE CENTRALIZAÇÃO & DECALQUE */}
+          {/* BARRA DE CONTROLE LIMPA */}
           <div className="mt-4 flex items-center gap-3 text-xs text-zinc-400">
             <button
               type="button"
-              onClick={centerAllElementsHorizontally}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Crosshair className="w-3.5 h-3.5 text-cyan-400" /> Centralizar Horizontal (50%)
-            </button>
-
-            <button
-              type="button"
-              onClick={centerVideoBoth}
-              title="Centraliza o quadro do vídeo no centro exato horizontal e vertical (X: 50%, Y: 50%)"
-              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Crosshair className="w-3.5 h-3.5 text-orange-400" /> Centralizar Vídeo (Meio X e Y)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setInstagramDecal(prev => prev === 'off' ? 'semi' : prev === 'semi' ? 'full' : 'off')}
+              onClick={() => setInstagramDecal(prev => !prev)}
               className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
             >
               <Film className="w-3.5 h-3.5 text-pink-400" />
               <span>Decalque Instagram: </span>
-              <strong className="text-white font-mono">
-                {instagramDecal === 'full' ? '100%' : instagramDecal === 'semi' ? '40%' : 'OFF'}
+              <strong className={`font-mono ${instagramDecal ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                {instagramDecal ? 'LIGADO' : 'DESLIGADO'}
               </strong>
             </button>
           </div>

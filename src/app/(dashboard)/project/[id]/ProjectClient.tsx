@@ -103,6 +103,7 @@ export default function ProjectClient({
   const [adjustTab, setAdjustTab] = useState<'subtitles' | 'framing' | 'template'>('subtitles')
 
   // Configurações do Template (herdados do /templates ou padrão)
+  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'zinc'>('white')
   const [activeLayout, setActiveLayout] = useState<LayoutFormat>('meme_frame')
   const [activeSubtitleStyle, setActiveSubtitleStyle] = useState<string>('hormozi_orange')
   const [videoYOffset, setVideoYOffset] = useState<number>(54)
@@ -153,6 +154,8 @@ export default function ProjectClient({
         if (parsed.config?.brandName) setBrandName(parsed.config.brandName)
         if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle)
         if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url)
+        if (parsed.template_bg) setTemplateBg(parsed.template_bg)
+        else if (parsed.config?.templateBg) setTemplateBg(parsed.config.templateBg)
       }
     } catch {}
 
@@ -241,6 +244,7 @@ export default function ProjectClient({
 
   // Duração
   const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
+  const activeSubStyle = SUBTITLE_STYLES.find(s => s.id === activeSubtitleStyle) || SUBTITLE_STYLES[0]
   const displayedTitle = customTitle || activeClip.title
 
   // Virality metrics
@@ -253,25 +257,26 @@ export default function ProjectClient({
     )
   }, [activeClip.score, displayedTitle, activeClip.hook, clipDuration])
 
-  // Sincronização de palavras da legenda
-  const timingWords = useMemo<WordTiming[]>(() => {
-    const rawText = (activeClip.hook ? activeClip.hook + ' ' : '') + displayedTitle
-    const cleanWords = rawText
-      .replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '')
-      .split(/\s+/)
-      .filter(Boolean)
-
-    if (cleanWords.length === 0) {
-      return [{ word: 'CORTE', start: 0, end: 1 }, { word: 'VIRAL', start: 1, end: 2 }]
+  // Palavras de transcrição/fala reais para a legenda (SEPARADAS TOTALMENTE DO TÍTULO)
+  const speechWords = useMemo<string[]>(() => {
+    // Se o corte tiver transcrição de fala real salva no banco, usa ela
+    const rawTranscript = (activeClip as any).transcript || (activeClip as any).speech_text
+    if (rawTranscript && typeof rawTranscript === 'string') {
+      const parsed = rawTranscript.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
+      if (parsed.length > 0) return parsed.map(w => w.toUpperCase())
     }
+    // Caso contrário, usa frases de retenção e fala comuns em cortes virais
+    return ['ESSA', 'PARTE', 'AQUI', 'MUDOU', 'COMPLETAMENTE', 'O', 'RESULTADO', 'FINAL', 'PRESTE', 'MUITO', 'ATENÇÃO']
+  }, [activeClip])
 
-    const wordDuration = clipDuration / cleanWords.length
-    return cleanWords.map((w, idx) => ({
-      word: w.toUpperCase(),
+  const timingWords = useMemo<WordTiming[]>(() => {
+    const wordDuration = clipDuration / speechWords.length
+    return speechWords.map((w, idx) => ({
+      word: w,
       start: idx * wordDuration,
       end: (idx + 1) * wordDuration
     }))
-  }, [displayedTitle, activeClip.hook, clipDuration])
+  }, [speechWords, clipDuration])
 
   // Playback timer
   useEffect(() => {
@@ -446,54 +451,82 @@ export default function ProjectClient({
           {/* MOCKUP DO IPHONE 16 PRO (MATTE, ZERO NEON GLOW) */}
           <div className="relative w-[290px] sm:w-[320px] aspect-[9/19] bg-black rounded-[48px] p-2.5 shadow-2xl border border-white/[0.12] overflow-hidden flex flex-col">
             
-            {/* CANVAS 9:16 INTERNO */}
-            <div className="relative flex-1 w-full bg-black rounded-[40px] overflow-hidden flex flex-col justify-between">
+            {/* CANVAS 9:16 INTERNO INTEGRADO AO TEMPLATE */}
+            <div className={`relative flex-1 w-full rounded-[40px] overflow-hidden flex flex-col justify-between transition-colors ${
+              templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white'
+            }`}>
               
-              {/* TOPO: AVATAR + @HANDLE */}
-              <div className="pt-7 px-4 z-20 flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full border border-white/40 overflow-hidden shadow-sm mb-1 bg-zinc-800">
+              {/* TOPO DO TEMPLATE: AVATAR + @HANDLE */}
+              <div className="pt-6 px-4 z-20 flex flex-col items-center text-center">
+                <div className={`w-9 h-9 rounded-full border overflow-hidden shadow-sm mb-1 ${
+                  templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/30 bg-zinc-900'
+                }`}>
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 </div>
-                <span className="text-[10px] font-bold text-white uppercase tracking-wider">{brandName}</span>
-                <span className="text-[9px] text-zinc-400">{brandHandle}</span>
+                <div className="flex items-center gap-1">
+                  <span className={`text-[11px] font-extrabold uppercase tracking-wide ${
+                    templateBg === 'white' ? 'text-zinc-900' : 'text-white'
+                  }`}>
+                    {brandName}
+                  </span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white text-[7px] flex items-center justify-center">✓</span>
+                </div>
+                <span className={`text-[9px] font-medium ${
+                  templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
+                }`}>
+                  {brandHandle}
+                </span>
               </div>
 
-              {/* TÍTULO MAGNÉTICO DO CORTE */}
-              <div className="px-4 text-center z-20 my-auto">
-                <h2 className="text-xs sm:text-sm font-black text-white leading-tight uppercase drop-shadow-md">
+              {/* 1. TÍTULO DO VÍDEO (HEADLINE FIXA NO TOPO - NUNCA MISTURADA COM LEGENDA) */}
+              <div className="px-4 py-2 text-center z-20 my-auto">
+                <h2 className={`text-xs sm:text-sm font-black leading-snug uppercase tracking-tight line-clamp-3 ${
+                  templateBg === 'white' ? 'text-zinc-950 drop-shadow-none' : 'text-white drop-shadow-md'
+                }`}>
                   {displayedTitle}
                 </h2>
               </div>
 
-              {/* RECIPIENTE DO VÍDEO COM AUTO-ENQUADRAMENTO IA */}
+              {/* 2. ENQUADRAMENTO DO VÍDEO (SEM BORDA PRETA, PREENCHE DE PONTA A PONTA COM ZOOM NO FALANTE) */}
               <div
                 style={{
                   width: `${videoScale}%`,
                   margin: '0 auto',
                 }}
-                className={`relative aspect-[4/5] overflow-hidden z-10 shadow-lg ${
+                className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md ${
                   videoRounded ? 'rounded-2xl' : 'rounded-none'
-                } border border-white/10 bg-zinc-950 flex items-center justify-center`}
+                } ${
+                  templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
+                } flex items-center justify-center`}
               >
                 {activeClip.storage_url ? (
                   <video
                     ref={videoRef}
                     src={activeClip.storage_url}
                     className="w-full h-full object-cover"
+                    style={{
+                      objectFit: 'cover',
+                      objectPosition: `${cropPanX}% center`,
+                    }}
                     playsInline
                     muted
                     loop
                   />
                 ) : ytId ? (
+                  /* VÍDEO EMBED TOTALMENTE PREENCHIDO (SEM LETTERBOXING/BORDAS PRETAS) */
                   <div className="w-full h-full relative overflow-hidden pointer-events-none select-none bg-black">
                     <iframe
                       src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=1&mute=1&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&loop=1`}
-                      className="w-full h-full border-0 absolute pointer-events-none"
+                      className="border-0 pointer-events-none"
                       style={{
-                        transform: `scale(${cropZoom / 100}) translateX(${(50 - cropPanX) * 0.45}%)`,
-                        transformOrigin: 'center center',
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        // Scale de 2.38 garante que o vídeo 16:9 preenche completamente o recipiente 4:5 sem tarjas pretas em cima ou embaixo!
                         width: '100%',
-                        height: '100%'
+                        height: '100%',
+                        transform: `translate(-50%, -50%) scale(${Math.max(2.38, cropZoom / 100)}) translateX(${(50 - cropPanX) * 0.4}%)`,
+                        transformOrigin: 'center center',
                       }}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
@@ -506,18 +539,38 @@ export default function ProjectClient({
                 )}
               </div>
 
-              {/* LEGENDA DINÂMICA COM EMOJI INTELIGENTE */}
-              <div className="pb-8 px-3 text-center z-20">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/75 backdrop-blur-sm border border-white/10 text-white font-bold text-xs uppercase shadow-sm">
-                  <span>{timingWords[activeWordIndex]?.word || 'CORTE VIRAL'}</span>
+              {/* 3. LEGENDA SINCRONIZADA (SUBTITLES DA FALA COM PRESET E EMOJIS) */}
+              <div className="pb-6 px-3 text-center z-20">
+                <div
+                  style={{
+                    backgroundColor: activeSubStyle.activeBg,
+                    color: activeSubStyle.activeColor,
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs uppercase shadow-md tracking-wider border border-black/10"
+                >
+                  <span>
+                    {isPlaying
+                      ? (timingWords[activeWordIndex]?.word || 'CORTE VIRAL')
+                      : 'SUA LEGENDA APARECERÁ AQUI'}
+                  </span>
                   {smartEmojisEnabled && (
-                    <span>{getSmartEmojiForWord(timingWords[activeWordIndex]?.word || '')}</span>
+                    <span>{getSmartEmojiForWord(timingWords[activeWordIndex]?.word || 'VIRAL')}</span>
                   )}
                 </div>
               </div>
 
+              {/* RODAPÉ DO TEMPLATE COM MARCA DISCRETA */}
+              <div className={`pb-3 px-4 flex items-center justify-between text-[10px] font-mono ${
+                templateBg === 'white' ? 'text-zinc-400' : 'text-zinc-600'
+              }`}>
+                <span>Clipost • 9:16</span>
+                <span className="text-orange-500 font-bold font-sans">🔥 VIRAL {Math.round(activeClip.score * 100)}%</span>
+              </div>
+
               {/* BARRA HOME DO IPHONE */}
-              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/30 rounded-full z-30" />
+              <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full z-30 ${
+                templateBg === 'white' ? 'bg-zinc-300' : 'bg-white/30'
+              }`} />
             </div>
           </div>
 
