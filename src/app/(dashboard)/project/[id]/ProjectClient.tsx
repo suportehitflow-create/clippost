@@ -568,46 +568,9 @@ export default function ProjectClient({
                 <span className="text-orange-500 font-bold font-sans">🔥 VIRAL {Math.round(activeClip.score * 100)}%</span>
               </div>
 
-              {/* DECALQUE OFICIAL REELS SAFE ZONE (1080x1920 COM ZONAS MORTAS E ÁREA SEGURA 1080x1440) */}
+              {/* DECALQUE SAFE ZONE REELS: APENAS A PARTE DE BAIXO TRANSLÚCIDA (SEM ÍCONES, SEM BARRAS, SEM TEXTO) */}
               {showReelsSafeZone && (
-                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[40px]">
-                  {/* ZONA MORTA SUPERIOR 420px (21%) */}
-                  <div className="absolute top-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-b border-dashed border-red-500/40 p-2 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-white/80 text-[10px] font-mono">
-                      <span>9:41 • 5G</span>
-                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1 py-0.5 rounded border border-red-500/30">
-                        Zona Morta (Topo 420px)
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-white/70 font-bold">Reels</div>
-                  </div>
-
-                  {/* ÁREA SEGURA CENTRAL 1080x1440 */}
-                  <div className="absolute top-[21%] bottom-[21%] left-0 right-0 pointer-events-none z-30">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-px bg-cyan-400/60" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-px bg-cyan-400/60" />
-                    <div className="absolute top-2 left-3 bg-black/60 px-1.5 py-0.5 rounded text-[8px] font-mono text-emerald-400 font-bold border border-emerald-500/30">
-                      Área Segura Reels (1080x1440)
-                    </div>
-                  </div>
-
-                  {/* RECORTE LATERAL DIREITO (BOTÕES REELS) */}
-                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/75 backdrop-blur-[1px] border-l border-t border-dashed border-red-500/40 rounded-tl-xl flex flex-col items-center justify-around py-2 text-white/80">
-                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
-                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
-                    <div className="w-3.5 h-3.5 rounded-full border border-white/60" />
-                  </div>
-
-                  {/* ZONA MORTA INFERIOR 420px (21%) */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/75 backdrop-blur-[1px] border-t border-dashed border-red-500/40 p-2 flex flex-col justify-between">
-                    <div className="text-center">
-                      <span className="text-[8px] uppercase font-extrabold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
-                        Zona Morta (Rodapé 420px)
-                      </span>
-                    </div>
-                    <div className="text-[9px] text-zinc-500 text-center">Legendas e Barra de Abas do Feed</div>
-                  </div>
-                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20 pointer-events-none z-40 rounded-b-[40px] transition-opacity" />
               )}
 
               {/* BARRA HOME DO IPHONE */}
