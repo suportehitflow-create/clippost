@@ -78,11 +78,10 @@ const TEMPLATE_PRESETS = [
   {
     id: 'corte_padrao',
     name: 'CORTE PADRÃO',
-    description: 'Layout otimizado com fundo preto, proporção 9:16 e safe zone calculada para Reels.',
     bg: 'dark',
     brandName: 'HUMOR DA IGUANA',
     brandHandle: '@humordaiguana',
-    title: 'É assim que o seu título vai aparecer no vídeo',
+    title: 'É assim que o seu título vai aparecer no vídeo 🔥',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
     subtitle: 'hormozi_yellow',
@@ -441,6 +440,38 @@ export default function TemplatesPage() {
   }
 
   // Salvar no Banco
+    // Redimensionamento Vertical Superior (Puxar a linha de cima no meio para mudar a proporção vertical)
+  const startResizeTop = (clientY: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    setIsResizingVideo(true)
+    const startY = clientY
+    const initH = videoHeight
+
+    const onTopMove = (ev: MouseEvent | TouchEvent) => {
+      if (!phoneRef.current) return
+      const curY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY
+      const h = phoneRef.current.clientHeight
+      // Puxar para cima (curY < startY) aumenta a altura e altera a proporção do vídeo
+      const deltaY = startY - curY
+      const deltaH = (deltaY / h) * 100
+      const newH = Math.max(15, Math.min(85, Math.round(initH + deltaH)))
+      setVideoHeight(newH)
+    }
+
+    const onTopUp = () => {
+      setIsResizingVideo(false)
+      window.removeEventListener('mousemove', onTopMove)
+      window.removeEventListener('mouseup', onTopUp)
+      window.removeEventListener('touchmove', onTopMove)
+      window.removeEventListener('touchend', onTopUp)
+    }
+
+    window.addEventListener('mousemove', onTopMove)
+    window.addEventListener('mouseup', onTopUp)
+    window.addEventListener('touchmove', onTopMove)
+    window.addEventListener('touchend', onTopUp)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -665,28 +696,23 @@ export default function TemplatesPage() {
 
             {/* ABA 1: MODELOS PRONTOS */}
             {activeTool === 'templates' && (
-              <div className="space-y-3">
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Escolha um layout comprovado para carregar fontes, posições e proporções instantaneamente:
-                </p>
-                <div className="space-y-2">
-                  {TEMPLATE_PRESETS.map(p => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => applyPreset(p)}
-                      className="w-full text-left p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-[#ea7a3e]/40 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <strong className="text-xs text-white group-hover:text-[#ea7a3e]">{p.name}</strong>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 font-mono">
-                          {p.bg === 'dark' ? 'Preto' : 'Branco'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 truncate mt-1">{p.title}</p>
-                    </button>
-                  ))}
-                </div>
+              <div className="space-y-2">
+                {TEMPLATE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="w-full p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-[#ea7a3e]/40 transition-all text-left flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-[#ea7a3e]" />
+                      <span className="text-xs font-bold text-white tracking-wide">{preset.name}</span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-[#ea7a3e] bg-[#ea7a3e]/10 px-2 py-0.5 rounded border border-[#ea7a3e]/20">
+                      Ativo
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
 
@@ -1073,7 +1099,7 @@ export default function TemplatesPage() {
               >
                 <div className="w-full h-full overflow-hidden bg-black flex items-center justify-center relative border border-white/10">
                   <img
-                    src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80"
+                    src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80"
                     alt="Preview"
                     className="w-full h-full object-cover pointer-events-none select-none"
                   />
@@ -1141,9 +1167,15 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE SAFE ZONE: APENAS A PARTE DE BAIXO TRANSLÚCIDA (SEM ÍCONES, SEM BARRAS, SEM TEXTO) */}
+              {/* 6. DECALQUE SAFE ZONE: PARTE DE BAIXO + COLUNA DIREITA ESCURECIDA (SEM ÍCONES) */}
               {instagramDecal && (
-                <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20 pointer-events-none z-40 rounded-b-[38px] transition-opacity" />
+                <div className="absolute inset-0 pointer-events-none z-40 transition-opacity duration-150 overflow-hidden rounded-[40px]">
+                  {/* Zona Morta Inferior (21%) */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20" />
+
+                  {/* Coluna Direita Escurecida onde ficam os botões do Reels (SEM ÍCONES) */}
+                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/65 backdrop-blur-[0.5px] border-l border-t border-dashed border-white/20 rounded-tl-xl" />
+                </div>
               )}
 
               {/* HOME BAR DO IPHONE */}
