@@ -4,25 +4,20 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Sparkles,
-  Type,
-  User,
   Move,
   Check,
   Upload,
   RefreshCw,
-  Eye,
-  Layers,
-  Palette,
   RotateCcw,
   CheckCircle2,
   Camera,
+  Type,
+  X,
+  Palette,
+  Eye,
   Sliders,
-  Maximize2,
-  Zap,
-  Info
+  CheckCheck
 } from 'lucide-react'
-
-export type VideoLayoutType = 'meme_frame' | 'split_screen' | 'single_speaker' | 'screen_react'
 
 export interface SubtitlePreset {
   id: string
@@ -36,296 +31,164 @@ export interface SubtitlePreset {
   sampleText: string
 }
 
-const SUBTITLE_PRESETS_18: SubtitlePreset[] = [
-  {
-    id: 'hormozi_orange',
-    name: 'Hormozi Orange',
-    tag: 'Mais Retenção',
-    badgeColor: '#ea580c',
-    textColor: '#ffffff',
-    bgColor: '#ea580c',
-    sampleText: 'AUTOMATICALLY'
-  },
-  {
-    id: 'hormozi_yellow',
-    name: 'Hormozi Yellow',
-    tag: 'Viral Clássico',
-    badgeColor: '#facc15',
-    textColor: '#000000',
-    bgColor: '#facc15',
-    sampleText: 'HEY THERE'
-  },
-  {
-    id: 'neon_cyan',
-    name: 'Neon Cyan',
-    tag: 'Gamer / Tech',
-    badgeColor: '#06b6d4',
-    textColor: '#22d3ee',
-    glow: '0 0 12px rgba(6,182,212,0.8)',
-    sampleText: 'HEY THERE'
-  },
-  {
-    id: 'neon_magenta',
-    name: 'Neon Magenta',
-    tag: 'Cyberpunk',
-    badgeColor: '#ec4899',
-    textColor: '#f472b6',
-    glow: '0 0 12px rgba(236,72,153,0.8)',
-    sampleText: 'HEY THERE'
-  },
-  {
-    id: 'neon_green',
-    name: 'Neon Green',
-    tag: 'Finanças / Crypto',
-    badgeColor: '#22c55e',
-    textColor: '#4ade80',
-    glow: '0 0 12px rgba(34,197,94,0.8)',
-    sampleText: 'HEY THERE'
-  },
-  {
-    id: 'karaoke_active',
-    name: 'Karaoke Active',
-    tag: 'Dinâmico',
-    badgeColor: '#eab308',
-    textColor: '#ffffff',
-    bgColor: '#22c55e',
-    sampleText: 'PALAVRA ATIVA'
-  },
-  {
-    id: 'two_tone_red',
-    name: 'Two Tone Red',
-    tag: 'Atenção Total',
-    badgeColor: '#ef4444',
-    textColor: '#f87171',
-    sampleText: 'TO GET STARTED'
-  },
-  {
-    id: 'two_tone_orange',
-    name: 'Two Tone Orange',
-    tag: 'Podcast',
-    badgeColor: '#f97316',
-    textColor: '#fb923c',
-    sampleText: 'TO GET STARTED'
-  },
-  {
-    id: 'two_tone_green',
-    name: 'Two Tone Green',
-    tag: 'Natureza',
-    badgeColor: '#10b981',
-    textColor: '#34d399',
-    sampleText: 'TO GET STARTED'
-  },
-  {
-    id: 'two_tone_yellow',
-    name: 'Two Tone Yellow',
-    tag: 'Alerta',
-    badgeColor: '#eab308',
-    textColor: '#fde047',
-    sampleText: 'TO GET STARTED'
-  },
-  {
-    id: 'two_tone_blue',
-    name: 'Two Tone Blue',
-    tag: 'Profissional',
-    badgeColor: '#3b82f6',
-    textColor: '#60a5fa',
-    sampleText: 'TO GET STARTED'
-  },
-  {
-    id: 'typewriter_underline',
-    name: 'Typewriter Underline',
-    tag: 'Editorial',
-    badgeColor: '#d4d4d8',
-    textColor: '#f4f4f5',
-    sampleText: 'HEY THERE'
-  },
-  {
-    id: 'italic_gold',
-    name: 'Italic Gold',
-    tag: 'Storytelling',
-    badgeColor: '#fef08a',
-    textColor: '#fef08a',
-    sampleText: 'Hey there'
-  },
-  {
-    id: 'apple_sf',
-    name: 'Apple SF Pro',
-    tag: 'Sofisticado',
-    badgeColor: '#e4e4e7',
-    textColor: '#f4f4f5',
-    sampleText: 'Simplicidade pura'
-  },
-  {
-    id: 'bold_stroke',
-    name: 'Bold Black Stroke',
-    tag: 'Alto Contraste',
-    badgeColor: '#ffffff',
-    textColor: '#ffffff',
-    sampleText: 'ESTE SEGREDO'
-  },
-  {
-    id: 'purple_pill',
-    name: 'Purple Pill',
-    tag: 'Tech',
-    badgeColor: '#7c3aed',
-    textColor: '#ffffff',
-    bgColor: '#7c3aed',
-    sampleText: 'Hey there'
-  },
-  {
-    id: 'retro_gradient',
-    name: 'Retro Sunset',
-    tag: 'Lifestyle',
-    badgeColor: '#f43f5e',
-    textColor: '#fb7185',
-    sampleText: 'VEJA O VÍDEO'
-  },
-  {
-    id: 'minimal_dark',
-    name: 'Minimal Dark',
-    tag: 'Discreto',
-    badgeColor: '#71717a',
-    textColor: '#f4f4f5',
-    bgColor: 'rgba(0,0,0,0.7)',
-    sampleText: 'SUBTÍTULO'
-  }
+const SUBTITLE_PRESETS: SubtitlePreset[] = [
+  { id: 'hormozi_orange', name: 'Hormozi Orange', tag: 'Mais Retenção', badgeColor: '#ea580c', textColor: '#ffffff', bgColor: '#ea580c', sampleText: 'AUTOMATICALLY' },
+  { id: 'hormozi_yellow', name: 'Hormozi Yellow', tag: 'Viral Clássico', badgeColor: '#facc15', textColor: '#000000', bgColor: '#facc15', sampleText: 'HEY THERE' },
+  { id: 'neon_cyan', name: 'Neon Cyan', tag: 'Gamer / Tech', badgeColor: '#06b6d4', textColor: '#22d3ee', glow: '0 0 12px rgba(6,182,212,0.8)', sampleText: 'HEY THERE' },
+  { id: 'neon_magenta', name: 'Neon Magenta', tag: 'Cyberpunk', badgeColor: '#ec4899', textColor: '#f472b6', glow: '0 0 12px rgba(236,72,153,0.8)', sampleText: 'HEY THERE' },
+  { id: 'neon_green', name: 'Neon Green', tag: 'Finanças / Crypto', badgeColor: '#22c55e', textColor: '#4ade80', glow: '0 0 12px rgba(34,197,94,0.8)', sampleText: 'HEY THERE' },
+  { id: 'karaoke_active', name: 'Karaoke Verde', tag: 'Dinâmico', badgeColor: '#22c55e', textColor: '#ffffff', bgColor: '#22c55e', sampleText: 'PALAVRA ATIVA' },
+  { id: 'two_tone_red', name: 'Two Tone Red', tag: 'Atenção Total', badgeColor: '#ef4444', textColor: '#f87171', sampleText: 'TO GET STARTED' },
+  { id: 'two_tone_orange', name: 'Two Tone Orange', tag: 'Podcast', badgeColor: '#f97316', textColor: '#fb923c', sampleText: 'TO GET STARTED' },
+  { id: 'two_tone_blue', name: 'Two Tone Blue', tag: 'Profissional', badgeColor: '#3b82f6', textColor: '#60a5fa', sampleText: 'TO GET STARTED' },
+  { id: 'typewriter_underline', name: 'Typewriter Underline', tag: 'Editorial', badgeColor: '#d4d4d8', textColor: '#f4f4f5', sampleText: 'HEY THERE' },
+  { id: 'apple_sf', name: 'Apple SF Pro', tag: 'Sofisticado', badgeColor: '#e4e4e7', textColor: '#f4f4f5', sampleText: 'Simplicidade pura' },
+  { id: 'bold_stroke', name: 'Bold Stroke', tag: 'Alto Contraste', badgeColor: '#ffffff', textColor: '#ffffff', sampleText: 'ESTE SEGREDO' },
+  { id: 'purple_pill', name: 'Purple Pill', tag: 'Tech', badgeColor: '#7c3aed', textColor: '#ffffff', bgColor: '#7c3aed', sampleText: 'Hey there' },
+  { id: 'retro_gradient', name: 'Retro Sunset', tag: 'Lifestyle', badgeColor: '#f43f5e', textColor: '#fb7185', sampleText: 'VEJA O VÍDEO' },
+  { id: 'minimal_dark', name: 'Minimal Dark', tag: 'Discreto', badgeColor: '#71717a', textColor: '#f4f4f5', bgColor: 'rgba(0,0,0,0.7)', sampleText: 'SUBTÍTULO' }
 ]
 
-const AVATAR_PRESETS = [
-  { label: 'Gatinho Meme', url: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80' },
-  { label: 'Podcast Host', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80' },
-  { label: 'Gamer Pro', url: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=200&auto=format&fit=crop&q=80' },
-  { label: 'Influencer', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80' },
-]
-
-const HOOK_PRESETS = [
-  'Meu maior arrependimento foi não ter seguido essa página antes 😭😭',
-  'Você não vai acreditar no que ele falou no final desse podcast... 🤯',
-  'Pare de cometer esse erro imediatamente se você quer ter resultados! 🚨',
-  'Esse segredo nunca foi revelado em nenhum lugar antes 🤫',
-]
-
-export default function TemplatesPageEnhanced() {
+export default function TemplatesCleanPage() {
   const supabase = createClient()
 
-  // Layout & Positioning
-  const [selectedLayout, setSelectedLayout] = useState<VideoLayoutType>('meme_frame')
-  const [selectedSubtitle, setSelectedSubtitle] = useState<string>('hormozi_orange')
-  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gradient'>('white')
-  
-  // Interactive Frame Positioning
-  const [videoYOffset, setVideoYOffset] = useState<number>(50) // % from top
-  const [videoScale, setVideoScale] = useState<number>(88) // % width
-  const [hookText, setHookText] = useState('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
+  // Cores de fundo (bolinhas à esquerda)
+  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray'>('white')
+
+  // Posições verticais individuais (em %) para cada elemento ser 100% móvel
+  const [avatarY, setAvatarY] = useState(5) // % topo
+  const [headerY, setHeaderY] = useState(16) // % topo (Nome e @)
+  const [titleY, setTitleY] = useState(25) // % topo (Título explicativo)
+  const [videoY, setVideoY] = useState(45) // % topo (Vídeo)
+  const [subtitleY, setSubtitleY] = useState(82) // % topo (Legenda independente do vídeo)
+  const [videoScale, setVideoScale] = useState(88) // % largura
+
+  // Conteúdo textual e visual
   const [brandName, setBrandName] = useState('HUMOR DO BICHANO')
   const [brandHandle, setBrandHandle] = useState('@humordobichano')
   const [hasVerified, setHasVerified] = useState(true)
-  const [avatarPreview, setAvatarPreview] = useState<string>('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
+  const [titleText, setTitleText] = useState('É assim que o seu título vai aparecer no template quando você fizer uma edição de vídeo')
+  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
+  const [selectedSubtitle, setSelectedSubtitle] = useState('hormozi_orange')
 
-  // Dragging & Interaction State
-  const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState(false)
+  // Modais e seletores
+  const [subtitleModalOpen, setSubtitleModalOpen] = useState(false)
+  const [draggingTarget, setDraggingTarget] = useState<'avatar' | 'header' | 'title' | 'video' | 'subtitle' | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
 
-  const phoneScreenRef = useRef<HTMLDivElement>(null)
+  const phoneRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const dragStartYRef = useRef<number>(0)
-  const initialYOffsetRef = useRef<number>(50)
-  const dragStartXRef = useRef<number>(0)
-  const initialScaleRef = useRef<number>(88)
+  const dragStartY = useRef(0)
+  const initialElemY = useRef(0)
 
-  // Load saved template
+  // Carregar dados salvos
   useEffect(() => {
     try {
       const saved = localStorage.getItem('clippost_active_template')
       if (saved) {
-        const parsed = JSON.parse(saved)
-        if (parsed.layout) setSelectedLayout(parsed.layout)
-        if (parsed.subtitle_preset) setSelectedSubtitle(parsed.subtitle_preset)
-        if (parsed.config?.videoYOffset !== undefined) setVideoYOffset(parsed.config.videoYOffset)
-        if (parsed.config?.videoScale !== undefined) setVideoScale(parsed.config.videoScale)
-        if (parsed.config?.hookText) setHookText(parsed.config.hookText)
-        if (parsed.config?.brandName) setBrandName(parsed.config.brandName)
-        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle)
-        if (parsed.config?.hasVerified !== undefined) setHasVerified(parsed.config.hasVerified)
-        if (parsed.config?.templateBg) setTemplateBg(parsed.config.templateBg)
-        if (parsed.avatar_url) setAvatarPreview(parsed.avatar_url)
+        const p = JSON.parse(saved)
+        if (p.subtitle_preset) setSelectedSubtitle(p.subtitle_preset)
+        if (p.avatar_url) setAvatarUrl(p.avatar_url)
+        if (p.config) {
+          const c = p.config
+          if (c.templateBg) setTemplateBg(c.templateBg)
+          if (c.avatarY !== undefined) setAvatarY(c.avatarY)
+          if (c.headerY !== undefined) setHeaderY(c.headerY)
+          if (c.titleY !== undefined) setTitleY(c.titleY)
+          if (c.videoY !== undefined) setVideoY(c.videoY)
+          if (c.subtitleY !== undefined) setSubtitleY(c.subtitleY)
+          if (c.videoScale !== undefined) setVideoScale(c.videoScale)
+          if (c.brandName) setBrandName(c.brandName)
+          if (c.brandHandle) setBrandHandle(c.brandHandle)
+          if (c.hasVerified !== undefined) setHasVerified(c.hasVerified)
+          if (c.titleText) setTitleText(c.titleText)
+        }
       }
     } catch {}
 
-    async function loadRemote() {
+    async function fetchSupabase() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
         const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
         if (bk?.layout_config) {
-          const cfg = bk.layout_config
-          if (cfg.layout) setSelectedLayout(cfg.layout)
-          if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
-          if (cfg.videoYOffset !== undefined) setVideoYOffset(cfg.videoYOffset)
-          if (cfg.videoScale !== undefined) setVideoScale(cfg.videoScale)
-          if (cfg.hookText) setHookText(cfg.hookText)
-          if (cfg.brandName) setBrandName(cfg.brandName)
-          if (cfg.hasVerified !== undefined) setHasVerified(cfg.hasVerified)
-          if (cfg.templateBg) setTemplateBg(cfg.templateBg)
-          if (bk.username) setBrandHandle(bk.username)
-          if (bk.avatar_url) setAvatarPreview(bk.avatar_url)
+          const c = bk.layout_config
+          if (c.templateBg) setTemplateBg(c.templateBg)
+          if (c.avatarY !== undefined) setAvatarY(c.avatarY)
+          if (c.headerY !== undefined) setHeaderY(c.headerY)
+          if (c.titleY !== undefined) setTitleY(c.titleY)
+          if (c.videoY !== undefined) setVideoY(c.videoY)
+          if (c.subtitleY !== undefined) setSubtitleY(c.subtitleY)
+          if (c.videoScale !== undefined) setVideoScale(c.videoScale)
+          if (c.brandName) setBrandName(c.brandName)
+          if (c.titleText) setTitleText(c.titleText)
+          if (c.hasVerified !== undefined) setHasVerified(c.hasVerified)
+          if (c.subtitle_preset) setSelectedSubtitle(c.subtitle_preset)
         }
+        if (bk?.avatar_url) setAvatarUrl(bk.avatar_url)
+        if (bk?.username) setBrandHandle(bk.username)
       } catch {}
     }
-    loadRemote()
+    fetchSupabase()
   }, [])
 
-  // Auto-persist to localStorage on changes
-  const persistTemplate = useCallback((overrides: any = {}) => {
+  // Salvar no localStorage
+  const saveState = useCallback(() => {
     const payload = {
-      name: 'Template 9:16 Personalizado',
-      layout: selectedLayout,
+      name: 'Template 9:16 Oficial',
+      layout: 'meme_frame',
       subtitle_preset: selectedSubtitle,
-      avatar_url: avatarPreview,
+      avatar_url: avatarUrl,
       config: {
-        videoYOffset,
+        templateBg,
+        avatarY,
+        headerY,
+        titleY,
+        videoY,
+        subtitleY,
         videoScale,
-        hookText,
         brandName,
         brandHandle,
         hasVerified,
-        templateBg,
-        ...overrides
+        titleText
       }
     }
     try {
       localStorage.setItem('clippost_active_template', JSON.stringify(payload))
     } catch {}
-  }, [selectedLayout, selectedSubtitle, avatarPreview, videoYOffset, videoScale, hookText, brandName, brandHandle, hasVerified, templateBg])
+  }, [templateBg, avatarY, headerY, titleY, videoY, subtitleY, videoScale, brandName, brandHandle, hasVerified, titleText, selectedSubtitle, avatarUrl])
 
   useEffect(() => {
-    persistTemplate()
-  }, [persistTemplate])
+    saveState()
+  }, [saveState])
 
-  // Explicit Save
+  // Salvar no Supabase
   const handleSave = async () => {
     setSaving(true)
     try {
-      persistTemplate()
+      saveState()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('brand_kits').upsert({
           user_id: user.id,
           name: 'Template 9:16',
           username: brandHandle,
-          avatar_url: avatarPreview,
+          avatar_url: avatarUrl,
           is_default: true,
           layout_config: {
-            layout: selectedLayout,
+            layout: 'meme_frame',
             subtitle_preset: selectedSubtitle,
-            videoYOffset,
+            templateBg,
+            avatarY,
+            headerY,
+            titleY,
+            videoY,
+            subtitleY,
             videoScale,
-            hookText,
             brandName,
             hasVerified,
-            templateBg
+            titleText
           }
         })
       }
@@ -338,277 +201,441 @@ export default function TemplatesPageEnhanced() {
     }
   }
 
-  // File Upload for Avatar
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
+  // Upload de Imagem de Perfil
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (f) {
+      const r = new FileReader()
+      r.onload = (ev) => {
         if (ev.target?.result) {
-          const url = ev.target.result as string
-          setAvatarPreview(url)
-          persistTemplate({ avatar_url: url })
+          setAvatarUrl(ev.target.result as string)
         }
       }
-      reader.readAsDataURL(file)
+      r.readAsDataURL(f)
     }
   }
 
-  // --- DRAG LOGIC FOR POSITIONING VIDEO ON SCREEN ---
-  const handleStartDrag = (clientY: number) => {
-    setIsDragging(true)
-    dragStartYRef.current = clientY
-    initialYOffsetRef.current = videoYOffset
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!phoneScreenRef.current) return
-      const screenH = phoneScreenRef.current.clientHeight
-      const deltaY = e.clientY - dragStartYRef.current
-      const deltaPercent = (deltaY / screenH) * 100
-      const newY = Math.max(15, Math.min(75, initialYOffsetRef.current + deltaPercent))
-      setVideoYOffset(Math.round(newY))
-    }
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!phoneScreenRef.current || !e.touches[0]) return
-      const screenH = phoneScreenRef.current.clientHeight
-      const deltaY = e.touches[0].clientY - dragStartYRef.current
-      const deltaPercent = (deltaY / screenH) * 100
-      const newY = Math.max(15, Math.min(75, initialYOffsetRef.current + deltaPercent))
-      setVideoYOffset(Math.round(newY))
-    }
-
-    const handleStop = () => {
-      setIsDragging(false)
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleStop)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('touchend', handleStop)
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleStop)
-    window.addEventListener('touchmove', handleTouchMove)
-    window.addEventListener('touchend', handleStop)
-  }
-
-  // --- RESIZE LOGIC FOR CORNER HANDLES ---
-  const handleStartResize = (clientX: number, e: React.MouseEvent) => {
+  // Sistema de Drag and Drop Livre
+  const startDrag = (target: 'avatar' | 'header' | 'title' | 'video' | 'subtitle', clientY: number, e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
-    setIsResizing(true)
-    dragStartXRef.current = clientX
-    initialScaleRef.current = videoScale
+    setDraggingTarget(target)
+    dragStartY.current = clientY
 
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!phoneScreenRef.current) return
-      const screenW = phoneScreenRef.current.clientWidth
-      const deltaX = ev.clientX - dragStartXRef.current
-      const deltaPercent = (deltaX / screenW) * 100
-      const newScale = Math.max(55, Math.min(98, initialScaleRef.current + deltaPercent))
-      setVideoScale(Math.round(newScale))
+    if (target === 'avatar') initialElemY.current = avatarY
+    else if (target === 'header') initialElemY.current = headerY
+    else if (target === 'title') initialElemY.current = titleY
+    else if (target === 'video') initialElemY.current = videoY
+    else if (target === 'subtitle') initialElemY.current = subtitleY
+
+    const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      if (!phoneRef.current) return
+      const curY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY
+      const h = phoneRef.current.clientHeight
+      const delta = ((curY - dragStartY.current) / h) * 100
+      const nextY = Math.max(2, Math.min(94, initialElemY.current + delta))
+
+      if (target === 'avatar') setAvatarY(Math.round(nextY))
+      else if (target === 'header') setHeaderY(Math.round(nextY))
+      else if (target === 'title') setTitleY(Math.round(nextY))
+      else if (target === 'video') setVideoY(Math.round(nextY))
+      else if (target === 'subtitle') setSubtitleY(Math.round(nextY))
     }
 
-    const handleStop = () => {
-      setIsResizing(false)
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleStop)
+    const onUp = () => {
+      setDraggingTarget(null)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleStop)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove)
+    window.addEventListener('touchend', onUp)
   }
 
-  // Current Subtitle Preset Info
-  const activeSubPreset = SUBTITLE_PRESETS_18.find(p => p.id === selectedSubtitle) || SUBTITLE_PRESETS_18[0]
-
-  // Cycle Subtitle Style on direct click
-  const cycleNextSubtitle = () => {
-    const currentIdx = SUBTITLE_PRESETS_18.findIndex(p => p.id === selectedSubtitle)
-    const nextIdx = (currentIdx + 1) % SUBTITLE_PRESETS_18.length
-    setSelectedSubtitle(SUBTITLE_PRESETS_18[nextIdx].id)
-  }
+  const activeSub = SUBTITLE_PRESETS.find(s => s.id === selectedSubtitle) || SUBTITLE_PRESETS[0]
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
-      {/* Hidden file input for Avatar */}
+    <div className="p-6 lg:p-10 max-w-6xl mx-auto space-y-6">
+      {/* Input oculto para upload de imagem */}
       <input
         type="file"
         ref={fileInputRef}
         accept="image/*"
-        onChange={handleAvatarUpload}
+        onChange={handlePhotoUpload}
         className="hidden"
       />
 
-      {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
+      {/* HEADER LIMPO */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-              <Sparkles className="w-6 h-6 text-orange-500" />
-              Templates 9:16 Interativo
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold">
-              100% Interativo
-            </span>
-          </div>
-          <p className="text-sm text-zinc-400 mt-1">
-            Arraste o vídeo diretamente na tela do celular, clique nos textos para editar e escolha a legenda ideal.
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-orange-500" />
+            Editor de Template 9:16 - Clipost
+          </h1>
+          <p className="text-xs text-zinc-400 mt-1">
+            Personalize seu template oficial. Arraste qualquer elemento para posicionar e clique para editar.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => {
-              setVideoYOffset(50)
+              setAvatarY(5)
+              setHeaderY(16)
+              setTitleY(24)
+              setVideoY(45)
+              setSubtitleY(82)
               setVideoScale(88)
-              setHookText('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
+              setTemplateBg('white')
               setBrandName('HUMOR DO BICHANO')
               setBrandHandle('@humordobichano')
               setHasVerified(true)
+              setTitleText('É assim que o seu título vai aparecer no template quando você fizer uma edição de vídeo')
               setSelectedSubtitle('hormozi_orange')
-              setTemplateBg('white')
             }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Restaurar Padrão
+            <RotateCcw className="w-3.5 h-3.5" /> Restaurar
           </button>
 
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95"
           >
             {saving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : savedSuccess ? (
-              <CheckCircle2 className="w-4 h-4 text-white" />
+              <CheckCheck className="w-3.5 h-3.5 text-white" />
             ) : (
-              <Check className="w-4 h-4" />
+              <Check className="w-3.5 h-3.5" />
             )}
-            {savedSuccess ? 'Template Salvo!' : 'Salvar Template'}
+            {savedSuccess ? 'Salvo com Sucesso!' : 'Salvar Template'}
           </button>
         </div>
       </div>
 
-      {/* PAINEL PRINCIPAL: CONTROLES À ESQUERDA + CELULAR INTERATIVO À DIREITA */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* ÁREA CENTRAL DO EDITOR */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-8 pt-2">
         
-        {/* COLUNA ESQUERDA: PRESETS RÁPIDOS & CONTROLES */}
-        <div className="lg:col-span-6 space-y-6">
+        {/* BARRA LATERAL ESQUERDA: CORES DE FUNDO & ATALHOS */}
+        <div className="flex lg:flex-col items-center gap-4 bg-[#121216] border border-white/[0.08] p-3.5 rounded-2xl shadow-xl">
+          <span className="text-[10px] font-semibold uppercase text-zinc-500 tracking-wider hidden lg:block">
+            Fundo
+          </span>
+
+          {/* Bolinhas de Cores */}
+          <div className="flex lg:flex-col gap-3">
+            {/* Branco Padrão */}
+            <button
+              type="button"
+              onClick={() => setTemplateBg('white')}
+              title="Branco Padrão (Meme clássico)"
+              className={`w-7 h-7 rounded-full bg-white border-2 transition-all cursor-pointer flex items-center justify-center ${
+                templateBg === 'white' ? 'border-orange-500 ring-2 ring-orange-500/40 scale-110 shadow-lg' : 'border-zinc-300 hover:scale-105'
+              }`}
+            >
+              {templateBg === 'white' && <div className="w-2 h-2 rounded-full bg-orange-500" />}
+            </button>
+
+            {/* Preto OLED */}
+            <button
+              type="button"
+              onClick={() => setTemplateBg('dark')}
+              title="Preto OLED"
+              className={`w-7 h-7 rounded-full bg-black border-2 transition-all cursor-pointer flex items-center justify-center ${
+                templateBg === 'dark' ? 'border-orange-500 ring-2 ring-orange-500/40 scale-110 shadow-lg' : 'border-zinc-700 hover:scale-105'
+              }`}
+            >
+              {templateBg === 'dark' && <div className="w-2 h-2 rounded-full bg-orange-500" />}
+            </button>
+
+            {/* Cinza Moderno */}
+            <button
+              type="button"
+              onClick={() => setTemplateBg('gray')}
+              title="Cinza Moderno"
+              className={`w-7 h-7 rounded-full bg-zinc-800 border-2 transition-all cursor-pointer flex items-center justify-center ${
+                templateBg === 'gray' ? 'border-orange-500 ring-2 ring-orange-500/40 scale-110 shadow-lg' : 'border-zinc-600 hover:scale-105'
+              }`}
+            >
+              {templateBg === 'gray' && <div className="w-2 h-2 rounded-full bg-orange-500" />}
+            </button>
+          </div>
+
+          <div className="w-px h-6 lg:w-6 lg:h-px bg-white/10" />
+
+          {/* Botão de Trocar Foto */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Trocar Foto de Perfil"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
+          </button>
+
+          {/* Botão de Trocar Legenda */}
+          <button
+            type="button"
+            onClick={() => setSubtitleModalOpen(true)}
+            title="Escolher Estilo de Legenda"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+          >
+            <Type className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* CELULAR INTERATIVO (CANVAS 9:16) */}
+        <div className="relative flex flex-col items-center">
           
-          {/* GUIA DE INTERAÇÃO DIRETA */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 flex items-start gap-3">
-            <Zap className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
-            <div className="text-xs space-y-1">
-              <span className="font-semibold text-white block">Tudo é editável diretamente no celular ao lado:</span>
-              <p className="text-zinc-300 leading-relaxed">
-                • <strong className="text-orange-400">Arraste o vídeo</strong> para cima ou para baixo para posicionar.<br />
-                • <strong className="text-orange-400">Clique na foto</strong> para enviar qualquer foto do seu computador.<br />
-                • <strong className="text-orange-400">Clique no título ou no texto</strong> para digitar seu próprio conteúdo.<br />
-                • <strong className="text-orange-400">Clique na legenda</strong> para trocar de estilo instantaneamente.
-              </p>
-            </div>
+          {/* Indicador de Status Superior */}
+          <div className="text-[11px] text-zinc-400 mb-2 flex items-center gap-1.5 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Arraste os elementos para reposicionar livremente
           </div>
 
-          {/* 1. SELEÇÃO DE LAYOUT VIRAL */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-orange-400" />
-                1. Formato do Template
-              </h2>
-              <span className="text-[11px] text-zinc-400">Padrão: Meme Frame</span>
+          {/* Moldura do Celular */}
+          <div className="relative w-[340px] h-[670px] bg-black rounded-[48px] p-3 shadow-2xl ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden select-none">
+            
+            {/* Dynamic Island */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-40 flex items-center justify-end px-2 pointer-events-none">
+              <div className="w-2 h-2 rounded-full bg-zinc-900 border border-zinc-800" />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {[
-                { id: 'meme_frame', name: 'Meme Frame', desc: 'Foto + Título + Vídeo Flutuante' },
-                { id: 'single_speaker', name: 'Tela Cheia 9:16', desc: 'Vídeo preenchendo o fundo' },
-                { id: 'split_screen', name: 'Tela Dividida', desc: 'Duas câmeras ou gameplay embaixo' },
-                { id: 'screen_react', name: 'Reação / React', desc: 'Vídeo principal com react no topo' },
-              ].map(layout => (
-                <button
-                  key={layout.id}
-                  type="button"
-                  onClick={() => setSelectedLayout(layout.id as VideoLayoutType)}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    selectedLayout === layout.id
-                      ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30'
-                      : 'border-white/[0.08] bg-[#16161a] hover:border-white/20'
-                  }`}
+            {/* Tela Canvas 9:16 */}
+            <div
+              ref={phoneRef}
+              className={`relative flex-1 w-full rounded-[38px] overflow-hidden transition-colors duration-200 ${
+                templateBg === 'white'
+                  ? 'bg-white text-zinc-900'
+                  : templateBg === 'dark'
+                  ? 'bg-[#09090b] text-white'
+                  : 'bg-zinc-800 text-white'
+              }`}
+            >
+              
+              {/* 1. FOTO / AVATAR MÓVEL (SEM BORDA VERMELHA) */}
+              <div
+                onMouseDown={(e) => startDrag('avatar', e.clientY, e)}
+                onTouchStart={(e) => startDrag('avatar', e.touches[0].clientY, e)}
+                style={{ top: `${avatarY}%` }}
+                className={`absolute left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing z-30 transition-all ${
+                  draggingTarget === 'avatar' ? 'ring-2 ring-orange-500 scale-105' : ''
+                }`}
+                title="Arraste para mover a foto. Clique para trocar."
+              >
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group relative w-14 h-14 rounded-full overflow-hidden border border-zinc-200/80 shadow-md hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer bg-zinc-100"
                 >
-                  <span className={`text-xs font-bold block ${selectedLayout === layout.id ? 'text-orange-400' : 'text-white'}`}>
-                    {layout.name}
-                  </span>
-                  <span className="text-[10px] text-zinc-400 mt-0.5 block line-clamp-1">
-                    {layout.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. COR DE FUNDO DO MEME */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Palette className="w-4 h-4 text-orange-400" />
-              2. Fundo da Moldura
-            </h2>
-            <div className="flex gap-2.5">
-              {[
-                { id: 'white', label: 'Branco Viral (Meme Twitter/Insta)', bg: 'bg-white text-black border-zinc-300' },
-                { id: 'dark', label: 'Dark / OLED Black', bg: 'bg-zinc-950 text-white border-zinc-700' },
-                { id: 'gradient', label: 'Cinza Moderno', bg: 'bg-zinc-800 text-zinc-100 border-zinc-600' },
-              ].map(b => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setTemplateBg(b.id as any)}
-                  className={`flex-1 p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    templateBg === b.id
-                      ? 'border-orange-500 ring-2 ring-orange-500/40'
-                      : 'border-white/10 hover:border-white/30'
-                  } ${b.bg}`}
-                >
-                  {templateBg === b.id && <Check className="w-3.5 h-3.5" />}
-                  {b.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. CATÁLOGO DE 18 ESTILOS DE LEGENDAS VIRAIS */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Type className="w-4 h-4 text-orange-400" />
-                  3. Escolha o Estilo de Legenda
-                </h2>
-                <p className="text-xs text-zinc-400">Clique em qualquer estilo para aplicar imediatamente na tela ao lado.</p>
+                  <img
+                    src={avatarUrl}
+                    alt="Foto de Perfil"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span className="text-[7px] font-bold uppercase mt-0.5">Trocar</span>
+                  </div>
+                </div>
               </div>
-              <span className="text-xs text-orange-400 font-mono font-bold">18 Presets</span>
+
+              {/* 2. NOME DA PÁGINA + VERIFICADO + @HANDLE MÓVEL */}
+              <div
+                onMouseDown={(e) => startDrag('header', e.clientY, e)}
+                onTouchStart={(e) => startDrag('header', e.touches[0].clientY, e)}
+                style={{ top: `${headerY}%` }}
+                className={`absolute left-1/2 -translate-x-1/2 w-full px-4 text-center cursor-grab active:cursor-grabbing z-30 flex flex-col items-center ${
+                  draggingTarget === 'header' ? 'ring-1 ring-orange-500/50 rounded-lg py-1' : ''
+                }`}
+                title="Arraste para mover o cabeçalho. Clique nos textos para editar."
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="NOME DA PÁGINA"
+                    className={`font-black text-xs uppercase tracking-tight text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 transition-all ${
+                      templateBg === 'white' ? 'text-zinc-900' : 'text-white'
+                    }`}
+                  />
+
+                  {/* Selo de Verificado Clicável */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHasVerified(!hasVerified)
+                    }}
+                    title={hasVerified ? 'Selo de verificado ativo (clique para remover)' : 'Sem selo (clique para adicionar)'}
+                    className="cursor-pointer hover:scale-125 transition-transform"
+                  >
+                    {hasVerified ? (
+                      <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px] font-black shadow-sm">
+                        ✓
+                      </div>
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border border-dashed border-zinc-400 text-zinc-400 flex items-center justify-center text-[7px] opacity-40 hover:opacity-100">
+                        +
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* @Handle */}
+                <input
+                  type="text"
+                  value={brandHandle}
+                  onChange={(e) => setBrandHandle(e.target.value)}
+                  placeholder="@seucanal"
+                  className={`text-[10px] font-mono text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 transition-all mt-0.5 ${
+                    templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
+                  }`}
+                />
+              </div>
+
+              {/* 3. TÍTULO / GANCHO MÓVEL & EDITÁVEL */}
+              <div
+                onMouseDown={(e) => startDrag('title', e.clientY, e)}
+                onTouchStart={(e) => startDrag('title', e.touches[0].clientY, e)}
+                style={{ top: `${titleY}%` }}
+                className={`absolute left-1/2 -translate-x-1/2 w-full px-5 text-center cursor-grab active:cursor-grabbing z-30 ${
+                  draggingTarget === 'title' ? 'ring-1 ring-orange-500/50 rounded-lg py-1' : ''
+                }`}
+                title="Arraste para mover o título. Clique para editar o texto."
+              >
+                <textarea
+                  value={titleText}
+                  onChange={(e) => setTitleText(e.target.value)}
+                  placeholder="É assim que o seu título vai aparecer no template..."
+                  rows={3}
+                  className={`w-full font-bold text-xs text-center bg-transparent border border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded-lg p-1 resize-none leading-snug transition-all ${
+                    templateBg === 'white' ? 'text-zinc-900' : 'text-zinc-100'
+                  }`}
+                />
+              </div>
+
+              {/* 4. VÍDEO MÓVEL (DRAGGABLE & RESIZABLE) */}
+              <div
+                onMouseDown={(e) => startDrag('video', e.clientY, e)}
+                onTouchStart={(e) => startDrag('video', e.touches[0].clientY, e)}
+                style={{
+                  top: `${videoY}%`,
+                  width: `${videoScale}%`,
+                  aspectRatio: '1/1'
+                }}
+                className={`absolute left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing z-20 group transition-shadow ${
+                  draggingTarget === 'video' ? 'ring-4 ring-orange-500/30' : ''
+                }`}
+                title="Arraste para posicionar o vídeo na tela."
+              >
+                <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-blue-500 shadow-2xl bg-black">
+                  <img
+                    src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80"
+                    alt="Vídeo"
+                    className="w-full h-full object-cover pointer-events-none"
+                  />
+
+                  {/* Âncora Central de Movimento */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="px-2.5 py-1 rounded-full bg-blue-600/90 text-white text-[9px] font-bold font-mono flex items-center gap-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Move className="w-3 h-3" />
+                      Arraste o Vídeo
+                    </div>
+                  </div>
+
+                  {/* Handles nos Cantos */}
+                  <div className="absolute top-1 left-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
+                  <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
+                  <div className="absolute bottom-1 left-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
+                  <div className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
+                </div>
+              </div>
+
+              {/* 5. LEGENDA INDEPENDENTE & MÓVEL (NÃO FICA PRESA AO VÍDEO) */}
+              <div
+                onMouseDown={(e) => startDrag('subtitle', e.clientY, e)}
+                onTouchStart={(e) => startDrag('subtitle', e.touches[0].clientY, e)}
+                style={{ top: `${subtitleY}%` }}
+                className={`absolute left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing z-40 flex flex-col items-center select-none group/sub ${
+                  draggingTarget === 'subtitle' ? 'scale-105' : ''
+                }`}
+                title="Arraste para mover a legenda para qualquer lugar da tela. Clique para trocar o estilo!"
+              >
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSubtitleModalOpen(true)
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer border border-white/20"
+                  style={{
+                    backgroundColor: activeSub.bgColor || 'rgba(0,0,0,0.85)',
+                    color: activeSub.textColor,
+                    border: activeSub.borderColor ? `1px solid ${activeSub.borderColor}` : 'none',
+                    boxShadow: activeSub.glow || '0 4px 14px rgba(0,0,0,0.6)'
+                  }}
+                >
+                  {activeSub.sampleText}
+                </div>
+
+                <span className="text-[8px] font-mono text-white/90 bg-black/70 px-1.5 py-0.5 rounded mt-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                  {activeSub.name} • Clique para trocar estilo
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* MODAL SUSPENSO: SELETOR DE 15+ ESTILOS DE LEGENDAS */}
+      {subtitleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#121216] border border-white/10 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Type className="w-4 h-4 text-orange-400" />
+                  Escolha o Estilo de Legenda
+                </h3>
+                <p className="text-xs text-zinc-400">Clique para aplicar diretamente no template.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubtitleModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto p-1 pr-2">
-              {SUBTITLE_PRESETS_18.map(sub => {
-                const isSelected = selectedSubtitle === sub.id
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[360px] overflow-y-auto p-1">
+              {SUBTITLE_PRESETS.map(sub => {
+                const isSel = selectedSubtitle === sub.id
                 return (
                   <button
                     key={sub.id}
                     type="button"
-                    onClick={() => setSelectedSubtitle(sub.id)}
-                    className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-center items-center min-h-[64px] ${
-                      isSelected
-                        ? 'border-orange-500 bg-orange-500/[0.12] ring-2 ring-orange-500/40 scale-[1.02]'
+                    onClick={() => {
+                      setSelectedSubtitle(sub.id)
+                      setSubtitleModalOpen(false)
+                    }}
+                    className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-center items-center ${
+                      isSel
+                        ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/40'
                         : 'border-white/[0.08] bg-[#16161a] hover:border-white/20'
                     }`}
                   >
                     <div
-                      className="px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-tight"
+                      className="px-2 py-0.5 rounded text-[11px] font-black uppercase"
                       style={{
                         backgroundColor: sub.bgColor || 'transparent',
                         color: sub.textColor,
@@ -626,278 +653,8 @@ export default function TemplatesPageEnhanced() {
               })}
             </div>
           </div>
-
-          {/* AJUSTES MANUAIS POR SLIDERS (OPCIONAL) */}
-          <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-orange-400" />
-              Ajuste Fino por Sliders
-            </h2>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                  <span>Posição Vertical do Vídeo</span>
-                  <span className="font-mono text-orange-400">{videoYOffset}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="15"
-                  max="75"
-                  value={videoYOffset}
-                  onChange={e => setVideoYOffset(Number(e.target.value))}
-                  className="w-full accent-orange-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                  <span>Tamanho / Zoom do Vídeo</span>
-                  <span className="font-mono text-orange-400">{videoScale}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="55"
-                  max="98"
-                  value={videoScale}
-                  onChange={e => setVideoScale(Number(e.target.value))}
-                  className="w-full accent-orange-500 cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
         </div>
-
-        {/* COLUNA DIREITA: CELULAR INTERATIVO COM EDIÇÃO DIRETA */}
-        <div className="lg:col-span-6 flex flex-col items-center">
-          
-          <div className="w-full max-w-[340px] flex items-center justify-between mb-3 px-2">
-            <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-orange-400" />
-              Editor WYSIWYG ao Vivo
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 font-mono font-semibold">
-              Arraste & Clique
-            </span>
-          </div>
-
-          {/* MOCKUP DO IPHONE */}
-          <div className="relative w-[340px] h-[660px] bg-black rounded-[48px] p-3 shadow-2xl ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden">
-            
-            {/* Dynamic Island */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-full z-40 flex items-center justify-end px-2 pointer-events-none">
-              <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-zinc-800" />
-            </div>
-
-            {/* SCREEN CANVAS (9:16) */}
-            <div
-              ref={phoneScreenRef}
-              className={`relative flex-1 w-full rounded-[38px] overflow-hidden flex flex-col p-4 select-none transition-colors duration-200 ${
-                templateBg === 'white'
-                  ? 'bg-white text-zinc-900'
-                  : templateBg === 'dark'
-                  ? 'bg-black text-white'
-                  : 'bg-gradient-to-b from-zinc-900 via-zinc-900 to-black text-white'
-              }`}
-            >
-              
-              {/* HEADER INTERATIVO: FOTO + TÍTULO + HANDLE + HOOK */}
-              <div className="pt-6 flex flex-col items-center text-center relative z-20">
-                
-                {/* AVATAR CLICÁVEL COM UPLOAD */}
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="group relative w-16 h-16 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-2 shadow-lg cursor-pointer hover:ring-2 hover:ring-orange-500 transition-all"
-                  title="Clique para trocar foto de perfil"
-                >
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity rounded-full">
-                    <Camera className="w-4 h-4 mb-0.5" />
-                    <span className="text-[8px] font-bold uppercase">Trocar</span>
-                  </div>
-                </div>
-
-                {/* TÍTULO EDITÁVEL INLINE + SELO DE VERIFICADO */}
-                <div className="flex items-center justify-center gap-1.5 w-full px-2">
-                  <input
-                    type="text"
-                    value={brandName}
-                    onChange={e => setBrandName(e.target.value)}
-                    placeholder="NOME DA PÁGINA"
-                    className={`font-black text-xs tracking-tight uppercase text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 max-w-[200px] transition-all ${
-                      templateBg === 'white' ? 'text-zinc-900' : 'text-white'
-                    }`}
-                  />
-                  
-                  {/* SELO DE VERIFICADO CLICÁVEL */}
-                  <button
-                    type="button"
-                    onClick={() => setHasVerified(!hasVerified)}
-                    title={hasVerified ? 'Selo de verificado ativo (clique para desativar)' : 'Sem selo (clique para ativar)'}
-                    className="cursor-pointer hover:scale-120 active:scale-95 transition-transform shrink-0"
-                  >
-                    {hasVerified ? (
-                      <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                        ✓
-                      </div>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-dashed border-zinc-400 text-zinc-400 flex items-center justify-center text-[8px] opacity-40 hover:opacity-100">
-                        +
-                      </div>
-                    )}
-                  </button>
-                </div>
-
-                {/* @HANDLE EDITÁVEL INLINE */}
-                <input
-                  type="text"
-                  value={brandHandle}
-                  onChange={e => setBrandHandle(e.target.value)}
-                  placeholder="@seucanal"
-                  className={`text-[10px] font-mono text-center bg-transparent border-b border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded px-1 max-w-[180px] transition-all ${
-                    templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
-                  }`}
-                />
-
-                {/* HOOK CAPTION EDITÁVEL INLINE */}
-                <textarea
-                  value={hookText}
-                  onChange={e => setHookText(e.target.value)}
-                  placeholder="Digite sua chamada viral aqui..."
-                  rows={2}
-                  className={`font-bold text-xs text-center bg-transparent border border-dashed border-transparent hover:border-orange-500/50 focus:border-orange-500 outline-none rounded-lg p-1.5 mt-2 w-full resize-none transition-all leading-snug ${
-                    templateBg === 'white' ? 'text-zinc-900' : 'text-zinc-100'
-                  }`}
-                />
-              </div>
-
-              {/* VÍDEO ARRASTÁVEL INTERATIVO (DRAGGABLE & RESIZABLE) */}
-              <div
-                onMouseDown={(e) => handleStartDrag(e.clientY)}
-                onTouchStart={(e) => handleStartDrag(e.touches[0].clientY)}
-                className={`absolute left-1/2 -translate-x-1/2 select-none group ${
-                  isDragging ? 'cursor-grabbing scale-[1.01]' : 'cursor-grab'
-                }`}
-                style={{
-                  top: `${videoYOffset}%`,
-                  width: `${videoScale}%`,
-                  aspectRatio: '1/1',
-                  transition: isDragging ? 'none' : 'box-shadow 0.2s',
-                  zIndex: 30
-                }}
-              >
-                {/* Bounding Box com borda azul e handles */}
-                <div className={`relative w-full h-full rounded-2xl overflow-hidden border-2 shadow-2xl ${
-                  isDragging ? 'border-orange-500 ring-4 ring-orange-500/30' : 'border-blue-500 hover:border-orange-400'
-                }`}>
-                  
-                  {/* Imagem de preview do vídeo */}
-                  <img
-                    src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80"
-                    alt="Video Preview"
-                    className="w-full h-full object-cover pointer-events-none"
-                  />
-
-                  {/* Âncora Central de Movimento */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xl transition-all ${
-                      isDragging
-                        ? 'bg-orange-600 text-white scale-110 shadow-orange-500/40'
-                        : 'bg-blue-600/90 text-white group-hover:bg-orange-600'
-                    }`}>
-                      <Move className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-bold font-mono tracking-tight">
-                        {isDragging ? `Y: ${videoYOffset}%` : 'Arraste Aqui'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Corner Handles de Redimensionamento */}
-                  <div className="absolute top-1.5 left-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
-                  <div className="absolute top-1.5 right-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
-                  <div className="absolute bottom-1.5 left-1.5 w-3 h-3 bg-blue-500 rounded-sm border border-white shadow pointer-events-none" />
-                  
-                  {/* Resize Handle Interativo no canto inferior direito */}
-                  <div
-                    onMouseDown={(e) => handleStartResize(e.clientX, e)}
-                    className="absolute bottom-1 right-1 w-4 h-4 bg-orange-500 rounded-sm border-2 border-white shadow-lg cursor-nwse-resize z-40 hover:scale-125 transition-transform"
-                    title="Arraste para redimensionar o vídeo"
-                  />
-
-                  {/* LEGENDA DINÂMICA DENTRO DO VÍDEO (CLICÁVEL E INTERATIVA) */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      cycleNextSubtitle()
-                    }}
-                    className="absolute bottom-3 inset-x-2 flex flex-col items-center cursor-pointer group/sub z-40"
-                    title="Clique para trocar o estilo da legenda!"
-                  >
-                    <div
-                      className="px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-tight shadow-xl transition-all hover:scale-105 active:scale-95 text-center"
-                      style={{
-                        backgroundColor: activeSubPreset.bgColor || 'rgba(0,0,0,0.85)',
-                        color: activeSubPreset.textColor,
-                        border: activeSubPreset.borderColor ? `1px solid ${activeSubPreset.borderColor}` : 'none',
-                        boxShadow: activeSubPreset.glow || '0 4px 12px rgba(0,0,0,0.6)'
-                      }}
-                    >
-                      {activeSubPreset.sampleText}
-                    </div>
-
-                    <span className="text-[8px] font-mono text-white/90 bg-black/70 px-1.5 py-0.5 rounded mt-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                      Estilo: {activeSubPreset.name} (Clique para mudar)
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* DICAS DE CONTROLE RÁPIDO DO CELULAR */}
-          <div className="w-full max-w-[340px] mt-4 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400">
-              <span>Sugestões de Hooks Virais:</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {HOOK_PRESETS.map((h, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setHookText(h)}
-                  className="p-1.5 rounded-lg bg-[#16161a] border border-white/[0.08] hover:border-orange-500/40 text-[10px] text-zinc-300 hover:text-white truncate text-left transition-colors cursor-pointer"
-                  title={h}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-2">
-              <span>Avatares Rápidos:</span>
-            </div>
-            <div className="flex gap-2">
-              {AVATAR_PRESETS.map((av, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setAvatarPreview(av.url)}
-                  className="flex-1 p-1 rounded-lg bg-[#16161a] border border-white/[0.08] hover:border-orange-500/50 text-[10px] text-zinc-300 flex items-center justify-center gap-1 transition-all cursor-pointer"
-                >
-                  <img src={av.url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                  <span className="truncate">{av.label.split(' ')[0]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -46,7 +46,7 @@ export default function Sidebar({ user }: { user: User }) {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-orange-600 to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/20">
             <Scissors className="w-4 h-4 text-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-white">Clipos</span>
+          <span className="text-base font-bold tracking-tight text-white">Clipost</span>
         </Link>
 
         {/* Lista de Navegação */}

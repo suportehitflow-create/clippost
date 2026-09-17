@@ -3,12 +3,11 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, Link2, Sparkles, Wand2, VolumeX, Check, Loader2, UploadCloud, AlertCircle } from 'lucide-react'
+import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles } from 'lucide-react'
 
 export default function CreateClipsPage() {
   const [url, setUrl] = useState('')
-  const [template, setTemplate] = useState('hormozi_yellow')
-  const [cutMode, setCutMode] = useState<'all' | 'top3'>('all')
+  const [clipDuration, setClipDuration] = useState<'30' | '60' | '90' | 'auto'>('auto')
   const [removeSilence, setRemoveSilence] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,18 +79,17 @@ export default function CreateClipsPage() {
         sourceUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
       }
 
-      // Dispara job no backend em segundo plano (com timeout seguro)
+      // Dispara job no backend em segundo plano
       fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: sourceUrl,
           user_id: user.id,
-          clip_duration: 'auto',
+          clip_duration: clipDuration,
           project_id: project.id,
-          template_preset: template,
+          template_preset: 'meme_frame',
           remove_silence: removeSilence,
-          cut_mode: cutMode,
         }),
       }).catch(() => null)
 
@@ -107,7 +105,7 @@ export default function CreateClipsPage() {
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
       {/* Header */}
       <header className="h-16 border-b border-white/[0.08] flex items-center px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Criar Novos Cortes</h1>
+        <h1 className="text-sm font-semibold text-white tracking-wide">Criar Novos Cortes - Clipost</h1>
       </header>
 
       <div className="max-w-2xl w-full mx-auto p-6 md:p-10 space-y-8">
@@ -117,7 +115,7 @@ export default function CreateClipsPage() {
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Criar Cortes 9:16 com IA</h2>
           <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Cole o link do YouTube, Instagram ou TikTok. A IA encontra os momentos mais virais, corta no formato vertical e adiciona legendas automáticas.
+            Cole o link do YouTube, Instagram ou TikTok. A IA encontra os momentos mais virais, corta no formato vertical e aplica seu template oficial do Clipost.
           </p>
         </div>
 
@@ -126,7 +124,7 @@ export default function CreateClipsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('link')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'link' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -135,7 +133,7 @@ export default function CreateClipsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('file')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'file' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -160,7 +158,7 @@ export default function CreateClipsPage() {
                 </div>
                 <input
                   type="url"
-                  placeholder="https://www.youtube.com/watch?v=... ou Instagram / TikTok"
+                  placeholder="https://www.youtube.com/watch?v=... ou link do TikTok / Instagram"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
@@ -191,74 +189,71 @@ export default function CreateClipsPage() {
             </div>
           )}
 
-          {/* Configurações de Template & Modo */}
-          <div className="space-y-4 pt-2 border-t border-white/[0.08]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Template de Legendas */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-orange-400" /> Template das Legendas
-                </label>
-                <select
-                  value={template}
-                  onChange={(e) => setTemplate(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-xs focus:outline-none focus:border-orange-500"
-                >
-                  <option value="hormozi_yellow">Hormozi Viral (Amarelo Neon)</option>
-                  <option value="neon_glow">Neon Glow (Ciano)</option>
-                  <option value="clean_box">Clean Box (Caixa Discreta)</option>
-                  <option value="minimal_apple">Minimal Apple (Clean)</option>
-                </select>
-              </div>
-
-              {/* Quantidade de Cortes */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                  <Wand2 className="w-3.5 h-3.5 text-orange-400" /> Modo de Extração
-                </label>
-                <select
-                  value={cutMode}
-                  onChange={(e) => setCutMode(e.target.value as any)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-xs focus:outline-none focus:border-orange-500"
-                >
-                  <option value="all">Achar Todos os Momentos (6 a 10 Cortes)</option>
-                  <option value="top3">Apenas os 3 Mais Virais</option>
-                </select>
+          {/* Configurações de Duração dos Cortes & Áudio */}
+          <div className="space-y-4 pt-4 border-t border-white/[0.08]">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-orange-400" /> Duração dos Cortes
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: '30', label: '30s', desc: 'Até 45s (Reels rápidos)' },
+                  { id: '60', label: '1 minuto', desc: '45s a 60s (Padrão viral)' },
+                  { id: '90', label: 'Mais de 1 min', desc: '60s a 120s+ (Histórias)' },
+                  { id: 'auto', label: 'Automático', desc: 'IA escolhe o melhor tempo' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setClipDuration(opt.id as any)}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      clipDuration === opt.id
+                        ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30'
+                        : 'border-white/[0.08] bg-[#121216] hover:border-white/20'
+                    }`}
+                  >
+                    <span className={`text-xs font-bold block ${clipDuration === opt.id ? 'text-orange-400' : 'text-white'}`}>
+                      {opt.label}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 mt-0.5 block leading-tight">
+                      {opt.desc}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Toggle Corte de Silêncio */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <div className="flex items-center gap-2.5">
-                <VolumeX className="w-4 h-4 text-zinc-400" />
-                <div>
-                  <p className="text-xs font-semibold text-white">Corte Inteligente de Silêncios</p>
-                  <p className="text-[11px] text-zinc-400">Remove pausas longas e respirações mortas para maximizar retenção.</p>
+            {/* Toggle de Silêncio */}
+            <div className="pt-2">
+              <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={removeSilence}
+                  onChange={(e) => setRemoveSilence(e.target.checked)}
+                  className="rounded border-white/20 text-orange-500 focus:ring-0 w-4 h-4 accent-orange-500"
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                    <VolumeX className="w-3.5 h-3.5 text-zinc-400" /> Remover pausas longas e silêncios
+                  </span>
+                  <p className="text-[11px] text-zinc-500">Aumenta o ritmo e a retenção do corte para prender a atenção.</p>
                 </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={removeSilence}
-                onChange={(e) => setRemoveSilence(e.target.checked)}
-                className="w-4 h-4 accent-orange-500 rounded cursor-pointer"
-              />
+              </label>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Iniciando Inteligência Artificial...
+                <Loader2 className="w-4 h-4 animate-spin" /> Gerando cortes inteligentes com IA...
               </>
             ) : (
               <>
-                <Scissors className="w-4 h-4" />
-                Gerar Cortes 9:16 Agora
+                <Scissors className="w-4 h-4" /> Gerar Cortes Virais com Clipost
               </>
             )}
           </button>

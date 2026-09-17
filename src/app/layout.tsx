@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Clipos — A Plataforma Definitiva para Clipadores',
+  title: 'Clipost — A Plataforma Definitiva para Clipadores',
   description: 'Do silêncio ao viral em 3 passos. Mineração de YouTube e Instagram, cortes com IA, reenquadramento inteligente, edição em massa com Brand Kit e agendamento automático.',
 }
 

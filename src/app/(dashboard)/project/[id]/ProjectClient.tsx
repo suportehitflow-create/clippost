@@ -585,7 +585,7 @@ export default function ProjectClient({
 
                 {/* RODAPÉ DO TEMPLATE MEME */}
                 <div className="absolute bottom-3 inset-x-4 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
-                  <span>Clipos ⚡ 9:16</span>
+                  <span>Clipost ⚡ 9:16</span>
                   <span className="font-bold text-orange-600">VIRAL {Math.round(activeClip.score * 100)}%</span>
                 </div>
               </div>
