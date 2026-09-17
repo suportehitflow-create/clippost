@@ -148,6 +148,7 @@ export default function ProjectClient({
   const [videoRounded, setVideoRounded] = useState<boolean>(false)
   const [brandName, setBrandName] = useState('Nome da Página')
   const [brandHandle, setBrandHandle] = useState('@nomedapagina')
+  const [brandScale, setBrandScale] = useState<number>(14)
   const DEFAULT_BRAND_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
 
@@ -600,28 +601,49 @@ export default function ProjectClient({
               </div>
               
               {/* TOPO DO TEMPLATE: AVATAR + @HANDLE */}
-              <div className="pt-2 px-4 z-20 flex flex-col items-center text-center pointer-events-none">
-                <div className={`w-9 h-9 rounded-full border overflow-hidden shadow-sm mb-1 ${
-                  templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/30 bg-zinc-900'
-                }`}>
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className={`text-[11px] font-extrabold uppercase tracking-wide ${
-                    templateBg === 'white' ? 'text-zinc-900' : 'text-white'
-                  }`}>
-                    {brandName}
+                <div className="pt-2 px-4 z-20 flex flex-col items-center text-center pointer-events-none">
+                  <div
+                    style={{
+                      width: `${Math.round(brandScale * 2.4)}px`,
+                      height: `${Math.round(brandScale * 2.4)}px`,
+                    }}
+                    className={`rounded-full border overflow-hidden shadow-sm mb-1 transition-all ${
+                      templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/30 bg-zinc-900'
+                    }`}
+                  >
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span
+                      style={{ fontSize: `${Math.round(brandScale * 0.8)}px` }}
+                      className={`font-extrabold uppercase tracking-wide leading-tight transition-all ${
+                        templateBg === 'white' ? 'text-zinc-900' : 'text-white'
+                      }`}
+                    >
+                      {brandName}
+                    </span>
+                    {showVerifiedBadge && (
+                      <svg
+                        style={{
+                          width: `${Math.max(8, Math.round(brandScale * 0.7))}px`,
+                          height: `${Math.max(8, Math.round(brandScale * 0.7))}px`,
+                        }}
+                        className="text-blue-500 fill-current shrink-0"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    style={{ fontSize: `${Math.max(8, Math.round(brandScale * 0.65))}px` }}
+                    className={`font-medium transition-all ${
+                      templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
+                    }`}
+                  >
+                    {brandHandle}
                   </span>
-                  {showVerifiedBadge && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white text-[7px] flex items-center justify-center">✓</span>
-                  )}
                 </div>
-                <span className={`text-[9px] font-medium ${
-                  templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
-                }`}>
-                  {brandHandle}
-                </span>
-              </div>
 
               {/* 1. TÍTULO DO VÍDEO (HEADLINE FIXA NO TOPO) */}
               <div className="px-4 py-1.5 text-center z-20 my-auto pointer-events-none">

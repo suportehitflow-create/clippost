@@ -33,6 +33,7 @@ import {
   User,
   LayoutTemplate,
   ShieldCheck,
+  Square,
   Play,
   Undo2,
   Redo2,
@@ -90,6 +91,8 @@ const TEMPLATE_PRESETS = [
     title: 'ASSIM QUE SEU TITULO APARECERA NO VIDEOS',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
+    brandScale: 14,
+    videoRounded: true,
     subtitle: 'hormozi_yellow',
     avatarPos: { x: 50, y: 8 },
     headerPos: { x: 50, y: 16 },
@@ -163,6 +166,7 @@ export default function TemplatesPage() {
   const [brandAlign, setBrandAlign] = useState<'left' | 'center' | 'right'>('center')
   const [brandLayout, setBrandLayout] = useState<'inline' | 'stacked'>('inline')
   const [showVerifiedBadge, setShowVerifiedBadge] = useState<boolean>(true)
+  const [brandScale, setBrandScale] = useState<number>(14)
   const DEFAULT_BRAND_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
   const [titleText, setTitleText] = useState('AQUI QUE O SEU TITULO VAI ESTAR POSICIONADO NO VÍDEO')
@@ -225,6 +229,7 @@ export default function TemplatesPage() {
           }
           if (c.fontFamily) setFontFamily(c.fontFamily)
           if (c.fontSize) setFontSize(c.fontSize)
+          if (c.brandScale) setBrandScale(c.brandScale)
           if (c.textAlign) setTextAlign(c.textAlign)
           if (c.videoWidth) setVideoWidth(c.videoWidth)
           if (c.videoHeight) setVideoHeight(c.videoHeight)
@@ -256,6 +261,7 @@ export default function TemplatesPage() {
             if (cfg.showVerifiedBadge !== undefined) setShowVerifiedBadge(cfg.showVerifiedBadge)
             if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
             if (cfg.fontSize) setFontSize(cfg.fontSize)
+            if (cfg.brandScale) setBrandScale(cfg.brandScale)
             if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
             if (cfg.videoWidth) setVideoWidth(cfg.videoWidth)
             if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
@@ -301,11 +307,13 @@ export default function TemplatesPage() {
         titleText,
         fontFamily,
         fontSize,
+        brandScale,
         textAlign,
         titleColor,
         titleStroke,
         titleStrokeColor,
         titleCapsLock,
+        videoRounded,
         videoScale: videoWidth,
       }
     }
@@ -326,6 +334,8 @@ export default function TemplatesPage() {
     fontSize,
     textAlign,
     selectedSubtitle,
+    brandScale,
+    videoRounded,
     avatarUrl
   ])
 
@@ -338,6 +348,8 @@ export default function TemplatesPage() {
     setTitleText(preset.title)
     setFontFamily(preset.font)
     setFontSize(preset.fontSize)
+    if ((preset as any).brandScale) setBrandScale((preset as any).brandScale)
+    if ((preset as any).videoRounded !== undefined) setVideoRounded((preset as any).videoRounded)
     setSelectedSubtitle(preset.subtitle)
     setAvatarPos(preset.avatarPos)
     setHeaderPos(preset.headerPos)
@@ -900,7 +912,29 @@ export default function TemplatesPage() {
                       activeColor="emerald"
                     />
                   </div>
-              </div>
+                </div>
+
+                {/* PÍLULA BORDA ARREDONDADA */}
+                <div className="pt-2 border-t border-white/[0.08]">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                        videoRounded ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
+                      }`}>
+                        <Square className="w-4 h-4 rounded-sm" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Borda Arredondada</span>
+                        <span className="text-[10px] text-zinc-400">Cantos suaves no vídeo</span>
+                      </div>
+                    </div>
+                    <LiquidToggle
+                      checked={videoRounded}
+                      onChange={setVideoRounded}
+                      activeColor="indigo"
+                    />
+                  </div>
+                </div>
                 </div>
             )}
 
@@ -926,11 +960,35 @@ export default function TemplatesPage() {
                   {/* TAMANHO DA FONTE (BENCHO SWEEP STEPPER: TAP FOR ONE, HOLD TO SWEEP) */}
                   <div className="space-y-1.5">
                     <SweepStepper
-                      label="Tamanho da Fonte (11 a 18px):"
+                      label="Tamanho da Fonte (11 a 22px):"
                       value={fontSize}
                       onChange={setFontSize}
                       min={11}
-                      max={18}
+                      max={22}
+                      step={1}
+                      unit="px"
+                    />
+                  </div>
+
+                  {/* TAMANHO DO PERFIL (COMBINAÇÃO DIRETA COM LETRAS) */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-400 font-medium text-xs">Tamanho do Perfil (Combinação):</label>
+                      <button
+                        type="button"
+                        onClick={() => setBrandScale(fontSize)}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline flex items-center gap-1"
+                        title="Igualar o perfil ao tamanho da fonte do título"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Igualar ({fontSize}px)</span>
+                      </button>
+                    </div>
+                    <SweepStepper
+                      value={brandScale}
+                      onChange={setBrandScale}
+                      min={11}
+                      max={22}
                       step={1}
                       unit="px"
                     />
@@ -1186,6 +1244,51 @@ export default function TemplatesPage() {
                   </div>
                 </div>
 
+                {/* ESCALA E TAMANHO DO PERFIL (BENCHO SWEEP STEPPER + NÍVEL IGUAL DAS LETRAS) */}
+                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Tamanho do Perfil:</label>
+                    <button
+                      type="button"
+                      onClick={() => setBrandScale(fontSize)}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline flex items-center gap-1"
+                      title="Igualar o perfil ao tamanho da fonte do título"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Igualar à Letra ({fontSize}px)</span>
+                    </button>
+                  </div>
+                  <SweepStepper
+                    value={brandScale}
+                    onChange={setBrandScale}
+                    min={11}
+                    max={22}
+                    step={1}
+                    unit="px"
+                  />
+                  <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                    {[
+                      { label: 'P (12px)', val: 12 },
+                      { label: 'M (14px)', val: 14 },
+                      { label: 'G (16px)', val: 16 },
+                      { label: 'GG (18px)', val: 18 },
+                    ].map((lvl) => (
+                      <button
+                        key={lvl.val}
+                        type="button"
+                        onClick={() => setBrandScale(lvl.val)}
+                        className={`py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                          brandScale === lvl.val
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                            : 'bg-white/[0.03] text-zinc-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.04]'
+                        }`}
+                      >
+                        {lvl.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* DISPOSIÇÃO DO PERFIL (LADO A LADO VS EMPILHADO) */}
                 <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
                   <div className="flex items-center justify-between">
@@ -1294,6 +1397,28 @@ export default function TemplatesPage() {
                         <span className="text-[11px] leading-tight text-center">{b.label}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* BORDA ARREDONDADA DO VÍDEO */}
+                <div className="pt-3 border-t border-white/[0.08]">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                        videoRounded ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
+                      }`}>
+                        <Square className="w-4 h-4 rounded-sm" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Borda Arredondada</span>
+                        <span className="text-[10px] text-zinc-400">Cantos arredondados no vídeo</span>
+                      </div>
+                    </div>
+                    <LiquidToggle
+                      checked={videoRounded}
+                      onChange={setVideoRounded}
+                      activeColor="indigo"
+                    />
                   </div>
                 </div>
 
@@ -1431,10 +1556,19 @@ export default function TemplatesPage() {
                 }`}
                 title="Arraste o perfil para reposicionar verticalmente"
               >
-                <div className={`flex items-center gap-2.5 max-w-full ${brandLayout === 'stacked' ? 'flex-col text-center' : 'flex-row'}`}>
-                  <div className={`w-10 h-10 rounded-full border-2 overflow-hidden shadow-md shrink-0 ${
-                    templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/60 bg-zinc-900'
-                  }`}>
+                <div
+                  className={`flex items-center max-w-full ${brandLayout === 'stacked' ? 'flex-col text-center' : 'flex-row'}`}
+                  style={{ gap: `${Math.max(6, Math.round(brandScale * 0.65))}px` }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.round(brandScale * 2.85)}px`,
+                      height: `${Math.round(brandScale * 2.85)}px`,
+                    }}
+                    className={`rounded-full border-2 overflow-hidden shadow-md shrink-0 transition-all ${
+                      templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/60 bg-zinc-900'
+                    }`}
+                  >
                     <img
                       src={avatarUrl}
                       alt={brandName}
@@ -1442,21 +1576,34 @@ export default function TemplatesPage() {
                     />
                   </div>
                   <div className={`flex flex-col min-w-0 ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-                    <div className="flex items-center gap-1">
-                      <span className={`text-xs font-bold tracking-tight truncate ${
-                        templateBg === 'white' ? 'text-zinc-950' : 'text-white'
-                      }`}>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        style={{ fontSize: `${brandScale}px` }}
+                        className={`font-bold tracking-tight truncate leading-snug transition-all ${
+                          templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+                        }`}
+                      >
                         {brandName}
                       </span>
                       {showVerifiedBadge && (
-                        <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                        <svg
+                          style={{
+                            width: `${Math.max(10, Math.round(brandScale * 0.85))}px`,
+                            height: `${Math.max(10, Math.round(brandScale * 0.85))}px`,
+                          }}
+                          className="text-blue-500 fill-current shrink-0"
+                          viewBox="0 0 24 24"
+                        >
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                         </svg>
                       )}
                     </div>
-                    <span className={`text-[10px] font-medium truncate ${
-                      templateBg === 'white' ? 'text-zinc-600' : 'text-zinc-400'
-                    }`}>
+                    <span
+                      style={{ fontSize: `${Math.max(9, Math.round(brandScale * 0.75))}px` }}
+                      className={`font-medium truncate leading-tight transition-all ${
+                        templateBg === 'white' ? 'text-zinc-600' : 'text-zinc-400'
+                      }`}
+                    >
                       {brandHandle}
                     </span>
                   </div>
