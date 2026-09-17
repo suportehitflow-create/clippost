@@ -1,6 +1,7 @@
 'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
+import { SweepStepper } from '@/components/ui/SweepStepper'
 import { useVerticalFisheyeDock } from '@/components/ui/FisheyeDock'
 import { useState, useRef, useEffect } from 'react'
 import {
@@ -913,48 +914,17 @@ export default function TemplatesPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {/* TAMANHO DA FONTE (APENAS CONTROLE + E -) */}
+                  {/* TAMANHO DA FONTE (BENCHO SWEEP STEPPER: TAP FOR ONE, HOLD TO SWEEP) */}
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-zinc-400 font-medium text-xs">Tamanho da Fonte (11 a 18):</label>
-                      <span className="font-mono text-xs text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{fontSize}px</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFontSize(f => Math.max(11, f - 1))}
-                        disabled={fontSize <= 11}
-                        className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95 text-base"
-                        title="Diminuir fonte (mínimo 11)"
-                      >
-                        -
-                      </button>
-                      <div className="flex-1 relative">
-                        <input
-                          type="number"
-                          min={11}
-                          max={18}
-                          value={fontSize}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10)
-                            if (!isNaN(val)) {
-                              setFontSize(Math.max(11, Math.min(18, val)))
-                            }
-                          }}
-                          className="w-full h-9 bg-zinc-900 border border-white/10 focus:border-indigo-500 rounded-xl text-center text-sm font-bold text-white outline-none"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-mono pointer-events-none">px</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFontSize(f => Math.min(18, f + 1))}
-                        disabled={fontSize >= 18}
-                        className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95 text-base"
-                        title="Aumentar fonte (máximo 18)"
-                      >
-                        +
-                      </button>
-                    </div>
+                    <SweepStepper
+                      label="Tamanho da Fonte (11 a 18px):"
+                      value={fontSize}
+                      onChange={setFontSize}
+                      min={11}
+                      max={18}
+                      step={1}
+                      unit="px"
+                    />
                   </div>
 
                   {/* COR DA LETRA */}
@@ -1604,43 +1574,27 @@ export default function TemplatesPage() {
           </span>
         </div>
 
-        {/* Controles de Zoom do Canvas (Canva Style) */}
+        {/* Controles de Zoom do Canvas (Bencho Sweep Stepper) */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCanvasZoom(z => Math.max(70, z - 10))}
-            className="p-1 rounded hover:text-white hover:bg-white/10 cursor-pointer"
-            title="Diminuir Zoom"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>
-
-          <input
-            type="range"
-            min={70}
-            max={130}
+          <ZoomOut className="w-3.5 h-3.5 text-zinc-500" />
+          <SweepStepper
             value={canvasZoom}
-            onChange={(e) => setCanvasZoom(Number(e.target.value))}
-            className="w-20 accent-indigo-500 cursor-pointer"
+            onChange={setCanvasZoom}
+            min={50}
+            max={150}
+            step={5}
+            unit="%"
+            size="sm"
+            className="w-28"
           />
-
-          <span className="font-mono text-[11px] text-white w-9 text-center">{canvasZoom}%</span>
-
-          <button
-            type="button"
-            onClick={() => setCanvasZoom(z => Math.min(130, z + 10))}
-            className="p-1 rounded hover:text-white hover:bg-white/10 cursor-pointer"
-            title="Aumentar Zoom"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>
-
+          <ZoomIn className="w-3.5 h-3.5 text-zinc-500" />
           <button
             type="button"
             onClick={() => setCanvasZoom(100)}
-            className="px-2 py-0.5 rounded text-[10px] bg-white/[0.05] hover:bg-white/10 text-zinc-300 hover:text-white cursor-pointer"
+            className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/[0.05] hover:bg-white/10 text-zinc-300 hover:text-white cursor-pointer transition-colors border border-white/[0.06]"
+            title="Restaurar zoom para 100%"
           >
-            Ajustar
+            100%
           </button>
         </div>
       </footer>

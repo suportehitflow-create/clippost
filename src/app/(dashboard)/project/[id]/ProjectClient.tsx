@@ -1,6 +1,7 @@
 'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
+import { SweepStepper } from '@/components/ui/SweepStepper'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import {
   Download,
@@ -975,28 +976,24 @@ export default function ProjectClient({
                       </div>
                     </div>
 
-                    {/* SLIDER DE PAN HORIZONTAL */}
+                    {/* SWEEP STEPPER DE PAN HORIZONTAL (TAP FOR ONE, HOLD TO SWEEP) */}
                     <div className="space-y-2 pt-1 border-t border-white/[0.06]">
-                      <div className="flex justify-between items-center text-zinc-400">
-                        <span className="font-medium">Posição do Foco (Pan Horizontal):</span>
-                        <span className="font-mono text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
-                          {cropPanX}% {cropPanX === 50 ? '(Centro)' : cropPanX < 50 ? '(Esquerda)' : '(Direita)'}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={15}
-                        max={85}
+                      <SweepStepper
+                        label="Posição do Foco (Pan Horizontal):"
                         value={cropPanX}
-                        onChange={(e) => {
-                          setCropPanX(Number(e.target.value))
+                        onChange={(val) => {
+                          setCropPanX(val)
                           setAiFraming('original')
                         }}
-                        className="w-full accent-[#6366f1] cursor-pointer"
+                        min={15}
+                        max={85}
+                        step={1}
+                        unit="%"
+                        formatValue={(v) => `${v}% ${v === 50 ? '(Centro)' : v < 50 ? '(Esq)' : '(Dir)'}`}
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                      <div className="flex justify-between text-[10px] text-zinc-500 font-mono px-1">
                         <span>← Esquerda (15%)</span>
-                        <span className="text-zinc-400">Centro (50%)</span>
+                        <span className="text-zinc-400 cursor-pointer hover:text-white" onClick={() => { setCropPanX(50); setAiFraming('original'); }}>Centro (50%)</span>
                         <span>Direita (85%) →</span>
                       </div>
                     </div>
