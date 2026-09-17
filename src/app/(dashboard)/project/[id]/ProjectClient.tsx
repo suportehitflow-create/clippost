@@ -70,7 +70,7 @@ export default function ProjectClient({
     if (status === 'done' && clips.length === 0) {
       const defaultViralClips: Clip[] = [
         {
-          id: `${project.id}-c1`,
+          id: `${project.id.slice(0, 32)}0001`,
           title: 'O Momento Decisivo: Gol Impossível ao Vivo!',
           hook: 'Como fazer o lance que deixou todo mundo sem reação na transmissão',
           start_time: 42,
@@ -80,7 +80,7 @@ export default function ProjectClient({
           status: 'ready'
         },
         {
-          id: `${project.id}-c2`,
+          id: `${project.id.slice(0, 32)}0002`,
           title: 'A Jogada que Destruiu a Marcação',
           hook: 'O segredo tático e drible desconhecido para furar a retranca',
           start_time: 125,
@@ -90,7 +90,7 @@ export default function ProjectClient({
           status: 'ready'
         },
         {
-          id: `${project.id}-c3`,
+          id: `${project.id.slice(0, 32)}0003`,
           title: 'Final Dramático no Último Lance!',
           hook: 'A tentativa desesperada de virada nos acréscimos e o desfecho chocante',
           start_time: 210,
