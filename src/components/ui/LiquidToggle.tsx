@@ -1,23 +1,25 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 
-interface LiquidToggleProps {
+export interface LiquidToggleProps {
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
   className?: string
-  activeColor?: 'emerald' | 'indigo' | 'violet'
-  // Compatibilidade com código legado se passado
+  activeColor?: 'emerald' | 'indigo' | 'ink'
   activeLabel?: string
   inactiveLabel?: string
   showBadge?: boolean
 }
 
 /**
- * LiquidToggle (Apple / Bencho Liquid Gooey Spring Switch)
- * Pure pill toggle without redundant "LIGADO / DESLIGADO" text labels.
- * Physics: Thumb spring with following liquid gooey droplet.
+ * Bencho Liquid Toggle (https://bencho.dev/?c=liq-toggle&theme=dark)
+ * 
+ * "Two blobs, not one, and ONE POSITION between them. The thumb's x is a motion value,
+ * and the drop is a spring FOLLOWING that value rather than the same target with a delay on it.
+ * That difference is the whole component: drag slowly and it stays one shape, flick it and
+ * the goo necks out behind."
  */
 export function LiquidToggle({
   checked,
@@ -26,15 +28,22 @@ export function LiquidToggle({
   className = '',
   activeColor = 'emerald',
 }: LiquidToggleProps) {
-  const isEmerald = activeColor === 'emerald'
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  const handleClick = () => {
+    if (disabled) return
+    setIsTransitioning(true)
+    onChange(!checked)
+    setTimeout(() => setIsTransitioning(false), 360)
+  }
 
   return (
     <div className={`inline-flex items-center select-none ${disabled ? 'opacity-50 pointer-events-none' : ''} ${className}`}>
-      {/* SVG Gooey Filter global para fusão líquida orgânica */}
+      {/* SVG Gooey Filter exact spec from bencho.dev */}
       <svg className="fixed -top-full -left-full pointer-events-none w-0 h-0" aria-hidden="true">
         <defs>
           <filter id="liq-goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="smear" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="smear" />
             <feColorMatrix
               in="smear"
               type="matrix"
@@ -42,51 +51,51 @@ export function LiquidToggle({
                 1 0 0 0 0
                 0 1 0 0 0
                 0 0 1 0 0
-                0 0 0 18 -8"
+                0 0 0 19 -9"
             />
           </filter>
         </defs>
       </svg>
 
-      {/* Track da Pílula */}
+      {/* Bencho liq-sw button */}
       <button
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative w-12 h-6.5 rounded-full p-0.5 transition-all duration-300 cursor-pointer border shadow-sm outline-none ${
+        onClick={handleClick}
+        className={`relative w-[52px] h-[28px] rounded-full p-0 cursor-pointer border transition-colors duration-300 outline-none overflow-visible ${
           checked
-            ? isEmerald
-              ? 'bg-emerald-500 border-emerald-400/80 shadow-[0_0_14px_rgba(16,185,129,0.4)]'
-              : 'bg-[#6366f1] border-[#818cf8]/80 shadow-[0_0_14px_rgba(99,102,241,0.4)]'
-            : 'bg-zinc-800 border-white/15 hover:border-white/25 hover:bg-zinc-700/80'
+            ? activeColor === 'emerald'
+              ? 'bg-emerald-500 border-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+              : 'bg-[#6366f1] border-[#818cf8]/80 shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+            : 'bg-zinc-800/95 border-white/15 hover:border-white/25 hover:bg-zinc-700/90'
         }`}
       >
         {/* Recipiente com Filtro Líquido Gooey */}
         <div
-          className="relative w-full h-full"
+          className="absolute inset-0 pointer-events-none"
           style={{ filter: 'url(#liq-goo)' }}
         >
-          {/* Bolha de Arraste (Liquid Drop Trail) — persegue o botão principal com amortecimento */}
+          {/* Drop líquido rastro (Goo Neck) — estica com amortecimento */}
           <div
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-500 pointer-events-none ${
+            className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white transition-all pointer-events-none ${
               checked
-                ? 'translate-x-4.5 scale-x-110 scale-y-90 opacity-90'
-                : 'translate-x-1.5 scale-x-110 scale-y-90 opacity-80'
+                ? 'left-[26px] scale-x-125 opacity-90'
+                : 'left-[3px] scale-x-125 opacity-90'
             }`}
             style={{
-              transitionTimingFunction: 'cubic-bezier(0.25, 1.4, 0.5, 1)',
+              transitionDuration: '420ms',
+              transitionTimingFunction: 'cubic-bezier(0.22, 1.4, 0.36, 1)',
             }}
           />
 
-          {/* Botão Principal (Thumb Knob) — movimento spring rápido e elástico */}
+          {/* Thumb Principal (Botão central com overshoot) */}
           <div
-            className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 pointer-events-none ${
-              checked
-                ? 'translate-x-5.5 scale-100'
-                : 'translate-x-0.5 scale-95'
+            className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-md transition-all pointer-events-none ${
+              checked ? 'left-[26px]' : 'left-[3px]'
             }`}
             style={{
+              transitionDuration: '280ms',
               transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
           />

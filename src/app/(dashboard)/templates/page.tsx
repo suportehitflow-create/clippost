@@ -2,6 +2,7 @@
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
+import { AspectRatioSelector, AspectFormat } from '@/components/ui/AspectRatioSelector'
 import { useState, useRef, useEffect } from 'react'
 import {
   Type,
@@ -151,6 +152,7 @@ export default function TemplatesPage() {
   // Dimensões livres do vídeo (Largura e Altura em % do canvas)
   const [videoWidth, setVideoWidth] = useState(92)
   const [videoHeight, setVideoHeight] = useState(48)
+  const [videoAspect, setVideoAspect] = useState<'9:16' | '4:5' | '1:1' | '16:9'>('9:16')
 
   // Conteúdo textual e identidade
   const [brandName, setBrandName] = useState('Nome da Página')
@@ -839,6 +841,18 @@ export default function TemplatesPage() {
                   </button>
                 ))}
 
+                {/* SELETOR DE PROPORÇÃO BENCHO (EQUAL-AREA MORPHING) */}
+                <div className="pt-2 border-t border-white/[0.08]">
+                  <AspectRatioSelector
+                    currentAspect={videoAspect}
+                    onSelectAspect={(format) => {
+                      setVideoAspect(format.id)
+                      setVideoWidth(format.widthPercent)
+                      setVideoHeight(format.heightPercent)
+                    }}
+                  />
+                </div>
+
                 {/* PÍLULA SAFEZONE DENTRO DE MODELOS */}
                 <div className="pt-2 border-t border-white/[0.08]">
                   <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
@@ -1418,7 +1432,10 @@ export default function TemplatesPage() {
                   top: `${videoPos.y}%`,
                   width: `${videoWidth}%`,
                   height: `${videoHeight}%`,
-                  transform: 'translate(-50%, -50%)'
+                  transform: 'translate(-50%, -50%)',
+                  transition: isResizingVideo
+                    ? 'none'
+                    : 'width 520ms cubic-bezier(0.22, 1, 0.36, 1), height 520ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
                 className="absolute z-20 group"
               >

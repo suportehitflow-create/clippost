@@ -26,19 +26,19 @@ const NAV_ITEMS = [
 ]
 
 /**
- * Floating Vertical Apple Glass Dock Sidebar
- * - Fixed at upper-left corner of the screen
- * - Compact by default (icons only)
- * - Smoothly auto-expands on mouse hover revealing labels
- * - Raised cosine fisheye magnification on glyphs
- * - Zero manual collapse button needed
+ * Bencho Vertical Magnifying Dock (https://bencho.dev/?c=dock&theme=dark)
+ * Floating vertical Apple-grade glass dock positioned at the upper-left.
+ * Features:
+ * - Raised cosine fisheye glyph scaling (--d distance tracking)
+ * - Steady running dot indicator (.gdock-dot)
+ * - Instant floating pill tooltip (.gdock-tip)
+ * - Translucent frosted glass with specular highlight
  */
 export default function Sidebar({ user }: { user: User }) {
   const pathname = usePathname()
   const supabase = createClient()
-  const [isHovered, setIsHovered] = useState(false)
 
-  // Bencho / macOS Fisheye Dock Physics
+  // Bencho Fisheye Dock Physics
   const { registerItem, onMouseMove, onMouseLeave } = useVerticalFisheyeDock(2.8)
 
   async function signOut() {
@@ -52,127 +52,87 @@ export default function Sidebar({ user }: { user: User }) {
 
   return (
     <>
-      {/* Spacer para garantir que o conteúdo da página não fique oculto sob o dock flutuante */}
+      {/* Spacer para o fluxo normal de páginas */}
       <div className="w-16 sm:w-20 shrink-0 select-none pointer-events-none" aria-hidden="true" />
 
-      {/* Dock Flutuante Vertical estilo Apple (Fixed Top-Left) */}
-      <aside
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => {
-          setIsHovered(false)
-          onMouseLeave()
-        }}
+      {/* Bencho Floating Vertical Dock */}
+      <nav
+        aria-label="Dock"
         onMouseMove={onMouseMove}
-        className={
-          "fixed top-4 left-4 z-50 flex flex-col justify-between rounded-2xl bg-[#0c0c0f]/85 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6)] py-3 px-2 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] select-none " +
-          (isHovered ? "w-56" : "w-14")
-        }
+        onMouseLeave={onMouseLeave}
+        className="fixed top-5 left-5 z-50 flex flex-col items-center py-2.5 px-1.5 rounded-[24px] bg-[#0c0c0f]/80 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] gap-1 select-none"
       >
-        <div className="space-y-3">
-          {/* Logo Clipost */}
-          <div className="flex items-center px-1">
+        {/* Logo / Home */}
+        <Link
+          href="/dashboard"
+          title="Clipost"
+          className="w-11 h-11 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity mb-1"
+        >
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
+            <Scissors className="w-4 h-4 text-white" />
+          </div>
+        </Link>
+
+        <div className="w-6 h-px bg-white/10 my-0.5" />
+
+        {/* Navigation Items */}
+        {NAV_ITEMS.map((item, index) => {
+          const Icon = item.icon
+          const active =
+            pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+
+          return (
             <Link
-              href="/dashboard"
-              className="flex items-center gap-2.5 transition-opacity hover:opacity-90 w-full overflow-hidden"
-              title="Clipost"
+              key={item.href}
+              href={item.href}
+              ref={registerItem(index)}
+              className={`gdock-item group relative w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                active ? 'opacity-100' : 'opacity-50 hover:opacity-100'
+              }`}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 flex-shrink-0 ring-1 ring-white/20">
-                <Scissors className="w-4 h-4 text-white" />
-              </div>
+              {/* Bencho Running Active Dot */}
               <span
-                className={
-                  "text-sm font-bold tracking-tight text-white whitespace-nowrap transition-all duration-200 " +
-                  (isHovered ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none")
-                }
-              >
-                Clipost
+                className={`gdock-dot absolute left-1 w-1 h-1 rounded-full bg-[#6366f1] shadow-[0_0_6px_rgba(99,102,241,0.9)] transition-all ${
+                  active ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                }`}
+              />
+
+              {/* Bencho Glyph with raised cosine magnification */}
+              <span className="gdock-glyph flex items-center justify-center text-white">
+                <Icon
+                  className={`w-5 h-5 transition-colors ${
+                    active ? 'text-indigo-400' : 'text-zinc-300 group-hover:text-white'
+                  }`}
+                />
+              </span>
+
+              {/* Bencho Floating Tip (.gdock-tip) */}
+              <span className="absolute left-[calc(100%+14px)] px-2.5 py-1 rounded-full bg-[#18181b] text-white font-mono text-[9px] uppercase tracking-wider shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0 z-50 whitespace-nowrap">
+                {item.label}
               </span>
             </Link>
-          </div>
+          )
+        })}
 
-          <div className="h-px bg-white/[0.08] mx-1" />
+        <div className="w-6 h-px bg-white/10 my-0.5" />
 
-          {/* Navegação Flutuante Fisheye */}
-          <nav className="space-y-1">
-            {NAV_ITEMS.map((item, index) => {
-              const Icon = item.icon
-              const active =
-                pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  ref={registerItem(index)}
-                  title={item.label}
-                  className={
-                    "gdock-item group relative flex items-center h-10 rounded-xl transition-colors overflow-hidden " +
-                    (isHovered ? "px-2.5 " : "justify-center px-0 ") +
-                    (active
-                      ? "bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/30 "
-                      : "text-zinc-400 hover:text-white hover:bg-white/[0.04] ")
-                  }
-                >
-                  {/* Running active dot estilo Apple */}
-                  {active && (
-                    <span
-                      className={
-                        "absolute left-0.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)] " +
-                        (isHovered ? "h-4" : "h-3 -left-0.5")
-                      }
-                    />
-                  )}
-
-                  {/* Glyph com magnificação fisheye de cosseno elevado */}
-                  <div className="gdock-glyph flex items-center justify-center shrink-0 w-6 h-6">
-                    <Icon
-                      className={
-                        "w-4 h-4 transition-colors " +
-                        (active ? "text-indigo-400" : "text-zinc-400 group-hover:text-white")
-                      }
-                    />
-                  </div>
-
-                  {/* Label suave com slide-in */}
-                  <span
-                    className={
-                      "text-xs font-medium ml-2.5 truncate whitespace-nowrap transition-all duration-200 " +
-                      (isHovered ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none")
-                    }
-                  >
-                    {item.label}
-                  </span>
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
-
-        {/* Rodapé: Encerrar sessão */}
-        <div className="pt-2 mt-2 border-t border-white/[0.08]">
-          <button
-            type="button"
-            onClick={signOut}
-            title="Encerrar sessão"
-            className={
-              "gdock-item w-full flex items-center h-9 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-white/[0.04] transition-colors cursor-pointer overflow-hidden " +
-              (isHovered ? "px-2.5" : "justify-center px-0")
-            }
-          >
-            <div className="gdock-glyph flex items-center justify-center shrink-0 w-6 h-6">
-              <LogOut className="w-4 h-4" />
-            </div>
-            <span
-              className={
-                "text-xs font-medium ml-2.5 truncate whitespace-nowrap transition-all duration-200 " +
-                (isHovered ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 pointer-events-none")
-              }
-            >
-              Encerrar sessão
-            </span>
-          </button>
-        </div>
-      </aside>
+        {/* Sign Out Button */}
+        <button
+          type="button"
+          onClick={signOut}
+          className="gdock-item group relative w-11 h-11 rounded-xl flex items-center justify-center text-zinc-400 hover:text-red-400 opacity-50 hover:opacity-100 transition-all cursor-pointer"
+          aria-label="Encerrar sessão"
+        >
+          <span className="gdock-glyph flex items-center justify-center">
+            <LogOut className="w-4 h-4" />
+          </span>
+          <span className="absolute left-[calc(100%+14px)] px-2.5 py-1 rounded-full bg-[#18181b] text-white font-mono text-[9px] uppercase tracking-wider shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0 z-50 whitespace-nowrap">
+            Encerrar sessão
+          </span>
+        </button>
+      </nav>
     </>
   )
 }
