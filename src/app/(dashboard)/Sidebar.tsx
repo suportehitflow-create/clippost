@@ -5,21 +5,23 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Scissors,
+  Layers,
   Sparkles,
+  Zap,
   Calendar,
-  CreditCard,
   LogOut,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
-// Navegação minimalista e focada (5 itens essenciais)
+// Navegação completa reorganizada conforme solicitação do usuário
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
+  { label: 'Edição em Massa', href: '/bulk', icon: Layers },
   { label: 'Templates', href: '/templates', icon: Sparkles },
+  { label: 'Autopilot', href: '/autopilot', icon: Zap },
   { label: 'Agendamentos', href: '/schedule', icon: Calendar },
-  { label: 'Assinatura', href: '/billing', icon: CreditCard },
 ]
 
 export default function Sidebar({ user }: { user: User }) {
@@ -39,7 +41,7 @@ export default function Sidebar({ user }: { user: User }) {
   return (
     <aside className="w-64 border-r border-white/[0.08] bg-[#0c0c0f] flex flex-col justify-between p-5 flex-shrink-0 sticky top-0 h-screen">
       <div className="space-y-6">
-        {/* Logo Minimalista */}
+        {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2.5 px-2 hover:opacity-90 transition-opacity">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-orange-600 to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/20">
             <Scissors className="w-4 h-4 text-white" />
@@ -47,7 +49,7 @@ export default function Sidebar({ user }: { user: User }) {
           <span className="text-base font-bold tracking-tight text-white">ClipPost</span>
         </Link>
 
-        {/* Lista de Navegação Minimalista */}
+        {/* Lista de Navegação */}
         <nav className="space-y-1">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon

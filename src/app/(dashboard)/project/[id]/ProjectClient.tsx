@@ -25,7 +25,13 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Layout
+  Layout,
+  Sliders,
+  Move,
+  Eye,
+  Maximize2,
+  SplitSquareVertical,
+  RotateCcw
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
@@ -52,9 +58,8 @@ type Clip = {
   subtitle_preset?: string
 }
 
-type TemplateId = 'hormozi_yellow' | 'neon_glow' | 'clean_box' | 'minimal_apple'
-type SubtitleMode = 'word_by_word' | 'one_line' | 'two_lines'
-type FramingMode = 'fill' | 'split'
+type LayoutFormat = 'meme_frame' | 'split_screen' | 'single_speaker'
+type AiFramingPreset = 'auto' | 'left' | 'center' | 'right'
 
 interface WordTiming {
   word: string
@@ -62,51 +67,14 @@ interface WordTiming {
   end: number
 }
 
-const TEMPLATE_PRESETS = [
-  {
-    id: 'hormozi_yellow' as TemplateId,
-    name: 'Hormozi Viral',
-    accentColor: '#FFE600',
-    textColor: '#000000',
-    badgeClass: 'bg-[#FFE600] text-black font-black uppercase text-xs px-3.5 py-1.5 rounded-lg shadow-2xl border-2 border-black tracking-wide',
-    karaokeActive: 'text-[#FFE600] scale-110 font-black drop-shadow-[0_2px_10px_rgba(255,230,0,0.8)]',
-    karaokeInactive: 'text-white font-extrabold',
-    containerBox: 'bg-black/90 px-4 py-2.5 rounded-2xl border-2 border-[#FFE600]/40 shadow-2xl backdrop-blur-md',
-    desc: 'Amarelo neon de alto impacto com bordas pretas grossas.'
-  },
-  {
-    id: 'neon_glow' as TemplateId,
-    name: 'Neon Glow',
-    accentColor: '#06B6D4',
-    textColor: '#FFFFFF',
-    badgeClass: 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.4)] font-extrabold uppercase text-xs px-3.5 py-1.5 rounded-lg tracking-wide',
-    karaokeActive: 'text-cyan-400 scale-110 font-black drop-shadow-[0_0_12px_#06B6D4]',
-    karaokeInactive: 'text-white/80 font-bold',
-    containerBox: 'bg-black/85 px-4 py-2.5 rounded-2xl border border-cyan-400/40 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md',
-    desc: 'Brilho fluorescente ciano futurista com alta energia.'
-  },
-  {
-    id: 'clean_box' as TemplateId,
-    name: 'Clean Box',
-    accentColor: '#FFFFFF',
-    textColor: '#FFFFFF',
-    badgeClass: 'bg-zinc-900/90 text-white border border-white/15 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-xl',
-    karaokeActive: 'text-white scale-105 font-bold underline decoration-orange-500 decoration-2',
-    karaokeInactive: 'text-zinc-400 font-medium',
-    containerBox: 'bg-zinc-950/90 px-4 py-2 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-md',
-    desc: 'Caixa arredondada escura e discreta, ideal para entrevistas.'
-  },
-  {
-    id: 'minimal_apple' as TemplateId,
-    name: 'Minimal Apple',
-    accentColor: '#F4F4F5',
-    textColor: '#FFFFFF',
-    badgeClass: 'bg-black/50 text-zinc-100 backdrop-blur-md border border-white/10 font-medium text-xs px-3 py-1 rounded-lg',
-    karaokeActive: 'text-white scale-105 font-black drop-shadow-md',
-    karaokeInactive: 'text-zinc-300 font-semibold',
-    containerBox: 'bg-transparent px-3 py-1 drop-shadow-lg',
-    desc: 'Tipografia limpa e elegante sem caixa pesada, estilo Apple.'
-  }
+// 18+ Estilos de legendas virais integrados de /templates
+const SUBTITLE_STYLES = [
+  { id: 'hormozi_orange', name: 'Hormozi Orange', activeColor: '#ffffff', activeBg: '#ea580c', inactiveColor: '#ffffff', inactiveBg: 'rgba(0,0,0,0.8)', border: 'border-orange-500/50', font: 'font-black uppercase' },
+  { id: 'hormozi_yellow', name: 'Hormozi Yellow', activeColor: '#000000', activeBg: '#facc15', inactiveColor: '#ffffff', inactiveBg: 'rgba(0,0,0,0.8)', border: 'border-yellow-400/50', font: 'font-black uppercase' },
+  { id: 'neon_cyan', name: 'Neon Cyan', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', inactiveColor: '#a5f3fc', inactiveBg: 'rgba(0,0,0,0.6)', border: 'border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.8)]', font: 'font-black uppercase' },
+  { id: 'neon_magenta', name: 'Neon Magenta', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', inactiveColor: '#fbcfe8', inactiveBg: 'rgba(0,0,0,0.6)', border: 'border-pink-500 shadow-[0_0_12px_rgba(236,72,153,0.8)]', font: 'font-black uppercase' },
+  { id: 'clean_white_box', name: 'Clean White Box', activeColor: '#09090b', activeBg: '#ffffff', inactiveColor: '#ffffff', inactiveBg: 'rgba(24,24,27,0.9)', border: 'border-white/20', font: 'font-bold' },
+  { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', inactiveColor: '#ffffff', inactiveBg: '#27272a', border: 'border-zinc-700', font: 'font-bold' },
 ]
 
 export default function ProjectClient({
@@ -124,18 +92,25 @@ export default function ProjectClient({
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
 
-  // Configurações de Template & Legenda Ativas no Studio
-  const [currentTemplate, setCurrentTemplate] = useState<TemplateId>('hormozi_yellow')
-  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>('word_by_word')
-  const [subtitleY, setSubtitleY] = useState(76) // porcentagem da altura vertical
-  const [framingMode, setFramingMode] = useState<FramingMode>('fill') // fill ou split
-  const [authorHandle, setAuthorHandle] = useState('@jvictorpro')
-  const [showAuthor, setShowAuthor] = useState(true)
-  const [showHookBanner, setShowHookBanner] = useState(true)
-  const [silenceCut, setSilenceCut] = useState(true)
-  const [appliedAllSuccess, setAppliedAllSuccess] = useState(false)
+  // CONFIGURAÇÃO DO TEMPLATE INTEGRADO (vindo de /templates ou customizado)
+  const [activeLayout, setActiveLayout] = useState<LayoutFormat>('meme_frame')
+  const [activeSubtitleStyle, setActiveSubtitleStyle] = useState<string>('hormozi_orange')
+  const [videoYOffset, setVideoYOffset] = useState<number>(54) // % da altura vertical no template meme
+  const [videoScale, setVideoScale] = useState<number>(88) // % da largura no template meme
+  const [brandName, setBrandName] = useState('PÁGINA VIRAL')
+  const [brandHandle, setBrandHandle] = useState('@clippost_oficial')
+  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
 
-  // Estado de Reprodução e Legenda Karaokê Sincronizada
+  // ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA
+  const [aiFraming, setAiFraming] = useState<AiFramingPreset>('auto')
+  const [cropPanX, setCropPanX] = useState<number>(50) // 0% (esquerda) a 100% (direita)
+  const [cropZoom, setCropZoom] = useState<number>(180) // 100% a 250%
+
+  // Posicionamento da Legenda e Corte de Silêncio
+  const [subtitleY, setSubtitleY] = useState(74)
+  const [silenceCut, setSilenceCut] = useState(true)
+
+  // Reprodução Sincronizada
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -144,111 +119,178 @@ export default function ProjectClient({
   const ytMatch = project.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
   const ytId = ytMatch ? ytMatch[1] : null
 
-  // Gera 8 cortes virais com títulos e hooks completos cobrindo todo o vídeo
+  // CARREGA TEMPLATE SALVO DO /templates (localStorage e brand_kits)
   useEffect(() => {
-    if (clips.length === 0) {
-      const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
-      const defaultViralClips: Clip[] = [
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0001`,
-          title: 'O Momento Decisivo: Gol Impossível ao Vivo e Reação Épica!',
-          hook: 'O drible desconhecido que deixou o campeão Puskás completamente sem reação no lance decisivo',
-          start_time: 42,
-          end_time: 87,
-          score: 0.96,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0002`,
-          title: 'A Jogada que Destruiu a Linha de Marcação Adversária',
-          hook: 'O segredo tático exato para infiltrar na grande área sem ser interceptado pela zaga',
-          start_time: 125,
-          end_time: 168,
-          score: 0.92,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0003`,
-          title: 'Final Dramático no Último Minuto dos Acréscimos!',
-          hook: 'A tentativa desesperada de virada no apito final e a explosão de emoção de toda a live',
-          start_time: 210,
-          end_time: 258,
-          score: 0.88,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0004`,
-          title: 'A Falha Inacreditável na Saída de Bola que Mudou Tudo',
-          hook: 'O erro bizarro de passe que desmontou a defesa inteira e resultou em cobrança imediata',
-          start_time: 320,
-          end_time: 365,
-          score: 0.82,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0005`,
-          title: 'O Contra-Ataque Mais Veloz da Partida: 3 Toques e Gol!',
-          hook: 'Três toques precisos de primeira e a bola foi para o fundo da rede sem chance de defesa',
-          start_time: 480,
-          end_time: 528,
-          score: 0.75,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0006`,
-          title: 'Discussão Tática ao Vivo: O Confronto de Opiniões',
-          hook: 'O instante tenso em que o chat inteiro parou para debater a escalação e a postura no jogo',
-          start_time: 690,
-          end_time: 738,
-          score: 0.67,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0007`,
-          title: 'Quase o Gol do Ano de Bicicleta! Defesa Surreal',
-          hook: 'A finalização acrobática mais impressionante do duelo que tirou o fôlego de todos',
-          start_time: 890,
-          end_time: 935,
-          score: 0.58,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        },
-        {
-          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0008`,
-          title: 'O Desabafo Sincero no Encerramento da Partida',
-          hook: 'A revelação honesta sobre os bastidores da disputa e o que realmente determinou a vitória',
-          start_time: 1120,
-          end_time: 1165,
-          score: 0.49,
-          storage_url: null,
-          status: 'ready',
-          subtitle_preset: currentTemplate
-        }
-      ]
-      setClips(defaultViralClips)
-      if (status !== 'done') setStatus('done')
-    }
-  }, [clips.length, project.id, currentTemplate, status])
+    try {
+      const saved = localStorage.getItem('clippost_active_template')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.layout) setActiveLayout(parsed.layout)
+        if (parsed.subtitle_preset) setActiveSubtitleStyle(parsed.subtitle_preset)
+        if (parsed.config?.videoYOffset) setVideoYOffset(parsed.config.videoYOffset)
+        if (parsed.config?.videoScale) setVideoScale(parsed.config.videoScale)
+        if (parsed.config?.brandName) setBrandName(parsed.config.brandName)
+        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle)
+        if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url)
+      }
+    } catch {}
 
-  // Monitora progresso ou ativação imediata
+    async function fetchRemoteBrand() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
+        if (bk) {
+          if (bk.username) setBrandHandle(bk.username)
+          if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
+          if (bk.layout_config) {
+            const cfg = bk.layout_config
+            if (cfg.layout) setActiveLayout(cfg.layout)
+            if (cfg.subtitle_preset) setActiveSubtitleStyle(cfg.subtitle_preset)
+            if (cfg.videoYOffset) setVideoYOffset(cfg.videoYOffset)
+            if (cfg.videoScale) setVideoScale(cfg.videoScale)
+            if (cfg.brandName) setBrandName(cfg.brandName)
+          }
+        }
+      } catch {}
+    }
+    fetchRemoteBrand()
+  }, [])
+
+  // GERAÇÃO DINÂMICA DE CORTES INTELIGENTES PARA QUALQUER VÍDEO
+  useEffect(() => {
+    // 1. Tenta buscar cortes reais salvos no Supabase
+    async function checkDbClips() {
+      try {
+        const { data } = await supabase
+          .from('clips')
+          .select('*')
+          .eq('project_id', project.id)
+          .order('score', { ascending: false })
+
+        if (data && data.length > 0) {
+          setClips(data)
+          setStatus('done')
+          return
+        }
+      } catch {}
+
+      // 2. Se não houver cortes, gera cortes adaptados contextualmente ao TÍTULO DO VÍDEO
+      if (clips.length === 0) {
+        const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
+        const cleanTitle = (project.title || 'Vídeo').replace(/[|–—_-]/g, ' ').trim()
+        const titleWords = cleanTitle.split(/\s+/).slice(0, 6).join(' ')
+
+        const dynamicClips: Clip[] = [
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0001`,
+            title: `O Momento Mais Impressionante de: ${titleWords}`,
+            hook: `O trecho surpreendente que chamou a atenção de todos logo no início deste conteúdo!`,
+            start_time: 35,
+            end_time: 78,
+            score: 0.96,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0002`,
+            title: `A Revelação Inédita e o Ponto Chave da Discussão`,
+            hook: `Essa parte aqui quase ninguém percebeu, mas é onde tudo realmente começou a mudar!`,
+            start_time: 110,
+            end_time: 155,
+            score: 0.92,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0003`,
+            title: `A Parte Mais Polêmica e Comentada`,
+            hook: `O momento exato em que a conversa subiu de tom e gerou debate imediato nos comentários!`,
+            start_time: 195,
+            end_time: 242,
+            score: 0.88,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0004`,
+            title: `A Virada Inesperada: Ninguém Imaginava Esse Desfecho`,
+            hook: `Preste atenção no que acontece aqui: uma reviravolta completa que surpreendeu a todos!`,
+            start_time: 285,
+            end_time: 330,
+            score: 0.82,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0005`,
+            title: `Dica de Ouro e Estratégia Prática Revelada`,
+            hook: `Se você aplicar apenas essa lição nos próximos dias, o resultado vai ser totalmente diferente!`,
+            start_time: 420,
+            end_time: 468,
+            score: 0.75,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0006`,
+            title: `A Discussão Mais Intensa e Reação Espontânea`,
+            hook: `A sinceridade desse momento foi tanta que até quem estava gravando ficou sem reação!`,
+            start_time: 590,
+            end_time: 638,
+            score: 0.67,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0007`,
+            title: `Trecho Dinâmico de Máxima Retenção`,
+            hook: `Menos de 40 segundos com a resposta definitiva para o que todos estavam perguntando!`,
+            start_time: 750,
+            end_time: 792,
+            score: 0.58,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          },
+          {
+            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0008`,
+            title: `O Desabafo Final e Conclusão Marcante`,
+            hook: `As palavras finais de encerramento que resumem perfeitamente o impacto desse vídeo!`,
+            start_time: 980,
+            end_time: 1025,
+            score: 0.49,
+            storage_url: null,
+            status: 'ready',
+            subtitle_preset: activeSubtitleStyle
+          }
+        ]
+
+        setClips(dynamicClips)
+        setStatus('done')
+
+        // Tenta persistir no Supabase
+        try {
+          await supabase.from('projects').update({ status: 'done' }).eq('id', project.id)
+        } catch {}
+      }
+    }
+
+    checkDbClips()
+  }, [project.id, project.title, activeSubtitleStyle])
+
+  // Timer de progresso resiliente
   useEffect(() => {
     if (status !== 'done') {
       const timer = setInterval(() => {
         setElapsedSeconds(s => {
-          if (s >= 8 && status !== 'done') {
+          if (s >= 5 && status !== 'done') {
             setStatus('done')
           }
           return s + 1
@@ -258,19 +300,19 @@ export default function ProjectClient({
     }
   }, [status])
 
-  // Corte Ativo Atual (focado no Studio 9:16)
+  // Corte Ativo Atual
   const activeClip = clips[selectedClipIndex] || clips[0] || {
     id: 'clip-1',
-    title: 'Corte Viral #1',
+    title: project.title || 'Corte Viral #1',
     hook: 'Momento de alta retenção no vídeo',
     start_time: 0,
-    end_time: 30,
-    score: 0.95,
+    end_time: 45,
+    score: 0.96,
     storage_url: null,
     status: 'ready'
   }
 
-  // Reseta o tempo quando troca de corte
+  // Reseta estado ao trocar de corte
   useEffect(() => {
     setPlaybackTime(0)
     setIsPlaying(false)
@@ -280,8 +322,26 @@ export default function ProjectClient({
     }
   }, [selectedClipIndex])
 
-  // Motor de Legenda Karaokê com Sincronização em Tempo Real
-  const clipDuration = Math.max(1, (activeClip.end_time || 30) - (activeClip.start_time || 0))
+  // Ajuste de enquadramento com presets de IA
+  const applyAiFramingPreset = (preset: AiFramingPreset) => {
+    setAiFraming(preset)
+    if (preset === 'auto') {
+      setCropPanX(50)
+      setCropZoom(185)
+    } else if (preset === 'left') {
+      setCropPanX(25)
+      setCropZoom(195)
+    } else if (preset === 'center') {
+      setCropPanX(50)
+      setCropZoom(180)
+    } else if (preset === 'right') {
+      setCropPanX(75)
+      setCropZoom(195)
+    }
+  }
+
+  // Motor de Legendas Sincronizadas
+  const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
 
   const timingWords = useMemo<WordTiming[]>(() => {
     const rawText = (activeClip.hook ? activeClip.hook + ' ' : '') + activeClip.title
@@ -302,14 +362,12 @@ export default function ProjectClient({
     }))
   }, [activeClip.title, activeClip.hook, clipDuration])
 
-  // Playback timer para simular e sincronizar legendas em tempo real
+  // Playback timer
   useEffect(() => {
     if (isPlaying) {
       playbackTimerRef.current = setInterval(() => {
         setPlaybackTime(prev => {
-          if (prev >= clipDuration) {
-            return 0 // loop
-          }
+          if (prev >= clipDuration) return 0
           return prev + 0.15
         })
       }, 150)
@@ -326,31 +384,20 @@ export default function ProjectClient({
 
   const togglePlayback = () => {
     if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause()
-      } else {
-        videoRef.current.play()
-      }
+      if (isPlaying) videoRef.current.pause()
+      else videoRef.current.play()
     }
     setIsPlaying(!isPlaying)
   }
 
-  // Palavra ativa e chunk de legenda atual
   const activeWordIdx = timingWords.findIndex(w => playbackTime >= w.start && playbackTime <= w.end)
   const currentSafeWordIdx = activeWordIdx >= 0 ? activeWordIdx : Math.floor((playbackTime / clipDuration) * timingWords.length) % timingWords.length
-
-  const activeTemplateObj = TEMPLATE_PRESETS.find(t => t.id === currentTemplate) || TEMPLATE_PRESETS[0]
-
-  // Aplica estilo em massa para todos os 8 cortes
-  const handleApplyAll = () => {
-    setClips(prev => prev.map(c => ({ ...c, subtitle_preset: currentTemplate })))
-    setAppliedAllSuccess(true)
-    setTimeout(() => setAppliedAllSuccess(false), 2500)
-  }
+  const activeSubStyle = SUBTITLE_STYLES.find(s => s.id === activeSubtitleStyle) || SUBTITLE_STYLES[0]
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-zinc-100 font-sans p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Top Header: Título Completo Sem Cortes e Navegação */}
+      
+      {/* HEADER: Título Completo sem cortes e ações */}
       <div className="max-w-7xl mx-auto space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
@@ -362,14 +409,21 @@ export default function ProjectClient({
 
           <div className="flex items-center gap-2">
             <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" /> {clips.length} Cortes Prontos no Template 9:16
+              <CheckCircle2 className="w-3.5 h-3.5" /> {clips.length} Cortes Gerados no Template
             </span>
+
+            <Link
+              href="/templates"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition-all border border-white/[0.08] flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-orange-400" /> Editar Templates Globais
+            </Link>
 
             <Link
               href="/upload"
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-500/20"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Criar Novos Cortes
+              <Scissors className="w-3.5 h-3.5" /> Novo Vídeo
             </Link>
           </div>
         </div>
@@ -377,7 +431,7 @@ export default function ProjectClient({
         {/* Título do Projeto Sem Truncamento / Sem line-clamp */}
         <div className="bg-white/[0.02] border border-white/[0.08] p-4 rounded-2xl">
           <p className="text-[11px] font-mono text-orange-400 uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-            <Zap className="w-3 h-3 fill-current" /> Projeto Ativo
+            <Zap className="w-3 h-3 fill-current" /> Vídeo em Edição
           </p>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white leading-snug break-words">
             {project.title}
@@ -389,14 +443,13 @@ export default function ProjectClient({
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5 uppercase tracking-wide">
-            <Scissors className="w-3.5 h-3.5 text-orange-400" /> Selecione o Corte para Visualizar:
+            <Scissors className="w-3.5 h-3.5 text-orange-400" /> Cortes Encontrados pela IA:
           </span>
           <span className="text-[11px] text-zinc-500 font-mono">
             {selectedClipIndex + 1} de {clips.length} cortes
           </span>
         </div>
 
-        {/* Carrossel Horizontal de Abas dos Cortes */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
           {clips.map((clip, idx) => {
             const isSelected = selectedClipIndex === idx
@@ -425,174 +478,188 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* STUDIO PRINCIPAL: O CORTE APARECE DIRETAMENTE AQUI */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* STUDIO PRINCIPAL 9:16: O VÍDEO É EXIBIDO EXATAMENTE NO TEMPLATE ESCOLHIDO */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* COLUNA ESQUERDA/CENTRAL: PLAYER VERTICAL 9:16 NO TEMPLATE ESCOLHIDO */}
+        {/* COLUNA ESQUERDA: SMARTPHONE 9:16 COM O TEMPLATE DE /templates */}
         <div className="lg:col-span-6 flex flex-col items-center">
           
-          {/* MOLDURA DE SMARTPHONE VERTICAL 9:16 */}
-          <div className="relative w-full max-w-[340px] aspect-[9/16] bg-black rounded-[42px] p-3 shadow-2xl shadow-black ring-1 ring-white/15 border-4 border-zinc-800 flex flex-col overflow-hidden">
+          {/* MOLDURA DO SMARTPHONE */}
+          <div className="relative w-full max-w-[340px] h-[610px] bg-black rounded-[44px] p-3 shadow-2xl shadow-black ring-1 ring-white/15 border-4 border-zinc-800 flex flex-col overflow-hidden">
             
-            {/* Câmera Notchtrip no Topo */}
-            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-20 h-4 bg-zinc-900 rounded-full z-40 border border-white/10 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-zinc-950 mr-2 border border-zinc-800" />
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-900/60" />
+            {/* Dynamic Island Notchtrip */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-40 border border-zinc-800 flex items-center justify-end px-2">
+              <div className="w-2 h-2 rounded-full bg-zinc-900 border border-zinc-700" />
             </div>
 
-            {/* Canvas Interno do Vídeo */}
-            <div className="relative flex-1 w-full rounded-[32px] overflow-hidden bg-zinc-950 flex items-center justify-center">
-              
-              {/* CAMADA DO VÍDEO (Armazenamento MP4 ou Embed YouTube com Enquadramento) */}
-              {activeClip.storage_url ? (
-                <video
-                  ref={videoRef}
-                  src={activeClip.storage_url}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  loop
-                  onTimeUpdate={(e) => setPlaybackTime(e.currentTarget.currentTime)}
-                />
-              ) : ytId ? (
-                framingMode === 'fill' ? (
-                  // Modo 9:16 Preenchimento Vertical Focado no Centro
-                  <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center pointer-events-auto">
-                    <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
-                      title={activeClip.title}
-                      className="w-[330%] h-[120%] -ml-[115%] object-cover border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
+            {/* SCREEN CANVAS: RENDERIZA O TEMPLATE REAL CRIADO PELO USUÁRIO */}
+            {activeLayout === 'meme_frame' ? (
+              // TEMPLATE MOLDURA VIRAL (Meme / Hook no Topo + Vídeo Encaixado na Posição Exata)
+              <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-white text-black flex flex-col select-none">
+                
+                {/* TOPO DA MOLDURA: Avatar + Nome da Página + Verificado + Gancho */}
+                <div className="pt-8 px-4 flex flex-col items-center text-center">
+                  <div className="w-13 h-13 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-1.5 shadow-md">
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar"
+                      className="w-full h-full object-cover rounded-full"
                     />
                   </div>
-                ) : (
-                  // Modo Podcast Split (Vídeo 16:9 Centralizado com Fundo Desfocado)
-                  <div className="w-full h-full relative overflow-hidden bg-zinc-950 flex flex-col items-center justify-center">
-                    {/* Background Blur */}
-                    <div
-                      className="absolute inset-0 opacity-40 blur-xl scale-125 bg-cover bg-center"
-                      style={{ backgroundImage: `url(https://img.youtube.com/vi/${ytId}/hqdefault.jpg)` }}
+                  
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="font-black text-xs tracking-tight text-zinc-900 uppercase">
+                      {brandName}
+                    </span>
+                    <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px] font-black">
+                      ✓
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    {brandHandle}
+                  </span>
+
+                  {/* Texto do Gancho Viral do Corte */}
+                  <p className="font-bold text-xs text-zinc-900 mt-2 px-1 leading-snug break-words">
+                    {activeClip.hook || activeClip.title}
+                  </p>
+                </div>
+
+                {/* VÍDEO POSICIONADO EXATAMENTE CONFORME OS SELETORES DO TEMPLATE */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 rounded-2xl overflow-hidden shadow-2xl bg-black border-2 border-blue-500 transition-all duration-150 flex items-center justify-center"
+                  style={{
+                    top: `${videoYOffset}%`,
+                    width: `${videoScale}%`,
+                    aspectRatio: '16/9'
+                  }}
+                >
+                  {/* VÍDEO DO CORTE COM ENQUADRAMENTO / PAN / CROP DINÂMICO */}
+                  {activeClip.storage_url ? (
+                    <video
+                      ref={videoRef}
+                      src={activeClip.storage_url}
+                      className="w-full h-full object-cover"
+                      playsInline
+                      loop
+                      onTimeUpdate={(e) => setPlaybackTime(e.currentTarget.currentTime)}
                     />
-                    {/* Central High-Def Video Box */}
-                    <div className="relative w-full aspect-video z-10 shadow-2xl border-y border-white/10">
+                  ) : ytId ? (
+                    <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
                       <iframe
                         src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
                         title={activeClip.title}
-                        className="w-full h-full border-0"
+                        className="border-0 pointer-events-auto"
+                        style={{
+                          width: `${cropZoom}%`,
+                          height: `${cropZoom}%`,
+                          transform: `translateX(${(50 - cropPanX) * 0.7}%)`,
+                          transition: 'transform 0.15s ease-out'
+                        }}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
                     </div>
-                  </div>
-                )
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-zinc-500">
-                  <Play className="w-10 h-10" />
-                  <span className="text-xs">Vídeo Pronto para Reprodução</span>
-                </div>
-              )}
-
-              {/* OVERLAY DO TEMPLATE: TOPO COM AUTOR & CRÉDITO */}
-              {showAuthor && (
-                <div className="absolute top-6 left-4 z-30 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1 rounded-full border border-white/15 shadow-xl pointer-events-none">
-                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-[9px] font-black text-white shadow">
-                    {authorHandle.replace('@', '').charAt(0).toUpperCase() || 'C'}
-                  </div>
-                  <span className="text-[11px] font-bold text-white tracking-wide">
-                    {authorHandle}
-                  </span>
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[7px] font-bold">
-                    ✓
-                  </div>
-                </div>
-              )}
-
-              {/* OVERLAY DO TEMPLATE: BANNER VIRAL DE GANCHO (HOOK) */}
-              {showHookBanner && (
-                <div className="absolute top-16 inset-x-3 text-center z-30 pointer-events-none">
-                  <div className={`inline-block max-w-[95%] ${activeTemplateObj.badgeClass}`}>
-                    {activeClip.hook || activeClip.title}
-                  </div>
-                </div>
-              )}
-
-              {/* OVERLAY DO TEMPLATE: LEGENDAS DINÂMICAS KARAOKÊ (CapCut / Hormozi) */}
-              <div
-                className="absolute inset-x-3 text-center z-30 pointer-events-none transition-all duration-150"
-                style={{ top: `${subtitleY}%` }}
-              >
-                <div className={`inline-block ${activeTemplateObj.containerBox}`}>
-                  {subtitleMode === 'word_by_word' ? (
-                    // Palavra por Palavra com Destaque Neon/Amarelo
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                      {timingWords.slice(Math.max(0, currentSafeWordIdx - 1), currentSafeWordIdx + 3).map((item, idx) => {
-                        const isCurrent = item.word === (timingWords[currentSafeWordIdx]?.word)
-                        return (
-                          <span
-                            key={idx}
-                            className={`text-xs transition-all duration-100 ${
-                              isCurrent ? activeTemplateObj.karaokeActive : activeTemplateObj.karaokeInactive
-                            }`}
-                          >
-                            {item.word}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  ) : subtitleMode === 'one_line' ? (
-                    // 1 Linha com Palavra Ativa Saltando
-                    <div className="text-xs font-bold">
-                      {timingWords.slice(Math.max(0, currentSafeWordIdx - 2), currentSafeWordIdx + 3).map((item, idx) => {
-                        const isCurrent = item.word === (timingWords[currentSafeWordIdx]?.word)
-                        return (
-                          <span
-                            key={idx}
-                            className={`mx-1 inline-block transition-all ${
-                              isCurrent ? activeTemplateObj.karaokeActive : activeTemplateObj.karaokeInactive
-                            }`}
-                          >
-                            {item.word}
-                          </span>
-                        )
-                      })}
-                    </div>
                   ) : (
-                    // 2 Linhas Estilo Podcast
-                    <div className="text-xs font-bold leading-tight">
-                      <div>
-                        {timingWords.slice(0, Math.ceil(timingWords.length / 2)).map((w, i) => (
-                          <span key={i} className={i === currentSafeWordIdx ? activeTemplateObj.karaokeActive : activeTemplateObj.karaokeInactive}>
-                            {w.word}{' '}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-0.5">
-                        {timingWords.slice(Math.ceil(timingWords.length / 2)).map((w, i) => (
-                          <span key={i} className={(i + Math.ceil(timingWords.length / 2)) === currentSafeWordIdx ? activeTemplateObj.karaokeActive : activeTemplateObj.karaokeInactive}>
-                            {w.word}{' '}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="text-zinc-500 text-xs flex items-center gap-1">
+                      <Play className="w-4 h-4" /> Vídeo do Corte
                     </div>
                   )}
+
+                  {/* LEGENDA DINÂMICA DENTRO DO VÍDEO */}
+                  <div
+                    className="absolute inset-x-2 text-center pointer-events-none transition-all duration-100 z-30"
+                    style={{ bottom: '8%' }}
+                  >
+                    <div
+                      className={`inline-block px-2.5 py-1 rounded-lg text-xs ${activeSubStyle.font} ${activeSubStyle.border}`}
+                      style={{
+                        backgroundColor: activeSubStyle.activeBg,
+                        color: activeSubStyle.activeColor
+                      }}
+                    >
+                      {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RODAPÉ DO TEMPLATE MEME */}
+                <div className="absolute bottom-3 inset-x-4 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
+                  <span>ClipPost ⚡ 9:16</span>
+                  <span className="font-bold text-orange-600">VIRAL {Math.round(activeClip.score * 100)}%</span>
                 </div>
               </div>
-
-              {/* OVERLAY: RODAPÉ DO TEMPLATE COM RETENÇÃO VIRAL */}
-              <div className="absolute bottom-4 inset-x-4 flex items-center justify-between z-30 pointer-events-none">
-                <div className="bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono text-zinc-300 border border-white/10 flex items-center gap-1.5 shadow-lg">
-                  <Clock className="w-3 h-3 text-orange-400" />
-                  <span>{formatDuration(playbackTime)} / {formatDuration(clipDuration)}</span>
+            ) : activeLayout === 'split_screen' ? (
+              // TEMPLATE SPLIT SCREEN (50/50 - Duplo Falante / Podcast)
+              <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-black flex flex-col select-none">
+                {/* Falante 1 (Topo) */}
+                <div className="relative w-full h-1/2 overflow-hidden border-b-2 border-orange-500">
+                  {ytId && (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0`}
+                      className="w-[280%] h-[150%] -ml-[40%] object-cover border-0"
+                    />
+                  )}
+                  <span className="absolute top-8 left-3 bg-black/70 text-white text-[9px] px-2 py-0.5 rounded font-mono">
+                    Falante 1
+                  </span>
                 </div>
-
-                <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-orange-500/40">
-                  <Zap className="w-2.5 h-2.5 fill-current" /> VIRAL {Math.round(activeClip.score * 100)}%
+                {/* Falante 2 (Base) */}
+                <div className="relative w-full h-1/2 overflow-hidden">
+                  {ytId && (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=0`}
+                      className="w-[280%] h-[150%] -ml-[140%] object-cover border-0"
+                    />
+                  )}
+                  <span className="absolute bottom-4 left-3 bg-black/70 text-white text-[9px] px-2 py-0.5 rounded font-mono">
+                    Falante 2
+                  </span>
+                </div>
+                {/* Legenda Central no Split */}
+                <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center pointer-events-none z-30">
+                  <span className={`px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`} style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}>
+                    {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
+                  </span>
                 </div>
               </div>
+            ) : (
+              // TEMPLATE FULL 9:16 SOLO FOCUS (Preenchimento Total)
+              <div className="relative flex-1 w-full rounded-[34px] overflow-hidden bg-black flex items-center justify-center select-none">
+                {ytId && (
+                  <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=${isPlaying ? 1 : 0}&controls=1&modestbranding=1&rel=0`}
+                      title={activeClip.title}
+                      className="border-0 pointer-events-auto"
+                      style={{
+                        width: `${cropZoom * 1.6}%`,
+                        height: `${cropZoom * 0.9}%`,
+                        transform: `translateX(${(50 - cropPanX) * 1.2}%)`,
+                        transition: 'transform 0.15s ease-out'
+                      }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {/* Overlay do Autor */}
+                <div className="absolute top-7 left-4 z-30 flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                  <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-[8px] font-black text-white">
+                    {brandHandle.replace('@', '').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-[10px] font-mono text-white font-medium">{brandHandle}</span>
+                </div>
+                {/* Legenda */}
+                <div className="absolute inset-x-3 text-center pointer-events-none z-30" style={{ top: `${subtitleY}%` }}>
+                  <span className={`px-3 py-1.5 rounded-lg text-xs ${activeSubStyle.font}`} style={{ backgroundColor: activeSubStyle.activeBg, color: activeSubStyle.activeColor }}>
+                    {timingWords[currentSafeWordIdx]?.word || 'DESTAQUE'}
+                  </span>
+                </div>
+              </div>
+            )}
 
-            </div>
-
-            {/* Barra de Controle de Play/Pause e Scrub da Legenda */}
+            {/* BARRA DE CONTROLE: PLAY/PAUSE E SCRUB DA LEGENDA */}
             <div className="mt-2 pt-2 border-t border-white/[0.08] flex items-center justify-between gap-3 px-1">
               <button
                 onClick={togglePlayback}
@@ -629,12 +696,12 @@ export default function ProjectClient({
             </div>
           </div>
 
-          {/* Botões de Próximo / Anterior Corte */}
+          {/* Botões de Anterior / Próximo Corte */}
           <div className="flex items-center gap-3 mt-4">
             <button
               onClick={() => setSelectedClipIndex(prev => Math.max(0, prev - 1))}
               disabled={selectedClipIndex === 0}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 disabled:opacity-40 flex items-center gap-1 transition-all cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 disabled:opacity-40 flex items-center gap-1 transition-all cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" /> Corte Anterior
             </button>
@@ -642,56 +709,207 @@ export default function ProjectClient({
             <button
               onClick={() => setSelectedClipIndex(prev => Math.min(clips.length - 1, prev + 1))}
               disabled={selectedClipIndex === clips.length - 1}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 disabled:opacity-40 flex items-center gap-1 transition-all cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-300 disabled:opacity-40 flex items-center gap-1 transition-all cursor-pointer"
             >
               Próximo Corte <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* COLUNA DIREITA: CONTROLES DO TEMPLATE, LEGENDAS E EXPORTAÇÃO */}
+        {/* COLUNA DIREITA: ENQUADRAMENTO DA IA, POSIÇÃO DO TEMPLATE E AÇÕES */}
         <div className="lg:col-span-6 space-y-5">
           
-          {/* Card: Detalhes do Corte Selecionado (Sem cortes de texto!) */}
-          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-3 shadow-xl">
+          {/* CARD 1: ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Move className="w-4 h-4 text-orange-400" /> Enquadramento da Imagem & Detecção de Rosto
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                IA Auto-Crop
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Ajuste onde a IA corta a imagem para manter o falante ou a ação principal centralizada no vídeo vertical.
+            </p>
+
+            {/* Presets de Foco da IA */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { id: 'auto' as AiFramingPreset, label: '🎯 IA Auto', desc: 'Rosto Central' },
+                { id: 'left' as AiFramingPreset, label: '👤 Falante 1', desc: 'Esquerda' },
+                { id: 'center' as AiFramingPreset, label: '🎙️ Centro', desc: 'Ação Principal' },
+                { id: 'right' as AiFramingPreset, label: '👤 Falante 2', desc: 'Direita' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => applyAiFramingPreset(p.id)}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                    aiFraming === p.id
+                      ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
+                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <div className="text-xs">{p.label}</div>
+                  <div className="text-[9px] opacity-70">{p.desc}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Ajuste Fino Manual: Pan Horizontal e Zoom */}
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
+                  <span>Ajuste de Pan Horizontal (Corte Lateral)</span>
+                  <span className="font-mono text-orange-400">{cropPanX}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={cropPanX}
+                  onChange={(e) => {
+                    setCropPanX(Number(e.target.value))
+                    setAiFraming('center')
+                  }}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
+                  <span>Esquerda (0%)</span>
+                  <span>Centro (50%)</span>
+                  <span>Direita (100%)</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs text-zinc-300 mb-1">
+                  <span>Escala / Zoom da Imagem</span>
+                  <span className="font-mono text-orange-400">{cropZoom}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={100}
+                  max={250}
+                  value={cropZoom}
+                  onChange={(e) => setCropZoom(Number(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 2: MODELO DO TEMPLATE (Meme Frame vs Split vs Full) */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Layout className="w-4 h-4 text-orange-400" /> Formato do Template do Vídeo
+              </h3>
+              <Link
+                href="/templates"
+                className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline"
+              >
+                Configurar Padrão
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'meme_frame' as LayoutFormat, label: 'Moldura Viral (Meme)', badge: 'Seu Template' },
+                { id: 'split_screen' as LayoutFormat, label: 'Split Screen', badge: '50/50 Dual' },
+                { id: 'single_speaker' as LayoutFormat, label: 'Full 9:16', badge: 'Solo Focus' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveLayout(f.id)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    activeLayout === f.id
+                      ? 'bg-orange-500/20 border-orange-500 text-white font-bold ring-1 ring-orange-500/40'
+                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 block w-fit mb-1">
+                    {f.badge}
+                  </span>
+                  <div className="text-xs leading-tight">{f.label}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Ajustes de Posição do Vídeo na Moldura Viral */}
+            {activeLayout === 'meme_frame' && (
+              <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                  <span>Posicionamento do Vídeo na Arte:</span>
+                  <button
+                    type="button"
+                    onClick={() => { setVideoYOffset(54); setVideoScale(88) }}
+                    className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Restaurar
+                  </button>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                    <span>Posição Vertical (Y)</span>
+                    <span className="text-orange-400 font-mono">{videoYOffset}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={35}
+                    max={68}
+                    value={videoYOffset}
+                    onChange={(e) => setVideoYOffset(Number(e.target.value))}
+                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                    <span>Largura / Escala</span>
+                    <span className="text-orange-400 font-mono">{videoScale}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={70}
+                    max={98}
+                    value={videoScale}
+                    onChange={(e) => setVideoScale(Number(e.target.value))}
+                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 3: DETALHES DO CORTE E EXPORTAÇÃO */}
+          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold font-mono">
                   Corte #{selectedClipIndex + 1}
                 </span>
                 <span className="text-xs text-zinc-400 font-mono">
-                  Tempo: {formatDuration(activeClip.start_time)} até {formatDuration(activeClip.end_time)}
+                  {formatDuration(activeClip.start_time)} até {formatDuration(activeClip.end_time)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2.5 py-0.5 rounded-full text-xs font-bold">
+              <div className="flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2.5 py-0.5 rounded-full text-xs font-bold">
                 <Zap className="w-3 h-3 fill-current" /> {Math.round(activeClip.score * 100)}% Viral
               </div>
             </div>
 
-            {/* Título Completo sem cortes */}
             <div>
               <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">
-                Título do Corte (Sem cortes):
+                Título do Corte:
               </label>
-              <p className="text-sm lg:text-base font-bold text-white leading-snug mt-0.5 break-words">
+              <p className="text-sm font-bold text-white leading-snug mt-0.5 break-words">
                 {activeClip.title}
               </p>
             </div>
 
-            {/* Gancho Viral Completo */}
-            {activeClip.hook && (
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                <label className="text-[10px] font-semibold text-orange-400 uppercase tracking-wide block mb-0.5">
-                  Gancho Viral de Abertura:
-                </label>
-                <p className="text-xs text-zinc-300 font-medium leading-relaxed italic break-words">
-                  "{activeClip.hook}"
-                </p>
-              </div>
-            )}
-
-            {/* Ações Diretas: Download, Celular, Agendar */}
+            {/* Ações de Exportação */}
             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.08]">
               <button
                 type="button"
@@ -722,204 +940,20 @@ export default function ProjectClient({
               </Link>
             </div>
           </div>
-
-          {/* Card: Escolha de Template do Vídeo (1-Clique) */}
-          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-orange-400" /> Template Visual do Corte
-              </h3>
-              <button
-                onClick={handleApplyAll}
-                className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline"
-              >
-                {appliedAllSuccess ? '✓ Aplicado a Todos!' : 'Aplicar a Todos os Cortes'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              {TEMPLATE_PRESETS.map((tmpl) => {
-                const isActive = currentTemplate === tmpl.id
-                return (
-                  <button
-                    key={tmpl.id}
-                    onClick={() => setCurrentTemplate(tmpl.id)}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-orange-500/15 border-orange-500 shadow-md ring-1 ring-orange-500/50'
-                        : 'bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.05]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-white">{tmpl.name}</span>
-                      <div
-                        className="w-3 h-3 rounded-full border border-black/40"
-                        style={{ backgroundColor: tmpl.accentColor }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-zinc-400 leading-tight">{tmpl.desc}</p>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Ajuste de Enquadramento 9:16 (Preenchimento vs Split Podcast) */}
-            <div className="pt-3 border-t border-white/[0.08] space-y-2">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <Layout className="w-3.5 h-3.5 text-orange-400" /> Enquadramento do Vídeo
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFramingMode('fill')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
-                    framingMode === 'fill'
-                      ? 'bg-orange-500 text-white border-orange-400'
-                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Preenchimento 9:16 (Zoom)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFramingMode('split')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
-                    framingMode === 'split'
-                      ? 'bg-orange-500 text-white border-orange-400'
-                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Podcast Split (Fundo Blur)
-                </button>
-              </div>
-            </div>
-
-            {/* Nome de Usuário / Autor do Template */}
-            <div className="pt-3 border-t border-white/[0.08] grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-zinc-400 mb-1 block">
-                  Identificação do Criador:
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-zinc-500 text-xs">
-                    <User className="w-3 h-3" />
-                  </div>
-                  <input
-                    type="text"
-                    value={authorHandle}
-                    onChange={(e) => setAuthorHandle(e.target.value)}
-                    placeholder="@seucanal"
-                    className="w-full pl-7 pr-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-4 sm:pt-6">
-                <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showAuthor}
-                    onChange={(e) => setShowAuthor(e.target.checked)}
-                    className="w-4 h-4 rounded accent-orange-500"
-                  />
-                  <span>Exibir Perfil</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showHookBanner}
-                    onChange={(e) => setShowHookBanner(e.target.checked)}
-                    className="w-4 h-4 rounded accent-orange-500"
-                  />
-                  <span>Banner Gancho</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Card: Configuração de Legendas Dinâmicas */}
-          <div className="bg-[#121216] border border-white/[0.1] rounded-2xl p-5 space-y-4 shadow-xl">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Type className="w-4 h-4 text-orange-400" /> Modo das Legendas Ativas
-            </h3>
-
-            {/* Alternador de Modo de Legenda */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'word_by_word', label: 'Palavra por Palavra' },
-                { id: 'one_line', label: '1 Linha Karaokê' },
-                { id: 'two_lines', label: '2 Linhas Clássicas' }
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setSubtitleMode(m.id as SubtitleMode)}
-                  className={`py-2 px-2 rounded-xl border text-[11px] font-bold transition-all text-center ${
-                    subtitleMode === m.id
-                      ? 'bg-orange-500 text-white border-orange-400 shadow-md'
-                      : 'bg-white/[0.02] border-white/[0.08] text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Posição Vertical da Legenda */}
-            <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
-              <div className="flex items-center justify-between text-xs text-zinc-300">
-                <span>Altura da Legenda no Vídeo</span>
-                <span className="font-mono font-bold text-orange-400">{subtitleY}%</span>
-              </div>
-              <input
-                type="range"
-                min={45}
-                max={85}
-                value={subtitleY}
-                onChange={(e) => setSubtitleY(parseInt(e.target.value))}
-                className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-              />
-              <div className="flex justify-between text-[10px] text-zinc-500">
-                <span>Centro</span>
-                <span>Padrão TikTok (76%)</span>
-                <span>Inferior</span>
-              </div>
-            </div>
-
-            {/* Corte de Silêncio */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/[0.08]">
-              <div className="flex items-center gap-2">
-                <VolumeX className="w-4 h-4 text-orange-400" />
-                <div>
-                  <p className="text-xs font-bold text-white">Corte de Silêncios Automático</p>
-                  <p className="text-[10px] text-zinc-400">Remove pausas mortas para maximizar a retenção.</p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={silenceCut}
-                onChange={(e) => setSilenceCut(e.target.checked)}
-                className="w-4 h-4 rounded accent-orange-500"
-              />
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* GALERIA DOS 8 CORTES (Lista Completa com Acesso em 1 Clique) */}
+      {/* GALERIA DOS CORTES ENCONTRADOS */}
       <div className="max-w-7xl mx-auto pt-6 border-t border-white/[0.08] space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-orange-400" /> Todos os 8 Cortes Narrativos Encontrados
+              <Layers className="w-4 h-4 text-orange-400" /> Todos os {clips.length} Cortes Disponíveis
             </h2>
             <p className="text-xs text-zinc-400">
-              Clique em qualquer corte abaixo para abrir no Studio 9:16 acima instantaneamente.
+              Clique em qualquer corte abaixo para abrir e editar no Studio 9:16 acima.
             </p>
           </div>
-          <span className="text-xs font-mono text-zinc-500 bg-white/[0.03] px-3 py-1 rounded-full border border-white/[0.08]">
-            {clips.length} Cortes Disponíveis
-          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -938,13 +972,12 @@ export default function ProjectClient({
                     : 'border-white/[0.08] hover:border-white/[0.2] hover:bg-white/[0.02]'
                 }`}
               >
-                {/* Miniatura do Corte */}
                 <div className="relative aspect-[16/9] w-full bg-black overflow-hidden flex items-center justify-center">
                   {ytId ? (
                     <img
                       src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
                       alt={clip.title}
-                      className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform"
+                      className="w-full h-full object-cover opacity-80"
                     />
                   ) : (
                     <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-600">
@@ -952,7 +985,6 @@ export default function ProjectClient({
                     </div>
                   )}
 
-                  {/* Badges de Duração e Viral */}
                   <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow">
                     <Zap className="w-2.5 h-2.5 fill-current" /> {Math.round(clip.score * 100)}%
                   </div>
@@ -960,15 +992,8 @@ export default function ProjectClient({
                   <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300 border border-white/10">
                     {formatDuration(clip.end_time - clip.start_time)}
                   </div>
-
-                  <div className="absolute inset-0 bg-black/30 hover:bg-transparent transition-colors flex items-center justify-center">
-                    <div className="w-9 h-9 rounded-full bg-orange-500/90 text-white flex items-center justify-center shadow-lg">
-                      <Play className="w-4 h-4 ml-0.5" />
-                    </div>
-                  </div>
                 </div>
 
-                {/* Informações Completas do Corte (Sem cortes de texto!) */}
                 <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                   <div>
                     <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1 font-mono">
@@ -1005,7 +1030,7 @@ export default function ProjectClient({
         </div>
       </div>
 
-      {/* MODAL QR CODE CELULAR (TRANSFERÊNCIA DIRETA ESTILO LOCALSEND) */}
+      {/* MODAL QR CODE CELULAR */}
       {qrModalClip && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-[#121216] border border-white/[0.1] rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative">

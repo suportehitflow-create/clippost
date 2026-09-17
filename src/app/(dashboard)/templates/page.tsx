@@ -222,25 +222,57 @@ export default function TemplatesPageEnhanced() {
 
   // Live word simulation in preview
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('clippost_active_template');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.layout) setSelectedLayout(parsed.layout);
+        if (parsed.subtitle_preset) setSelectedSubtitle(parsed.subtitle_preset);
+        if (parsed.config?.videoYOffset) setVideoYOffset(parsed.config.videoYOffset);
+        if (parsed.config?.videoScale) setVideoScale(parsed.config.videoScale);
+        if (parsed.config?.hookText) setHookText(parsed.config.hookText);
+        if (parsed.config?.brandName) setBrandName(parsed.config.brandName);
+        if (parsed.config?.brandHandle) setBrandHandle(parsed.config.brandHandle);
+      }
+    } catch {}
+
+    async function loadRemote() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle();
+        if (bk?.layout_config) {
+          const cfg = bk.layout_config;
+          if (cfg.layout) setSelectedLayout(cfg.layout);
+          if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset);
+          if (cfg.videoYOffset) setVideoYOffset(cfg.videoYOffset);
+          if (cfg.videoScale) setVideoScale(cfg.videoScale);
+          if (cfg.hookText) setHookText(cfg.hookText);
+          if (cfg.brandName) setBrandName(cfg.brandName);
+          if (bk.username) setBrandHandle(bk.username);
+        }
+      } catch {}
+    }
+    loadRemote();
+
     const timer = setInterval(() => {
-      setActiveWordIdx(prev => (prev + 1) % 4)
-    }, 450)
-    return () => clearInterval(timer)
+      setActiveWordIdx(prev => (prev + 1) % 4);
+    }, 450);
+    return () => clearInterval(timer);
   }, [])
 
   const handleSave = async () => {
-    setSaving(true)
+    setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const { data: { user } } = await supabase.auth.getUser();
 
       const payload = {
-        user_id: user.id,
         name: 'Template Meme & Posicionamento 9:16',
         layout: selectedLayout,
         layout_type: selectedLayout,
         subtitle_preset: selectedSubtitle,
         username: brandHandle,
+        avatar_url: avatarPreview,
         is_default: isDefault,
         config: {
           videoYOffset,
@@ -250,15 +282,41 @@ export default function TemplatesPageEnhanced() {
           brandHandle
         },
         updated_at: new Date().toISOString()
+      };
+
+      // 1. Sempre salva localmente
+      try {
+        localStorage.setItem('clippost_active_template', JSON.stringify(payload));
+        window.dispatchEvent(new Event('clippost_template_updated'));
+      } catch (err) {}
+
+      // 2. Salva em brand_kits no Supabase
+      if (user) {
+        await supabase.from('brand_kits').upsert({
+          user_id: user.id,
+          username: brandHandle,
+          avatar_url: avatarPreview,
+          layout_config: {
+            ...payload.config,
+            layout: selectedLayout,
+            subtitle_preset: selectedSubtitle
+          },
+          updated_at: new Date().toISOString()
+        });
+
+        // 3. Tenta tabela templates se existir
+        await supabase.from('templates').upsert({
+          user_id: user.id,
+          ...payload
+        });
       }
 
-      await supabase.from('templates').upsert(payload)
-      setSavedSuccess(true)
-      setTimeout(() => setSavedSuccess(false), 3000)
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
     } catch (e) {
-      console.warn('Erro ao salvar template:', e)
+      console.warn('Erro ao salvar template:', e);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
