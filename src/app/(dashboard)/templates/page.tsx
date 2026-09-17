@@ -1,5 +1,6 @@
 'use client'
 
+import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useState, useRef, useEffect } from 'react'
 import {
   Type,
@@ -846,17 +847,13 @@ export default function TemplatesPage() {
                         <span className="text-[10px] text-zinc-400">Guia de segurança 9:16</span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setInstagramDecal(!instagramDecal)}
-                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
-                        instagramDecal
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
-                          : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
-                      }`}
-                    >
-                      {instagramDecal ? 'LIGADO' : 'DESLIGADO'}
-                    </button>
+                    <LiquidToggle
+                      checked={instagramDecal}
+                      onChange={setInstagramDecal}
+                      activeLabel="LIGADO"
+                      inactiveLabel="DESLIGADO"
+                      activeColor="emerald"
+                    />
                   </div>
               </div>
                 </div>

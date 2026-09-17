@@ -1,5 +1,6 @@
 'use client'
 
+import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import {
   Download,
@@ -872,6 +873,20 @@ export default function ProjectClient({
                 {/* Conteúdo da Aba: Legendas */}
                 {adjustTab === 'subtitles' && (
                   <div className="space-y-3 text-xs">
+                    {/* TOGGLE LIQUID EMOJIS */}
+                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Emojis Nativos Apple</span>
+                        <span className="text-[10px] text-zinc-400">Insere emojis dinâmicos nas palavras da legenda</span>
+                      </div>
+                      <LiquidToggle
+                        checked={smartEmojisEnabled}
+                        onChange={setSmartEmojisEnabled}
+                        activeLabel="ATIVOS"
+                        inactiveLabel="OCULTOS"
+                        activeColor="indigo"
+                      />
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-zinc-400">Emojis Automáticos:</span>
                       <button
@@ -986,6 +1001,21 @@ export default function ProjectClient({
                       </div>
                     </div>
 
+                    {/* TOGGLE SAFE ZONE REELS */}
+                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-semibold text-white block">Decalque Safe Zone Reels</span>
+                        <span className="text-[10px] text-zinc-400">Exibe margens de segurança para Stories e Reels</span>
+                      </div>
+                      <LiquidToggle
+                        checked={showReelsSafeZone}
+                        onChange={setShowReelsSafeZone}
+                        activeLabel="LIGADO"
+                        inactiveLabel="DESLIGADO"
+                        activeColor="emerald"
+                      />
+                    </div>
+
                     {/* DIMENSÕES HERDADAS DO TEMPLATE */}
                     <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <div className="space-y-0.5">
@@ -1037,17 +1067,13 @@ export default function ProjectClient({
                         <span className="text-xs font-semibold text-white block">Bordas Arredondadas no Vídeo</span>
                         <span className="text-[10px] text-zinc-400">Suaviza as bordas do recorte de vídeo</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setVideoRounded(!videoRounded)}
-                        className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
-                          videoRounded
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
-                            : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
-                        }`}
-                      >
-                        {videoRounded ? 'LIGADO' : 'DESLIGADO'}
-                      </button>
+                      <LiquidToggle
+                        checked={videoRounded}
+                        onChange={setVideoRounded}
+                        activeLabel="ARREDONDADA"
+                        inactiveLabel="QUADRADA"
+                        activeColor="indigo"
+                      />
                     </div>
                   </div>
                 )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -605,7 +606,16 @@ export default function AutoPilotPage() {
                       <span className="text-[10px] text-zinc-500 font-mono">Status: Ativo · Checado a cada 15 min</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-emerald-400 font-mono">Conectado</span>
+                      <LiquidToggle
+                        checked={w.is_active}
+                        onChange={async (newVal) => {
+                          await supabase.from('channel_watches').update({ is_active: newVal }).eq('id', w.id)
+                          if (userId) loadWatches(userId)
+                        }}
+                        activeLabel="ATIVO"
+                        inactiveLabel="PAUSADO"
+                        activeColor="emerald"
+                      />
                       <button
                         type="button"
                         onClick={async () => {
@@ -664,23 +674,24 @@ export default function AutoPilotPage() {
               {/* Left Column: Positioning Controls (Screenshot 3) */}
               <div className="lg:col-span-6 space-y-6">
                 
-                {/* Manual Position Checkbox */}
-                <label className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={manualPosition}
-                    onChange={(e) => setManualPosition(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-0 cursor-pointer"
-                  />
+                {/* Manual Position Checkbox (LiquidToggle) */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-between gap-4">
                   <div>
                     <span className="text-xs font-semibold text-white block">
-                      Posicionar manualmente (escolha onde o vídeo entra na arte)
+                      Posicionar manualmente
                     </span>
                     <span className="text-[11px] text-zinc-400 leading-relaxed block mt-0.5">
-                      Ele sempre aparece por cima na área escolhida, e o template decora o resto ao redor.
+                      Personalize onde o vídeo entra na arte com o template ao redor
                     </span>
                   </div>
-                </label>
+                  <LiquidToggle
+                    checked={manualPosition}
+                    onChange={setManualPosition}
+                    activeLabel="ATIVO"
+                    inactiveLabel="DESLIGADO"
+                    activeColor="indigo"
+                  />
+                </div>
 
                 {/* Action: Redefinir Posição */}
                 <div>

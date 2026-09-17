@@ -1,5 +1,6 @@
 'use client'
 
+import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -248,17 +249,13 @@ export default function CreateClipsPage() {
                     <span className="text-[11px] text-zinc-400">Aumenta o ritmo e retenção do corte para prender a atenção</span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setRemoveSilence(!removeSilence)}
-                  className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer shadow-sm ${
-                    removeSilence
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-emerald-500/10'
-                      : 'bg-white/5 text-zinc-500 hover:text-zinc-300 border border-white/10'
-                  }`}
-                >
-                  {removeSilence ? 'LIGADO' : 'DESLIGADO'}
-                </button>
+                <LiquidToggle
+                  checked={removeSilence}
+                  onChange={setRemoveSilence}
+                  activeLabel="LIGADO"
+                  inactiveLabel="DESLIGADO"
+                  activeColor="emerald"
+                />
               </div>
             </div>
           </div>
