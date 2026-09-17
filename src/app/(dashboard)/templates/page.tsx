@@ -152,6 +152,8 @@ export default function TemplatesPage() {
   // Conteúdo textual e identidade
   const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
   const [brandHandle, setBrandHandle] = useState('@humordaiguana')
+  const [brandAlign, setBrandAlign] = useState<'left' | 'center' | 'right'>('center')
+  const [brandLayout, setBrandLayout] = useState<'inline' | 'stacked'>('inline')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
   const [titleText, setTitleText] = useState('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
 
@@ -612,6 +614,21 @@ export default function TemplatesPage() {
   }
 
   // Upload de Foto
+  const handleBrandAlign = (align: 'left' | 'center' | 'right') => {
+    setBrandAlign(align)
+    if (align === 'left') {
+      setHeaderPos({ x: 26, y: headerPos.y || 16 })
+    } else if (align === 'center') {
+      setHeaderPos({ x: 50, y: headerPos.y || 16 })
+    } else {
+      setHeaderPos({ x: 74, y: headerPos.y || 16 })
+    }
+  }
+
+  const handleBrandLayout = (layout: 'inline' | 'stacked') => {
+    setBrandLayout(layout)
+  }
+
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -1076,6 +1093,67 @@ export default function TemplatesPage() {
                     className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#6366f1] font-mono"
                   />
                 </div>
+
+                {/* FERRAMENTA DE ALINHAMENTO DO PERFIL */}
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Alinhamento do Perfil:</label>
+                    <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">{brandAlign}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'left', icon: AlignLeft, label: 'Esquerda' },
+                      { id: 'center', icon: AlignCenter, label: 'Centro' },
+                      { id: 'right', icon: AlignRight, label: 'Direita' },
+                    ].map((a) => {
+                      const Icon = a.icon
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => handleBrandAlign(a.id as any)}
+                          className={`py-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                            brandAlign === a.id
+                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent font-bold'
+                              : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-[11px] font-semibold">{a.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* DISPOSIÇÃO DO PERFIL (LADO A LADO VS EMPILHADO) */}
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                  <label className="text-zinc-400 font-medium text-xs">Disposição do Perfil:</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleBrandLayout('inline')}
+                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                        brandLayout === 'inline'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent'
+                          : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <span>Lado a Lado</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBrandLayout('stacked')}
+                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                        brandLayout === 'stacked'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 border-transparent'
+                          : 'bg-white/[0.03] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <span>Empilhado</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1252,26 +1330,7 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* 1. AVATAR MÓVEL (EIXOS X E Y) */}
-              <div
-                onMouseDown={(e) => startDrag2D('avatar', e.clientX, e.clientY, e)}
-                onTouchStart={(e) => startDrag2D('avatar', e.touches[0].clientX, e.touches[0].clientY, e)}
-                style={{
-                  left: `${avatarPos.x}%`,
-                  top: `${avatarPos.y}%`,
-                  transform: 'translate(-50%, -50%)'
-                }}
-                className={`absolute cursor-grab active:cursor-grabbing z-30 ${
-                  draggingTarget === 'avatar' ? 'ring-2 ring-[#6366f1] rounded-full scale-105' : ''
-                }`}
-                title="Arraste o avatar para posicionar livremente"
-              >
-                <div className="w-12 h-12 rounded-full border-2 border-white/60 overflow-hidden shadow-lg bg-zinc-900">
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover pointer-events-none" />
-                </div>
-              </div>
-
-              {/* 2. NOME DO CANAL E ARROBA (MÓVEL) */}
+              {/* 1 & 2. PERFIL DO CANAL UNIFICADO (FOTO + NOME + ARROBA COM FERRAMENTA DE ALINHAMENTO) */}
               <div
                 onMouseDown={(e) => startDrag2D('header', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('header', e.touches[0].clientX, e.touches[0].clientY, e)}
@@ -1280,26 +1339,35 @@ export default function TemplatesPage() {
                   top: `${headerPos.y}%`,
                   transform: 'translate(-50%, -50%)'
                 }}
-                className={`absolute cursor-grab active:cursor-grabbing z-30 flex flex-col items-center select-none ${
-                  draggingTarget === 'header' ? 'ring-1 ring-[#6366f1]/50 rounded-lg p-1' : ''
+                className={`absolute cursor-grab active:cursor-grabbing z-30 flex items-center gap-2.5 select-none transition-[gap] ${
+                  draggingTarget === 'header' ? 'ring-2 ring-[#6366f1] rounded-2xl p-1.5 bg-white/5' : ''
+                } ${
+                  brandLayout === 'stacked' ? 'flex-col justify-center' : 'flex-row'
                 }`}
-                title="Arraste o nome e arroba para reposicionar"
+                title="Arraste o perfil (foto, nome e arroba) para reposicionar livremente"
               >
-                <div className="flex items-center gap-1">
-                  <span className={`text-[12px] font-black uppercase tracking-wide ${
-                    templateBg === 'white' ? 'text-zinc-950' : 'text-white'
-                  }`}>
-                    {brandName}
-                  </span>
-                  <span className="w-3 h-3 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold">
-                    ✓
+                <div className="w-11 h-11 rounded-full border-2 border-white/60 overflow-hidden shadow-lg bg-zinc-900 shrink-0">
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover pointer-events-none" />
+                </div>
+                <div className={`flex flex-col ${brandAlign === 'center' && brandLayout === 'stacked' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[12px] font-black uppercase tracking-wide ${
+                      templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+                    }`}
+                    >
+                      {brandName}
+                    </span>
+                    <span className="w-3 h-3 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold">
+                      ✓
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-medium font-mono ${
+                    templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
+                  }`}
+                  >
+                    {brandHandle}
                   </span>
                 </div>
-                <span className={`text-[10px] font-medium font-mono ${
-                  templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
-                }`}>
-                  {brandHandle}
-                </span>
               </div>
 
               {/* 3. TÍTULO / GANCHO COM FONTE E TAMANHO NATIVOS (MÓVEL) */}
