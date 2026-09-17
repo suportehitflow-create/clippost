@@ -148,7 +148,8 @@ export default function ProjectClient({
   const [videoRounded, setVideoRounded] = useState<boolean>(false)
   const [brandName, setBrandName] = useState('Nome da Página')
   const [brandHandle, setBrandHandle] = useState('@nomedapagina')
-  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
+  const DEFAULT_BRAND_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
 
   // Dimensões e Coordenadas do Template
   const [videoWidth, setVideoWidth] = useState<number>(96)
@@ -183,6 +184,8 @@ export default function ProjectClient({
   // Reprodução
   const [isPlaying, setIsPlaying] = useState(false)
   const [showReelsSafeZone, setShowReelsSafeZone] = useState(false)
+  const [showVideoControls, setShowVideoControls] = useState(false)
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [playbackTime, setPlaybackTime] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -204,7 +207,8 @@ export default function ProjectClient({
         const parsed = JSON.parse(saved)
         if (parsed.layout) setActiveLayout(parsed.layout)
         if (parsed.subtitle_preset) setActiveSubtitleStyle(parsed.subtitle_preset)
-        if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url)
+        if (parsed.avatar_url && !parsed.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(parsed.avatar_url)
+        else setAvatarUrl(DEFAULT_BRAND_AVATAR)
         if (parsed.template_bg) setTemplateBg(parsed.template_bg)
         
         if (parsed.config) {
@@ -244,7 +248,8 @@ export default function ProjectClient({
         if (bk) {
           if (bk.username && bk.username !== '@humordaiguana') setBrandHandle(bk.username)
           else setBrandHandle('@nomedapagina')
-          if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
+          if (bk.avatar_url && !bk.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(bk.avatar_url)
+          else setAvatarUrl(DEFAULT_BRAND_AVATAR)
           if (bk.layout_config) {
             const cfg = bk.layout_config
             if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
@@ -623,15 +628,22 @@ export default function ProjectClient({
                 </h2>
               </div>
 
-              {/* 2. ENQUADRAMENTO DO VÍDEO COM ZOOM E PAN */}
+              {/* 2. ENQUADRAMENTO DO VÍDEO COM PLAYER INTEGRADO (ÚNICO PLAYER) */}
               <div
                 style={{
                   width: `${videoScale}%`,
                   margin: '0 auto',
                 }}
-                className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md ${
+                onMouseEnter={() => setShowVideoControls(true)}
+                onMouseMove={() => {
+                  setShowVideoControls(true)
+                  if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+                  controlsTimeoutRef.current = setTimeout(() => setShowVideoControls(false), 2500)
+                }}
+                onMouseLeave={() => setShowVideoControls(false)}
+                className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md group/player ${
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
-                } flex items-center justify-center`}
+                } flex items-center justify-center cursor-pointer`}
               >
                 {activeClip.storage_url ? (
                   <video
@@ -647,11 +659,11 @@ export default function ProjectClient({
                     loop
                   />
                 ) : ytId ? (
-                  <div className="w-full h-full relative overflow-hidden select-none bg-black">
+                  <div className="w-full h-full relative overflow-hidden select-none bg-black pointer-events-none">
                     <iframe
                       ref={iframeRef}
                       src={`https://www.youtube-nocookie.com/embed/${ytId}?enablejsapi=1&start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=0&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&loop=1`}
-                      className="border-0 pointer-events-none"
+                      className="border-0"
                       style={{
                         position: 'absolute',
                         top: '50%',
@@ -671,14 +683,46 @@ export default function ProjectClient({
                   </div>
                 )}
 
-                {/* Overlay Play quando pausado */}
-                {!isPlaying && (
-                  <div className="absolute inset-0 bg-black/35 flex items-center justify-center pointer-events-none transition-opacity">
-                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-xl">
-                      <Play className="w-6 h-6 ml-1 fill-white text-white" />
-                    </div>
+                {/* CONTROLES NATIVOS DO PLAYER SOBREPOSTOS DENTRO DO QUADRO (ESTILO YOUTUBE/TIKTOK) */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className={`absolute bottom-0 left-0 right-0 p-2.5 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex flex-col gap-1.5 z-30 transition-opacity duration-200 ${
+                    showVideoControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  {/* Linha da barra de progresso (scrubber) */}
+                  <div
+                    className="w-full h-1.5 bg-white/20 hover:h-2 rounded-full overflow-hidden cursor-pointer relative transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                      setPlaybackTime(pct * clipDuration)
+                    }}
+                  >
+                    <div
+                      className="h-full bg-indigo-500 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, (playbackTime / clipDuration) * 100)}%` }}
+                    />
                   </div>
-                )}
+
+                  {/* Play/Pause e Tempo */}
+                  <div className="flex items-center justify-between text-white text-[11px] font-medium select-none">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        togglePlayback()
+                      }}
+                      className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                    </button>
+                    <span className="font-mono text-[10px] text-zinc-300">
+                      {formatDuration(Math.floor(playbackTime))} / {formatDuration(Math.floor(clipDuration))}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* 3. LEGENDA SINCRONIZADA */}

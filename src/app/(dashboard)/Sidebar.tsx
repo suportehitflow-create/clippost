@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
   Scissors,
   Layers,
   Sparkles,
@@ -17,7 +16,6 @@ import { useVerticalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
   { label: 'Edição em Massa', href: '/bulk', icon: Layers },
   { label: 'Templates', href: '/templates', icon: Sparkles },

@@ -228,7 +228,7 @@ def parse_vtt_subtitles(vtt_path: Path):
     return {"segments": segments, "words": words}
 
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True):
     # Atualiza status imediatamente para processing para a UI avançar e não dar timeout
     if project_id:
         try:
@@ -364,6 +364,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     brand_kit=brand_kit,
                     subtitle_file=subtitle_file,
                     hook_title=clip["hook_title"],
+                    remove_silence=remove_silence,
                 )
             except Exception as e:
                 print(f"[ffmpeg] erro no clipe {i}: {e}")

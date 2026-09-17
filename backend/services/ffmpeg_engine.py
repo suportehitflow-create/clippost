@@ -33,7 +33,7 @@ def create_vertical_clip(
     subtitle_file: str | None = None,
     hook_title: str | None = None,
     hflip: bool = False,
-    remove_silence: bool = False,
+    remove_silence: bool = True,
     speed: float = 1.0,
 ) -> str:
     """
@@ -137,9 +137,9 @@ def create_vertical_clip(
         if avatar_url:
             avatar_local = _download_avatar(avatar_url, tmp_dir)
 
-        brand_name = layout.get("brandName") or "HUMOR DA IGUANA"
+        brand_name = layout.get("brandName") or "Nome da Página"
         display_user = brand_name
-        brand_handle = username or layout.get("brandHandle") or "@humordaiguana"
+        brand_handle = username or layout.get("brandHandle") or "@nomedapagina"
 
         if avatar_local and os.path.exists(avatar_local):
             aw, ah = 96, 96

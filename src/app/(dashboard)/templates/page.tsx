@@ -159,7 +159,8 @@ export default function TemplatesPage() {
   const [brandHandle, setBrandHandle] = useState('@nomedapagina')
   const [brandAlign, setBrandAlign] = useState<'left' | 'center' | 'right'>('center')
   const [brandLayout, setBrandLayout] = useState<'inline' | 'stacked'>('inline')
-  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
+  const DEFAULT_BRAND_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
   const [titleText, setTitleText] = useState('AQUI QUE O SEU TITULO VAI ESTAR POSICIONADO NO VÍDEO')
 
   // Tipografia
@@ -203,7 +204,8 @@ export default function TemplatesPage() {
       if (saved) {
         const p = JSON.parse(saved)
         if (p.subtitle_preset) setSelectedSubtitle(p.subtitle_preset)
-        if (p.avatar_url) setAvatarUrl(p.avatar_url)
+        if (p.avatar_url && !p.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(p.avatar_url)
+        else setAvatarUrl(DEFAULT_BRAND_AVATAR)
         if (p.config) {
           const c = p.config
           if (c.templateBg) setTemplateBg(c.templateBg)
@@ -236,7 +238,8 @@ export default function TemplatesPage() {
         if (!user) return
         const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
         if (bk) {
-          if (bk.avatar_url) setAvatarUrl(bk.avatar_url)
+          if (bk.avatar_url && !bk.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(bk.avatar_url)
+          else setAvatarUrl(DEFAULT_BRAND_AVATAR)
           if (bk.username && bk.username !== '@humordaiguana') setBrandHandle(bk.username)
           else setBrandHandle('@nomedapagina')
           if (bk.layout_config) {
@@ -613,41 +616,57 @@ export default function TemplatesPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
+      const layoutConfig = {
+        brandName,
+        brandHandle,
+        brandAlign,
+        brandLayout,
+        templateBg,
+        subtitle_preset: selectedSubtitle,
+        fontFamily,
+        fontSize,
+        textAlign,
+        titleColor,
+        titleStroke,
+        titleStrokeColor,
+        titleCapsLock,
+        videoWidth,
+        videoHeight,
+        avatarPos,
+        headerPos,
+        titlePos,
+        videoPos,
+        subtitlePos,
+      }
+
+      // Salva localmente primeiro (100% resiliente)
+      localStorage.setItem('clippost_active_template', JSON.stringify({
+        layout: 'meme_frame',
+        subtitle_preset: selectedSubtitle,
+        avatar_url: avatarUrl,
+        template_bg: templateBg,
+        config: layoutConfig,
+      }))
+      localStorage.setItem('clippost_template_config', JSON.stringify(layoutConfig))
+
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.from('brand_kits').upsert({
-          user_id: user.id,
-          avatar_url: avatarUrl,
-          username: brandHandle,
-          layout_config: {
-            brandName,
-            brandHandle,
-            brandAlign,
-            brandLayout,
-            templateBg,
-            subtitle_preset: selectedSubtitle,
-            fontFamily,
-            fontSize,
-            textAlign,
-            titleColor,
-            titleStroke,
-            titleStrokeColor,
-            titleCapsLock,
-            videoWidth,
-            videoHeight,
-            avatarPos,
-            headerPos,
-            titlePos,
-            videoPos,
-            subtitlePos,
-          },
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
+        // Envia para /api/brand-kit sem erros 400
+        await fetch('/api/brand-kit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            avatar_url: avatarUrl,
+            username: brandHandle,
+            layout_config: layoutConfig,
+          }),
+        }).catch(() => null)
       }
+
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
     } catch {
-      // salvo no localStorage
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
     } finally {
@@ -1432,15 +1451,20 @@ export default function TemplatesPage() {
                   color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
                   textAlign: textAlign,
                   textTransform: titleCapsLock ? 'uppercase' : 'none',
+                  paintOrder: 'stroke fill',
                   textShadow: titleStroke !== 'none'
-                    ? titleStroke === 'thin'
-                      ? `-1px -1px 0 ${titleStrokeColor}, 1px -1px 0 ${titleStrokeColor}, -1px 1px 0 ${titleStrokeColor}, 1px 1px 0 ${titleStrokeColor}`
-                      : titleStroke === 'medium'
-                      ? `-2px -2px 0 ${titleStrokeColor}, 2px -2px 0 ${titleStrokeColor}, -2px 2px 0 ${titleStrokeColor}, 2px 2px 0 ${titleStrokeColor}`
-                      : `-3px -3px 0 ${titleStrokeColor}, 3px -3px 0 ${titleStrokeColor}, -3px 3px 0 ${titleStrokeColor}, 3px 3px 0 ${titleStrokeColor}`
+                    ? (() => {
+                        const r = titleStroke === 'thin' ? 1.2 : titleStroke === 'medium' ? 2.2 : 3.2
+                        const pts = []
+                        for (let i = 0; i < 16; i++) {
+                          const a = (i * Math.PI) / 8
+                          pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
+                        }
+                        return pts.join(', ')
+                      })()
                     : 'none',
                   WebkitTextStroke: titleStroke !== 'none'
-                    ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '1.5px' : '2px'} ${titleStrokeColor}`
+                    ? `${titleStroke === 'thin' ? '1.5px' : titleStroke === 'medium' ? '2.5px' : '3.5px'} ${titleStrokeColor}`
                     : 'none'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 font-black leading-tight tracking-tight select-none ${
