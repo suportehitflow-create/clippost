@@ -1323,7 +1323,7 @@ export default function TemplatesPage() {
             <div
               ref={phoneRef}
               style={{ width: "324px", height: "576px", aspectRatio: "9 / 16" }}
-              className={`relative rounded-[36px] overflow-hidden transition-colors bg-black ${
+              className={`relative rounded-[36px] overflow-hidden transition-colors ${
                 templateBg === 'white'
                   ? 'bg-white text-zinc-950'
                   : templateBg === 'gray'
@@ -1331,10 +1331,16 @@ export default function TemplatesPage() {
                   : 'bg-black text-white'
               }`}
             >
+              {/* Imagem de Fundo Personalizada (se selecionada) */}
+              {customBgImage && (
+                <img
+                  src={customBgImage}
+                  alt="Fundo"
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                />
+              )}
               
               {/* LINHA GUIA MAGNÉTICA HORIZONTAL (CENTRO X: 50%) */}
-              {/* CAMADA BASE ESCURA: IMPEDE QUE O BRANCO DO TOPO VAZE NO CORPO DO VÍDEO OU NA BASE */}
-              <div className="absolute top-[32%] bottom-0 left-0 right-0 bg-black pointer-events-none" />
               {snapActiveX && (
                 <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-50 pointer-events-none flex items-center justify-center">
                   <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-8">
