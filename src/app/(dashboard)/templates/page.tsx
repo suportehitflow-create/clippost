@@ -20,7 +20,21 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Maximize2
+  Maximize2,
+  Crosshair,
+  Magnet,
+  Heart,
+  MessageCircle,
+  Send,
+  MoreHorizontal,
+  Music,
+  Home,
+  Search,
+  ShoppingBag,
+  User,
+  Eye,
+  EyeOff,
+  Film
 } from 'lucide-react'
 
 export interface SubtitlePreset {
@@ -39,51 +53,40 @@ const SUBTITLE_PRESETS: SubtitlePreset[] = [
   { id: 'hormozi_orange', name: 'Hormozi Orange', tag: 'Mais Retenção', badgeColor: '#ea580c', textColor: '#ffffff', bgColor: '#ea580c', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
   { id: 'hormozi_yellow', name: 'Hormozi Yellow', tag: 'Viral Clássico', badgeColor: '#facc15', textColor: '#000000', bgColor: '#facc15', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
   { id: 'neon_cyan', name: 'Neon Cyan', tag: 'Tech', badgeColor: '#06b6d4', textColor: '#22d3ee', glow: '0 0 12px rgba(6,182,212,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'neon_magenta', name: 'Neon Magenta', tag: 'Cyberpunk', badgeColor: '#ec4899', textColor: '#f472b6', glow: '0 0 12px rgba(236,72,153,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'neon_green', name: 'Neon Green', tag: 'Finanças', badgeColor: '#22c55e', textColor: '#4ade80', glow: '0 0 12px rgba(34,197,94,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'karaoke_active', name: 'Karaoke Verde', tag: 'Dinâmico', badgeColor: '#22c55e', textColor: '#ffffff', bgColor: '#22c55e', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'two_tone_red', name: 'Two Tone Red', tag: 'Atenção', badgeColor: '#ef4444', textColor: '#f87171', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'two_tone_orange', name: 'Two Tone Orange', tag: 'Podcast', badgeColor: '#f97316', textColor: '#fb923c', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'two_tone_blue', name: 'Two Tone Blue', tag: 'Business', badgeColor: '#3b82f6', textColor: '#60a5fa', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'typewriter_underline', name: 'Typewriter', tag: 'Editorial', badgeColor: '#d4d4d8', textColor: '#f4f4f5', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'apple_sf', name: 'Apple SF Pro', tag: 'Apple Style', badgeColor: '#e4e4e7', textColor: '#f4f4f5', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'bold_stroke', name: 'Bold Stroke', tag: 'Contraste', badgeColor: '#ffffff', textColor: '#ffffff', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'purple_pill', name: 'Purple Pill', tag: 'Modern', badgeColor: '#7c3aed', textColor: '#ffffff', bgColor: '#7c3aed', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
-  { id: 'minimal_dark', name: 'Minimal Dark', tag: 'Discreto', badgeColor: '#71717a', textColor: '#f4f4f5', bgColor: 'rgba(0,0,0,0.75)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' }
+  { id: 'neon_magenta', name: 'Neon Magenta', tag: 'Hype', badgeColor: '#ec4899', textColor: '#f472b6', glow: '0 0 12px rgba(236,72,153,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
+  { id: 'clean_white', name: 'Clean White', tag: 'Minimalista', badgeColor: '#ffffff', textColor: '#09090b', bgColor: '#ffffff', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
+  { id: 'dark_box', name: 'Dark Box', tag: 'Contraste', badgeColor: '#27272a', textColor: '#f97316', bgColor: '#18181b', borderColor: '#3f3f46', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
 ]
 
 const FONT_OPTIONS = [
-  { id: 'sf_pro', name: 'SF Pro (Apple)', family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-  { id: 'inter', name: 'Inter', family: 'Inter, sans-serif' },
-  { id: 'montserrat', name: 'Montserrat', family: 'Montserrat, sans-serif' },
-  { id: 'anton', name: 'Impact / Anton', family: 'Impact, "Arial Black", sans-serif' },
-  { id: 'outfit', name: 'Outfit', family: 'Outfit, sans-serif' }
+  { id: 'sf_pro', name: 'SF Pro Display (Apple)', family: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif' },
+  { id: 'inter', name: 'Inter (Moderno)', family: 'Inter, sans-serif' },
+  { id: 'montserrat', name: 'Montserrat (Viral)', family: 'Montserrat, sans-serif' },
+  { id: 'impact', name: 'Impact / Anton (Forte)', family: 'Impact, sans-serif' },
+  { id: 'outfit', name: 'Outfit (Geométrico)', family: 'Outfit, sans-serif' },
 ]
 
-export default function TemplatesAppleStandard() {
+export default function TemplatesPage() {
   const supabase = createClient()
 
-  // Fundo do template (Branco, Preto, Cinza)
+  // Cores de fundo do template
   const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray'>('white')
-
-  // Borda do vídeo: 'square' (0px) ou 'rounded' (20px)
   const [videoBorderRadius, setVideoBorderRadius] = useState<'rounded' | 'square'>('rounded')
 
-  // Posicionamento 2D livre (X e Y em %)
+  // Posições Livres 2D (Eixos X e Y em porcentagem 0-100)
   const [avatarPos, setAvatarPos] = useState<{ x: number, y: number }>({ x: 50, y: 7 })
   const [headerPos, setHeaderPos] = useState<{ x: number, y: number }>({ x: 50, y: 17 })
   const [titlePos, setTitlePos] = useState<{ x: number, y: number }>({ x: 50, y: 26 })
-  const [videoPos, setVideoPos] = useState<{ x: number, y: number }>({ x: 50, y: 46 })
+  const [videoPos, setVideoPos] = useState<{ x: number, y: number }>({ x: 50, y: 50 })
   const [subtitlePos, setSubtitlePos] = useState<{ x: number, y: number }>({ x: 50, y: 84 })
 
-  // Escala / Dimensão do vídeo
-  const [videoScale, setVideoScale] = useState(88) // % largura
+  // Escala / Tamanho do Vídeo
+  const [videoScale, setVideoScale] = useState(88) // % da largura da tela
 
   // Tipografia do Título (Padrão Apple)
   const [fontFamily, setFontFamily] = useState('system-ui, -apple-system, BlinkMacSystemFont, sans-serif')
   const [fontSize, setFontSize] = useState(13) // px
   const [textAlign, setTextAlign] = useState<'center' | 'left' | 'right'>('center')
-  const [fontWeight, setFontWeight] = useState<'font-bold' | 'font-black' | 'font-semibold'>('font-bold')
 
   // Conteúdos textuais e visuais
   const [brandName, setBrandName] = useState('HUMOR DO BICHANO')
@@ -100,6 +103,15 @@ export default function TemplatesAppleStandard() {
   const [isResizingVideo, setIsResizingVideo] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  // NOVO: DECALQUE DO INSTAGRAM REELS (SAFE ZONES)
+  // 'off' | 'semi' (40% de opacidade) | 'full' (100% de opacidade)
+  const [instagramDecal, setInstagramDecal] = useState<'off' | 'semi' | 'full'>('semi')
+
+  // NOVO: LINHAS GUIA E CENTRALIZAÇÃO MAGNÉTICA (SNAPPING)
+  const [snapActiveX, setSnapActiveX] = useState(false)
+  const [snapActiveY, setSnapActiveY] = useState(false)
+  const [magneticSnapEnabled, setMagneticSnapEnabled] = useState(true)
 
   const phoneRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -201,6 +213,28 @@ export default function TemplatesAppleStandard() {
     saveToLocal()
   }, [saveToLocal])
 
+  // Centralizar Tudo no Meio (1-Clique)
+  const centerAllElementsHorizontally = () => {
+    setAvatarPos(prev => ({ ...prev, x: 50 }))
+    setHeaderPos(prev => ({ ...prev, x: 50 }))
+    setTitlePos(prev => ({ ...prev, x: 50 }))
+    setVideoPos(prev => ({ ...prev, x: 50 }))
+    setSubtitlePos(prev => ({ ...prev, x: 50 }))
+    setSnapActiveX(true)
+    setTimeout(() => setSnapActiveX(false), 1200)
+  }
+
+  // Centralizar o Vídeo no Meio Vertical e Horizontal
+  const centerVideoBoth = () => {
+    setVideoPos({ x: 50, y: 50 })
+    setSnapActiveX(true)
+    setSnapActiveY(true)
+    setTimeout(() => {
+      setSnapActiveX(false)
+      setSnapActiveY(false)
+    }, 1200)
+  }
+
   // Salvar explícito
   const handleSave = async () => {
     setSaving(true)
@@ -257,7 +291,7 @@ export default function TemplatesAppleStandard() {
     }
   }
 
-  // Drag 2D (Eixos X e Y Livres)
+  // Drag 2D com Snapping Magnético Inteligente (Guia Central X e Y)
   const startDrag2D = (target: 'avatar' | 'header' | 'title' | 'video' | 'subtitle', clientX: number, clientY: number, e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
     setDraggingTarget(target)
@@ -279,8 +313,24 @@ export default function TemplatesAppleStandard() {
       const deltaX = ((curX - dragStartPos.current.x) / w) * 100
       const deltaY = ((curY - dragStartPos.current.y) / h) * 100
 
-      const nextX = Math.max(10, Math.min(90, Math.round(initialElemPos.current.x + deltaX)))
-      const nextY = Math.max(2, Math.min(96, Math.round(initialElemPos.current.y + deltaY)))
+      let nextX = Math.max(10, Math.min(90, Math.round(initialElemPos.current.x + deltaX)))
+      let nextY = Math.max(2, Math.min(96, Math.round(initialElemPos.current.y + deltaY)))
+
+      // SNAPPING MAGNÉTICO NO CENTRO HORIZONTAL (X = 50%)
+      if (magneticSnapEnabled && Math.abs(nextX - 50) <= 2.5) {
+        nextX = 50
+        setSnapActiveX(true)
+      } else {
+        setSnapActiveX(false)
+      }
+
+      // SNAPPING NO CENTRO VERTICAL (Y = 50%)
+      if (magneticSnapEnabled && Math.abs(nextY - 50) <= 2.5) {
+        nextY = 50
+        setSnapActiveY(true)
+      } else {
+        setSnapActiveY(false)
+      }
 
       if (target === 'avatar') setAvatarPos({ x: nextX, y: nextY })
       else if (target === 'header') setHeaderPos({ x: nextX, y: nextY })
@@ -291,6 +341,8 @@ export default function TemplatesAppleStandard() {
 
     const onUp = () => {
       setDraggingTarget(null)
+      setSnapActiveX(false)
+      setSnapActiveY(false)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       window.removeEventListener('touchmove', onMove)
@@ -314,7 +366,12 @@ export default function TemplatesAppleStandard() {
       if (!phoneRef.current) return
       const w = phoneRef.current.clientWidth
       const deltaPercent = ((ev.clientX - resizeStartX.current) / w) * 100
-      const newScale = Math.max(50, Math.min(98, Math.round(initialScale.current + deltaPercent)))
+      let newScale = Math.max(50, Math.min(98, Math.round(initialScale.current + deltaPercent)))
+      
+      // Snap para larguras padrão (88% e 94%)
+      if (Math.abs(newScale - 88) <= 1.5) newScale = 88
+      if (Math.abs(newScale - 94) <= 1.5) newScale = 94
+
       setVideoScale(newScale)
     }
 
@@ -343,8 +400,11 @@ export default function TemplatesAppleStandard() {
 
       {/* CABEÇALHO LIMPO - PADRÃO APPLE */}
       <header className="w-full max-w-4xl flex items-center justify-between pb-6 mb-2 border-b border-white/[0.08]">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight text-white">Template</h1>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.08]">
+            Edição Visual 9:16
+          </span>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -354,7 +414,7 @@ export default function TemplatesAppleStandard() {
               setAvatarPos({ x: 50, y: 7 })
               setHeaderPos({ x: 50, y: 17 })
               setTitlePos({ x: 50, y: 26 })
-              setVideoPos({ x: 50, y: 46 })
+              setVideoPos({ x: 50, y: 50 })
               setSubtitlePos({ x: 50, y: 84 })
               setVideoScale(88)
               setVideoBorderRadius('rounded')
@@ -394,7 +454,7 @@ export default function TemplatesAppleStandard() {
       <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center justify-center gap-8 pt-4">
         
         {/* BALÃO FLUTUANTE DE OPÇÕES NA ESQUERDA (PADRÃO APPLE FLOATING DOCK) */}
-        <aside className="bg-[#141416]/90 border border-white/[0.1] backdrop-blur-2xl rounded-3xl p-3 shadow-2xl flex md:flex-col items-center gap-4 z-40">
+        <aside className="bg-[#141416]/90 border border-white/[0.1] backdrop-blur-2xl rounded-3xl p-3 shadow-2xl flex md:flex-col items-center gap-3.5 z-40">
           
           {/* SELEÇÃO DE CORES: BOLINHAS MINIMALISTAS */}
           <div className="flex md:flex-col gap-2.5 items-center">
@@ -437,6 +497,41 @@ export default function TemplatesAppleStandard() {
 
           <div className="w-px h-5 md:w-5 md:h-px bg-white/10" />
 
+          {/* NOVO: DECALQUE DO INSTAGRAM REELS (SAFE ZONE OVERLAY) */}
+          <button
+            type="button"
+            onClick={() => {
+              setInstagramDecal(prev => prev === 'off' ? 'semi' : prev === 'semi' ? 'full' : 'off')
+            }}
+            title={
+              instagramDecal === 'full'
+                ? 'Decalque Instagram: 100% Visível (clique para Ocultar)'
+                : instagramDecal === 'semi'
+                ? 'Decalque Instagram: Semitransparente (clique para 100%)'
+                : 'Decalque Instagram: Desligado (clique para Ligar Safe Zones)'
+            }
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+              instagramDecal !== 'off'
+                ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 text-white shadow-md shadow-pink-500/30'
+                : 'bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10'
+            }`}
+          >
+            <Film className="w-4 h-4" />
+            {instagramDecal !== 'off' && (
+              <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black" />
+            )}
+          </button>
+
+          {/* NOVO: CENTRALIZAR TUDO NO MEIO (IMÃ / SNAPPING CENTRAL) */}
+          <button
+            type="button"
+            onClick={centerAllElementsHorizontally}
+            title="Centralizar Todos os Elementos no Meio Horizontal (X: 50%)"
+            className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-cyan-500/20 hover:text-cyan-300 text-zinc-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer group"
+          >
+            <Crosshair className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          </button>
+
           {/* BORDA DO VÍDEO: ARREDONDADA VS QUADRADA */}
           <button
             type="button"
@@ -455,7 +550,7 @@ export default function TemplatesAppleStandard() {
             )}
           </button>
 
-          {/* CONTROLE INTEGRADO DE TIPOGRAFIA (FONTE E TAMANHO) */}
+          {/* CONTROLE INTEGRADO DE TIPOGRAFIA */}
           <div className="relative">
             <button
               type="button"
@@ -480,7 +575,6 @@ export default function TemplatesAppleStandard() {
                   </button>
                 </div>
 
-                {/* Seleção de Fonte */}
                 <div className="space-y-1">
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold block">Fonte</label>
                   <select
@@ -496,7 +590,6 @@ export default function TemplatesAppleStandard() {
                   </select>
                 </div>
 
-                {/* Stepper de Tamanho */}
                 <div className="flex items-center justify-between pt-1">
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Tamanho</label>
                   <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-lg p-0.5">
@@ -518,7 +611,6 @@ export default function TemplatesAppleStandard() {
                   </div>
                 </div>
 
-                {/* Alinhamento de Texto */}
                 <div className="flex items-center justify-between pt-1">
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Alinhar</label>
                   <div className="flex gap-1">
@@ -570,7 +662,7 @@ export default function TemplatesAppleStandard() {
           </button>
         </aside>
 
-        {/* TELA DO IPHONE 16 PRO (MICRO-BEZEL, SEM SOMBRAS INTERNAS) */}
+        {/* TELA DO IPHONE 16 PRO (MICRO-BEZEL, COM LINHAS GUIAS E DECALQUE DO INSTAGRAM) */}
         <div className="relative flex flex-col items-center">
           
           {/* MOCKUP IPHONE 16 PRO */}
@@ -581,7 +673,7 @@ export default function TemplatesAppleStandard() {
               <div className="w-2.5 h-2.5 rounded-full bg-[#141416] border border-white/[0.06]" />
             </div>
 
-            {/* CANVAS 9:16 (SEM SOMBRAS INTERNAS) */}
+            {/* CANVAS 9:16 */}
             <div
               ref={phoneRef}
               className={`relative flex-1 w-full rounded-[44px] overflow-hidden transition-colors duration-150 ${
@@ -593,7 +685,25 @@ export default function TemplatesAppleStandard() {
               }`}
             >
               
-              {/* 1. LOGO / AVATAR SOLTO 2D (SEM BORDA VERMELHA, MÓVEL EM X E Y) */}
+              {/* LINHA GUIA MAGNÉTICA HORIZONTAL (CENTRO X: 50%) */}
+              {snapActiveX && (
+                <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-40 pointer-events-none animate-in fade-in duration-75 flex items-center justify-center">
+                  <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-8 whitespace-nowrap">
+                    Centro X
+                  </span>
+                </div>
+              )}
+
+              {/* LINHA GUIA MAGNÉTICA VERTICAL (CENTRO Y: 50%) */}
+              {snapActiveY && (
+                <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-40 pointer-events-none animate-in fade-in duration-75 flex items-center justify-center">
+                  <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute left-4 whitespace-nowrap">
+                    Centro Y
+                  </span>
+                </div>
+              )}
+
+              {/* 1. LOGO / AVATAR SOLTO 2D (MÓVEL EM X E Y) */}
               <div
                 onMouseDown={(e) => startDrag2D('avatar', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('avatar', e.touches[0].clientX, e.touches[0].clientY, e)}
@@ -605,7 +715,7 @@ export default function TemplatesAppleStandard() {
                 className={`absolute cursor-grab active:cursor-grabbing z-30 transition-shadow ${
                   draggingTarget === 'avatar' ? 'ring-2 ring-orange-500 rounded-full' : ''
                 }`}
-                title="Arraste a logo para onde quiser (para baixo, cima ou lados)"
+                title="Arraste a foto para qualquer lugar (snaps no centro)"
               >
                 <div
                   onClick={() => fileInputRef.current?.click()}
@@ -694,7 +804,7 @@ export default function TemplatesAppleStandard() {
                 className={`absolute w-full px-5 cursor-grab active:cursor-grabbing z-30 ${
                   draggingTarget === 'title' ? 'ring-1 ring-orange-500/50 rounded-lg py-1' : ''
                 }`}
-                title="Arraste o título para onde quiser"
+                title="Arraste o título (snaps no centro)"
               >
                 <textarea
                   value={titleText}
@@ -745,7 +855,7 @@ export default function TemplatesAppleStandard() {
                     </div>
                   </div>
 
-                  {/* Handle nos Cantos */}
+                  {/* Handles nos Cantos */}
                   <div className="absolute top-1 left-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
                   <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
                   <div className="absolute bottom-1 left-1 w-2.5 h-2.5 bg-blue-500 rounded-sm border border-white" />
@@ -771,7 +881,7 @@ export default function TemplatesAppleStandard() {
                 className={`absolute cursor-grab active:cursor-grabbing z-40 flex flex-col items-center select-none ${
                   draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-orange-500 rounded-lg' : ''
                 }`}
-                title="Arraste a legenda para qualquer lugar. Clique para trocar o estilo!"
+                title="Arraste a legenda (snaps no centro). Clique para trocar o estilo!"
               >
                 <div
                   onClick={(e) => {
@@ -790,67 +900,188 @@ export default function TemplatesAppleStandard() {
                 </div>
               </div>
 
+              {/* 6. DECALQUE OFICIAL DO INSTAGRAM REELS (SAFE ZONE OVERLAY) */}
+              {instagramDecal !== 'off' && (
+                <div
+                  className={`absolute inset-0 pointer-events-none z-45 transition-opacity duration-200 flex flex-col justify-between ${
+                    instagramDecal === 'semi' ? 'opacity-45' : 'opacity-95'
+                  }`}
+                >
+                  {/* Topo do Reels: Horário, Notch e 'Reels' Header */}
+                  <div className="pt-2 px-4 flex items-center justify-between text-white text-xs font-semibold drop-shadow">
+                    <span className="font-mono text-[11px]">9:41</span>
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span>5G</span>
+                      <div className="w-4 h-2 rounded-sm border border-white p-0.5 flex items-center">
+                        <div className="w-full h-full bg-white rounded-2xs" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 px-4 flex items-center justify-between text-white drop-shadow">
+                    <span className="text-sm font-black tracking-tight">Reels</span>
+                    <Camera className="w-5 h-5 text-white" />
+                  </div>
+
+                  {/* Meio: Área Segura (Safe Zone) Pontilhada */}
+                  <div className="flex-1 mx-3 my-2 border border-dashed border-white/25 rounded-2xl flex items-start justify-end p-2 pointer-events-none">
+                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/50 text-white/80 border border-white/10">
+                      Área Segura (Safe Zone)
+                    </span>
+                  </div>
+
+                  {/* Coluna Lateral Direita: Like, Comentário, Enviar, Opções, Áudio */}
+                  <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3.5 text-white drop-shadow-md">
+                    {/* Like */}
+                    <div className="flex flex-col items-center">
+                      <Heart className="w-6 h-6 text-white" />
+                      <span className="text-[10px] font-bold mt-0.5">107,1 K</span>
+                    </div>
+
+                    {/* Comentário */}
+                    <div className="flex flex-col items-center">
+                      <MessageCircle className="w-6 h-6 text-white" />
+                      <span className="text-[10px] font-bold mt-0.5">1.842</span>
+                    </div>
+
+                    {/* Compartilhar */}
+                    <div className="flex flex-col items-center">
+                      <Send className="w-5 h-5 text-white" />
+                      <span className="text-[10px] font-bold mt-0.5">Share</span>
+                    </div>
+
+                    {/* Mais Opções */}
+                    <MoreHorizontal className="w-5 h-5 text-white" />
+
+                    {/* Disco de Áudio */}
+                    <div className="w-7 h-7 rounded-lg border-2 border-white/80 bg-zinc-900 overflow-hidden flex items-center justify-center mt-1">
+                      <Music className="w-3.5 h-3.5 text-white animate-spin" />
+                    </div>
+                  </div>
+
+                  {/* Rodapé do Instagram: Perfil, Legenda e Áudio */}
+                  <div className="pb-12 pl-4 pr-16 space-y-1.5 text-white drop-shadow-md">
+                    {/* Perfil e Botão Seguir */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/40 overflow-hidden">
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-xs font-bold">{brandHandle}</span>
+                      <span className="px-2 py-0.5 rounded-full border border-white/60 text-[9px] font-bold bg-white/10">
+                        Seguir
+                      </span>
+                    </div>
+
+                    {/* Descrição do Post */}
+                    <p className="text-[11px] leading-tight text-white/90 line-clamp-2">
+                      É assim que o seu vídeo e legenda são vistos no feed do Instagram Reels 🔥 #viral #cortes
+                    </p>
+
+                    {/* Tag de Áudio Original */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/80">
+                      <Music className="w-3 h-3" />
+                      <span>Áudio original • {brandHandle}</span>
+                    </div>
+                  </div>
+
+                  {/* Barra de Navegação Inferior do Instagram */}
+                  <div className="h-10 bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-around px-4 text-white">
+                    <Home className="w-5 h-5 opacity-90" />
+                    <Search className="w-5 h-5 opacity-90" />
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <Film className="w-5 h-5 text-white" />
+                    </div>
+                    <ShoppingBag className="w-5 h-5 opacity-90" />
+                    <div className="w-5 h-5 rounded-full border border-white overflow-hidden">
+                      <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* HOME BAR DO IPHONE 16 PRO */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-zinc-400/40 rounded-full pointer-events-none" />
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-zinc-400/40 rounded-full pointer-events-none z-50" />
 
             </div>
+          </div>
+
+          {/* DICA DE CENTRALIZAÇÃO & DECALQUE */}
+          <div className="mt-4 flex items-center gap-3 text-xs text-zinc-400">
+            <button
+              type="button"
+              onClick={centerAllElementsHorizontally}
+              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <Crosshair className="w-3.5 h-3.5 text-cyan-400" /> Centralizar Tudo no Meio
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setInstagramDecal(prev => prev === 'off' ? 'semi' : prev === 'semi' ? 'full' : 'off')}
+              className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <Film className="w-3.5 h-3.5 text-pink-400" />
+              <span>Decalque Instagram: </span>
+              <strong className="text-white font-mono">
+                {instagramDecal === 'full' ? '100%' : instagramDecal === 'semi' ? '40%' : 'OFF'}
+              </strong>
+            </button>
           </div>
         </div>
 
       </div>
 
-      {/* MODAL SUSPENSO DE ESTILOS DE LEGENDA */}
+      {/* MODAL DE ESTILOS DE LEGENDA */}
       {subtitleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#141416] border border-white/10 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#141416] border border-white/10 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
-                <h3 className="text-sm font-semibold text-white">Estilos de Legenda</h3>
-                <p className="text-xs text-zinc-400">Escolha o preset visual para seus cortes.</p>
+                <h3 className="text-sm font-bold text-white">Estilos de Legenda</h3>
+                <p className="text-xs text-zinc-400">Escolha o preset que será aplicado no corte.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSubtitleModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                className="text-zinc-400 hover:text-white p-1 rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[360px] overflow-y-auto p-1">
-              {SUBTITLE_PRESETS.map(sub => {
-                const isSel = selectedSubtitle === sub.id
-                return (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSubtitle(sub.id)
-                      setSubtitleModalOpen(false)
-                    }}
-                    className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-center items-center ${
-                      isSel
-                        ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/40'
-                        : 'border-white/[0.08] bg-[#1a1a1e] hover:border-white/20'
-                    }`}
-                  >
-                    <div
-                      className="px-2 py-0.5 rounded text-[10px] font-black uppercase truncate max-w-[130px]"
-                      style={{
-                        backgroundColor: sub.bgColor || 'transparent',
-                        color: sub.textColor,
-                        border: sub.borderColor ? `1px solid ${sub.borderColor}` : 'none',
-                        boxShadow: sub.glow || 'none'
-                      }}
-                    >
-                      {sub.name}
-                    </div>
-                    <span className="text-[9px] text-zinc-500 mt-1 font-mono">
-                      {sub.tag}
+            <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1">
+              {SUBTITLE_PRESETS.map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSubtitle(st.id)
+                    setSubtitleModalOpen(false)
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                    selectedSubtitle === st.id
+                      ? 'bg-orange-500/20 border-orange-500 ring-1 ring-orange-500/40'
+                      : 'bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-white">{st.name}</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/[0.08] text-zinc-300">
+                      {st.tag}
                     </span>
-                  </button>
-                )
-              })}
+                  </div>
+                  <div
+                    className="w-full py-2 px-1 rounded-lg text-[10px] font-black uppercase text-center truncate border border-white/10"
+                    style={{
+                      backgroundColor: st.bgColor || 'rgba(0,0,0,0.85)',
+                      color: st.textColor,
+                      boxShadow: st.glow || 'none'
+                    }}
+                  >
+                    EXEMPLO VIRAL
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
