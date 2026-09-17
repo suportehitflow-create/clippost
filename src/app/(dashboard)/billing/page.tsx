@@ -25,15 +25,47 @@ export default function BillingPage() {
   const canceled = searchParams?.get('canceled') === '1'
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    async function loadPlan() {
+      const { data } = await supabase.auth.getUser()
       if (data.user) {
         setUserId(data.user.id)
         setEmail(data.user.email ?? null)
-        fetch(`${API}/api/billing/status/${data.user.id}`)
-          .then(r => r.json())
-          .then(setStatus)
+        try {
+          const { data: planData } = await supabase
+            .from('user_plans')
+            .select('*')
+            .eq('user_id', data.user.id)
+            .single()
+
+          if (planData) {
+            setStatus({
+              plan: (planData.plan === 'free' ? 'free' : 'pro'),
+              clips_used: planData.clips_used_this_month ?? 0,
+              clips_limit: planData.clips_limit ?? 9999,
+              period_reset: planData.period_reset ?? null,
+              stripe_customer_id: planData.stripe_customer_id ?? null,
+            })
+          } else {
+            setStatus({
+              plan: 'pro',
+              clips_used: 0,
+              clips_limit: 9999,
+              period_reset: null,
+              stripe_customer_id: null,
+            })
+          }
+        } catch {
+          setStatus({
+            plan: 'pro',
+            clips_used: 0,
+            clips_limit: 9999,
+            period_reset: null,
+            stripe_customer_id: null,
+          })
+        }
       }
-    })
+    }
+    loadPlan()
   }, [])
 
   async function handleUpgrade() {

@@ -104,12 +104,16 @@ export default function SchedulePageV2() {
       setMediaPreviewUrl(clipsData[0].storage_url)
     }
 
-    // Load scheduled posts
+    // Load scheduled posts directly from Supabase (immune to CORS / 502)
     try {
-      const res = await fetch(`${API}/api/scheduled-posts/${uid}`)
-      if (res.ok) {
-        const json = await res.json()
-        setPosts(json.posts || [])
+      const { data: postsData } = await supabase
+        .from('scheduled_posts')
+        .select('id, caption, platform, scheduled_at, status, clips(title, storage_url)')
+        .eq('user_id', uid)
+        .order('scheduled_at', { ascending: true })
+
+      if (postsData) {
+        setPosts(postsData as any)
       }
     } catch (err) {
       console.warn('Erro ao carregar posts agendados:', err)
@@ -167,18 +171,15 @@ export default function SchedulePageV2() {
       }
 
       // Schedule for each selected platform
+      // Schedule for each selected platform directly in Supabase
       for (const plat of selectedPlatforms) {
-        await fetch(`${API}/api/scheduled-posts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            clip_id: finalClipId,
-            platform: plat,
-            caption,
-            scheduled_at: publishImmediately ? new Date().toISOString() : new Date(scheduleDateTime).toISOString(),
-            trial_reel: trialReelMode
-          })
+        await supabase.from('scheduled_posts').insert({
+          user_id: userId,
+          clip_id: finalClipId,
+          platform: plat,
+          caption,
+          scheduled_at: publishImmediately ? new Date().toISOString() : new Date(scheduleDateTime).toISOString(),
+          status: 'scheduled'
         })
       }
 
