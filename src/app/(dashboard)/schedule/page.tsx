@@ -24,7 +24,6 @@ import {
   Video
 } from 'lucide-react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
 type Platform = 'instagram' | 'tiktok' | 'youtube_shorts'
 type TrialReelMode = 'disabled' | 'manual' | 'auto'

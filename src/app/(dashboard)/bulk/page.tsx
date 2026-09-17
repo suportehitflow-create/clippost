@@ -27,7 +27,6 @@ import {
   X
 } from 'lucide-react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
 interface BatchItem {
   id: string

@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
 interface PlanStatus {
   plan: 'free' | 'pro'
@@ -71,7 +70,7 @@ export default function BillingPage() {
   async function handleUpgrade() {
     if (!userId || !email) return
     setLoading(true)
-    const res = await fetch(`${API}/api/billing/checkout`, {
+    const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, email }),
@@ -83,7 +82,7 @@ export default function BillingPage() {
   async function handlePortal() {
     if (!userId) return
     setLoading(true)
-    const res = await fetch(`${API}/api/billing/portal/${userId}`)
+    const res = await fetch(`/api/billing/portal/${userId}`)
     if (res.ok) {
       const { url } = await res.json()
       window.location.href = url

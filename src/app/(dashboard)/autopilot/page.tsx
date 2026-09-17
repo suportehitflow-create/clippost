@@ -29,10 +29,10 @@ import {
   RefreshCw,
   Clock,
   ArrowRight,
-  Move
+  Move,
+  Trash2
 } from 'lucide-react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
 interface MinedVideo {
   id: string
@@ -116,15 +116,18 @@ export default function AutoPilotPage() {
     handleSearchProfile('@modotorque')
   }, [])
 
-  async function loadWatches(uid: string) {
+    async function loadWatches(uid: string) {
     try {
-      const res = await fetch(`${API}/api/autopilot/watches/${uid}`)
-      if (res.ok) {
-        const d = await res.json()
-        setWatches(d.watches || [])
+      const { data, error } = await supabase
+        .from('channel_watches')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setWatches(data as Watch[])
       }
-    } catch (e) {
-      console.warn('Watches error:', e)
+    } catch {
+      // safe fallback
     }
   }
 
@@ -546,17 +549,25 @@ export default function AutoPilotPage() {
               if (!userId || !canal.trim()) return
               setSalvandoWatch(true)
               try {
-                const res = await fetch(`${API}/api/autopilot/watches`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ user_id: userId, canal: canal.trim(), clip_duration: 'auto' })
-                })
-                if (res.ok) {
-                  setCanal('')
-                  setAviso('Canal conectado para monitoramento!')
-                  setTimeout(() => setAviso(''), 4000)
-                  loadWatches(userId)
-                }
+                const clean = canal.trim()
+                await supabase
+                  .from('channel_watches')
+                  .insert({
+                    user_id: userId,
+                    channel_id: clean,
+                    channel_handle: clean,
+                    channel_name: clean.replace('@', ''),
+                    clip_duration: 'auto',
+                    num_clips: 3,
+                    is_active: true
+                  })
+
+                setCanal('')
+                setAviso('Canal conectado para monitoramento!')
+                setTimeout(() => setAviso(''), 4000)
+                loadWatches(userId)
+              } catch (err) {
+                console.error(err)
               } finally {
                 setSalvandoWatch(false)
               }
@@ -591,7 +602,20 @@ export default function AutoPilotPage() {
                       <span className="text-xs font-semibold text-white block">{w.channel_name || w.channel_handle || w.channel_id}</span>
                       <span className="text-[10px] text-zinc-500 font-mono">Status: Ativo · Checado a cada 15 min</span>
                     </div>
-                    <span className="text-xs text-emerald-400 font-mono">Conectado</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-emerald-400 font-mono">Conectado</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await supabase.from('channel_watches').delete().eq('id', w.id)
+                          if (userId) loadWatches(userId)
+                        }}
+                        className="text-zinc-500 hover:text-red-400 transition-colors p-1 cursor-pointer"
+                        title="Remover canal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

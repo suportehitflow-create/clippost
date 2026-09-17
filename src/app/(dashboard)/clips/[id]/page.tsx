@@ -246,8 +246,7 @@ export default function ClipEditorPage() {
         .eq('id', clipId)
 
       // 2. Call backend re-render endpoint if available
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
-      await fetch(`${apiUrl}/api/clips/${clipId}/re-render`, {
+      await fetch(`/api/clips/${clipId}/re-render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
