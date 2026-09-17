@@ -82,7 +82,7 @@ const TEMPLATE_PRESETS = [
     bg: 'dark',
     brandName: 'HUMOR DA IGUANA',
     brandHandle: '@humordaiguana',
-    title: 'Meu maior arrependimento foi não ter seguido essa página antes 😂😂😂',
+    title: 'É assim que o seu título vai aparecer no vídeo',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
     subtitle: 'hormozi_yellow',
@@ -96,6 +96,38 @@ const TEMPLATE_PRESETS = [
   }
 ]
 type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'safezone' | 'background' | null
+
+// Renderizador Oficial de Emojis Nativos Apple iOS (Emojipedia / Apple Assets)
+function AppleEmojiText({ text, className }: { text: string; className?: string }) {
+  if (!text) return null
+  const emojiRegex = /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u
+  const parts = text.split(emojiRegex)
+
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        if (emojiRegex.test(part)) {
+          const codePoints = Array.from(part)
+            .map(c => c.codePointAt(0)!.toString(16))
+            .filter(c => c !== 'fe0f')
+          const hex = codePoints.join('-').toLowerCase()
+          return (
+            <img
+              key={i}
+              src={`https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/${hex}.png`}
+              alt={part}
+              className="inline-block w-[1.15em] h-[1.15em] align-[-0.18em] mx-[1px] select-none pointer-events-none"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none'
+              }}
+            />
+          )
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </span>
+  )
+}
 
 export default function TemplatesPage() {
   const supabase = createClient()
@@ -122,7 +154,7 @@ export default function TemplatesPage() {
   const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
   const [brandHandle, setBrandHandle] = useState('@humordaiguana')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
-  const [titleText, setTitleText] = useState('Meu maior arrependimento foi não ter seguido essa página antes 😂😂😂')
+  const [titleText, setTitleText] = useState('É assim que o seu título vai aparecer no vídeo')
 
   // Tipografia
   const [fontFamily, setFontFamily] = useState(FONT_OPTIONS[0].family)
@@ -463,7 +495,7 @@ export default function TemplatesPage() {
     <div className="min-h-screen bg-[#0d0f12] text-white flex flex-col select-none overflow-hidden">
       
       {/* 1. TOP BAR PADRÃO CANVA (HEADER COM TÍTULO, AUTO-SAVE E AÇÕES) */}
-      <header className="h-14 bg-[#12161b] border-b border-white/[0.08] px-4 sm:px-6 flex items-center justify-between z-30 shrink-0">
+      <header className="h-14 bg-[#0e0e11] border-b border-white/[0.08] px-4 sm:px-6 flex items-center justify-between z-30 shrink-0">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"
@@ -476,8 +508,8 @@ export default function TemplatesPage() {
           <div className="h-4 w-px bg-white/10" />
 
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
-              <LayoutTemplate className="w-4 h-4 text-orange-400" />
+            <div className="w-7 h-7 rounded-lg bg-[#ea7a3e]/20 border border-[#ea7a3e]/30 flex items-center justify-center">
+              <LayoutTemplate className="w-4 h-4 text-[#ea7a3e]" />
             </div>
             <div>
               <h1 className="text-xs sm:text-sm font-semibold text-white tracking-tight flex items-center gap-2">
@@ -524,14 +556,14 @@ export default function TemplatesPage() {
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* BARRA DE FERRAMENTAS LATERAL (CANVA SIDEBAR) */}
-        <aside className="w-16 sm:w-[72px] bg-[#12161b] border-r border-white/[0.08] flex flex-col items-center py-3 gap-1 z-20 shrink-0 select-none">
+        <aside className="w-16 sm:w-[72px] bg-[#0e0e11] border-r border-white/[0.08] flex flex-col items-center py-3 gap-1 z-20 shrink-0 select-none">
           
           <button
             type="button"
             onClick={() => setActiveTool(activeTool === 'templates' ? null : 'templates')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'templates'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -544,7 +576,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'text'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -557,7 +589,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'brand' ? null : 'brand')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'brand'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -570,7 +602,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'subtitles' ? null : 'subtitles')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'subtitles'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -583,7 +615,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'safezone' ? null : 'safezone')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer relative ${
               activeTool === 'safezone'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -599,7 +631,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'background' ? null : 'background')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'background'
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -611,7 +643,7 @@ export default function TemplatesPage() {
 
         {/* PAINEL EXPANSÍVEL LATERAL DO CANVA (DRAWER 280px - SEM COBRIR O CANVAS) */}
         {activeTool && (
-          <div className="w-72 sm:w-80 bg-[#161b22] border-r border-white/[0.08] p-4 flex flex-col gap-4 z-10 shrink-0 animate-in slide-in-from-left-4 duration-200 overflow-y-auto">
+          <div className="w-72 sm:w-80 bg-[#121215] border-r border-white/[0.08] p-4 flex flex-col gap-4 z-10 shrink-0 animate-in slide-in-from-left-4 duration-200 overflow-y-auto">
             
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -643,10 +675,10 @@ export default function TemplatesPage() {
                       key={p.id}
                       type="button"
                       onClick={() => applyPreset(p)}
-                      className="w-full text-left p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-orange-500/40 transition-all cursor-pointer group"
+                      className="w-full text-left p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-[#ea7a3e]/40 transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between">
-                        <strong className="text-xs text-white group-hover:text-orange-400">{p.name}</strong>
+                        <strong className="text-xs text-white group-hover:text-[#ea7a3e]">{p.name}</strong>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 font-mono">
                           {p.bg === 'dark' ? 'Preto' : 'Branco'}
                         </span>
@@ -666,7 +698,7 @@ export default function TemplatesPage() {
                   <select
                     value={fontFamily}
                     onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-orange-500 cursor-pointer"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e] cursor-pointer"
                   >
                     {FONT_OPTIONS.map(f => (
                       <option key={f.id} value={f.family} className="bg-zinc-900 text-white">
@@ -707,7 +739,7 @@ export default function TemplatesPage() {
                           onClick={() => setTextAlign(a.id as any)}
                           className={`py-1.5 rounded-lg flex items-center justify-center gap-1 border transition-all cursor-pointer ${
                             textAlign === a.id
-                              ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                              ? 'bg-[#ea7a3e]/20 text-[#ea7a3e] border-[#ea7a3e]/40'
                               : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white'
                           }`}
                         >
@@ -719,43 +751,22 @@ export default function TemplatesPage() {
                 </div>
 
                 <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                  <label className="text-zinc-400 font-medium">Exemplo de Gancho Viral:</label>
+                  <label className="text-zinc-400 font-medium">Texto do Título:</label>
                   <textarea
                     value={titleText}
                     onChange={(e) => setTitleText(e.target.value)}
                     rows={3}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-orange-500 resize-none text-xs leading-relaxed"
+                    placeholder="É assim que o seu título vai aparecer no vídeo"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-[#ea7a3e]/50 resize-none text-xs leading-relaxed"
                   />
-
-                  {/* Barra de Emojis Padrão iOS */}
-                  <div className="space-y-1 pt-1">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                      <span>Emojis Padrão iOS:</span>
-                      <span className="text-[10px] text-orange-400 font-medium">Toque para inserir</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-black/40 border border-white/10 rounded-xl">
-                      {['😂', '🔥', '😱', '👏', '🤯', '💀', '💯', '👀', '🚨', '⚡', '🤫', '👇', '🤣', '😭', '✨', '👑'].map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => setTitleText(prev => prev + ' ' + emoji)}
-                          className="w-7 h-7 flex items-center justify-center text-base hover:bg-white/10 rounded-lg transition-transform hover:scale-125 active:scale-95 cursor-pointer font-['Apple_Color_Emoji',_'Segoe_UI_Emoji',_sans-serif]"
-                          title={`Inserir ${emoji}`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                </div></div>
             )}
 
             {/* ABA 3: PERFIL E AVATAR */}
             {activeTool === 'brand' && (
               <div className="space-y-4 text-xs">
                 <div className="flex flex-col items-center gap-2 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-                  <div className="w-14 h-14 rounded-full border-2 border-orange-500/50 overflow-hidden shadow-md">
+                  <div className="w-14 h-14 rounded-full border-2 border-[#ea7a3e]/50 overflow-hidden shadow-md">
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   </div>
                   <input
@@ -780,7 +791,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-orange-500"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e]"
                   />
                 </div>
 
@@ -790,7 +801,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={brandHandle}
                     onChange={(e) => setBrandHandle(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-orange-500 font-mono"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e] font-mono"
                   />
                 </div>
               </div>
@@ -808,7 +819,7 @@ export default function TemplatesPage() {
                       onClick={() => setSelectedSubtitle(sub.id)}
                       className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                         selectedSubtitle === sub.id
-                          ? 'bg-white/10 border-orange-500/50 shadow-sm'
+                          ? 'bg-white/10 border-[#ea7a3e]/50 shadow-sm'
                           : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
                       }`}
                     >
@@ -876,7 +887,7 @@ export default function TemplatesPage() {
                           setCustomBgImage(null)
                         }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${b.bg} ${
-                          templateBg === b.id && !customBgImage ? 'ring-2 ring-orange-500 scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
+                          templateBg === b.id && !customBgImage ? 'ring-2 ring-[#ea7a3e] scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
                         }`}
                       >
                         <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center">
@@ -894,7 +905,7 @@ export default function TemplatesPage() {
                   
                   {customBgImage ? (
                     <div className="space-y-2">
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-orange-500/40 shadow-inner">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#ea7a3e]/40 shadow-inner">
                         <img src={customBgImage} alt="Fundo Personalizado" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                           <span className="text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">Fundo Ativo</span>
@@ -916,8 +927,8 @@ export default function TemplatesPage() {
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-orange-500/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
-                      <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-[#ea7a3e]/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
+                      <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-[#ea7a3e]/20 flex items-center justify-center text-[#ea7a3e]">
                         <Upload className="w-4 h-4" />
                       </div>
                       <div className="text-center">
@@ -976,7 +987,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 ${
-                  draggingTarget === 'avatar' ? 'ring-2 ring-orange-500 rounded-full scale-105' : ''
+                  draggingTarget === 'avatar' ? 'ring-2 ring-[#ea7a3e] rounded-full scale-105' : ''
                 }`}
                 title="Arraste o avatar para posicionar livremente"
               >
@@ -995,7 +1006,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 flex flex-col items-center select-none ${
-                  draggingTarget === 'header' ? 'ring-1 ring-orange-500/50 rounded-lg p-1' : ''
+                  draggingTarget === 'header' ? 'ring-1 ring-[#ea7a3e]/50 rounded-lg p-1' : ''
                 }`}
                 title="Arraste o nome e arroba para reposicionar"
               >
@@ -1026,7 +1037,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute w-full px-5 cursor-grab active:cursor-grabbing z-30 select-none ${
-                  draggingTarget === 'title' ? 'ring-1 ring-orange-500/50 rounded-lg py-1' : ''
+                  draggingTarget === 'title' ? 'ring-1 ring-[#ea7a3e]/50 rounded-lg py-1' : ''
                 }`}
                 title="Arraste o título para reposicionar"
               >
@@ -1056,7 +1067,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-20 group select-none shadow-2xl ${
-                  draggingTarget === 'video' ? 'ring-2 ring-orange-500' : ''
+                  draggingTarget === 'video' ? 'ring-2 ring-[#ea7a3e]' : ''
                 }`}
                 title="Arraste para mover. Use as alças para ajustar largura e altura livremente."
               >
@@ -1075,7 +1086,7 @@ export default function TemplatesPage() {
                   onMouseDown={(e) => startResizeVideo('tl', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('tl', e.touches[0].clientX, e.touches[0].clientY, e)}
                   title="Redimensionar proporção (Canto Superior Esquerdo)"
-                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
+                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
 
                 {/* Canto Superior Direito (tr) */}
@@ -1083,7 +1094,7 @@ export default function TemplatesPage() {
                   onMouseDown={(e) => startResizeVideo('tr', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('tr', e.touches[0].clientX, e.touches[0].clientY, e)}
                   title="Redimensionar proporção (Canto Superior Direito)"
-                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
+                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
                 />
 
                 {/* Canto Inferior Esquerdo (bl) */}
@@ -1091,7 +1102,7 @@ export default function TemplatesPage() {
                   onMouseDown={(e) => startResizeVideo('bl', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('bl', e.touches[0].clientX, e.touches[0].clientY, e)}
                   title="Redimensionar proporção (Canto Inferior Esquerdo)"
-                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
+                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
                 />
 
                 {/* Canto Inferior Direito (br) */}
@@ -1099,7 +1110,7 @@ export default function TemplatesPage() {
                   onMouseDown={(e) => startResizeVideo('br', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('br', e.touches[0].clientX, e.touches[0].clientY, e)}
                   title="Redimensionar proporção (Canto Inferior Direito)"
-                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
+                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
               </div>
 
@@ -1113,7 +1124,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-40 flex flex-col items-center select-none ${
-                  draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-orange-500 rounded-lg' : ''
+                  draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-[#ea7a3e] rounded-lg' : ''
                 }`}
                 title="Arraste a legenda para posicionar"
               >
@@ -1145,7 +1156,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* 3. BARRA INFERIOR PADRÃO CANVA (ZOOM, CONTROLE DE ESCALA E DIMENSÕES) */}
-      <footer className="h-10 bg-[#12161b] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between text-xs text-zinc-400 z-30 shrink-0">
+      <footer className="h-10 bg-[#0e0e11] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between text-xs text-zinc-400 z-30 shrink-0">
         <div className="flex items-center gap-3">
           <span className="font-mono text-[11px] text-zinc-400">1080 × 1920 px (9:16 Reels)</span>
           <div className="h-3 w-px bg-white/10" />
