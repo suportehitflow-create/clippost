@@ -89,6 +89,9 @@ export default function ClipEditorPage() {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [error, setError] = useState('')
+  const ytMatch = project?.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/
+  )
+  const ytId = ytMatch ? ytMatch[1] : null
 
   // Editor states
   const [selectedStyle, setSelectedStyle] = useState<SubtitleStyle>('hormozi_yellow')
@@ -298,7 +301,7 @@ export default function ClipEditorPage() {
                 {clip && formatDuration(clip.end_time - clip.start_time)}
               </span>
             </div>
-            <h1 className="text-lg lg:text-xl font-bold text-white line-clamp-1">
+            <h1 className="text-lg lg:text-xl font-bold text-white leading-snug break-words">
               {clip?.title || 'Editor de Clipe'}
             </h1>
           </div>
@@ -361,7 +364,19 @@ export default function ClipEditorPage() {
                   loop
                 />
               ) : (
+                ytId ? (
+                <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
+                  <iframe
+                    src={'https://www.youtube-nocookie.com/embed/' + ytId + '?start=' + Math.floor(clip.start_time || 0) + '&end=' + Math.floor(clip.end_time || 30) + '&autoplay=0&controls=1&modestbranding=1&rel=0'}
+                    title={clip.title || 'Corte 9:16'}
+                    className="w-[330%] h-[120%] -ml-[115%] object-cover border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
                 <div className="text-zinc-600 text-xs">Sem prévia disponível</div>
+              )
               )}
 
               {/* Author Badge Overlay */}
@@ -561,7 +576,7 @@ export default function ClipEditorPage() {
 
             <div>
               <h3 className="text-base font-bold text-white">Enviar para o Celular</h3>
-              <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{clip.title}</p>
+              <p className="text-xs text-zinc-400 mt-1 leading-relaxed break-words">{clip.title}</p>
             </div>
 
             {/* QR CODE BOX */}
