@@ -133,7 +133,7 @@ export default function AutoPilotPage() {
     if (!target.trim()) return
     setSearching(true)
     try {
-      const res = await fetch(`${API}/api/sources/profile`, {
+      const res = await fetch('/api/sources/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
