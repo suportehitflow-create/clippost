@@ -472,6 +472,37 @@ export default function TemplatesPage() {
     window.addEventListener('touchend', onTopUp)
   }
 
+    // Redimensionamento Vertical Inferior
+  const startResizeBottom = (clientY: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    setIsResizingVideo(true)
+    const startY = clientY
+    const initH = videoHeight
+
+    const onBottomMove = (ev: MouseEvent | TouchEvent) => {
+      if (!phoneRef.current) return
+      const curY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY
+      const h = phoneRef.current.clientHeight
+      const deltaY = curY - startY
+      const deltaH = (deltaY / h) * 100
+      const newH = Math.max(15, Math.min(85, Math.round(initH + deltaH)))
+      setVideoHeight(newH)
+    }
+
+    const onBottomUp = () => {
+      setIsResizingVideo(false)
+      window.removeEventListener('mousemove', onBottomMove)
+      window.removeEventListener('mouseup', onBottomUp)
+      window.removeEventListener('touchmove', onBottomMove)
+      window.removeEventListener('touchend', onBottomUp)
+    }
+
+    window.addEventListener('mousemove', onBottomMove)
+    window.addEventListener('mouseup', onBottomUp)
+    window.addEventListener('touchmove', onBottomMove)
+    window.addEventListener('touchend', onBottomUp)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -539,8 +570,8 @@ export default function TemplatesPage() {
           <div className="h-4 w-px bg-white/10" />
 
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-[#ea7a3e]/20 border border-[#ea7a3e]/30 flex items-center justify-center">
-              <LayoutTemplate className="w-4 h-4 text-[#ea7a3e]" />
+            <div className="w-7 h-7 rounded-lg bg-[#6366f1]/20 border border-[#6366f1]/30 flex items-center justify-center">
+              <LayoutTemplate className="w-4 h-4 text-[#6366f1]" />
             </div>
             <div>
               <h1 className="text-xs sm:text-sm font-semibold text-white tracking-tight flex items-center gap-2">
@@ -569,7 +600,7 @@ export default function TemplatesPage() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer disabled:opacity-50"
           >
             {saving ? (
               <RotateCcw className="w-3.5 h-3.5 animate-spin" />
@@ -594,7 +625,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'templates' ? null : 'templates')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'templates'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -607,7 +638,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'text'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -620,7 +651,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'brand' ? null : 'brand')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'brand'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -633,7 +664,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'subtitles' ? null : 'subtitles')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'subtitles'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -646,7 +677,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'safezone' ? null : 'safezone')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer relative ${
               activeTool === 'safezone'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -662,7 +693,7 @@ export default function TemplatesPage() {
             onClick={() => setActiveTool(activeTool === 'background' ? null : 'background')}
             className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'background'
-                ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] border border-[#ea7a3e]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
@@ -702,13 +733,13 @@ export default function TemplatesPage() {
                     key={preset.id}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className="w-full p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-[#ea7a3e]/40 transition-all text-left flex items-center justify-between cursor-pointer group"
+                    className="w-full p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-[#6366f1]/40 transition-all text-left flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2 h-2 rounded-full bg-[#ea7a3e]" />
+                      <div className="w-2 h-2 rounded-full bg-[#6366f1]" />
                       <span className="text-xs font-bold text-white tracking-wide">{preset.name}</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-[#ea7a3e] bg-[#ea7a3e]/10 px-2 py-0.5 rounded border border-[#ea7a3e]/20">
+                    <span className="text-[10px] font-semibold text-[#6366f1] bg-[#6366f1]/10 px-2 py-0.5 rounded border border-[#6366f1]/20">
                       Ativo
                     </span>
                   </button>
@@ -724,7 +755,7 @@ export default function TemplatesPage() {
                   <select
                     value={fontFamily}
                     onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e] cursor-pointer"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#6366f1] cursor-pointer"
                   >
                     {FONT_OPTIONS.map(f => (
                       <option key={f.id} value={f.family} className="bg-zinc-900 text-white">
@@ -745,7 +776,7 @@ export default function TemplatesPage() {
                     max={22}
                     value={fontSize}
                     onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="w-full accent-orange-500 cursor-pointer"
+                    className="w-full accent-indigo-500 cursor-pointer"
                   />
                 </div>
 
@@ -765,7 +796,7 @@ export default function TemplatesPage() {
                           onClick={() => setTextAlign(a.id as any)}
                           className={`py-1.5 rounded-lg flex items-center justify-center gap-1 border transition-all cursor-pointer ${
                             textAlign === a.id
-                              ? 'bg-[#ea7a3e]/20 text-[#ea7a3e] border-[#ea7a3e]/40'
+                              ? 'bg-[#6366f1]/20 text-[#6366f1] border-[#6366f1]/40'
                               : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white'
                           }`}
                         >
@@ -783,7 +814,7 @@ export default function TemplatesPage() {
                     onChange={(e) => setTitleText(e.target.value)}
                     rows={3}
                     placeholder="É assim que o seu título vai aparecer no vídeo"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-[#ea7a3e]/50 resize-none text-xs leading-relaxed"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-[#6366f1]/50 resize-none text-xs leading-relaxed"
                   />
                 </div></div>
             )}
@@ -792,7 +823,7 @@ export default function TemplatesPage() {
             {activeTool === 'brand' && (
               <div className="space-y-4 text-xs">
                 <div className="flex flex-col items-center gap-2 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-                  <div className="w-14 h-14 rounded-full border-2 border-[#ea7a3e]/50 overflow-hidden shadow-md">
+                  <div className="w-14 h-14 rounded-full border-2 border-[#6366f1]/50 overflow-hidden shadow-md">
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   </div>
                   <input
@@ -817,7 +848,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e]"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#6366f1]"
                   />
                 </div>
 
@@ -827,7 +858,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={brandHandle}
                     onChange={(e) => setBrandHandle(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#ea7a3e] font-mono"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-[#6366f1] font-mono"
                   />
                 </div>
               </div>
@@ -845,7 +876,7 @@ export default function TemplatesPage() {
                       onClick={() => setSelectedSubtitle(sub.id)}
                       className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                         selectedSubtitle === sub.id
-                          ? 'bg-white/10 border-[#ea7a3e]/50 shadow-sm'
+                          ? 'bg-white/10 border-[#6366f1]/50 shadow-sm'
                           : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
                       }`}
                     >
@@ -913,7 +944,7 @@ export default function TemplatesPage() {
                           setCustomBgImage(null)
                         }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${b.bg} ${
-                          templateBg === b.id && !customBgImage ? 'ring-2 ring-[#ea7a3e] scale-105 shadow-md' : 'opacity-70 hover:opacity-100'
+                          templateBg === b.id && !customBgImage ? 'ring-2 ring-indigo-500 shadow-[0_0_16px_rgba(99,102,241,0.35)] scale-105' : 'opacity-70 hover:opacity-100 border-white/10'
                         }`}
                       >
                         <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center">
@@ -931,7 +962,7 @@ export default function TemplatesPage() {
                   
                   {customBgImage ? (
                     <div className="space-y-2">
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#ea7a3e]/40 shadow-inner">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#6366f1]/40 shadow-inner">
                         <img src={customBgImage} alt="Fundo Personalizado" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                           <span className="text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">Fundo Ativo</span>
@@ -953,8 +984,8 @@ export default function TemplatesPage() {
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-[#ea7a3e]/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
-                      <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-[#ea7a3e]/20 flex items-center justify-center text-[#ea7a3e]">
+                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-[#6366f1]/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-600/10 border border-[#6366f1]/20 flex items-center justify-center text-[#6366f1]">
                         <Upload className="w-4 h-4" />
                       </div>
                       <div className="text-center">
@@ -980,7 +1011,7 @@ export default function TemplatesPage() {
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative w-[320px] sm:w-[350px] aspect-[9/19] bg-black rounded-[46px] p-2.5 shadow-2xl border border-white/[0.15] shrink-0"
+            className="relative w-[310px] sm:w-[340px] aspect-[9/16] bg-[#0c0c0e] rounded-[48px] p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.12)] shrink-0 overflow-hidden ring-1 ring-white/10"
           >
             {/* CANVAS INTERNO DO TEMPLATE */}
             <div
@@ -1013,7 +1044,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 ${
-                  draggingTarget === 'avatar' ? 'ring-2 ring-[#ea7a3e] rounded-full scale-105' : ''
+                  draggingTarget === 'avatar' ? 'ring-2 ring-[#6366f1] rounded-full scale-105' : ''
                 }`}
                 title="Arraste o avatar para posicionar livremente"
               >
@@ -1032,7 +1063,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 flex flex-col items-center select-none ${
-                  draggingTarget === 'header' ? 'ring-1 ring-[#ea7a3e]/50 rounded-lg p-1' : ''
+                  draggingTarget === 'header' ? 'ring-1 ring-[#6366f1]/50 rounded-lg p-1' : ''
                 }`}
                 title="Arraste o nome e arroba para reposicionar"
               >
@@ -1063,7 +1094,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute w-full px-5 cursor-grab active:cursor-grabbing z-30 select-none ${
-                  draggingTarget === 'title' ? 'ring-1 ring-[#ea7a3e]/50 rounded-lg py-1' : ''
+                  draggingTarget === 'title' ? 'ring-1 ring-[#6366f1]/50 rounded-lg py-1' : ''
                 }`}
                 title="Arraste o título para reposicionar"
               >
@@ -1093,7 +1124,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-20 group select-none shadow-2xl ${
-                  draggingTarget === 'video' ? 'ring-2 ring-[#ea7a3e]' : ''
+                  draggingTarget === 'video' ? 'ring-2 ring-[#6366f1]' : ''
                 }`}
                 title="Arraste para mover. Use as alças para ajustar largura e altura livremente."
               >
@@ -1106,37 +1137,53 @@ export default function TemplatesPage() {
                   <div className="absolute inset-0 bg-black/10 pointer-events-none" />
                 </div>
 
-                {/* 4 ALÇAS DE REDIMENSIONAMENTO NOS CANTOS (Arrastar qualquer canto aumenta/diminui sem distorcer) */}
-                {/* Canto Superior Esquerdo (tl) */}
+                {/* ALÇA NA LINHA DE CIMA NO MEIO: PUXAR PARA CIMA AUMENTA A ALTURA E ALTERA A PROPORÇÃO */}
+                <div
+                  onMouseDown={(e) => startResizeTop(e.clientY, e)}
+                  onTouchStart={(e) => startResizeTop(e.touches[0].clientY, e)}
+                  title="Puxar para cima para aumentar a altura do vídeo (altera a proporção)"
+                  className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ns-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                >
+                  <div className="w-6 h-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                </div>
+
+                {/* ALÇA NA LINHA DE BAIXO NO MEIO: PUXAR PARA BAIXO AUMENTA A ALTURA */}
+                <div
+                  onMouseDown={(e) => startResizeBottom(e.clientY, e)}
+                  onTouchStart={(e) => startResizeBottom(e.touches[0].clientY, e)}
+                  title="Puxar para baixo para ajustar a altura"
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-3.5 rounded-full bg-white border border-zinc-500 shadow-xl cursor-ns-resize z-40 hover:scale-110 flex items-center justify-center transition-all group"
+                >
+                  <div className="w-6 h-1 bg-zinc-700 rounded-full group-hover:bg-black" />
+                </div>
+
+                {/* 4 Cantos para Escala Proporcional Suave */}
                 <div
                   onMouseDown={(e) => startResizeVideo('tl', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('tl', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar proporção (Canto Superior Esquerdo)"
-                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
+                  title="Redimensionar Canto Superior Esquerdo"
+                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
 
-                {/* Canto Superior Direito (tr) */}
                 <div
                   onMouseDown={(e) => startResizeVideo('tr', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('tr', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar proporção (Canto Superior Direito)"
-                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
+                  title="Redimensionar Canto Superior Direito"
+                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
                 />
 
-                {/* Canto Inferior Esquerdo (bl) */}
                 <div
                   onMouseDown={(e) => startResizeVideo('bl', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('bl', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar proporção (Canto Inferior Esquerdo)"
-                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
+                  title="Redimensionar Canto Inferior Esquerdo"
+                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
                 />
 
-                {/* Canto Inferior Direito (br) */}
                 <div
                   onMouseDown={(e) => startResizeVideo('br', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startResizeVideo('br', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar proporção (Canto Inferior Direito)"
-                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#ea7a3e] shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
+                  title="Redimensionar Canto Inferior Direito"
+                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
               </div>
 
@@ -1150,7 +1197,7 @@ export default function TemplatesPage() {
                   transform: 'translate(-50%, -50%)'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-40 flex flex-col items-center select-none ${
-                  draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-[#ea7a3e] rounded-lg' : ''
+                  draggingTarget === 'subtitle' ? 'scale-105 ring-2 ring-[#6366f1] rounded-lg' : ''
                 }`}
                 title="Arraste a legenda para posicionar"
               >
@@ -1215,7 +1262,7 @@ export default function TemplatesPage() {
             max={130}
             value={canvasZoom}
             onChange={(e) => setCanvasZoom(Number(e.target.value))}
-            className="w-20 accent-orange-500 cursor-pointer"
+            className="w-20 accent-indigo-500 cursor-pointer"
           />
 
           <span className="font-mono text-[11px] text-white w-9 text-center">{canvasZoom}%</span>

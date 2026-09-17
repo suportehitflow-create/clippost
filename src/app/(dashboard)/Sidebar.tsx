@@ -59,7 +59,7 @@ export default function Sidebar({ user }: { user: User }) {
             }`}
             title="Clipost"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#ea7a3e] to-[#f48c42] flex items-center justify-center shadow-md flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md flex-shrink-0">
               <Scissors className="w-4 h-4 text-white" />
             </div>
             {!collapsed && (
@@ -108,13 +108,13 @@ export default function Sidebar({ user }: { user: User }) {
                   collapsed ? 'justify-center px-0' : 'px-3'
                 } ${
                   active
-                    ? 'bg-[#ea7a3e]/15 text-[#ea7a3e] font-semibold border border-[#ea7a3e]/30'
+                    ? 'bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
                 <Icon
                   className={`w-4 h-4 flex-shrink-0 ${
-                    active ? 'text-[#ea7a3e]' : 'text-zinc-400 group-hover:text-white'
+                    active ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-white'
                   }`}
                 />
                 {!collapsed && <span className="truncate">{item.label}</span>}
