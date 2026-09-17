@@ -374,9 +374,9 @@ export default function TemplatesPage() {
     window.addEventListener('touchend', onUp)
   }
 
-  // Redimensionamento 2D Livre de Largura e Altura do Vídeo (Canva Style)
+  // Redimensionamento Proporcional pelos 4 Cantos (Canva/Apple Standard - Zero Distorção)
   const startResizeVideo = (
-    mode: 'corner' | 'width' | 'height',
+    corner: 'tl' | 'tr' | 'bl' | 'br',
     clientX: number,
     clientY: number,
     e: React.MouseEvent | React.TouchEvent
@@ -387,25 +387,34 @@ export default function TemplatesPage() {
     const startY = clientY
     const initW = videoWidth
     const initH = videoHeight
+    const aspectRatio = initW / (initH || 1)
 
     const onResizeMove = (ev: MouseEvent | TouchEvent) => {
       if (!phoneRef.current) return
       const curX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX
       const curY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY
-      const w = phoneRef.current.clientWidth
-      const h = phoneRef.current.clientHeight
 
-      const deltaW = ((curX - startX) / w) * 100
-      const deltaH = ((curY - startY) / h) * 100
+      const deltaX = curX - startX
+      const deltaY = curY - startY
 
-      if (mode === 'corner' || mode === 'width') {
-        const newW = Math.max(40, Math.min(98, Math.round(initW + deltaW)))
-        setVideoWidth(newW)
-      }
-      if (mode === 'corner' || mode === 'height') {
-        const newH = Math.max(20, Math.min(75, Math.round(initH + deltaH)))
-        setVideoHeight(newH)
-      }
+      // Cálculo intuitivo para qualquer um dos 4 cantos:
+      // br (inferior direito): arrastar para fora (baixo/direita) aumenta
+      // bl (inferior esquerdo): arrastar para fora (baixo/esquerda) aumenta
+      // tr (superior direito): arrastar para fora (cima/direita) aumenta
+      // tl (superior esquerdo): arrastar para fora (cima/esquerda) aumenta
+      let delta = 0
+      if (corner === 'br') delta = (deltaX + deltaY) / 2
+      else if (corner === 'bl') delta = (-deltaX + deltaY) / 2
+      else if (corner === 'tr') delta = (deltaX - deltaY) / 2
+      else if (corner === 'tl') delta = (-deltaX - deltaY) / 2
+
+      // Fator de proporção suave (100px = +50% tamanho)
+      const factor = 1 + (delta / 180)
+      const newW = Math.max(35, Math.min(98, Math.round(initW * factor)))
+      const newH = Math.max(18, Math.min(75, Math.round(newW / aspectRatio)))
+
+      setVideoWidth(newW)
+      setVideoHeight(newH)
     }
 
     const onResizeUp = () => {
@@ -740,6 +749,27 @@ export default function TemplatesPage() {
                     rows={3}
                     className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-white outline-none focus:border-orange-500 resize-none text-xs leading-relaxed"
                   />
+
+                  {/* Barra de Emojis Padrão iOS */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                      <span>Emojis Padrão iOS:</span>
+                      <span className="text-[10px] text-orange-400 font-medium">Toque para inserir</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-black/40 border border-white/10 rounded-xl">
+                      {['😂', '🔥', '😱', '👏', '🤯', '💀', '💯', '👀', '🚨', '⚡', '🤫', '👇', '🤣', '😭', '✨', '👑'].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setTitleText(prev => prev + ' ' + emoji)}
+                          className="w-7 h-7 flex items-center justify-center text-base hover:bg-white/10 rounded-lg transition-transform hover:scale-125 active:scale-95 cursor-pointer font-['Apple_Color_Emoji',_'Segoe_UI_Emoji',_sans-serif]"
+                          title={`Inserir ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1040,28 +1070,37 @@ export default function TemplatesPage() {
                   <div className="absolute inset-0 bg-black/10 pointer-events-none" />
                 </div>
 
-                {/* ALÇA INFERIOR DIREITA: LARGURA + ALTURA SIMULTÂNEAS */}
+                {/* 4 ALÇAS DE REDIMENSIONAMENTO NOS CANTOS (Arrastar qualquer canto aumenta/diminui sem distorcer) */}
+                {/* Canto Superior Esquerdo (tl) */}
                 <div
-                  onMouseDown={(e) => startResizeVideo('corner', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('corner', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar largura e altura"
-                  className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-orange-500 border-2 border-white cursor-nwse-resize shadow-md z-30 hover:scale-150 transition-transform"
+                  onMouseDown={(e) => startResizeVideo('tl', e.clientX, e.clientY, e)}
+                  onTouchStart={(e) => startResizeVideo('tl', e.touches[0].clientX, e.touches[0].clientY, e)}
+                  title="Redimensionar proporção (Canto Superior Esquerdo)"
+                  className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
 
-                {/* ALÇA LATERAL DIREITA: LARGURA */}
+                {/* Canto Superior Direito (tr) */}
                 <div
-                  onMouseDown={(e) => startResizeVideo('width', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('width', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar largura"
-                  className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-6 rounded-full bg-blue-500 border border-white cursor-ew-resize shadow-md z-30 hover:scale-125 transition-transform"
+                  onMouseDown={(e) => startResizeVideo('tr', e.clientX, e.clientY, e)}
+                  onTouchStart={(e) => startResizeVideo('tr', e.touches[0].clientX, e.touches[0].clientY, e)}
+                  title="Redimensionar proporção (Canto Superior Direito)"
+                  className="absolute -top-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
                 />
 
-                {/* ALÇA INFERIOR CENTRAL: ALTURA */}
+                {/* Canto Inferior Esquerdo (bl) */}
                 <div
-                  onMouseDown={(e) => startResizeVideo('height', e.clientX, e.clientY, e)}
-                  onTouchStart={(e) => startResizeVideo('height', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  title="Redimensionar altura"
-                  className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-3 rounded-full bg-blue-500 border border-white cursor-ns-resize shadow-md z-30 hover:scale-125 transition-transform"
+                  onMouseDown={(e) => startResizeVideo('bl', e.clientX, e.clientY, e)}
+                  onTouchStart={(e) => startResizeVideo('bl', e.touches[0].clientX, e.touches[0].clientY, e)}
+                  title="Redimensionar proporção (Canto Inferior Esquerdo)"
+                  className="absolute -bottom-2.5 -left-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nesw-resize z-30 hover:scale-125 transition-transform"
+                />
+
+                {/* Canto Inferior Direito (br) */}
+                <div
+                  onMouseDown={(e) => startResizeVideo('br', e.clientX, e.clientY, e)}
+                  onTouchStart={(e) => startResizeVideo('br', e.touches[0].clientX, e.touches[0].clientY, e)}
+                  title="Redimensionar proporção (Canto Inferior Direito)"
+                  className="absolute -bottom-2.5 -right-2.5 w-4 h-4 rounded-full bg-white border-2 border-orange-500 shadow-md cursor-nwse-resize z-30 hover:scale-125 transition-transform"
                 />
               </div>
 
