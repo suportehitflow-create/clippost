@@ -135,7 +135,7 @@ export default function TemplatesPage() {
   const [activeTool, setActiveTool] = useState<ActiveTool>('templates')
 
   // Cores de fundo do template
-  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray'>('dark')
+  const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray' | 'obsidian' | 'midnight'>('dark')
   const [customBgImage, setCustomBgImage] = useState<string | null>(null)
 
   // Posições Livres 2D (Eixos X e Y em porcentagem 0-100)
@@ -600,7 +600,7 @@ export default function TemplatesPage() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25 cursor-pointer disabled:opacity-50"
           >
             {saving ? (
               <RotateCcw className="w-3.5 h-3.5 animate-spin" />
@@ -1011,7 +1011,7 @@ export default function TemplatesPage() {
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative w-[310px] sm:w-[340px] aspect-[9/16] bg-[#0c0c0e] rounded-[48px] p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.12)] shrink-0 overflow-hidden ring-1 ring-white/10"
+            className="relative w-[310px] sm:w-[340px] aspect-[9/16] bg-black rounded-[48px] p-2 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 overflow-hidden ring-1 ring-white/10"
           >
             {/* CANVAS INTERNO DO TEMPLATE */}
             <div
