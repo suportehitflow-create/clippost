@@ -104,7 +104,7 @@ export default function ProjectClient({
   // ENQUADRAMENTO INTELIGENTE & CORTE DA IMAGEM COM IA
   const [aiFraming, setAiFraming] = useState<AiFramingPreset>('auto')
   const [cropPanX, setCropPanX] = useState<number>(50) // 0% (esquerda) a 100% (direita)
-  const [cropZoom, setCropZoom] = useState<number>(180) // 100% a 250%
+  const [cropZoom, setCropZoom] = useState<number>(100) // 100% a 250%
 
   // Posicionamento da Legenda e Corte de Silêncio
   const [subtitleY, setSubtitleY] = useState(74)
@@ -527,7 +527,7 @@ export default function ProjectClient({
 
                 {/* VÍDEO POSICIONADO EXATAMENTE CONFORME OS SELETORES DO TEMPLATE */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 rounded-2xl overflow-hidden shadow-2xl bg-black border-2 border-blue-500 transition-all duration-150 flex items-center justify-center"
+                  className="absolute left-1/2 -translate-x-1/2 rounded-2xl overflow-hidden shadow-2xl bg-black border border-black/20 transition-all duration-150 flex items-center justify-center"
                   style={{
                     top: `${videoYOffset}%`,
                     width: `${videoScale}%`,
@@ -585,7 +585,7 @@ export default function ProjectClient({
 
                 {/* RODAPÉ DO TEMPLATE MEME */}
                 <div className="absolute bottom-3 inset-x-4 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
-                  <span>ClipPost ⚡ 9:16</span>
+                  <span>Clipos ⚡ 9:16</span>
                   <span className="font-bold text-orange-600">VIRAL {Math.round(activeClip.score * 100)}%</span>
                 </div>
               </div>

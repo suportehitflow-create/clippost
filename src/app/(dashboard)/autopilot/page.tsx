@@ -258,7 +258,7 @@ export default function AutoPilotPage() {
                 Busca, edita e publica sozinha.
               </h2>
               <p className="text-xs text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                Você só aprova o que entra no ar — o resto o AutoPilot resolve, direto pela API oficial e nuvem do ClipPost.
+                Você só aprova o que entra no ar — o resto o AutoPilot resolve, direto pela API oficial e nuvem do Clipos.
               </p>
             </div>
 
