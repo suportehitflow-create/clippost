@@ -20,6 +20,7 @@ import {
   Check,
   X,
   VolumeX,
+  Wifi,
   ChevronLeft,
   ChevronRight,
   Sliders,
@@ -184,6 +185,7 @@ export default function ProjectClient({
   const [showReelsSafeZone, setShowReelsSafeZone] = useState(false)
   const [playbackTime, setPlaybackTime] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const ytMatch = project.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
@@ -388,11 +390,26 @@ export default function ProjectClient({
   }, [isPlaying, clipDuration])
 
   const togglePlayback = () => {
+    const nextPlaying = !isPlaying
+    setIsPlaying(nextPlaying)
+
     if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause()
-      else videoRef.current.play().catch(() => null)
+      if (nextPlaying) {
+        videoRef.current.play().catch(() => null)
+      } else {
+        videoRef.current.pause()
+      }
+    } else if (iframeRef.current && iframeRef.current.contentWindow) {
+      // Controle direto da API do YouTube IFrame via postMessage
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: nextPlaying ? 'playVideo' : 'pauseVideo',
+          args: []
+        }),
+        '*'
+      )
     }
-    setIsPlaying(!isPlaying)
   }
 
   const activeWordIndex = useMemo(() => {
@@ -537,16 +554,42 @@ export default function ProjectClient({
         {/* COLUNA ESQUERDA (5 COLUNAS): PLAYER DO IPHONE 16 PRO */}
         <div className="lg:col-span-5 flex flex-col items-center">
           
-          {/* MOCKUP DO IPHONE 16 PRO (MATTE, ZERO NEON GLOW) */}
-          <div className="relative w-[300px] sm:w-[324px] aspect-[9/16] bg-zinc-950 rounded-[44px] p-2 ring-1 ring-white/15 shadow-2xl border border-white/[0.12] overflow-hidden flex flex-col">
-            
-            {/* CANVAS 9:16 INTERNO INTEGRADO AO TEMPLATE */}
-            <div className={`relative flex-1 w-full rounded-[40px] overflow-hidden flex flex-col justify-between transition-colors ${
-              templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white'
-            }`}>
+          {/* MOCKUP DO IPHONE 16/18 PRO (TITÂNIO, PROPORÇÃO 19.5:9, STATUS BAR REALISTA, SEM DYNAMIC ISLAND) */}
+          <div className="relative p-[8px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[50px] shadow-[0_25px_80px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.25)] ring-1 ring-white/20 shrink-0 select-none my-auto">
+            {/* BOTÕES LATERAIS FÍSICOS DO IPHONE */}
+            <div className="absolute -left-[4px] top-[100px] w-[4px] h-[24px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            <div className="absolute -left-[4px] top-[138px] w-[4px] h-[44px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            <div className="absolute -left-[4px] top-[192px] w-[4px] h-[44px] bg-zinc-600 rounded-l-sm shadow-sm" />
+            <div className="absolute -right-[4px] top-[150px] w-[4px] h-[60px] bg-zinc-600 rounded-r-sm shadow-sm" />
+
+            {/* TELA OLED DO IPHONE (PROPORÇÃO REAL 19.5:9 -> 310 x 672 px) */}
+            <div
+              style={{ width: "310px", height: "672px", aspectRatio: "9 / 19.5" }}
+              className={`relative rounded-[42px] overflow-hidden flex flex-col justify-between transition-colors cursor-pointer ${
+                templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white'
+              }`}
+              onClick={togglePlayback}
+              title="Clique para Reproduzir / Pausar"
+            >
+              {/* STATUS BAR DO IPHONE (9:41 + SINAL, WI-FI, BATERIA - SEM DYNAMIC ISLAND) */}
+              <div className="h-9 px-5 pt-2 flex items-center justify-between z-50 pointer-events-none text-white select-none">
+                <span className="text-[11px] font-bold tracking-tight text-white/95 drop-shadow">9:41</span>
+
+                <div className="flex items-center gap-1.5 text-white/95 drop-shadow">
+                  <div className="flex items-end gap-0.5 h-2">
+                    <div className="w-[2px] h-1 bg-white rounded-xs" />
+                    <div className="w-[2px] h-1.5 bg-white rounded-xs" />
+                    <div className="w-[2px] h-2 bg-white rounded-xs" />
+                  </div>
+                  <Wifi className="w-3 h-3 stroke-[2.4]" />
+                  <div className="w-4 h-2 rounded-[3px] border border-white/80 p-0.5 flex items-center">
+                    <div className="w-2.5 h-full bg-white rounded-[1px]" />
+                  </div>
+                </div>
+              </div>
               
               {/* TOPO DO TEMPLATE: AVATAR + @HANDLE */}
-              <div className="pt-6 px-4 z-20 flex flex-col items-center text-center">
+              <div className="pt-2 px-4 z-20 flex flex-col items-center text-center pointer-events-none">
                 <div className={`w-9 h-9 rounded-full border overflow-hidden shadow-sm mb-1 ${
                   templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/30 bg-zinc-900'
                 }`}>
@@ -567,24 +610,22 @@ export default function ProjectClient({
                 </span>
               </div>
 
-              {/* 1. TÍTULO DO VÍDEO (HEADLINE FIXA NO TOPO - NUNCA MISTURADA COM LEGENDA) */}
-              <div className="px-4 py-2 text-center z-20 my-auto">
+              {/* 1. TÍTULO DO VÍDEO (HEADLINE FIXA NO TOPO) */}
+              <div className="px-4 py-1.5 text-center z-20 my-auto pointer-events-none">
                 <h2 className={`text-xs sm:text-sm font-black leading-snug uppercase tracking-tight line-clamp-3 ${
-                  templateBg === 'white' ? 'text-zinc-950 drop-shadow-none' : 'text-white drop-shadow-md'
+                  templateBg === 'white' ? 'text-zinc-950' : 'text-white'
                 }`}>
                   {displayedTitle}
                 </h2>
               </div>
 
-              {/* 2. ENQUADRAMENTO DO VÍDEO (SEM BORDA PRETA, PREENCHE DE PONTA A PONTA COM ZOOM NO FALANTE) */}
+              {/* 2. ENQUADRAMENTO DO VÍDEO COM ZOOM E PAN */}
               <div
                 style={{
                   width: `${videoScale}%`,
                   margin: '0 auto',
                 }}
                 className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md ${
-                  'rounded-none'
-                } ${
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
                 } flex items-center justify-center`}
               >
@@ -602,16 +643,15 @@ export default function ProjectClient({
                     loop
                   />
                 ) : ytId ? (
-                  /* VÍDEO EMBED TOTALMENTE PREENCHIDO (SEM LETTERBOXING/BORDAS PRETAS) */
-                  <div className="w-full h-full relative overflow-hidden pointer-events-none select-none bg-black">
+                  <div className="w-full h-full relative overflow-hidden select-none bg-black">
                     <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=1&mute=1&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&loop=1`}
+                      ref={iframeRef}
+                      src={`https://www.youtube-nocookie.com/embed/${ytId}?enablejsapi=1&start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=0&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&loop=1`}
                       className="border-0 pointer-events-none"
                       style={{
                         position: 'absolute',
                         top: '50%',
                         left: '50%',
-                        // Scale de 2.38 garante que o vídeo 16:9 preenche completamente o recipiente 4:5 sem tarjas pretas em cima ou embaixo!
                         width: '100%',
                         height: '100%',
                         transform: `translate(-50%, -50%) scale(${Math.max(2.38, cropZoom / 100)}) translateX(${(50 - cropPanX) * 0.4}%)`,
@@ -626,10 +666,19 @@ export default function ProjectClient({
                     <span>Prévia do Corte</span>
                   </div>
                 )}
+
+                {/* Overlay Play quando pausado */}
+                {!isPlaying && (
+                  <div className="absolute inset-0 bg-black/35 flex items-center justify-center pointer-events-none transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-xl">
+                      <Play className="w-6 h-6 ml-1 fill-white text-white" />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* 3. LEGENDA SINCRONIZADA (SUBTITLES DA FALA COM PRESET E EMOJIS) */}
-              <div className="pb-6 px-3 text-center z-20">
+              {/* 3. LEGENDA SINCRONIZADA */}
+              <div className="pb-5 px-3 text-center z-20 pointer-events-none">
                 <div
                   style={{
                     backgroundColor: activeSubStyle.activeBg,
@@ -638,33 +687,25 @@ export default function ProjectClient({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs uppercase shadow-md tracking-wider border border-black/10"
                 >
                   <span>
-                    {isPlaying
-                      ? (timingWords[activeWordIndex]?.word || 'CORTE VIRAL')
-                      : 'SUA LEGENDA APARECERÁ AQUI'}
+                    {speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ')}
                   </span>
-                  {smartEmojisEnabled && (
-                    <span>{getSmartEmojiForWord(timingWords[activeWordIndex]?.word || 'VIRAL')}</span>
-                  )}
                 </div>
               </div>
 
-              {/* RODAPÉ DO TEMPLATE COM MARCA DISCRETA */}
-              <div className={`pb-3 px-4 flex items-center justify-between text-[10px] font-mono ${
-                templateBg === 'white' ? 'text-zinc-400' : 'text-zinc-600'
-              }`}>
-                <span>Clipost • 9:16</span>
-                <span className="text-orange-500 font-bold font-sans">🔥 VIRAL {Math.round(activeClip.score * 100)}%</span>
-              </div>
-
-              {/* DECALQUE SAFE ZONE REELS: APENAS A PARTE DE BAIXO TRANSLÚCIDA (SEM ÍCONES, SEM BARRAS, SEM TEXTO) */}
+              {/* DECALQUE SAFE ZONE TRANSLÚCIDO (SEM ÍCONES) */}
               {showReelsSafeZone && (
-                <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-black/65 backdrop-blur-[0.5px] border-t border-dashed border-white/20 pointer-events-none z-40 rounded-b-[40px] transition-opacity" />
+                <div className="absolute inset-0 pointer-events-none z-30 select-none overflow-hidden rounded-[42px]">
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-gradient-to-t from-black/90 via-black/80 to-black/60 border-t border-dashed border-white/25 flex flex-col justify-end pb-3.5 px-4">
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest text-center">
+                      Área Segura (Reels 9:16)
+                    </span>
+                  </div>
+                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/55 border-l border-t border-dashed border-white/20 rounded-tl-xl" />
+                </div>
               )}
 
               {/* BARRA HOME DO IPHONE */}
-              <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full z-30 ${
-                templateBg === 'white' ? 'bg-zinc-300' : 'bg-white/30'
-              }`} />
+              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
             </div>
           </div>
 
@@ -676,9 +717,7 @@ export default function ProjectClient({
               className="w-full py-1 px-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white flex items-center justify-between transition-all cursor-pointer"
             >
               <span>Decalque Safe Zone Reels (1080x1440):</span>
-              <strong className={`font-mono font-bold ${showReelsSafeZone ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                {showReelsSafeZone ? 'LIGADO' : 'DESLIGADO'}
-              </strong>
+              <LiquidToggle checked={showReelsSafeZone} onChange={setShowReelsSafeZone} activeColor="emerald" />
             </button>
           </div>
 

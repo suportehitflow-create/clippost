@@ -209,10 +209,10 @@ export default function CreateClipsPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'auto', label: '⚡ IA Auto', desc: 'Tempo ideal dinâmico' },
-                  { id: '30', label: '30s', desc: 'Reels rápidos (CTR alto)' },
+                  { id: 'auto', label: '⚡ IA Dinâmico', desc: 'Tempo ideal inteligente' },
+                  { id: '30', label: '< 60s', desc: 'Menos de 60s (Reels rápidos)' },
                   { id: '60', label: '60s', desc: 'Padrão viral completo' },
-                  { id: '90', label: '90s+', desc: 'Histórias e contexto' },
+                  { id: '90', label: '60s+', desc: 'Mais de 60s (Conteúdo longo)' },
                 ].map(opt => (
                   <button
                     key={opt.id}
@@ -252,8 +252,7 @@ export default function CreateClipsPage() {
                 <LiquidToggle
                   checked={removeSilence}
                   onChange={setRemoveSilence}
-                  activeLabel="LIGADO"
-                  inactiveLabel="DESLIGADO"
+                  
                   activeColor="emerald"
                 />
               </div>

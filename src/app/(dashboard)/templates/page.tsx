@@ -2,7 +2,6 @@
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
-import { useVerticalFisheyeDock } from '@/components/ui/FisheyeDock'
 import { useState, useRef, useEffect } from 'react'
 import {
   Type,
@@ -137,7 +136,6 @@ export default function TemplatesPage() {
 
   // Canva-Style Active Side Panel
   const [activeTool, setActiveTool] = useState<ActiveTool>('templates')
-  const railDock = useVerticalFisheyeDock(3.0)
 
   // Cores de fundo do template
   const [templateBg, setTemplateBg] = useState<'white' | 'dark' | 'gray' | 'obsidian' | 'midnight'>('dark')
@@ -155,12 +153,12 @@ export default function TemplatesPage() {
   const [videoHeight, setVideoHeight] = useState(48)
 
   // Conteúdo textual e identidade
-  const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
-  const [brandHandle, setBrandHandle] = useState('@humordaiguana')
+  const [brandName, setBrandName] = useState('Nome da Página')
+  const [brandHandle, setBrandHandle] = useState('@nomedapagina')
   const [brandAlign, setBrandAlign] = useState<'left' | 'center' | 'right'>('center')
   const [brandLayout, setBrandLayout] = useState<'inline' | 'stacked'>('inline')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
-  const [titleText, setTitleText] = useState('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
+  const [titleText, setTitleText] = useState('AQUI QUE O SEU TITULO VAI ESTAR POSICIONADO NO VÍDEO')
 
   // Tipografia
   const [fontFamily, setFontFamily] = useState(FONT_OPTIONS[0].family)
@@ -381,8 +379,15 @@ export default function TemplatesPage() {
       const deltaY = ((curY - dragStartPos.current.y) / h) * 100
       totalDragMovement.current += Math.abs(deltaX) + Math.abs(deltaY)
 
-      let nextX = Math.max(10, Math.min(90, Math.round(initialElemPos.current.x + deltaX)))
-      let nextY = Math.max(2, Math.min(96, Math.round(initialElemPos.current.y + deltaY)))
+      // Delimitação estrita para nenhum elemento vazar das bordas do iPhone
+      let minX = 20, maxX = 80, minY = 10, maxY = 90
+      if (target === 'header') { minX = 30; maxX = 70; minY = 12; maxY = 84 }
+      else if (target === 'title') { minX = 25; maxX = 75; minY = 16; maxY = 85 }
+      else if (target === 'video') { minX = 40; maxX = 60; minY = 30; maxY = 70 }
+      else if (target === 'subtitle') { minX = 25; maxX = 75; minY = 25; maxY = 82 }
+
+      let nextX = Math.max(minX, Math.min(maxX, Math.round(initialElemPos.current.x + deltaX)))
+      let nextY = Math.max(minY, Math.min(maxY, Math.round(initialElemPos.current.y + deltaY)))
 
       // Snapping no Centro Horizontal (X = 50%)
       if (Math.abs(nextX - 50) <= 2.5) {
@@ -726,107 +731,71 @@ export default function TemplatesPage() {
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* BARRA DE FERRAMENTAS LATERAL (CANVA SIDEBAR) */}
-        <aside
-          onMouseMove={railDock.onMouseMove}
-          onMouseLeave={railDock.onMouseLeave}
-          className="w-16 sm:w-[72px] bg-[#0c0c0f]/90 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col items-center py-3 gap-1.5 z-20 shrink-0 select-none shadow-[4px_0_24px_rgba(0,0,0,0.4)]"
-        >
-          
+        <aside className="w-16 sm:w-[72px] bg-[#0c0c0f] border-r border-white/[0.08] flex flex-col items-center py-3 gap-1 z-20 shrink-0 select-none">
           <button
             type="button"
-            ref={railDock.registerItem(0)}
             onClick={() => setActiveTool(activeTool === 'templates' ? null : 'templates')}
-            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
+            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'templates'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30 font-semibold'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            {activeTool === 'templates' && (
-              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-            )}
-            <div className="gdock-glyph flex items-center justify-center">
-              <LayoutTemplate className="w-5 h-5" />
-            </div>
+            <LayoutTemplate className="w-5 h-5" />
             <span className="text-[9px] font-semibold tracking-tight">Modelos</span>
           </button>
 
           <button
             type="button"
-            ref={railDock.registerItem(1)}
             onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
-            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
+            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'text'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30 font-semibold'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            {activeTool === 'text' && (
-              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-            )}
-            <div className="gdock-glyph flex items-center justify-center">
-              <Type className="w-5 h-5" />
-            </div>
+            <Type className="w-5 h-5" />
             <span className="text-[9px] font-semibold tracking-tight">Texto</span>
           </button>
 
           <button
             type="button"
-            ref={railDock.registerItem(2)}
             onClick={() => setActiveTool(activeTool === 'brand' ? null : 'brand')}
-            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
+            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'brand'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30 font-semibold'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            {activeTool === 'brand' && (
-              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-            )}
-            <div className="gdock-glyph flex items-center justify-center">
-              <User className="w-5 h-5" />
-            </div>
+            <User className="w-5 h-5" />
             <span className="text-[9px] font-semibold tracking-tight">Perfil</span>
           </button>
 
           <button
             type="button"
-            ref={railDock.registerItem(3)}
             onClick={() => setActiveTool(activeTool === 'subtitles' ? null : 'subtitles')}
-            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
+            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'subtitles'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30 font-semibold'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            {activeTool === 'subtitles' && (
-              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-            )}
-            <div className="gdock-glyph flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
+            <Sparkles className="w-5 h-5" />
             <span className="text-[9px] font-semibold tracking-tight">Legenda</span>
           </button>
 
           <button
             type="button"
-            ref={railDock.registerItem(4)}
             onClick={() => setActiveTool(activeTool === 'background' ? null : 'background')}
-            className={`gdock-item relative w-14 py-2 rounded-xl flex flex-col items-center gap-1 transition-colors cursor-pointer ${
+            className={`w-14 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
               activeTool === 'background'
-                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30'
+                ? 'bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30 font-semibold'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            {activeTool === 'background' && (
-              <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.9)]" />
-            )}
-            <div className="gdock-glyph flex items-center justify-center">
-              <Palette className="w-5 h-5" />
-            </div>
+            <Palette className="w-5 h-5" />
             <span className="text-[9px] font-semibold tracking-tight">Fundo</span>
           </button>
-
         </aside>
 
         {/* PAINEL EXPANSÍVEL LATERAL DO CANVA (DRAWER 280px - SEM COBRIR O CANVAS) */}
@@ -887,8 +856,6 @@ export default function TemplatesPage() {
                     <LiquidToggle
                       checked={instagramDecal}
                       onChange={setInstagramDecal}
-                      activeLabel="LIGADO"
-                      inactiveLabel="DESLIGADO"
                       activeColor="emerald"
                     />
                   </div>
@@ -1028,26 +995,26 @@ export default function TemplatesPage() {
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(true)}
-                        className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
                           titleCapsLock
-                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm'
                             : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                         }`}
+                        title="Tudo em Maiúsculas"
                       >
-                        <span className="font-mono text-xs font-bold">AA</span>
-                        <span>MAIÚSCULAS</span>
+                        <span className="font-mono text-sm font-black">AA</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setTitleCapsLock(false)}
-                        className={`py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
                           !titleCapsLock
-                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm'
                             : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                         }`}
+                        title="Caixa Normal"
                       >
-                        <span className="font-mono text-xs font-bold">Aa</span>
-                        <span>Normal</span>
+                        <span className="font-mono text-sm font-bold">Aa</span>
                       </button>
                     </div>
                   </div>
@@ -1080,16 +1047,7 @@ export default function TemplatesPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                  <label className="text-zinc-400 font-medium">Texto do Título:</label>
-                  <textarea
-                    value={titleText}
-                    onChange={(e) => setTitleText(e.target.value)}
-                    rows={3}
-                    placeholder="ASSIM QUE SEU TITULO APARECERA NO VIDEOS"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-[#6366f1]/50 resize-none text-xs leading-relaxed"
-                  />
-                </div></div>
+                </div>
             )}
 
             {/* ABA 3: PERFIL E AVATAR */}
@@ -1234,16 +1192,18 @@ export default function TemplatesPage() {
               </div>
             )}
 
-            {/* ABA 6: COR DE FUNDO & UPLOAD PERSONALIZADO */}
+            {/* ABA 6: COR DE FUNDO & UPLOAD PERSONALIZADO (PADRÃO HARMONIOSO) */}
             {activeTool === 'background' && (
-              <div className="space-y-4 text-xs">
-                <div className="space-y-2">
-                  <span className="text-zinc-400 font-medium">Cor da Tela do Template:</span>
-                  <div className="grid grid-cols-3 gap-1.5">
+              <div className="space-y-5 text-xs">
+                <div className="space-y-2.5">
+                  <label className="text-zinc-300 font-semibold block text-xs tracking-tight">
+                    Cor da Tela do Template:
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'dark', label: 'Preto Puro', dot: 'bg-black border border-white/40' },
-                      { id: 'white', label: 'Branco Neve', dot: 'bg-white border border-zinc-300' },
-                      { id: 'gray', label: 'Grafite', dot: 'bg-zinc-800 border border-white/30' }
+                      { id: 'dark', label: 'Preto Puro', color: '#000000', border: 'border-white/20' },
+                      { id: 'white', label: 'Branco Neve', color: '#ffffff', border: 'border-zinc-400' },
+                      { id: 'gray', label: 'Grafite', color: '#27272a', border: 'border-white/20' }
                     ].map(b => (
                       <button
                         key={b.id}
@@ -1252,54 +1212,61 @@ export default function TemplatesPage() {
                           setTemplateBg(b.id as any)
                           setCustomBgImage(null)
                         }}
-                        className={`py-2.5 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-semibold ${
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
                           templateBg === b.id && !customBgImage
-                            ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
-                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
+                            ? 'bg-[#6366f1]/15 text-white border-[#6366f1] ring-1 ring-[#6366f1]/50 shadow-md shadow-[#6366f1]/10 font-bold'
+                            : 'bg-white/[0.02] text-zinc-400 border-white/[0.08] hover:text-white hover:bg-white/[0.05] font-medium'
                         }`}
                       >
-                        <span className={`w-3 h-3 rounded-full shrink-0 ${b.dot}`} />
-                        <span>{b.label}</span>
+                        <span
+                          className={`w-6 h-6 rounded-full border shadow-sm shrink-0 ${b.border}`}
+                          style={{ backgroundColor: b.color }}
+                        />
+                        <span className="text-[11px] leading-tight text-center">{b.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Upload de Fundo Personalizado */}
-                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
-                  <span className="text-zinc-400 font-medium">Fundo Personalizável (Upload):</span>
+                {/* Upload de Imagem de Fundo */}
+                <div className="space-y-2.5 pt-3 border-t border-white/[0.08]">
+                  <label className="text-zinc-300 font-semibold block text-xs tracking-tight">
+                    Fundo Personalizável (Upload):
+                  </label>
                   
                   {customBgImage ? (
-                    <div className="space-y-2">
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#6366f1]/40 shadow-inner">
+                    <div className="space-y-3">
+                      <div className="relative w-full h-28 rounded-xl overflow-hidden border border-[#6366f1]/40 shadow-md">
                         <img src={customBgImage} alt="Fundo Personalizado" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                          <span className="text-xs font-bold text-white bg-black/60 px-2 py-0.5 rounded">Fundo Ativo</span>
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white bg-black/70 px-3 py-1 rounded-full border border-white/20">
+                            Fundo Ativo
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <label className="flex-1 py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/10 text-white font-medium text-center cursor-pointer transition-colors text-xs flex items-center justify-center gap-1.5">
-                          <Upload className="w-3.5 h-3.5" />
+                        <label className="flex-1 py-2.5 px-3 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/10 text-white font-semibold text-center cursor-pointer transition-colors text-xs flex items-center justify-center gap-2">
+                          <Upload className="w-4 h-4 text-indigo-400" />
                           <span>Trocar Imagem</span>
                           <input type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
                         </label>
                         <button
                           type="button"
                           onClick={() => setCustomBgImage(null)}
-                          className="py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-medium text-xs cursor-pointer transition-colors"
+                          className="py-2.5 px-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold text-xs cursor-pointer transition-colors"
                         >
                           Remover
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-[#6366f1]/50 bg-black/30 hover:bg-white/[0.02] cursor-pointer transition-all">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-600/10 border border-[#6366f1]/20 flex items-center justify-center text-[#6366f1]">
-                        <Upload className="w-4 h-4" />
+                    <label className="flex flex-col items-center justify-center gap-2.5 py-6 px-4 rounded-xl border border-dashed border-white/20 hover:border-[#6366f1]/60 bg-white/[0.01] hover:bg-[#6366f1]/[0.02] cursor-pointer transition-all">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-[#6366f1]/30 flex items-center justify-center text-[#6366f1]">
+                        <Upload className="w-5 h-5" />
                       </div>
-                      <div className="text-center">
-                        <p className="font-semibold text-white text-xs">Fazer Upload de Imagem de Fundo</p>
-                        <p className="text-[10px] text-zinc-500 mt-0.5">PNG, JPG ou WebP (proporção 9:16 recomendada)</p>
+                      <div className="text-center space-y-0.5">
+                        <p className="font-bold text-white text-xs">Fazer Upload de Imagem de Fundo</p>
+                        <p className="text-[10px] text-zinc-500">PNG, JPG ou WebP (proporção 9:16 recomendada)</p>
                       </div>
                       <input type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
                     </label>
@@ -1313,7 +1280,7 @@ export default function TemplatesPage() {
         {/* ÁREA CENTRAL DO WORKSPACE (CANVA CANVAS COM ZOOM E ESPAÇO LIVRE) */}
         <main className="flex-1 bg-[#090b0e] overflow-auto flex flex-col items-center justify-center p-4 sm:p-8 relative">
           
-          {/* MOCKUP DO IPHONE 18 PRO (CORPO DE TITÂNIO, BOTÕES LATERAIS, DYNAMIC ISLAND E STATUS BAR) */}
+          {/* MOCKUP DO IPHONE 16/18 PRO (TITÂNIO, PROPORÇÃO 19.5:9, STATUS BAR REALISTA, SEM DYNAMIC ISLAND) */}
           <div
             style={{
               transform: `scale(${canvasZoom / 100})`,
@@ -1322,19 +1289,14 @@ export default function TemplatesPage() {
             }}
             className="relative p-[10px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[54px] shadow-[0_30px_90px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.8)] ring-1 ring-white/20 shrink-0 select-none my-auto"
           >
-            {/* BOTÕES LATERAIS FÍSICOS DO IPHONE 18 (TITÂNIO 3D) */}
-            {/* Botão de Ação (topo esquerdo) */}
+            {/* BOTÕES LATERAIS FÍSICOS DO IPHONE (TITÂNIO 3D) */}
             <div className="absolute -left-[4px] top-[110px] w-[4px] h-[26px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            {/* Volume + */}
             <div className="absolute -left-[4px] top-[152px] w-[4px] h-[48px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            {/* Volume - */}
             <div className="absolute -left-[4px] top-[212px] w-[4px] h-[48px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            {/* Botão Liga/Desliga / Siri (lado direito) */}
             <div className="absolute -right-[4px] top-[170px] w-[4px] h-[68px] bg-zinc-600 rounded-r-sm shadow-sm" />
-            {/* Botão Camera Control (iPhone 16/18) */}
             <div className="absolute -right-[4px] top-[440px] w-[4px] h-[48px] bg-zinc-600/80 rounded-r-sm ring-1 ring-white/10" />
 
-            {/* TELA OLED DO IPHONE 18 (PROPORÇÃO REAL 19.5:9 -> 324 x 702 px) */}
+            {/* TELA OLED DO IPHONE (PROPORÇÃO REAL 19.5:9 -> 324 x 702 px) */}
             <div
               ref={phoneRef}
               style={{ width: "324px", height: "702px", aspectRatio: "9 / 19.5" }}
@@ -1346,23 +1308,11 @@ export default function TemplatesPage() {
                   : 'bg-black text-white'
               }`}
             >
-              {/* STATUS BAR DO IPHONE (HORÁRIO + DYNAMIC ISLAND + BATERIA/SINAL) */}
-              <div className="absolute top-0 left-0 right-0 h-11 px-6 pt-2.5 flex items-center justify-between z-50 pointer-events-none text-white select-none">
-                {/* Horário */}
-                <span className="text-[12px] font-bold tracking-tight text-white/95">9:41</span>
+              {/* STATUS BAR DO IPHONE (9:41 + SINAL, WI-FI, BATERIA - SEM DYNAMIC ISLAND) */}
+              <div className="absolute top-0 left-0 right-0 h-10 px-6 pt-2.5 flex items-center justify-between z-50 pointer-events-none text-white select-none">
+                <span className="text-[12px] font-bold tracking-tight text-white/95 drop-shadow">9:41</span>
 
-                {/* Dynamic Island com Câmera e Face ID */}
-                <div className="w-[100px] h-[27px] bg-black rounded-full ring-1 ring-white/15 shadow-md flex items-center justify-between px-2.5 pointer-events-auto">
-                  {/* Face ID Dot */}
-                  <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 ring-1 ring-white/5" />
-                  {/* Lente Frontal com Reflexo */}
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#0d1630] ring-1 ring-[#1e3a8a]/40 flex items-center justify-center">
-                    <div className="w-1 h-1 rounded-full bg-blue-400/50" />
-                  </div>
-                </div>
-
-                {/* Ícones de Sistema (Sinal, 5G/Wi-Fi, Bateria) */}
-                <div className="flex items-center gap-1.5 text-white/95">
+                <div className="flex items-center gap-1.5 text-white/95 drop-shadow">
                   <div className="flex items-end gap-0.5 h-2.5">
                     <div className="w-[2px] h-1 bg-white rounded-xs" />
                     <div className="w-[2px] h-1.5 bg-white rounded-xs" />
@@ -1394,7 +1344,7 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* 1 & 2. PERFIL DO CANAL UNIFICADO (FOTO + NOME + ARROBA COM FERRAMENTA DE ALINHAMENTO) */}
+              {/* 1 & 2. PERFIL DO CANAL UNIFICADO (FOTO + NOME + ARROBA) */}
               <div
                 onMouseDown={(e) => startDrag2D('header', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('header', e.touches[0].clientX, e.touches[0].clientY, e)}
@@ -1408,9 +1358,9 @@ export default function TemplatesPage() {
                 } ${
                   brandLayout === 'stacked' ? 'flex-col justify-center' : 'flex-row'
                 }`}
-                title="Arraste o perfil (foto, nome e arroba) para reposicionar livremente"
+                title="Arraste o perfil para reposicionar livremente"
               >
-                <div className="w-11 h-11 rounded-full border-2 border-white/60 overflow-hidden shadow-lg bg-zinc-900 shrink-0">
+                <div className="w-11 h-11 rounded-full border-2 border-white/60 overflow-hidden shadow-md bg-zinc-900 shrink-0">
                   <img
                     src={avatarUrl}
                     alt={brandName}
@@ -1419,7 +1369,7 @@ export default function TemplatesPage() {
                 </div>
                 <div className={`flex flex-col ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold tracking-tight drop-shadow">{brandName}</span>
+                    <span className="text-xs font-bold tracking-tight text-inherit">{brandName}</span>
                     <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                     </svg>
@@ -1428,7 +1378,7 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 3. TÍTULO / GANCHO COM PERSONALIZAÇÃO DE TIPOGRAFIA */}
+              {/* 3. TÍTULO / GANCHO COM PERSONALIZAÇÃO DE TIPOGRAFIA (SEM SOMBRA BORRADA) */}
               <div
                 onMouseDown={(e) => startDrag2D('title', e.clientX, e.clientY, e)}
                 onTouchStart={(e) => startDrag2D('title', e.touches[0].clientX, e.touches[0].clientY, e)}
@@ -1448,7 +1398,7 @@ export default function TemplatesPage() {
                       : titleStroke === 'medium'
                       ? `-2px -2px 0 ${titleStrokeColor}, 2px -2px 0 ${titleStrokeColor}, -2px 2px 0 ${titleStrokeColor}, 2px 2px 0 ${titleStrokeColor}`
                       : `-3px -3px 0 ${titleStrokeColor}, 3px -3px 0 ${titleStrokeColor}, -3px 3px 0 ${titleStrokeColor}, 3px 3px 0 ${titleStrokeColor}`
-                    : '0 2px 8px rgba(0,0,0,0.85)',
+                    : 'none',
                   WebkitTextStroke: titleStroke !== 'none'
                     ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '1.5px' : '2px'} ${titleStrokeColor}`
                     : 'none'
@@ -1461,7 +1411,7 @@ export default function TemplatesPage() {
                 {titleText}
               </div>
 
-              {/* 4. QUADRO DO VÍDEO (RESIZABLE COM ALÇAS SUPERIOR, INFERIOR E LATERAIS) */}
+              {/* 4. QUADRO DO VÍDEO (RESIZABLE COM ALÇAS) */}
               <div
                 style={{
                   left: `${videoPos.x}%`,
@@ -1472,62 +1422,60 @@ export default function TemplatesPage() {
                 }}
                 className="absolute z-20 group"
               >
-                {/* ALÇA SUPERIOR DE REDIMENSIONAMENTO VERTICAL */}
+                {/* ALÇA SUPERIOR */}
                 <div
                   onMouseDown={(e) => startResizeTop(e.clientY, e)}
                   onTouchStart={(e) => startResizeTop(e.touches[0].clientY, e)}
                   className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-5 flex items-center justify-center cursor-ns-resize z-40 group/top"
-                  title="Arrastar borda superior para redimensionar vídeo"
+                  title="Arrastar borda superior para redimensionar"
                 >
-                  <div className="w-9 h-1.5 bg-white rounded-full shadow-md group-hover/top:scale-110 group-hover/top:bg-indigo-400 transition-all border border-black/30" />
+                  <div className="w-9 h-1.5 bg-white rounded-full shadow group-hover/top:scale-110 group-hover/top:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* ALÇA INFERIOR DE REDIMENSIONAMENTO VERTICAL */}
+                {/* ALÇA INFERIOR */}
                 <div
                   onMouseDown={(e) => startResizeBottom(e.clientY, e)}
                   onTouchStart={(e) => startResizeBottom(e.touches[0].clientY, e)}
                   className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-5 flex items-center justify-center cursor-ns-resize z-40 group/bottom"
-                  title="Arrastar borda inferior para redimensionar vídeo"
+                  title="Arrastar borda inferior para redimensionar"
                 >
-                  <div className="w-9 h-1.5 bg-white rounded-full shadow-md group-hover/bottom:scale-110 group-hover/bottom:bg-indigo-400 transition-all border border-black/30" />
+                  <div className="w-9 h-1.5 bg-white rounded-full shadow group-hover/bottom:scale-110 group-hover/bottom:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* ALÇA LATERAL ESQUERDA DE PROPORÇÃO */}
+                {/* ALÇA LATERAL ESQUERDA */}
                 <div
                   onMouseDown={(e) => startResizeLeft(e.clientX, e)}
                   onTouchStart={(e) => startResizeLeft(e.touches[0].clientX, e)}
                   className="absolute -left-3 top-1/2 -translate-y-1/2 h-16 w-5 flex items-center justify-center cursor-ew-resize z-40 group/left"
-                  title="Arrastar borda esquerda para largura do vídeo"
+                  title="Arrastar borda esquerda para largura"
                 >
-                  <div className="h-9 w-1.5 bg-white rounded-full shadow-md group-hover/left:scale-110 group-hover/left:bg-indigo-400 transition-all border border-black/30" />
+                  <div className="h-9 w-1.5 bg-white rounded-full shadow group-hover/left:scale-110 group-hover/left:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* ALÇA LATERAL DIREITA DE PROPORÇÃO */}
+                {/* ALÇA LATERAL DIREITA */}
                 <div
                   onMouseDown={(e) => startResizeRight(e.clientX, e)}
                   onTouchStart={(e) => startResizeRight(e.touches[0].clientX, e)}
                   className="absolute -right-3 top-1/2 -translate-y-1/2 h-16 w-5 flex items-center justify-center cursor-ew-resize z-40 group/right"
-                  title="Arrastar borda direita para largura do vídeo"
+                  title="Arrastar borda direita para largura"
                 >
-                  <div className="h-9 w-1.5 bg-white rounded-full shadow-md group-hover/right:scale-110 group-hover/right:bg-indigo-400 transition-all border border-black/30" />
+                  <div className="h-9 w-1.5 bg-white rounded-full shadow group-hover/right:scale-110 group-hover/right:bg-indigo-400 transition-all border border-black/30" />
                 </div>
 
-                {/* CONTAINER VISUAL DO VÍDEO COM CONTROLES */}
+                {/* CONTAINER DO VÍDEO */}
                 <div
                   onMouseDown={(e) => startDrag2D('video', e.clientX, e.clientY, e)}
                   onTouchStart={(e) => startDrag2D('video', e.touches[0].clientX, e.touches[0].clientY, e)}
-                  className={`w-full h-full rounded-2xl overflow-hidden bg-black/90 shadow-2xl relative cursor-grab active:cursor-grabbing border-2 ${
+                  className={`w-full h-full rounded-2xl overflow-hidden bg-black/90 shadow-xl relative cursor-grab active:cursor-grabbing border-2 ${
                     draggingTarget === 'video' ? 'border-[#6366f1] ring-4 ring-[#6366f1]/30' : 'border-white/40 group-hover:border-indigo-400/80'
                   } transition-colors`}
-                  title="Arraste o centro do vídeo para mover; use as alças superior, inferior e laterais para redimensionar"
                 >
                   <img
                     src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80"
                     alt="Vídeo Preview"
-                    className="w-full h-full object-cover pointer-events-none opacity-85"
+                    className="w-full h-full object-cover pointer-events-none opacity-90"
                   />
                   
-                  {/* 4 Handles nos cantos indicando redimensionamento */}
                   <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
                   <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
                   <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
@@ -1562,86 +1510,22 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* 6. DECALQUE REELS COMPLETO E TRANSLÚCIDO (OVERLAY REALISTA DO INSTAGRAM / TIKTOK) */}
+              {/* 6. DECALQUE REELS (ÁREA ESCURECIDA TRANSLÚCIDA + ZONA SEGURA — SEM ÍCONES) */}
               {instagramDecal && (
                 <div className="absolute inset-0 pointer-events-none z-40 select-none overflow-hidden rounded-[44px]">
-                  {/* Gradiente suave inferior para legibilidade (o template permanece 100% visível) */}
-                  <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none" />
-
-                  {/* TOPO: Header "Reels" + Ícone de Câmera */}
-                  <div className="absolute top-12 left-5 right-5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                    <span className="font-bold text-base tracking-tight">Reels</span>
-                    <Camera className="w-5 h-5 opacity-90" />
-                  </div>
-
-                  {/* COLUNA LATERAL DIREITA: ÍCONES REAIS DO INSTAGRAM */}
-                  <div className="absolute right-3 bottom-18 flex flex-col items-center gap-4 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-                    {/* Curtir */}
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Heart className="w-6 h-6 stroke-[2.2] fill-transparent" />
-                      <span className="text-[10px] font-bold">142K</span>
-                    </div>
-
-                    {/* Comentários */}
-                    <div className="flex flex-col items-center gap-0.5">
-                      <MessageCircle className="w-6 h-6 stroke-[2.2]" />
-                      <span className="text-[10px] font-bold">1.8K</span>
-                    </div>
-
-                    {/* Compartilhar */}
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Send className="w-5 h-5 stroke-[2.2]" />
-                      <span className="text-[10px] font-bold">48K</span>
-                    </div>
-
-                    {/* Mais Opções */}
-                    <div className="flex flex-col items-center">
-                      <MoreHorizontal className="w-5 h-5" />
-                    </div>
-
-                    {/* Disco de Áudio Giratório */}
-                    <div className="w-7 h-7 rounded-full bg-zinc-900 border border-white/60 shadow-lg flex items-center justify-center overflow-hidden animate-[spin_8s_linear_infinite] mt-1">
-                      <img src={avatarUrl} alt="Áudio" className="w-full h-full object-cover opacity-80" />
-                    </div>
-                  </div>
-
-                  {/* RODAPÉ DO REELS: PERFIL, LEGENDA E FAIXA DE ÁUDIO */}
-                  <div className="absolute bottom-6 left-4 right-16 flex flex-col gap-1.5 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
-                    {/* Linha do Perfil */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full ring-1 ring-white/50 overflow-hidden shrink-0">
-                        <img src={avatarUrl} alt="Canal" className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-xs font-bold tracking-tight truncate max-w-[120px]">
-                        {brandHandle.startsWith('@') ? brandHandle : `@${brandHandle}`}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full border border-white/60 text-[9px] font-bold bg-white/10 backdrop-blur-xs">
-                        Seguir
-                      </span>
-                    </div>
-
-                    {/* Descrição / Legenda do Post */}
-                    <p className="text-[11px] leading-snug line-clamp-2 text-zinc-100 font-medium">
-                      {titleText ? (titleText.length > 55 ? titleText.slice(0, 55) + '...' : titleText) : 'Assim que o seu vídeo vai aparecer nos Reels e Stories'} 🔥
-                    </p>
-
-                    {/* Tag de Áudio Original */}
-                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-300 font-medium">
-                      <Music className="w-3 h-3 text-white shrink-0" />
-                      <span className="truncate">Áudio original • {brandName || 'Clipost'}</span>
-                    </div>
-                  </div>
-
-                  {/* GUIA DA ÁREA SEGURA DE LEGENDAS (DELIMITADOR DINÂMICO) */}
-                  <div className="absolute left-0 right-0 bottom-[146px] border-t border-dashed border-amber-400/50 flex items-center justify-center">
-                    <span className="bg-amber-400/90 text-black text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-md tracking-wider -translate-y-1/2">
-                      Zona Segura de Legendas
+                  {/* Zona Morta Inferior Escurecida (21% da altura) */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-gradient-to-t from-black/90 via-black/80 to-black/60 border-t border-dashed border-white/25 flex flex-col justify-end pb-3.5 px-4">
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest text-center">
+                      Área Segura de Legendas (Reels 9:16)
                     </span>
                   </div>
+
+                  {/* Coluna Lateral Direita Escurecida (16% da largura) */}
+                  <div className="absolute right-0 top-[48%] bottom-[21%] w-[16%] bg-black/55 border-l border-t border-dashed border-white/20 rounded-tl-xl" />
                 </div>
               )}
 
-              {/* BARRA HOME DO IPHONE 18 */}
+              {/* BARRA HOME DO IPHONE */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
             </div>
           </div>
@@ -1657,7 +1541,7 @@ export default function TemplatesPage() {
           <div className="h-3 w-px bg-white/10" />
           <span className="text-[11px] flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${instagramDecal ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-            <span>Decalque Reels: <strong className="text-white">{instagramDecal ? 'Ativo' : 'Oculto'}</strong></span>
+            <span>Decalque Reels</span>
           </span>
         </div>
 

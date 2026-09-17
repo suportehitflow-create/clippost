@@ -6,32 +6,35 @@ interface LiquidToggleProps {
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
-  showBadge?: boolean
-  activeLabel?: string
-  inactiveLabel?: string
   className?: string
   activeColor?: 'emerald' | 'indigo' | 'violet'
+  // Compatibilidade com código legado se passado
+  activeLabel?: string
+  inactiveLabel?: string
+  showBadge?: boolean
 }
 
+/**
+ * LiquidToggle (Apple / Bencho Liquid Gooey Spring Switch)
+ * Pure pill toggle without redundant "LIGADO / DESLIGADO" text labels.
+ * Physics: Thumb spring with following liquid gooey droplet.
+ */
 export function LiquidToggle({
   checked,
   onChange,
   disabled = false,
-  showBadge = true,
-  activeLabel = 'LIGADO',
-  inactiveLabel = 'DESLIGADO',
   className = '',
   activeColor = 'emerald',
 }: LiquidToggleProps) {
   const isEmerald = activeColor === 'emerald'
 
   return (
-    <div className={`inline-flex items-center gap-2.5 select-none ${disabled ? 'opacity-50 pointer-events-none' : ''} ${className}`}>
+    <div className={`inline-flex items-center select-none ${disabled ? 'opacity-50 pointer-events-none' : ''} ${className}`}>
       {/* SVG Gooey Filter global para fusão líquida orgânica */}
       <svg className="fixed -top-full -left-full pointer-events-none w-0 h-0" aria-hidden="true">
         <defs>
           <filter id="liq-goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="smear" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="smear" />
             <feColorMatrix
               in="smear"
               type="matrix"
@@ -39,7 +42,7 @@ export function LiquidToggle({
                 1 0 0 0 0
                 0 1 0 0 0
                 0 0 1 0 0
-                0 0 0 19 -9"
+                0 0 0 18 -8"
             />
           </filter>
         </defs>
@@ -54,9 +57,9 @@ export function LiquidToggle({
         className={`relative w-12 h-6.5 rounded-full p-0.5 transition-all duration-300 cursor-pointer border shadow-sm outline-none ${
           checked
             ? isEmerald
-              ? 'bg-emerald-500/90 border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-              : 'bg-[#6366f1]/90 border-[#6366f1]/60 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
-            : 'bg-zinc-800/90 border-white/15 hover:border-white/25 hover:bg-zinc-700/80'
+              ? 'bg-emerald-500 border-emerald-400/80 shadow-[0_0_14px_rgba(16,185,129,0.4)]'
+              : 'bg-[#6366f1] border-[#818cf8]/80 shadow-[0_0_14px_rgba(99,102,241,0.4)]'
+            : 'bg-zinc-800 border-white/15 hover:border-white/25 hover:bg-zinc-700/80'
         }`}
       >
         {/* Recipiente com Filtro Líquido Gooey */}
@@ -89,32 +92,6 @@ export function LiquidToggle({
           />
         </div>
       </button>
-
-      {/* Badge Indicador de Status com Pílula Suave */}
-      {showBadge && (
-        <button
-          type="button"
-          onClick={() => onChange(!checked)}
-          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide transition-all cursor-pointer border flex items-center gap-1.5 shadow-sm ${
-            checked
-              ? isEmerald
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-emerald-500/10'
-                : 'bg-[#6366f1]/15 text-[#818cf8] border-[#6366f1]/30 shadow-[#6366f1]/10'
-              : 'bg-white/[0.03] text-zinc-400 border-white/[0.08] hover:text-zinc-200 hover:bg-white/[0.06]'
-          }`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              checked
-                ? isEmerald
-                  ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]'
-                  : 'bg-[#6366f1] animate-pulse shadow-[0_0_6px_rgba(99,102,241,0.8)]'
-                : 'bg-zinc-500'
-            }`}
-          />
-          <span>{checked ? activeLabel : inactiveLabel}</span>
-        </button>
-      )}
     </div>
   )
 }
