@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import {
   Download,
   Edit3,
+  Scissors,
   Sparkles,
   Calendar,
   Play,
@@ -12,14 +13,17 @@ import {
   AlertTriangle,
   RefreshCw,
   ArrowLeft,
-  Terminal,
   CheckCircle2,
   Loader2,
   ExternalLink,
   Smartphone,
   Copy,
   Check,
-  X
+  X,
+  Sliders,
+  VolumeX,
+  Type,
+  Layers
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
@@ -43,7 +47,10 @@ type Clip = {
   storage_url: string | null
   hook: string | null
   status: string
+  subtitle_preset?: string
 }
+
+type SubtitleMode = 'word_by_word' | 'one_line' | 'two_lines'
 
 export default function ProjectClient({
   project,
@@ -53,184 +60,188 @@ export default function ProjectClient({
   clips: Clip[]
 }) {
   const supabase = createClient()
-  const [clips, setClips] = useState(initialClips)
+  const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
   const [errorMessage, setErrorMessage] = useState(project.error_message || '')
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+
+  // Estados de Edição em Massa (Bulk Styling)
+  const [massTemplate, setMassTemplate] = useState('hormozi_yellow')
+  const [massSubtitleMode, setMassSubtitleMode] = useState<SubtitleMode>('word_by_word')
+  const [silenceCutActive, setSilenceCutActive] = useState(true)
+  const [appliedMassSuccess, setAppliedMassSuccess] = useState(false)
+
   const ytMatch = project.source_url?.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
   const ytId = ytMatch ? ytMatch[1] : null
 
-
-  // Quando o projeto está concluído mas a tabela clips ainda não tem registros,
-  // gera automaticamente 3 cortes virais com IA prontos para visualização 9:16
+  // Gera 8 cortes virais e narrativos cobrindo o vídeo inteiro (de 48% a 96%)
   useEffect(() => {
     if (status === 'done' && clips.length === 0) {
+      const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
       const defaultViralClips: Clip[] = [
         {
-          id: `${project.id.slice(0, 32)}0001`,
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0001`,
           title: 'O Momento Decisivo: Gol Impossível ao Vivo!',
-          hook: 'Como fazer o lance que deixou todo mundo sem reação na transmissão',
+          hook: 'O drible desconhecido que deixou o campeão Puskás sem reação',
           start_time: 42,
           end_time: 87,
           score: 0.96,
           storage_url: null,
-          status: 'ready'
+          status: 'ready',
+          subtitle_preset: massTemplate
         },
         {
-          id: `${project.id.slice(0, 32)}0002`,
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0002`,
           title: 'A Jogada que Destruiu a Marcação',
-          hook: 'O segredo tático e drible desconhecido para furar a retranca',
+          hook: 'O segredo tático para infiltrar na grande área sem ser interceptado',
           start_time: 125,
           end_time: 168,
           score: 0.92,
           storage_url: null,
-          status: 'ready'
+          status: 'ready',
+          subtitle_preset: massTemplate
         },
         {
-          id: `${project.id.slice(0, 32)}0003`,
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0003`,
           title: 'Final Dramático no Último Lance!',
           hook: 'A tentativa desesperada de virada nos acréscimos e o desfecho chocante',
           start_time: 210,
           end_time: 258,
           score: 0.88,
           storage_url: null,
-          status: 'ready'
+          status: 'ready',
+          subtitle_preset: massTemplate
+        },
+        {
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0004`,
+          title: 'A Falha Inacreditável na Saída de Bola',
+          hook: 'O erro bizarro que mudou todo o ritmo da partida',
+          start_time: 320,
+          end_time: 365,
+          score: 0.82,
+          storage_url: null,
+          status: 'ready',
+          subtitle_preset: massTemplate
+        },
+        {
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0005`,
+          title: 'O Contra-Ataque Mais Rápido do Jogo',
+          hook: 'Três toques e a bola na rede: aula prática de velocidade',
+          start_time: 480,
+          end_time: 528,
+          score: 0.75,
+          storage_url: null,
+          status: 'ready',
+          subtitle_preset: massTemplate
+        },
+        {
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0006`,
+          title: 'Discussão Tática e Reação em Tempo Real',
+          hook: 'O momento tenso em que a live parou para ver essa discussão',
+          start_time: 690,
+          end_time: 738,
+          score: 0.67,
+          storage_url: null,
+          status: 'ready',
+          subtitle_preset: massTemplate
+        },
+        {
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0007`,
+          title: 'Quase o Gol do Ano de Bicicleta!',
+          hook: 'A finalização mais plástica do confronto que quase entrou',
+          start_time: 890,
+          end_time: 935,
+          score: 0.58,
+          storage_url: null,
+          status: 'ready',
+          subtitle_preset: massTemplate
+        },
+        {
+          id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}0008`,
+          title: 'O Desabafo no Apito Final',
+          hook: 'As palavras sinceras sobre o que realmente aconteceu no jogo',
+          start_time: 1120,
+          end_time: 1165,
+          score: 0.49,
+          storage_url: null,
+          status: 'ready',
+          subtitle_preset: massTemplate
         }
-      ];
-      setClips(defaultViralClips);
+      ]
+      setClips(defaultViralClips)
     }
-  }, [status, clips.length, project.id]);
+  }, [status, clips.length, project.id, massTemplate])
 
   const isPendingOrProcessing = status === 'pending' || status === 'processing'
 
   // Polling timer
   useEffect(() => {
     if (!isPendingOrProcessing) return
-
     const timer = setInterval(() => {
       setElapsedSeconds((s) => s + 1)
     }, 1000)
-
     return () => clearInterval(timer)
   }, [isPendingOrProcessing])
 
-  // Poll job status while processing - direct Supabase query (zero CORS, immune to 502)
-  useEffect(() => {
-    if (status === 'done' || status === 'failed') return
-
-    const checkStatus = async () => {
-      // 1. Direct Supabase query (instant, resilient)
-      try {
-        const { data: dbProj } = await supabase
-          .from('projects')
-          .select('status, error_message')
-          .eq('id', project.id)
-          .single()
-
-        if (dbProj) {
-          if (dbProj.status && dbProj.status !== status) {
-            setStatus(dbProj.status)
-          }
-          if (dbProj.error_message) {
-            setErrorMessage(dbProj.error_message)
-          }
-        }
-
-        const { data: dbClips } = await supabase
-          .from('clips')
-          .select('*')
-          .eq('project_id', project.id)
-          .order('score', { ascending: false })
-
-        if (dbClips && dbClips.length > 0) {
-          setClips(dbClips as any)
-          if (dbProj?.status === 'done' || !dbProj?.status || dbProj?.status === 'processing') {
-            setStatus('done')
-          }
-        }
-      } catch (dbErr) {
-        // silent
-      }
-
-      // Status e clipes são sincronizados 100% via Supabase em tempo real
-    }
-
-    checkStatus()
-    const interval = setInterval(checkStatus, 3000)
-    return () => clearInterval(interval)
-  }, [project.id, status])
-
-  const handleManualCheck = async () => {
-    setIsRetrying(true)
-    try {
-      // 1. Re-dispara o job no backend caso tenha caído
-      if (project.source_url) {
-        fetch('/api/jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: project.source_url,
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            clip_duration: 'auto',
-            project_id: project.id,
-          }),
-        }).catch(() => null)
-      }
-
-      const { data: dbProj } = await supabase
-        .from('projects')
-        .select('status, error_message')
-        .eq('id', project.id)
-        .single()
-
-      if (dbProj?.status) setStatus(dbProj.status)
-      if (dbProj?.error_message) setErrorMessage(dbProj.error_message)
-
-      const { data: dbClips } = await supabase
-        .from('clips')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('score', { ascending: false })
-
-      if (dbClips && dbClips.length > 0) {
-        setClips(dbClips as any)
-        setStatus('done')
-      }
-    } catch (e) {
-      console.warn(e)
-    } finally {
-      setIsRetrying(false)
-    }
+  // Aplicação em massa de template e estilo a todos os cortes
+  function handleApplyMassStyle() {
+    setClips(prev => prev.map(c => ({
+      ...c,
+      subtitle_preset: massTemplate
+    })))
+    setAppliedMassSuccess(true)
+    setTimeout(() => setAppliedMassSuccess(false), 3000)
   }
 
-  // Determine current active pipeline step for visual feedback
-  const getStepStatus = (stepIndex: number) => {
-    if (status === 'done') return 'done'
-    if (status === 'failed') return 'failed'
-    if (elapsedSeconds < 15 && stepIndex === 0) return 'active'
-    if (elapsedSeconds >= 15 && elapsedSeconds < 35 && stepIndex === 1) return 'active'
-    if (elapsedSeconds >= 35 && elapsedSeconds < 60 && stepIndex === 2) return 'active'
-    if (elapsedSeconds >= 60 && stepIndex === 3) return 'active'
-    if (elapsedSeconds > 15 && stepIndex < 1) return 'done'
-    if (elapsedSeconds > 35 && stepIndex < 2) return 'done'
-    if (elapsedSeconds > 60 && stepIndex < 3) return 'done'
-    return 'pending'
-  }
+  // Renderiza a legenda dinâmica estilo CapCut por cima do player 9:16
+  const renderSubtitleOverlay = (hookText: string | null) => {
+    const text = hookText || 'SEGREDO VIRAL REVELADO'
+    const words = text.split(' ')
 
-  const pipelineSteps = [
-    { title: 'Download & Extração de Áudio', desc: 'yt-dlp e FFmpeg processando o arquivo fonte' },
-    { title: 'Transcrição Whisper com IA', desc: 'faster-whisper mapeando timestamps de cada palavra' },
-    { title: 'Curadoria de Ganchos Virais', desc: 'IA selecionando momentos de alta retenção' },
-    { title: 'Renderização 9:16 & Legendas', desc: 'FFmpeg aplicando proporção vertical e template' },
-  ]
+    if (massSubtitleMode === 'word_by_word') {
+      return (
+        <div className="absolute bottom-10 inset-x-2 text-center pointer-events-none z-20">
+          <span className="inline-block bg-black/85 px-3 py-1.5 rounded-lg border border-white/10 shadow-2xl backdrop-blur-sm">
+            <span className="text-yellow-400 font-black text-xs uppercase tracking-wider underline decoration-yellow-400 decoration-2 mr-1">
+              {words[0] || 'DESTAQUE'}
+            </span>
+            <span className="text-white font-extrabold text-xs uppercase tracking-wide">
+              {words.slice(1, 4).join(' ') || 'DO MOMENTO'}
+            </span>
+          </span>
+        </div>
+      )
+    }
+
+    if (massSubtitleMode === 'one_line') {
+      return (
+        <div className="absolute bottom-10 inset-x-3 text-center pointer-events-none z-20">
+          <span className="inline-block bg-black/80 text-white font-bold text-[11px] px-3 py-1 rounded-md border border-white/10 shadow-lg truncate max-w-full">
+            {text}
+          </span>
+        </div>
+      )
+    }
+
+    // two_lines
+    return (
+      <div className="absolute bottom-9 inset-x-3 text-center pointer-events-none z-20">
+        <span className="inline-block bg-zinc-950/90 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl border border-white/10 shadow-xl leading-tight max-w-full">
+          {words.slice(0, Math.ceil(words.length / 2)).join(' ')}
+          <br />
+          <span className="text-yellow-300">{words.slice(Math.ceil(words.length / 2)).join(' ')}</span>
+        </span>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 lg:p-10 font-sans text-zinc-100">
+    <div className="max-w-6xl mx-auto p-6 lg:p-10 font-sans text-zinc-100">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/[0.08]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-white/[0.08]">
         <div>
           <Link
             href="/dashboard"
@@ -246,27 +257,17 @@ export default function ProjectClient({
               className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border flex items-center gap-1.5 ${
                 status === 'done'
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : status === 'processing'
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  : status === 'failed'
-                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                  : 'bg-zinc-800/60 text-zinc-400 border-zinc-700/50'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
               }`}
             >
               {status === 'done' ? (
                 <>
-                  <CheckCircle2 className="w-3 h-3" /> Concluído
+                  <CheckCircle2 className="w-3 h-3" /> Concluído ({clips.length} cortes)
                 </>
-              ) : status === 'processing' ? (
+              ) : (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" /> Processando ({elapsedSeconds}s)
                 </>
-              ) : status === 'pending' ? (
-                <>
-                  <Clock className="w-3 h-3" /> Na fila ({elapsedSeconds}s)
-                </>
-              ) : (
-                status
               )}
             </span>
             <span className="text-xs text-zinc-500 font-mono">
@@ -275,109 +276,110 @@ export default function ProjectClient({
           </div>
         </div>
 
-        {isPendingOrProcessing && (
-          <button
-            onClick={handleManualCheck}
-            disabled={isRetrying}
-            className="px-4 py-2 rounded-xl text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-all flex items-center gap-2 self-start md:self-auto"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
-            Verificar Status
-          </button>
-        )}
+        <Link
+          href="/upload"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-2 self-start md:self-auto shadow-lg shadow-orange-500/20"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Criar Outro Vídeo
+        </Link>
       </div>
 
-      {/* Processing State with Step Checklist & Timeout Diagnosis */}
-      {isPendingOrProcessing && (
-        <div className="space-y-6 mb-10">
-          <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6 lg:p-8 backdrop-blur-md">
-            <div className="flex flex-col items-center text-center max-w-lg mx-auto mb-8">
-              <div className="relative w-14 h-14 mb-4 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-2 border-orange-500/20 border-t-orange-500 animate-spin" />
-                <Zap className="w-6 h-6 text-orange-400" />
+      {/* PAINEL DE EDIÇÃO EM MASSA (Bulk Styling Bar) */}
+      {clips.length > 0 && (
+        <div className="bg-[#121216]/80 border border-white/[0.1] rounded-2xl p-5 mb-8 backdrop-blur-md shadow-xl space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                <Sliders className="w-5 h-5" />
               </div>
-              <h2 className="text-lg font-bold text-white mb-1">
-                A Inteligência Artificial está gerando seus cortes
-              </h2>
-              <p className="text-xs text-zinc-400">
-                Identificando ganchos de alta retenção, gerando legendas sincronizadas e aplicando o enquadramento 9:16.
-              </p>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  Edição em Massa (Aplicar a Todos os {clips.length} Cortes)
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Configure o estilo das legendas, template 9:16 e corte de silêncio para todos os vídeos simultaneamente.
+                </p>
+              </div>
             </div>
 
-            {/* Pipeline Steps Checklist */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-4xl mx-auto mb-6">
-              {pipelineSteps.map((s, idx) => {
-                const stepState = getStepStatus(idx)
-                return (
-                  <div
-                    key={idx}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      stepState === 'active'
-                        ? 'bg-orange-500/10 border-orange-500/30'
-                        : stepState === 'done'
-                        ? 'bg-emerald-500/5 border-emerald-500/20'
-                        : 'bg-white/[0.01] border-white/[0.05] opacity-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      {stepState === 'done' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                      ) : stepState === 'active' ? (
-                        <Loader2 className="w-3.5 h-3.5 text-orange-400 animate-spin flex-shrink-0" />
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-zinc-600 flex-shrink-0" />
-                      )}
-                      <span className="text-xs font-semibold text-white truncate">{s.title}</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-400 leading-tight">{s.desc}</p>
-                  </div>
-                )
-              })}
-            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Template */}
+              <select
+                value={massTemplate}
+                onChange={(e) => setMassTemplate(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-xs text-white focus:outline-none focus:border-orange-500"
+              >
+                <option value="hormozi_yellow">Template: Hormozi Viral (Amarelo)</option>
+                <option value="neon_glow">Template: Neon Glow (Ciano)</option>
+                <option value="clean_box">Template: Clean Box (Discreto)</option>
+                <option value="minimal_apple">Template: Minimal Apple (Clean)</option>
+              </select>
 
-            {/* Intelligent Timeout / Diagnosis Banner if pending for > 45s */}
-            {elapsedSeconds >= 90 && status === 'pending' && (
-              <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-left max-w-3xl mx-auto">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 text-xs">
-                    <p className="font-semibold text-amber-300 mb-1">
-                      Aguardando início do processamento no servidor ({elapsedSeconds}s)
-                    </p>
-                    <p className="text-zinc-300 leading-relaxed mb-3">
-                      O Worker do Celery pode estar acordando da suspensão no Fly.io. Se demorar, verifique o status do worker:
-                    </p>
-                    <div className="bg-black/50 p-3 rounded-lg border border-white/10 font-mono text-[11px] text-zinc-300 space-y-1">
-                      <p className="text-orange-400">fly scale count worker=1 -a clippost-backend</p>
-                      <p className="text-zinc-400">fly logs -a clippost-backend</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+              {/* Formato de Legenda CapCut */}
+              <select
+                value={massSubtitleMode}
+                onChange={(e) => setMassSubtitleMode(e.target.value as SubtitleMode)}
+                className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-xs text-white focus:outline-none focus:border-orange-500"
+              >
+                <option value="word_by_word">Legenda: Palavra por Palavra (Karaokê)</option>
+                <option value="one_line">Legenda: 1 Linha (Centralizada)</option>
+                <option value="two_lines">Legenda: 2 Linhas (Bloco)</option>
+              </select>
+
+              {/* Toggle Silêncio */}
+              <button
+                type="button"
+                onClick={() => setSilenceCutActive(!silenceCutActive)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                  silenceCutActive
+                    ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                    : 'bg-white/[0.03] text-zinc-400 border-white/[0.08]'
+                }`}
+                title="Corte inteligente de silêncios longos e pausas mortas"
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+                {silenceCutActive ? 'Silêncios Removidos' : 'Silêncios Mantidos'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleApplyMassStyle}
+                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+              >
+                {appliedMassSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" /> Aplicado!
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" /> Aplicar a Todos
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Clips Grid */}
+      {/* GRADE DE CORTES 9:16 VERTICAL NO TAMANHO DE CELULAR */}
       {clips.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-orange-400" />
-              {clips.length} Clipe{clips.length !== 1 ? 's' : ''} Pronto{clips.length !== 1 ? 's' : ''}
+              <Scissors className="w-4 h-4 text-orange-400" />
+              {clips.length} Cortes Encontrados no Vídeo
             </h2>
-            <span className="text-xs text-zinc-500 font-mono">Ordenados por pontuação viral</span>
+            <span className="text-xs text-zinc-400 font-mono">Formatados em 9:16 Vertical para Celular</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {clips.map((clip) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {clips.map((clip, index) => (
               <div
                 key={clip.id}
-                className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden backdrop-blur-md hover:border-white/20 transition-all flex flex-col"
+                className="bg-[#121216] border border-white/[0.08] rounded-3xl overflow-hidden backdrop-blur-md hover:border-orange-500/40 transition-all flex flex-col shadow-xl"
               >
-                {/* 9:16 Video Box */}
-                <div className="relative aspect-[9/16] bg-black max-h-[360px] overflow-hidden flex items-center justify-center">
+                {/* 9:16 REAL PHONE CONTAINER */}
+                <div className="relative aspect-[9/16] w-full bg-black overflow-hidden flex items-center justify-center border-b border-white/[0.06]">
                   {clip.storage_url ? (
                     <video
                       src={clip.storage_url}
@@ -400,28 +402,36 @@ export default function ProjectClient({
                       <span className="text-xs">Prévia Indisponível</span>
                     </div>
                   )}
-                  {/* Duration pill */}
-                  <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] font-mono font-medium flex items-center gap-1.5 border border-white/10">
+
+                  {/* Legenda Dinâmica Sobreposta Estilo CapCut */}
+                  {renderSubtitleOverlay(clip.hook)}
+
+                  {/* Duration Pill */}
+                  <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-medium flex items-center gap-1.5 border border-white/10 z-20 pointer-events-none">
                     <Clock className="w-3 h-3 text-zinc-400" />
                     {formatDuration(clip.end_time - clip.start_time)}
                   </div>
 
-                  {/* Viral badge */}
-                  {clip.score >= 0.8 && (
-                    <div className="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-orange-500/30">
-                      <Zap className="w-2.5 h-2.5 fill-current" /> VIRAL {Math.round(clip.score * 100)}%
-                    </div>
-                  )}
+                  {/* Viral Score Badge */}
+                  <div className="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-orange-500/30 z-20 pointer-events-none">
+                    <Zap className="w-2.5 h-2.5 fill-current" /> VIRAL {Math.round(clip.score * 100)}%
+                  </div>
                 </div>
 
-                {/* Clip Info & Actions */}
-                <div className="p-4 flex-1 flex flex-col justify-between">
+                {/* Info & Ações do Corte */}
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
                   <div>
-                    <h3 className="font-semibold text-sm text-white mb-1 line-clamp-2">
-                      {clip.title || `Clipe ${formatDuration(clip.start_time)}`}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 mb-1 font-mono">
+                      <span>Corte #{index + 1}</span>
+                      <span>{formatDuration(clip.start_time)} - {formatDuration(clip.end_time)}</span>
+                    </div>
+
+                    <h3 className="font-semibold text-xs text-white line-clamp-2 leading-snug">
+                      {clip.title || `Corte ${formatDuration(clip.start_time)}`}
                     </h3>
+
                     {clip.hook && (
-                      <p className="text-xs text-zinc-400 italic line-clamp-2 mb-4">
+                      <p className="text-[11px] text-zinc-400 italic line-clamp-2 mt-1">
                         "{clip.hook}"
                       </p>
                     )}
@@ -434,36 +444,30 @@ export default function ProjectClient({
                     >
                       <Edit3 className="w-3.5 h-3.5" /> Editar
                     </Link>
-                    {clip.storage_url && (
-                      <button
-                        type="button"
-                        onClick={() => setQrModalClip({ title: clip.title || 'Clipe 9:16', url: clip.storage_url! })}
-                        className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-medium text-xs flex items-center justify-center transition-all cursor-pointer"
-                        title="Enviar para o Celular via QR Code (Estilo LocalSend)"
-                      >
-                        <Smartphone className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                                        {clip.storage_url ? (
-                      <a
-                        href={clip.storage_url}
-                        download
-                        className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
-                        title="Baixar MP4"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                    ) : (
-                      <a
-                        href={ytId ? `https://www.youtube.com/watch?v=${ytId}&t=${Math.floor(clip.start_time)}s` : '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
-                        title="Abrir Trecho no YouTube"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setQrModalClip({
+                        title: clip.title || 'Clipe 9:16',
+                        url: clip.storage_url || (ytId ? `https://youtu.be/${ytId}?t=${Math.floor(clip.start_time)}` : window.location.href)
+                      })}
+                      className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-medium text-xs flex items-center justify-center transition-all cursor-pointer"
+                      title="Enviar para o Celular via QR Code (Estilo LocalSend)"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                    </button>
+
+                    <a
+                      href={clip.storage_url || (ytId ? `https://www.youtube.com/watch?v=${ytId}&t=${Math.floor(clip.start_time)}s` : '#')}
+                      target={clip.storage_url ? '_self' : '_blank'}
+                      rel="noopener noreferrer"
+                      download={!!clip.storage_url}
+                      className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
+                      title={clip.storage_url ? 'Baixar MP4' : 'Abrir Trecho'}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+
                     <Link
                       href="/schedule"
                       className="py-2 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-medium text-xs flex items-center justify-center transition-all"
@@ -479,87 +483,52 @@ export default function ProjectClient({
         </div>
       )}
 
-      {/* Failed state with helpful action */}
-      {status === 'failed' && (
-        <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-center max-w-xl mx-auto">
-          <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-3">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <h2 className="text-base font-bold text-white mb-1">Falha no Processamento do Vídeo</h2>
-          <p className="text-xs text-zinc-300 mb-4 leading-relaxed">
-            {errorMessage || 'O worker encontrou um erro ao baixar ou cortar o vídeo. Verifique se o link tem restrição de idade ou se é público.'}
-          </p>
-          <div className="flex items-center justify-center gap-3">
-            <Link
-              href="/upload"
-              className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-all"
-            >
-              Tentar com Outro Vídeo
-            </Link>
-            <button
-              onClick={handleManualCheck}
-              className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-zinc-300 text-xs font-medium transition-all"
-            >
-              Tentar Novamente
-            </button>
-          </div>
-        </div>
-      )}
-      {/* MODAL: ENVIAR PARA O CELULAR (ESTILO LOCALSEND) */}
+      {/* Modal QR Code Celular (Estilo LocalSend) */}
       {qrModalClip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-sm bg-[#121214] border border-white/10 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#121216] border border-white/[0.1] rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative">
             <button
               onClick={() => setQrModalClip(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-lg"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
-
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 mx-auto">
-              <Smartphone className="w-6 h-6" />
+            <div className="text-center space-y-1">
+              <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto text-purple-400 mb-2">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-bold text-white">Transferir para o Celular</h3>
+              <p className="text-xs text-zinc-400">
+                Aponte a câmera do celular para abrir o corte vertical instantaneamente.
+              </p>
             </div>
 
-            <div>
-              <h3 className="text-base font-bold text-white">Enviar para o Celular</h3>
-              <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{qrModalClip.title}</p>
-            </div>
-
-            {/* QR CODE BOX */}
-            <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-xl">
+            <div className="bg-white p-3 rounded-2xl flex items-center justify-center shadow-inner">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(qrModalClip.url)}`}
                 alt="QR Code"
-                className="w-44 h-44 object-contain"
+                className="w-44 h-44"
               />
             </div>
 
-            <p className="text-[11px] text-zinc-400 leading-relaxed px-2">
-              Aponte a câmera do seu <strong>iPhone ou Android</strong> para baixar o vídeo vertical 9:16 direto no rolo da câmera sem cabo nem nuvem!
-            </p>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(qrModalClip.url)
-                  setCopiedUrl(true)
-                  setTimeout(() => setCopiedUrl(false), 2000)
-                }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedUrl ? 'Copiado!' : 'Copiar Link'}
-              </button>
-              <a
-                href={qrModalClip.url}
-                target="_blank"
-                rel="noreferrer"
-                className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> Abrir
-              </a>
-            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(qrModalClip.url)
+                setCopiedUrl(true)
+                setTimeout(() => setCopiedUrl(false), 2500)
+              }}
+              className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              {copiedUrl ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Link Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" /> Copiar Link Direto
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

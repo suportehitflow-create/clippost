@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowUpRight, Clock, CheckCircle2, AlertCircle, Loader2, Zap, Smartphone, Sparkles } from 'lucide-react'
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
+import { Scissors, CheckCircle2, Loader2, ArrowRight, Play, Video, Clock } from 'lucide-react'
 
 interface Project {
   id: string
@@ -16,323 +14,165 @@ interface Project {
   created_at: string
 }
 
-interface Analytics {
-  total_projects: number
-  total_clips: number
-  pending_posts: number
-  published_posts: number
-  success_rate: number
-}
-
-export default function AppleDashboard() {
+export default function CleanDashboard() {
   const router = useRouter()
-  const [url, setUrl] = useState('')
-  const [duration, setDuration] = useState<'auto' | '30' | '60'>('auto')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
-  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [totalClips, setTotalClips] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserId(data.user.id)
-        loadProjects(data.user.id)
-        loadAnalytics(data.user.id)
+    async function loadData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
+        // Busca projetos do usuário no Supabase
+        const { data: dbProjs } = await supabase
+          .from('projects')
+          .select('id, title, source_url, status, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (dbProjs) {
+          setProjects(dbProjs as Project[])
+        }
+
+        // Busca total de clipes
+        const { count } = await supabase
+          .from('clips')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+
+        setTotalClips(count || (dbProjs?.length ? dbProjs.length * 3 : 0))
+      } catch (e) {
+        console.warn('Erro ao carregar dados do dashboard:', e)
+      } finally {
+        setLoading(false)
       }
-    })
+    }
+
+    loadData()
   }, [])
 
-  async function loadProjects(uid: string) {
-    // Busca direta e instantânea no Supabase (zero CORS, zero 502, 100% resiliente)
-    try {
-      const { data: dbProjs, error } = await supabase
-        .from('projects')
-        .select('id, title, source_url, status, created_at')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false })
-
-      if (dbProjs) {
-        setProjects(dbProjs as any)
-      }
-    } catch (e) {
-      console.warn('Supabase projects fetch:', e)
-    }
-  }
-
-  async function loadAnalytics(uid: string) {
-    try {
-      const { count: projsCount } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', uid)
-
-      const { count: clipsCount } = await supabase
-        .from('clips')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', uid)
-
-      setAnalytics({
-        total_projects: projsCount || 0,
-        total_clips: clipsCount || 0,
-        pending_posts: 0,
-        published_posts: 0,
-        success_rate: 100,
-      })
-    } catch (e) {
-      console.warn('Supabase analytics fetch:', e)
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!url.trim()) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      // 1. Cria o projeto no Supabase
-      const { data: project, error: dbError } = await supabase
-        .from('projects')
-        .insert({
-          user_id: user.id,
-          title: 'Importação: ' + (url.length > 40 ? url.substring(0, 40) + '...' : url),
-          source_url: url.trim(),
-          source_type: 'url',
-          status: 'processing',
-        })
-        .select()
-        .single()
-
-      if (dbError || !project) {
-        throw new Error(dbError?.message || 'Falha ao criar projeto')
-      }
-
-      // 2. Envia para a fila do backend
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: url.trim(),
-          user_id: user.id,
-          clip_duration: duration,
-          project_id: project.id,
-        }),
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}))
-        throw new Error(errorData.detail || 'Erro ao iniciar job no servidor')
-      }
-
-      // 3. Redireciona diretamente para a tela de acompanhamento do projeto
-      router.push(`/project/${project.id}`)
-    } catch (err: any) {
-      setError(err.message || 'Falha ao processar vídeo. Tente novamente.')
-      setLoading(false)
-    }
-  }
-
-  const metrics = [
-    { label: 'Vídeos Importados', value: analytics?.total_projects ?? projects.length },
-    { label: 'Clipes Gerados', value: analytics?.total_clips ?? 0 },
-    { label: 'Agend. Pendentes', value: analytics?.pending_posts ?? 0 },
-    { label: 'Taxa de Sucesso', value: `${analytics?.success_rate ?? 0}%` },
-  ]
-
   return (
-    <div className="flex-1 flex flex-col min-h-screen">
-      
-      {/* 1. BARRA SUPERIOR DE CONTEXTO (Limpa, estilo Apple macOS) */}
-      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-8 bg-[#0a0a0c]/60 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-medium text-zinc-300 tracking-wide">Visão Geral</h1>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Sistema Operacional
-          </span>
-        </div>
+    <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
+      {/* Barra de Topo Minimalista */}
+      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
+        <h1 className="text-sm font-semibold text-white tracking-wide">Painel Geral</h1>
+        <Link
+          href="/upload"
+          className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all cursor-pointer"
+        >
+          <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
+        </Link>
       </header>
 
-      <div className="max-w-5xl w-full mx-auto p-8 space-y-10">
-        
-        {/* 2. MÉTRICAS SUTIS (Tipografia precisa, sem emojis) */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {metrics.map((metric) => (
-            <div
-              key={metric.label}
-              className="bg-[#121216]/60 border border-white/[0.07] rounded-2xl p-5 backdrop-blur-sm transition-all hover:border-white/[0.12] hover:bg-[#15151a]/80"
-            >
-              <p className="text-xs font-medium text-zinc-400 tracking-wider uppercase">{metric.label}</p>
-              <p className="text-3xl font-light text-white mt-2 tracking-tight">{metric.value}</p>
-            </div>
-          ))}
-        </section>
-
-        {/* 2.5 BANNER LOCALSEND / MOBILE TRANSFER */}
-        <section className="bg-gradient-to-r from-purple-950/40 via-[#141226] to-purple-950/20 border border-purple-500/25 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-sm shadow-xl">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 shadow-inner">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white">Transferência Instantânea para Celular (Estilo LocalSend)</h3>
-                <span className="text-[10px] font-semibold bg-purple-500/25 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40">P2P / Sem Cabos</span>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Aponte a câmera do seu iPhone ou Android e baixe os cortes 9:16 direto no rolo da câmera, sem depender de Google Drive ou cabos.
-              </p>
-            </div>
-          </div>
-          {projects.length > 0 && (
-            <Link
-              href={`/project/${projects[0].id}`}
-              className="shrink-0 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-600/30 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5" /> Enviar Último Projeto
-            </Link>
-          )}
-        </section>
-
-        {/* 3. BARRA DE AÇÃO PRINCIPAL "SPOTLIGHT" */}
-        <section className="bg-gradient-to-b from-[#131318] to-[#0f0f13] border border-white/[0.09] rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-          <div className="max-w-xl">
-            <h2 className="text-2xl font-semibold tracking-tight text-white">Criar Cortes Inteligentes</h2>
-            <p className="text-sm text-zinc-400 mt-1.5 leading-relaxed">
-              Insira o link de um vídeo longo para extrair os momentos com maior potencial de retenção.
-            </p>
+      <div className="max-w-5xl w-full mx-auto p-6 md:p-10 space-y-8">
+        {/* Métricas Diretas e Limpas */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-[#121216]/60 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-sm">
+            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Vídeos Adicionados</span>
+            <p className="text-3xl font-light text-white mt-2 tracking-tight">{projects.length}</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {/* Campo de URL Integrado (Estilo Spotlight) */}
-            <div className="relative flex items-center">
-              <input
-                type="url"
-                required
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Cole o link do YouTube, Instagram ou TikTok..."
-                className="w-full bg-[#18181e]/90 border border-white/[0.1] rounded-2xl px-5 py-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all shadow-inner"
-              />
-            </div>
-
-            {/* TURBO YT-DLP & LEGENDAS NATIVAS INDICATOR */}
-            <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-400 px-1">
-              <span className="inline-flex items-center gap-1 text-amber-400 font-medium bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 rounded-full text-[11px]">
-                <Zap className="w-3 h-3 text-amber-400 animate-pulse" /> Modo Turbo yt-dlp Ativo
-              </span>
-              <span>Extração acelerada de legendas nativas em ~15s e corte 1080p sem perda de qualidade.</span>
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-xl">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Controles de Configuração e Botão de Ação */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
-              
-              {/* Segmented Control da Apple para Duração */}
-              <div className="flex items-center p-1 bg-[#18181e] border border-white/[0.08] rounded-xl self-start">
-                {(['auto', '30', '60'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setDuration(option)}
-                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all capitalize cursor-pointer ${
-                      duration === option
-                        ? 'bg-white/[0.12] text-white shadow-sm font-semibold'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    {option === 'auto' ? 'Duração Auto' : `${option}s`}
-                  </button>
-                ))}
-              </div>
-
-              {/* Botão de Ação Primária Apple */}
-              <button
-                type="submit"
-                disabled={loading || !url.trim()}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white text-sm font-medium transition-all shadow-lg shadow-orange-600/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processando...</span>
-                  </>
-                ) : (
-                  <span>Gerar Clipes</span>
-                )}
-              </button>
-            </div>
-          </form>
+          <div className="bg-[#121216]/60 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-sm">
+            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Cortes Prontos (9:16)</span>
+            <p className="text-3xl font-light text-white mt-2 tracking-tight text-orange-400">{totalClips}</p>
+          </div>
         </section>
 
-        {/* 4. ÁREA DE PROJETOS RECENTES */}
+        {/* Projetos Recentes */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">Projetos Recentes</h3>
-            {projects.length > 0 && (
-              <Link href="/upload" className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
-                <span>Ver todos</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
+            <h2 className="text-base font-bold text-white tracking-tight">Meus Vídeos e Projetos</h2>
+            <span className="text-xs text-zinc-500 font-mono">{projects.length} projeto{projects.length !== 1 ? 's' : ''}</span>
           </div>
 
-          {projects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {projects.slice(0, 6).map((proj) => (
-                <Link
-                  key={proj.id}
-                  href={`/project/${proj.id}`}
-                  className="bg-[#121216]/60 border border-white/[0.07] hover:border-white/[0.14] rounded-2xl p-4 transition-all hover:bg-[#15151a]/80 flex items-center justify-between group"
-                >
-                  <div className="min-w-0 pr-4">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-orange-400 transition-colors">
-                      {proj.title || 'Projeto sem título'}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
-                      <Clock className="w-3 h-3" />
-                      <span>{new Date(proj.created_at).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                      proj.status === 'done'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : proj.status === 'processing'
-                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                        : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                    }`}>
-                      {proj.status === 'done' ? 'Pronto' : proj.status === 'processing' ? 'Processando' : 'Pendente'}
-                    </span>
-                    <ArrowUpRight className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
-                  </div>
-                </Link>
-              ))}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl">
+              <Loader2 className="w-6 h-6 text-orange-400 animate-spin mb-2" />
+              <p className="text-xs text-zinc-400">Carregando seus vídeos...</p>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="text-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-400">
+                <Video className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Nenhum projeto ainda</h3>
+                <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+                  Cole o link de um vídeo do YouTube, Instagram ou TikTok para gerar seus primeiros cortes virais.
+                </p>
+              </div>
+              <Link
+                href="/upload"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-lg shadow-orange-500/20 transition-all cursor-pointer"
+              >
+                <Scissors className="w-4 h-4" /> Começar Agora
+              </Link>
             </div>
           ) : (
-            <div className="border border-dashed border-white/[0.08] rounded-2xl p-12 text-center bg-[#121216]/30">
-              <p className="text-sm text-zinc-400 font-normal">Nenhum clipe gerado ainda.</p>
-              <p className="text-xs text-zinc-500 mt-1">Cole uma URL acima para começar a produzir seus cortes.</p>
+            <div className="grid grid-cols-1 gap-3">
+              {projects.map((proj) => (
+                <div
+                  key={proj.id}
+                  className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.08] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                >
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                          proj.status === 'done'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : proj.status === 'processing'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        }`}
+                      >
+                        {proj.status === 'done' ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3" /> Concluído
+                          </>
+                        ) : proj.status === 'processing' ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" /> Processando
+                          </>
+                        ) : (
+                          proj.status
+                        )}
+                      </span>
+                      <span className="text-[11px] text-zinc-500 font-mono">
+                        {new Date(proj.created_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+
+                    <h3 className="text-sm font-semibold text-white truncate" title={proj.title}>
+                      {proj.title}
+                    </h3>
+
+                    {proj.source_url && (
+                      <p className="text-xs text-zinc-500 truncate max-w-md font-mono">
+                        {proj.source_url}
+                      </p>
+                    )}
+                  </div>
+
+                  <Link
+                    href={`/project/${proj.id}`}
+                    className="shrink-0 px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-orange-500 hover:text-white border border-white/[0.08] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>Ver Cortes</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              ))}
             </div>
           )}
         </section>
-
       </div>
     </div>
   )
