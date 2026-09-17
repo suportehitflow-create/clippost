@@ -110,7 +110,7 @@ export default function CreateClipsPage() {
 
       <div className="max-w-2xl w-full mx-auto p-6 md:p-10 space-y-8">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-400 mb-4 shadow-lg shadow-orange-500/10">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center mx-auto text-white mb-4 shadow-lg shadow-indigo-500/25">
             <Scissors className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Criar Cortes 9:16 com IA</h2>
@@ -245,7 +245,7 @@ export default function CreateClipsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>

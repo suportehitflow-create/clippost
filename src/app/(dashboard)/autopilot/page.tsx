@@ -93,7 +93,7 @@ export default function AutoPilotPage() {
   const [manualPosition, setManualPosition] = useState(true)
   const [videoYOffset, setVideoYOffset] = useState<number>(55) // % from top
   const [videoScale, setVideoScale] = useState<number>(85) // % width
-  const [hookText, setHookText] = useState('Meu maior arrependimento foi não ter seguido essa página antes 😭😭')
+  const [hookText, setHookText] = useState('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
   const [brandName, setBrandName] = useState('HUMOR DO BICHANO')
   const [brandHandle, setBrandHandle] = useState('@humordobichano')
   const [generatingPreview, setGeneratingPreview] = useState(false)

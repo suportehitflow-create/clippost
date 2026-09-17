@@ -99,7 +99,7 @@ export default function CleanDashboard() {
         <h1 className="text-sm font-semibold text-white tracking-wide">Painel Geral - Clipost</h1>
         <Link
           href="/upload"
-          className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
         >
           <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
         </Link>
@@ -115,7 +115,7 @@ export default function CleanDashboard() {
 
           <div className="bg-[#121216]/60 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-sm">
             <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Cortes Prontos (9:16)</span>
-            <p className="text-3xl font-light text-white mt-2 tracking-tight text-orange-400">{totalClips}</p>
+            <p className="text-3xl font-light text-white mt-2 tracking-tight text-indigo-400">{totalClips}</p>
           </div>
         </section>
 
@@ -133,7 +133,7 @@ export default function CleanDashboard() {
             </div>
           ) : projects.length === 0 ? (
             <div className="text-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-400">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center mx-auto text-white shadow-lg shadow-indigo-500/25">
                 <Video className="w-6 h-6" />
               </div>
               <div>
@@ -144,7 +144,7 @@ export default function CleanDashboard() {
               </div>
               <Link
                 href="/upload"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-lg shadow-orange-500/20 transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
               >
                 <Scissors className="w-4 h-4" /> Começar Agora
               </Link>
@@ -198,7 +198,7 @@ export default function CleanDashboard() {
                   <div className="flex items-center gap-2 shrink-0">
                     <Link
                       href={`/project/${proj.id}`}
-                      className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-orange-500 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-2 border border-white/[0.08] hover:border-orange-500 transition-all cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-indigo-600 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-2 border border-white/[0.08] hover:border-indigo-500 transition-all cursor-pointer"
                     >
                       <Play className="w-3 h-3 fill-current" /> Abrir Cortes
                     </Link>

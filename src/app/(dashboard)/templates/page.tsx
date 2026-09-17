@@ -81,7 +81,7 @@ const TEMPLATE_PRESETS = [
     bg: 'dark',
     brandName: 'HUMOR DA IGUANA',
     brandHandle: '@humordaiguana',
-    title: 'É assim que o seu título vai aparecer no vídeo 🔥',
+    title: 'ASSIM QUE SEU TITULO APARECERA NO VIDEOS',
     font: "-apple-system, BlinkMacSystemFont, 'Apple Color Emoji', 'SF Pro Display', 'SF Pro Text', sans-serif",
     fontSize: 14,
     subtitle: 'hormozi_yellow',
@@ -153,7 +153,7 @@ export default function TemplatesPage() {
   const [brandName, setBrandName] = useState('HUMOR DA IGUANA')
   const [brandHandle, setBrandHandle] = useState('@humordaiguana')
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80')
-  const [titleText, setTitleText] = useState('É assim que o seu título vai aparecer no vídeo')
+  const [titleText, setTitleText] = useState('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
 
   // Tipografia
   const [fontFamily, setFontFamily] = useState(FONT_OPTIONS[0].family)
@@ -199,7 +199,11 @@ export default function TemplatesPage() {
           if (c.templateBg) setTemplateBg(c.templateBg)
           if (c.brandName) setBrandName(c.brandName)
           if (c.brandHandle) setBrandHandle(c.brandHandle)
-          if (c.titleText) setTitleText(c.titleText)
+          if (c.titleText && !c.titleText.includes('arrependimento') && !c.titleText.includes('É assim que')) {
+            setTitleText(c.titleText)
+          } else {
+            setTitleText('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
+          }
           if (c.fontFamily) setFontFamily(c.fontFamily)
           if (c.fontSize) setFontSize(c.fontSize)
           if (c.textAlign) setTextAlign(c.textAlign)
@@ -570,8 +574,8 @@ export default function TemplatesPage() {
           <div className="h-4 w-px bg-white/10" />
 
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-[#6366f1]/20 border border-[#6366f1]/30 flex items-center justify-center">
-              <LayoutTemplate className="w-4 h-4 text-[#6366f1]" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white shrink-0">
+              <LayoutTemplate className="w-4 h-4 text-white" />
             </div>
             <div>
               <h1 className="text-xs sm:text-sm font-semibold text-white tracking-tight flex items-center gap-2">
@@ -586,16 +590,6 @@ export default function TemplatesPage() {
 
         {/* Ações da Direita */}
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={autoAlignSafeZone}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.08] transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Alinhar automaticamente todos os elementos na Área Segura"
-          >
-            <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Enquadrar na Safe Zone</span>
-          </button>
-
           <button
             type="button"
             onClick={handleSave}
@@ -765,19 +759,67 @@ export default function TemplatesPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-zinc-400 font-medium">Tamanho da Fonte:</label>
-                    <span className="font-mono text-white font-bold">{fontSize}px</span>
+                    <label className="text-zinc-400 font-medium text-xs">Tamanho da Fonte (11 a 18):</label>
+                    <span className="font-mono text-xs text-indigo-400 font-bold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{fontSize}px</span>
                   </div>
-                  <input
-                    type="range"
-                    min={11}
-                    max={22}
-                    value={fontSize}
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="w-full accent-indigo-500 cursor-pointer"
-                  />
+
+                  {/* Seletor Numérico com Botões [-] [ Número ] [+] */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFontSize(f => Math.max(11, f - 1))}
+                      disabled={fontSize <= 11}
+                      className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
+                      title="Diminuir fonte (mínimo 11)"
+                    >
+                      -
+                    </button>
+                    <div className="flex-1 relative">
+                      <input
+                        type="number"
+                        min={11}
+                        max={18}
+                        value={fontSize}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10)
+                          if (!isNaN(val)) {
+                            setFontSize(Math.max(11, Math.min(18, val)))
+                          }
+                        }}
+                        className="w-full h-9 bg-zinc-900 border border-white/10 focus:border-indigo-500 rounded-xl text-center text-sm font-bold text-white outline-none"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-mono pointer-events-none">px</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFontSize(f => Math.min(18, f + 1))}
+                      disabled={fontSize >= 18}
+                      className="w-10 h-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold border border-white/10 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
+                      title="Aumentar fonte (máximo 18)"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Seleção Direta dos Números Permitidos (11 a 18) */}
+                  <div className="grid grid-cols-8 gap-1 pt-1">
+                    {[11, 12, 13, 14, 15, 16, 17, 18].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setFontSize(size)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          fontSize === size
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 scale-105 ring-1 ring-white/30'
+                            : 'bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-white/5'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -813,7 +855,7 @@ export default function TemplatesPage() {
                     value={titleText}
                     onChange={(e) => setTitleText(e.target.value)}
                     rows={3}
-                    placeholder="É assim que o seu título vai aparecer no vídeo"
+                    placeholder="ASSIM QUE SEU TITULO APARECERA NO VIDEOS"
                     className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-[#6366f1]/50 resize-none text-xs leading-relaxed"
                   />
                 </div></div>
@@ -1011,12 +1053,12 @@ export default function TemplatesPage() {
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative w-[310px] sm:w-[340px] aspect-[9/16] bg-black rounded-[48px] p-2 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 overflow-hidden ring-1 ring-white/10"
+            className="relative bg-zinc-950 rounded-[46px] p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.95)] shrink-0 ring-1 ring-white/15 overflow-hidden"
           >
             {/* CANVAS INTERNO DO TEMPLATE */}
             <div
               ref={phoneRef}
-              className={`relative w-full h-full rounded-[38px] overflow-hidden transition-colors ${
+              className={`relative w-[315px] sm:w-[333px] aspect-[9/16] rounded-[36px] overflow-hidden transition-colors ${
                 templateBg === 'white'
                   ? 'bg-white text-zinc-950'
                   : templateBg === 'gray'
