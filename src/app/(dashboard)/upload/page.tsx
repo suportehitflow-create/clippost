@@ -130,7 +130,7 @@ export default function UploadPage() {
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 6000)
-      await fetch(`${API}/api/jobs`, {
+      await fetch(`/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: sourceUrl, user_id: user.id, clip_duration: 'auto', project_id: project.id }),

@@ -112,22 +112,7 @@ export default function ProjectClient({
         // silent
       }
 
-      // 2. Secondary check to API (silent catch)
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
-        const res = await fetch(`${apiUrl}/api/jobs/${project.id}`).catch(() => null)
-        if (res && res.ok) {
-          const data = await res.json()
-          if (data.status) setStatus(data.status)
-          if (data.clips && data.clips.length > 0) setClips(data.clips)
-          if (data.error_message) setErrorMessage(data.error_message)
-          if (data.status === 'done' || data.status === 'failed') {
-            setStatus(data.status)
-          }
-        }
-      } catch {
-        // silent
-      }
+      // Status e clipes são sincronizados 100% via Supabase em tempo real
     }
 
     checkStatus()
