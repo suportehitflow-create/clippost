@@ -63,7 +63,14 @@ export default function SettingsPage() {
         setUserEmail(user.email || '')
         setUserId(user.id)
         // Load profile settings
-        const { data: profile } = await supabase.from('profiles').select('plan, auto_publish').eq('id', user.id).single()
+        let profile: any = null
+        const { data: pWithAuto, error: pErr } = await supabase.from('profiles').select('plan, auto_publish').eq('id', user.id).maybeSingle()
+        if (pErr) {
+          const { data: pSimple } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+          profile = pSimple
+        } else {
+          profile = pWithAuto
+        }
         if (profile) {
           setPlan(profile.plan === 'pro' ? 'Pro Creator' : profile.plan === 'free' ? 'Gratuito' : profile.plan)
           setAutoPublish(profile.auto_publish ?? false)
@@ -87,7 +94,11 @@ export default function SettingsPage() {
   async function toggleAutoPublish(val: boolean) {
     setAutoPublish(val)
     if (userId) {
-      await supabase.from('profiles').update({ auto_publish: val }).eq('id', userId)
+      try {
+        await supabase.from('profiles').update({ auto_publish: val }).eq('id', userId)
+      } catch (e) {
+        console.warn('Coluna auto_publish ainda não migrada:', e)
+      }
       showSaved()
     }
   }
