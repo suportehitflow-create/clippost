@@ -318,6 +318,28 @@ export default function TemplatesPage() {
       }
     }
     localStorage.setItem('clippost_active_template', JSON.stringify(templateData))
+    localStorage.setItem('clippost_template_config', JSON.stringify(templateData.config))
+
+    // Sincroniza automaticamente com o Supabase com debounce de 1.5s
+    const timer = setTimeout(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await fetch('/api/brand-kit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: user.id,
+              avatar_url: avatarUrl,
+              username: brandHandle,
+              layout_config: templateData.config,
+            }),
+          })
+        }
+      } catch {}
+    }, 1500)
+
+    return () => clearTimeout(timer)
   }, [
     templateBg,
     avatarPos,
@@ -970,29 +992,7 @@ export default function TemplatesPage() {
                     />
                   </div>
 
-                  {/* TAMANHO DO PERFIL (COMBINAÇÃO DIRETA COM LETRAS) */}
-                  <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                    <div className="flex items-center justify-between">
-                      <label className="text-zinc-400 font-medium text-xs">Tamanho do Perfil (Combinação):</label>
-                      <button
-                        type="button"
-                        onClick={() => setBrandScale(fontSize)}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline flex items-center gap-1"
-                        title="Igualar o perfil ao tamanho da fonte do título"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>Igualar ({fontSize}px)</span>
-                      </button>
-                    </div>
-                    <SweepStepper
-                      value={brandScale}
-                      onChange={setBrandScale}
-                      min={11}
-                      max={22}
-                      step={1}
-                      unit="px"
-                    />
-                  </div>
+                  
 
                   {/* COR DA LETRA */}
                   <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
@@ -1620,21 +1620,21 @@ export default function TemplatesPage() {
                   color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
                   textAlign: textAlign,
                   textTransform: titleCapsLock ? 'uppercase' : 'none',
-                  paintOrder: 'stroke fill',
-                  textShadow: titleStroke !== 'none'
-                    ? (() => {
-                        const r = titleStroke === 'thin' ? 1.2 : titleStroke === 'medium' ? 2.2 : 3.2
-                        const pts = []
-                        for (let i = 0; i < 16; i++) {
-                          const a = (i * Math.PI) / 8
-                          pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
-                        }
-                        return pts.join(', ')
-                      })()
-                    : 'none',
-                  WebkitTextStroke: titleStroke !== 'none'
-                    ? `${titleStroke === 'thin' ? '1.5px' : titleStroke === 'medium' ? '2.5px' : '3.5px'} ${titleStrokeColor}`
-                    : 'none'
+                                      paintOrder: titleStroke !== 'none' ? 'stroke fill' : 'normal',
+                    textShadow: titleStroke !== 'none'
+                      ? (() => {
+                          const r = titleStroke === 'thin' ? 1.0 : titleStroke === 'medium' ? 1.8 : 2.6
+                          const pts = []
+                          for (let i = 0; i < 16; i++) {
+                            const a = (i * Math.PI) / 8
+                            pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
+                          }
+                          return pts.join(', ')
+                        })()
+                      : 'none',
+                    WebkitTextStroke: titleStroke !== 'none'
+                      ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '2px' : '3px'} ${titleStrokeColor}`
+                      : '0px transparent'
                 }}
                 className={`absolute cursor-grab active:cursor-grabbing z-30 font-black leading-tight tracking-tight select-none ${
                   draggingTarget === 'title' ? 'ring-2 ring-[#6366f1] rounded-xl p-1 bg-white/5' : ''

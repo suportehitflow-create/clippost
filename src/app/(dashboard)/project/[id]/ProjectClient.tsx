@@ -146,7 +146,7 @@ export default function ProjectClient({
   const [videoYOffset, setVideoYOffset] = useState<number>(54)
   const [videoScale, setVideoScale] = useState<number>(96)
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>('4/5')
-  const [videoRounded, setVideoRounded] = useState<boolean>(false)
+  const [videoRounded, setVideoRounded] = useState<boolean>(true)
   const [brandName, setBrandName] = useState('Nome da Página')
   const [brandHandle, setBrandHandle] = useState('@nomedapagina')
   const [brandScale, setBrandScale] = useState<number>(14)
@@ -646,14 +646,35 @@ export default function ProjectClient({
                   </span>
                 </div>
 
-              {/* 1. TÍTULO DO VÍDEO (HEADLINE FIXA NO TOPO) */}
-              <div className="px-4 py-1.5 text-center z-20 my-auto pointer-events-none">
-                <h2 className={`text-xs sm:text-sm font-black leading-snug uppercase tracking-tight line-clamp-3 ${
-                  templateBg === 'white' ? 'text-zinc-950' : 'text-white'
-                }`}>
-                  {displayedTitle}
-                </h2>
-              </div>
+                              {/* 1. TÍTULO DO VÍDEO (HEADLINE VINCULADA AO TEMPLATE OFICIAL) */}
+                <div className="px-4 py-1.5 z-20 my-auto pointer-events-none w-full" style={{ textAlign: textAlign, fontFamily: fontFamily }}>
+                  <h2
+                    style={{
+                      fontSize: `${fontSize}px`,
+                      color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
+                      textAlign: textAlign,
+                      textTransform: titleCapsLock ? 'uppercase' : 'none',
+                      paintOrder: titleStroke !== 'none' ? 'stroke fill' : 'normal',
+                      textShadow: titleStroke !== 'none'
+                        ? (() => {
+                            const r = titleStroke === 'thin' ? 1.0 : titleStroke === 'medium' ? 1.8 : 2.6
+                            const pts = []
+                            for (let i = 0; i < 16; i++) {
+                              const a = (i * Math.PI) / 8
+                              pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
+                            }
+                            return pts.join(', ')
+                          })()
+                        : 'none',
+                      WebkitTextStroke: titleStroke !== 'none'
+                        ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '2px' : '3px'} ${titleStrokeColor}`
+                        : '0px transparent',
+                    }}
+                    className="font-black leading-snug tracking-tight line-clamp-3"
+                  >
+                    {displayedTitle}
+                  </h2>
+                </div>
 
               {/* 2. ENQUADRAMENTO DO VÍDEO COM PLAYER INTEGRADO (ÚNICO PLAYER) */}
               <div
@@ -668,7 +689,7 @@ export default function ProjectClient({
                   controlsTimeoutRef.current = setTimeout(() => setShowVideoControls(false), 2500)
                 }}
                 onMouseLeave={() => setShowVideoControls(false)}
-                className={`relative aspect-[4/5] overflow-hidden z-10 shadow-md group/player ${
+                className={`relative aspect-[4/5] ${videoRounded ? "rounded-2xl" : "rounded-none"} overflow-hidden z-10 shadow-md group/player ${
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
                 } flex items-center justify-center cursor-pointer`}
               >
