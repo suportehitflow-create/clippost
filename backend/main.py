@@ -109,7 +109,7 @@ class WatchRequest(BaseModel):
     clip_duration: str = "auto"
 
 
-SCHEDULE_PLATFORMS = {"tiktok", "instagram", "youtube_shorts"}
+SCHEDULE_PLATFORMS = {"tiktok", "instagram", "youtube_shorts", "facebook"}
 
 
 class SocialAccountRequest(BaseModel):
