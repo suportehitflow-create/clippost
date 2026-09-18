@@ -123,6 +123,12 @@ export default function ProjectClient({
   const supabase = createClient()
   const router = useRouter()
   const [isDeletingProject, setIsDeletingProject] = useState(false)
+  const [elapsedSecs, setElapsedSecs] = useState(0)
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsedSecs(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
@@ -552,10 +558,32 @@ export default function ProjectClient({
             {/* Etapas do Processamento */}
             <div className="space-y-2.5 pt-1">
               {[
-                { title: 'Download & extração de áudio', desc: 'Processando fluxo do vídeo original', done: true },
-                { title: 'Transcrição Whisper & timestamps', desc: 'Mapeando cada palavra para a legenda', active: true },
-                { title: 'Mineração narrativa de ganchos virais', desc: 'Analisando retenção e tópicos magnéticos', pending: true },
-                { title: 'Renderização 9:16 & template oficial', desc: 'Aplicando cortes verticais e legendas', pending: true },
+                { 
+                  title: 'Download & extração de áudio', 
+                  desc: elapsedSecs < 18 ? `Baixando fluxo de vídeo e áudio (${elapsedSecs}s)... ` : 'Vídeo e áudio baixados com sucesso', 
+                  done: elapsedSecs >= 18, 
+                  active: elapsedSecs < 18 
+                },
+                { 
+                  title: 'Transcrição Whisper & timestamps', 
+                  desc: elapsedSecs < 18 ? 'Aguardando download' : elapsedSecs < 45 ? `Mapeando falas e palavras com IA (${elapsedSecs - 18}s)... ` : 'Transcrição e timestamps concluídos', 
+                  done: elapsedSecs >= 45, 
+                  active: elapsedSecs >= 18 && elapsedSecs < 45, 
+                  pending: elapsedSecs < 18 
+                },
+                { 
+                  title: 'Mineração narrativa de ganchos virais', 
+                  desc: elapsedSecs < 45 ? 'Aguardando transcrição' : elapsedSecs < 70 ? 'Calculando retenção e gerando títulos magnéticos...' : 'Ganchos de alta retenção encontrados', 
+                  done: elapsedSecs >= 70, 
+                  active: elapsedSecs >= 45 && elapsedSecs < 70, 
+                  pending: elapsedSecs < 45 
+                },
+                { 
+                  title: 'Renderização 9:16 & template oficial', 
+                  desc: elapsedSecs < 70 ? 'Aguardando ganchos' : 'Renderizando formato vertical e sincronizando legendas...', 
+                  active: elapsedSecs >= 70, 
+                  pending: elapsedSecs < 70 
+                },
               ].map((step, idx) => (
                 <div
                   key={idx}

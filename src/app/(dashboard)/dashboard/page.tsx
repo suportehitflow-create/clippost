@@ -20,6 +20,7 @@ export default function CleanDashboard() {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [totalClips, setTotalClips] = useState(0)
+  const [userEmail, setUserEmail] = useState<string>('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -30,6 +31,10 @@ export default function CleanDashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        router.push('/login')
+        return
+      }
+      setUserEmail(user.email || '')
         router.push('/login')
         return
       }
@@ -94,15 +99,39 @@ export default function CleanDashboard() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
-      {/* Barra de Topo Minimalista */}
-      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Painel Geral - Clipost</h1>
-        <Link
-          href="/upload"
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
-        >
-          <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
-        </Link>
+      {/* Barra de Topo com Identificação Clara da Conta */}
+      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clipost</h1>
+          {userEmail && (
+            <span className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-300 bg-white/[0.04] px-2.5 py-1 rounded-full border border-white/[0.08]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              {userEmail}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/upload"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+          >
+            <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
+          </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              if (confirm('Deseja realmente sair da sua conta?')) {
+                await supabase.auth.signOut()
+                window.location.href = '/login'
+              }
+            }}
+            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all text-xs font-medium flex items-center gap-1.5 border border-white/[0.06] cursor-pointer"
+            title="Sair da conta"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Sair</span>
+          </button>
+        </div>
       </header>
 
       <div className="max-w-5xl w-full mx-auto p-6 md:p-10 space-y-8">
