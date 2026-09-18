@@ -5,6 +5,12 @@ import { SweepStepper } from '@/components/ui/SweepStepper'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import {
   Download,
+  Gauge,
+  Shield,
+  Smile,
+  Type as TypeIcon,
+  Image as ImageIcon,
+  Sparkle,
   Scissors,
   Sparkles,
   Calendar,
@@ -136,6 +142,27 @@ export default function ProjectClient({
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+
+  // ESTADOS DE EDIÇÃO EM MASSA & ESTÚDIO
+  const [applyToAllClips, setApplyToAllClips] = useState<boolean>(true)
+  const [studioTab, setStudioTab] = useState<'speed' | 'format' | 'text' | 'watermark' | 'silence' | 'subtitles'>('speed')
+  const [videoSpeed, setVideoSpeed] = useState<number>(1.05)
+  const [showTitleEmojis, setShowTitleEmojis] = useState<boolean>(true)
+  const [removeSilence, setRemoveSilence] = useState<boolean>(true)
+  const [bulkFeedback, setBulkFeedback] = useState<string | null>(null)
+
+  // Marca D'água Anti-Furto
+  const [watermarkEnabled, setWatermarkEnabled] = useState<boolean>(true)
+  const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text')
+  const [watermarkText, setWatermarkText] = useState<string>('@clippost')
+  const [watermarkImage, setWatermarkImage] = useState<string | null>(null)
+  const [watermarkOpacity, setWatermarkOpacity] = useState<number>(45)
+  const [watermarkPosition, setWatermarkPosition] = useState<'center' | 'bottom_center' | 'top_right' | 'top_left' | 'bottom_right'>('center')
+
+  const triggerBulkFeedback = (msg: string) => {
+    setBulkFeedback(msg)
+    setTimeout(() => setBulkFeedback(null), 3000)
+  }
   const [viralityModalMetrics, setViralityModalMetrics] = useState<ViralityMetrics | null>(null)
 
   // CONTROLE MINIMALISTA: Painel de Edição minimizado por padrão
@@ -383,7 +410,11 @@ export default function ProjectClient({
   // Duração
   const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
   const activeSubStyle = SUBTITLE_STYLES.find(s => s.id === activeSubtitleStyle) || SUBTITLE_STYLES[0]
-  const displayedTitle = customTitle || activeClip.title
+  // Tratamento de Emojis no Título (Pílula Com/Sem Emojis)
+  const rawTitle = customTitle || activeClip.title || ''
+  const emojiRegexGlobal = /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/gu
+  const cleanTitleWithoutEmojis = rawTitle.replace(emojiRegexGlobal, '').replace(/\s+/g, ' ').trim()
+  const displayedTitle = showTitleEmojis ? rawTitle : cleanTitleWithoutEmojis
 
   // Virality metrics
   const activeVirality = useMemo(() => {
@@ -445,6 +476,13 @@ export default function ProjectClient({
   const speechWords = useMemo<string[]>(() => {
     return timingWords.map(tw => tw.word)
   }, [timingWords])
+
+  // Sincroniza velocidade de reprodução no player
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = videoSpeed
+    }
+  }, [videoSpeed, selectedClipIndex])
 
   // Sincroniza vídeo nativo ao trocar de corte
   useEffect(() => {
@@ -962,6 +1000,33 @@ export default function ProjectClient({
                   </div>
                 )}
 
+                {/* MARCA D'ÁGUA ANTI-FURTO */}
+                {watermarkEnabled && (
+                  <div
+                    style={{
+                      opacity: watermarkOpacity / 100,
+                      ...(watermarkPosition === 'center'
+                        ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                        : watermarkPosition === 'top_right'
+                        ? { top: '12%', right: '6%' }
+                        : watermarkPosition === 'top_left'
+                        ? { top: '12%', left: '6%' }
+                        : watermarkPosition === 'bottom_right'
+                        ? { bottom: '18%', right: '6%' }
+                        : { bottom: '18%', left: '50%', transform: 'translateX(-50%)' })
+                    }}
+                    className="absolute pointer-events-none z-30 select-none flex items-center gap-1 transition-all"
+                  >
+                    {watermarkType === 'image' && watermarkImage ? (
+                      <img src={watermarkImage} alt="Logo" className="max-h-8 max-w-[110px] object-contain drop-shadow-md" />
+                    ) : (
+                      <div className="px-2.5 py-1 rounded-md bg-black/45 backdrop-blur-xs border border-white/20 text-white font-bold font-mono text-[11px] tracking-wider drop-shadow-md whitespace-nowrap">
+                        {watermarkText || brandHandle || '@clippost'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* CONTROLES NATIVOS DO PLAYER */}
                 <div
                   onClick={(e) => e.stopPropagation()}
@@ -1002,6 +1067,26 @@ export default function ProjectClient({
                       className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                    </button>
+
+                    {/* SPEED BADGE NO PLAYER */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const speeds = [1.0, 1.05, 1.15, 1.25, 1.5, 1.8, 2.0]
+                        const curIdx = speeds.indexOf(videoSpeed)
+                        const nextSpeed = speeds[(curIdx + 1) % speeds.length]
+                        setVideoSpeed(nextSpeed)
+                        if (applyToAllClips) {
+                          triggerBulkFeedback(`Velocidade ${nextSpeed}x aplicada a todos os cortes`)
+                        }
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-white/15 hover:bg-white/25 text-[10px] font-mono font-bold text-indigo-300 flex items-center gap-0.5 cursor-pointer transition-colors"
+                      title="Alternar velocidade de reprodução"
+                    >
+                      <Zap className="w-2.5 h-2.5 text-indigo-400" />
+                      <span>{videoSpeed}x</span>
                     </button>
                     <span className="font-mono text-[10px] text-zinc-300">
                       {formatDuration(Math.floor(playbackTime))} / {formatDuration(Math.floor(clipDuration))}
@@ -1149,6 +1234,538 @@ export default function ProjectClient({
             </div>
 
             </div>
+
+          {/* CARD INTERMEDIÁRIO: ESTÚDIO DE EDIÇÃO EM MASSA */}
+          <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-4">
+            
+            {/* CABEÇALHO DO ESTÚDIO COM TOGGLE DE EDIÇÃO EM MASSA */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                  <Sliders className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Estúdio de Edição</span>
+                    {applyToAllClips ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                        EM MASSA ({clips.length} CORTES)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-400 border border-zinc-700 font-mono">
+                        CORTE #{selectedClipIndex + 1} APENAS
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-zinc-400">
+                    Ajuste velocidade, formato, emojis, marca d'água e silêncio
+                  </p>
+                </div>
+              </div>
+
+              {/* TOGGLE CHECKBOX: APLICAR A TODOS OS CLIPES */}
+              <label className="flex items-center gap-2.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] px-3.5 py-2 rounded-xl cursor-pointer transition-all shrink-0 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyToAllClips}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setApplyToAllClips(checked)
+                    triggerBulkFeedback(checked ? `Edição em massa ativada para todos os ${clips.length} clipes!` : 'Modo individual ativado para este corte')
+                  }}
+                  className="w-4 h-4 rounded border-zinc-600 text-indigo-600 focus:ring-indigo-500 bg-zinc-900 cursor-pointer accent-indigo-600"
+                />
+                <span className="text-xs font-semibold text-zinc-200">
+                  Aplicar a todos os clipes
+                </span>
+              </label>
+            </div>
+
+            {/* FEEDBACK BANNER (SE HOUVER AÇÃO EM MASSA) */}
+            {bulkFeedback && (
+              <div className="px-3.5 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 text-xs font-medium flex items-center justify-between animate-in fade-in duration-150">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>{bulkFeedback}</span>
+                </div>
+                <button type="button" onClick={() => setBulkFeedback(null)} className="text-zinc-400 hover:text-white p-0.5">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* ABAS SEGMENTADAS (PILLS) */}
+            <div className="grid grid-cols-5 gap-1.5 p-1 bg-black/40 border border-white/[0.06] rounded-xl text-xs select-none">
+              <button
+                type="button"
+                onClick={() => setStudioTab('speed')}
+                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  studioTab === 'speed' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span className="truncate">Velocidade</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioTab('format')}
+                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  studioTab === 'format' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span className="truncate">Formato</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioTab('text')}
+                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  studioTab === 'text' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <Smile className="w-3.5 h-3.5" />
+                <span className="truncate">Emojis</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioTab('watermark')}
+                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  studioTab === 'watermark' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span className="truncate">Marca D'água</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioTab('silence')}
+                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  studioTab === 'silence' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                }`}
+              >
+                <Scissors className="w-3.5 h-3.5" />
+                <span className="truncate">Silêncio</span>
+              </button>
+            </div>
+
+            {/* ABA 1: VELOCIDADE DO VÍDEO */}
+            {studioTab === 'speed' && (
+              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-300 font-medium">Aceleração de Retenção (Pitch-Preserved):</span>
+                  <span className="text-xs font-bold font-mono text-indigo-400 px-2 py-0.5 bg-indigo-500/10 rounded-md border border-indigo-500/20">
+                    Velocidade: {videoSpeed}x
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                  {[
+                    { val: 1.0, label: '1.0x', desc: 'Normal' },
+                    { val: 1.05, label: '1.05x', desc: 'Viral' },
+                    { val: 1.15, label: '1.15x', desc: 'Rápido' },
+                    { val: 1.25, label: '1.25x', desc: 'Dinâmico' },
+                    { val: 1.5, label: '1.5x', desc: 'Acelerado' },
+                    { val: 1.8, label: '1.8x', desc: 'Turbo' },
+                    { val: 2.0, label: '2.0x', desc: 'Max' }
+                  ].map((spd) => {
+                    const isAct = videoSpeed === spd.val
+                    return (
+                      <button
+                        key={spd.val}
+                        type="button"
+                        onClick={() => {
+                          setVideoSpeed(spd.val)
+                          if (applyToAllClips) {
+                            triggerBulkFeedback(`Velocidade ${spd.val}x aplicada a todos os ${clips.length} clipes!`)
+                          }
+                        }}
+                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                          isAct
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm shadow-indigo-500/20'
+                            : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        <strong className={`block text-xs ${isAct ? 'text-white' : 'text-zinc-200'}`}>{spd.label}</strong>
+                        <span className="text-[9px] text-zinc-500 block leading-tight">{spd.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  💡 <strong>Dica de Retenção:</strong> A velocidade 1.05x elimina micro-pausas mantendo o tom natural da voz, aumentando a taxa de retenção dos Shorts/Reels em até 18%.
+                </p>
+              </div>
+            )}
+
+            {/* ABA 2: FORMATO & LAYOUT */}
+            {studioTab === 'format' && (
+              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                <div className="space-y-1.5">
+                  <span className="text-xs text-zinc-300 font-medium block">Proporção de Tela:</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: '9:16' as VideoAspectRatio, label: '9:16 (Vertical)', desc: 'Reels / TikTok / Shorts' },
+                      { id: '1:1' as VideoAspectRatio, label: '1:1 (Quadrado)', desc: 'Feed Instagram / LinkedIn' },
+                      { id: '16:9' as VideoAspectRatio, label: '16:9 (Paisagem)', desc: 'YouTube / Desktop' },
+                      { id: '4:5' as VideoAspectRatio, label: '4:5 (Retrato)', desc: 'Feed Instagram Clássico' }
+                    ].map((asp) => (
+                      <button
+                        key={asp.id}
+                        type="button"
+                        onClick={() => {
+                          setVideoAspect(asp.id)
+                          if (applyToAllClips) {
+                            triggerBulkFeedback(`Formato ${asp.id} aplicado a todos os ${clips.length} clipes!`)
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          videoAspect === asp.id
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                            : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-bold block text-white">{asp.label}</span>
+                        <span className="text-[10px] text-zinc-500 block leading-tight">{asp.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                  <span className="text-xs text-zinc-300 font-medium block">Modelo de Layout do Template:</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'meme_frame' as LayoutFormat, label: 'Meme Frame', desc: 'Canal no topo + título + vídeo' },
+                      { id: 'split_screen' as LayoutFormat, label: 'Split Screen', desc: '2 vídeos / Reações' },
+                      { id: 'single_speaker' as LayoutFormat, label: 'Single Speaker', desc: '9:16 Imersivo sem bordas' }
+                    ].map((lay) => (
+                      <button
+                        key={lay.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveLayout(lay.id)
+                          if (applyToAllClips) {
+                            triggerBulkFeedback(`Layout ${lay.label} aplicado a todos os ${clips.length} clipes!`)
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          activeLayout === lay.id
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                            : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-bold block text-white">{lay.label}</span>
+                        <span className="text-[10px] text-zinc-500 block leading-tight">{lay.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ABA 3: TEXTO & EMOJIS */}
+            {studioTab === 'text' && (
+              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                <div className="space-y-1.5">
+                  <span className="text-xs text-zinc-300 font-medium block">Emojis Dinâmicos no Título / Gancho:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTitleEmojis(true)
+                        if (applyToAllClips) {
+                          triggerBulkFeedback(`Emojis no título ativados em todos os ${clips.length} cortes!`)
+                        }
+                      }}
+                      className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        showTitleEmojis
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <Smile className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs font-bold text-white">🔥 Com Emojis no Título</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTitleEmojis(false)
+                        if (applyToAllClips) {
+                          triggerBulkFeedback(`Emojis removidos do título em todos os ${clips.length} cortes!`)
+                        }
+                      }}
+                      className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        !showTitleEmojis
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <TypeIcon className="w-4 h-4 text-zinc-400" />
+                      <span className="text-xs font-bold text-white">🔤 Sem Emojis (Texto Limpo)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                  <span className="text-xs text-zinc-300 font-medium block">Estilo do Texto do Título:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTitleCapsLock(!titleCapsLock)
+                        if (applyToAllClips) {
+                          triggerBulkFeedback(titleCapsLock ? 'Texto em caixa normal aplicado' : 'CAIXA ALTA aplicada a todos')
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        titleCapsLock
+                          ? 'bg-white/[0.08] text-white border-white/20'
+                          : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{titleCapsLock ? 'ABC CAIXA ALTA' : 'Abc Normal'}</span>
+                    </button>
+
+                    <div className="flex items-center justify-center gap-1 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                      {(['left', 'center', 'right'] as const).map((al) => (
+                        <button
+                          key={al}
+                          type="button"
+                          onClick={() => {
+                            setTextAlign(al)
+                            if (applyToAllClips) triggerBulkFeedback(`Alinhamento ${al} aplicado`)
+                          }}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
+                            textAlign === al ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-white'
+                          }`}
+                        >
+                          {al === 'left' ? 'Esq' : al === 'center' ? 'Centro' : 'Dir'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ABA 4: MARCA D'ÁGUA ANTI-FURTO */}
+            {studioTab === 'watermark' && (
+              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-zinc-200 font-bold block">Marca D'água Anti-Furto</span>
+                    <span className="text-[11px] text-zinc-400">Proteja seus cortes contra repostagens não autorizadas</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={watermarkEnabled}
+                      onChange={(e) => {
+                        const en = e.target.checked
+                        setWatermarkEnabled(en)
+                        if (applyToAllClips) triggerBulkFeedback(en ? 'Marca d\'água ativada em todos' : 'Marca d\'água desativada')
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
+                  </label>
+                </div>
+
+                {watermarkEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+                    {/* TIPO: TEXTO VS IMAGEM */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setWatermarkType('text')}
+                        className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
+                          watermarkType === 'text' ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        }`}
+                      >
+                        @ da Página (Texto)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setWatermarkType('image')}
+                        className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
+                          watermarkType === 'image' ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        }`}
+                      >
+                        Logo / Imagem
+                      </button>
+                    </div>
+
+                    {watermarkType === 'text' ? (
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-zinc-400">Texto do @ ou Nome do Canal:</label>
+                        <input
+                          type="text"
+                          value={watermarkText}
+                          onChange={(e) => {
+                            setWatermarkText(e.target.value)
+                            if (applyToAllClips) triggerBulkFeedback('Texto da marca d\'água atualizado')
+                          }}
+                          placeholder="@meucanal_cortes"
+                          className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-zinc-400">Upload de Logo (PNG Transparente):</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const url = URL.createObjectURL(file)
+                                setWatermarkImage(url)
+                                if (applyToAllClips) triggerBulkFeedback('Logo carregada para a marca d\'água')
+                              }
+                            }}
+                            className="text-xs text-zinc-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SLIDER DE TRANSPARÊNCIA */}
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-400">Opacidade / Transparência:</span>
+                        <span className="text-white font-mono font-bold">{watermarkOpacity}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        step="5"
+                        value={watermarkOpacity}
+                        onChange={(e) => setWatermarkOpacity(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                    </div>
+
+                    {/* POSIÇÃO DA MARCA D'ÁGUA */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[11px] text-zinc-400 block">Posição no Vídeo:</span>
+                      <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                        {[
+                          { id: 'center' as const, label: 'Centro (Anti-Furto)' },
+                          { id: 'bottom_center' as const, label: 'Inferior Centro' },
+                          { id: 'top_right' as const, label: 'Topo Direita' }
+                        ].map((pos) => (
+                          <button
+                            key={pos.id}
+                            type="button"
+                            onClick={() => {
+                              setWatermarkPosition(pos.id)
+                              if (applyToAllClips) triggerBulkFeedback(`Posição da marca d'água alterada`)
+                            }}
+                            className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                              watermarkPosition === pos.id ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/40 font-semibold' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                            }`}
+                          >
+                            {pos.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 5: SILÊNCIO & ÁUDIO */}
+            {studioTab === 'silence' && (
+              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <div>
+                    <span className="text-xs font-bold text-white block">Remover Silêncios Automaticamente</span>
+                    <span className="text-[11px] text-zinc-400">Corta pausas e hesitações acima de 0.3s</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={removeSilence}
+                      onChange={(e) => {
+                        const en = e.target.checked
+                        setRemoveSilence(en)
+                        if (applyToAllClips) triggerBulkFeedback(en ? 'Remoção de silêncio ativada em todos' : 'Remoção de silêncio desativada')
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
+                  </label>
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <span className="text-xs text-zinc-300 font-medium block">Estilo de Legenda Rápido:</span>
+                  <div className="grid grid-cols-3 gap-1.5 text-xs">
+                    {SUBTITLE_STYLES.map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveSubtitleStyle(st.id)
+                          if (applyToAllClips) triggerBulkFeedback(`Estilo ${st.name} aplicado a todos os ${clips.length} clipes`)
+                        }}
+                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                          activeSubtitleStyle === st.id ? 'bg-indigo-600/20 text-white border-indigo-500/40 font-bold' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        }`}
+                      >
+                        <span className="block truncate">{st.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BOTÃO MESTRE: SINCRONIZAR TUDO EM MASSA */}
+            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-3">
+              <span className="text-[11px] text-zinc-500">
+                {applyToAllClips ? `⚡ Modo de lote ativo: alterações aplicadas a todos os ${clips.length} cortes.` : `Modo individual ativo para o corte #${selectedClipIndex + 1}.`}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const currentCfg = {
+                      videoSpeed,
+                      videoAspect,
+                      activeLayout,
+                      showTitleEmojis,
+                      removeSilence,
+                      watermark: {
+                        enabled: watermarkEnabled,
+                        type: watermarkType,
+                        text: watermarkText,
+                        imageUrl: watermarkImage,
+                        opacity: watermarkOpacity,
+                        position: watermarkPosition
+                      },
+                      activeSubtitleStyle
+                    }
+                    localStorage.setItem('clippost_active_template', JSON.stringify({ config: currentCfg, layout: activeLayout, subtitle_preset: activeSubtitleStyle }))
+                    triggerBulkFeedback(`Configurações gravadas e aplicadas a todos os ${clips.length} clipes com sucesso!`)
+                  } catch {}
+                }}
+                className="py-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Aplicar a Todos ({clips.length})</span>
+              </button>
+            </div>
+
+          </div>
 
           {/* CARD 2: LISTA DE CORTES EM LOTE (BATCH REVIEW & DOWNLOAD) */}
           <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-3">

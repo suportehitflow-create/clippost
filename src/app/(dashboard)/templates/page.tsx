@@ -103,7 +103,7 @@ const TEMPLATE_PRESETS = [
     videoHeight: 48,
   }
 ]
-type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'background' | null
+type ActiveTool = 'templates' | 'text' | 'brand' | 'subtitles' | 'background' | 'watermark' | null
 
 // Renderizador Oficial de Emojis Nativos Apple iOS (Emojipedia / Apple Assets)
 function AppleEmojiText({ text, className }: { text: string; className?: string }) {
@@ -183,6 +183,18 @@ export default function TemplatesPage() {
   // Presets de Legenda
   const [selectedSubtitle, setSelectedSubtitle] = useState('hormozi_yellow')
 
+  // Marca d'água Anti-Furto
+  const [showWatermark, setShowWatermark] = useState<boolean>(true)
+  const [watermarkText, setWatermarkText] = useState<string>('@nomedapagina')
+  const [watermarkOpacity, setWatermarkOpacity] = useState<number>(45)
+  const [watermarkPosition, setWatermarkPosition] = useState<'center' | 'bottom_center' | 'top_right' | 'top_left'>('bottom_center')
+  const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text')
+  const [watermarkImage, setWatermarkImage] = useState<string | null>(null)
+  const watermarkFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Emojis no Título
+  const [showTitleEmojis, setShowTitleEmojis] = useState<boolean>(true)
+
   // DECALQUE REELS SAFE ZONE (MÁSCARA TRANSLÚCIDA 1080x1440 COM ZONAS MORTAS 420px)
   const [instagramDecal, setInstagramDecal] = useState<boolean>(true)
 
@@ -239,6 +251,13 @@ export default function TemplatesPage() {
           if (c.titlePos) setTitlePos(c.titlePos)
           if (c.videoPos) setVideoPos(c.videoPos)
           if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
+          if (c.showWatermark !== undefined) setShowWatermark(c.showWatermark)
+          if (c.watermarkText) setWatermarkText(c.watermarkText)
+          if (c.watermarkOpacity !== undefined) setWatermarkOpacity(c.watermarkOpacity)
+          if (c.watermarkPosition) setWatermarkPosition(c.watermarkPosition)
+          if (c.watermarkType) setWatermarkType(c.watermarkType)
+          if (c.watermarkImage) setWatermarkImage(c.watermarkImage)
+          if (c.showTitleEmojis !== undefined) setShowTitleEmojis(c.showTitleEmojis)
         }
       }
     } catch {}
@@ -876,6 +895,7 @@ export default function TemplatesPage() {
                 {activeTool === 'brand' && 'Foto & Identidade'}
                 {activeTool === 'subtitles' && 'Estilos de Legenda'}
                 {activeTool === 'background' && 'Cor de Fundo do Template'}
+                {activeTool === 'watermark' && "Marca D'água Anti-Furto"}
               </h2>
               <button
                 type="button"
@@ -1150,6 +1170,45 @@ export default function TemplatesPage() {
                       )
                     })}
                   </div>
+                </div>
+
+                {/* PÍLULA DE EMOJIS NO TÍTULO */}
+                <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Emojis no Título / Gancho:</label>
+                    <span className="text-[10px] text-indigo-400 font-mono font-bold">
+                      {showTitleEmojis ? 'ATIVADO' : 'DESATIVADO'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 p-1 rounded-xl bg-white/[0.03] border border-white/[0.08] gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowTitleEmojis(true)}
+                      className={`py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        showTitleEmojis
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-orange-500/30 font-bold'
+                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <span>🔥 Com Emojis</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowTitleEmojis(false)}
+                      className={`py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        !showTitleEmojis
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 font-bold'
+                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <span>🔤 Sem Emojis</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-zinc-500">
+                    {showTitleEmojis
+                      ? 'A IA adiciona emojis magnéticos de alta retenção no gancho.'
+                      : 'Títulos limpos sem símbolos ou carinhas.'}
+                  </p>
                 </div>
 
                 </div>
@@ -1718,6 +1777,32 @@ export default function TemplatesPage() {
                     <span className="text-[11px] font-bold text-zinc-200 tracking-wider uppercase z-10 drop-shadow">Prévia do Vídeo</span>
                     <span className="text-[9px] font-mono text-indigo-300/80 z-10">Área Dinâmica do Corte</span>
                   </div>
+
+                  {/* OVERLAY DE MARCA D'ÁGUA NO CANVAS */}
+                  {showWatermark && (
+                    <div 
+                      className={`absolute pointer-events-none select-none z-20 flex items-center justify-center p-2.5 transition-all ${
+                        watermarkPosition === 'center' ? 'inset-0' :
+                        watermarkPosition === 'bottom_center' ? 'bottom-2 inset-x-0' :
+                        watermarkPosition === 'top_right' ? 'top-2 right-2' :
+                        'top-2 left-2'
+                      }`}
+                    >
+                      <div 
+                        style={{ opacity: watermarkOpacity / 100 }}
+                        className="bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/20 shadow-lg flex items-center gap-1.5"
+                      >
+                        {watermarkType === 'image' && watermarkImage ? (
+                          <img src={watermarkImage} alt="Watermark" className="h-4 max-w-[80px] object-contain" />
+                        ) : (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                            <span className="text-[10px] font-bold text-white tracking-wide">{watermarkText || brandHandle || '@nomedapagina'}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
                   <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-indigo-400 bg-white shadow-sm pointer-events-none" />
