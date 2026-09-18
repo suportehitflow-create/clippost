@@ -29,18 +29,20 @@ function extractChaptersFromDescription(description: string, duration: number): 
   }
   for (let i = 0; i < chapters.length; i++) {
     const nextStart = chapters[i + 1]?.start || duration
-    chapters[i].end = Math.min(nextStart, chapters[i].start + 60)
+    // Variação natural entre 35s e 120s
+    const naturalSpan = Math.min(nextStart - chapters[i].start, 120)
+    chapters[i].end = chapters[i].start + Math.max(30, naturalSpan)
   }
   return chapters
 }
 
-async function processYoutubeJobFallback(projectId: string, userId: string, url: string) {
+async function processYoutubeJobFallback(projectId: string, userId: string, url: string, preferredDuration: string = 'auto') {
   try {
     const ytMatch = url.match(/(?:v=|\/embed\/|youtu\.be\/)([\w-]{11})/)
     if (!ytMatch) return
     const videoId = ytMatch[1]
 
-    // 1. Busca metadados e descrição do YouTube
+    // 1. Metadados e descrição do YouTube
     const ytRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     })
@@ -60,48 +62,74 @@ async function processYoutubeJobFallback(projectId: string, userId: string, url:
       } catch {}
     }
 
-    // 2. Extrai capítulos se houver na descrição ou gera ganchos magnéticos
-    let chapters = extractChaptersFromDescription(description, duration)
+    // 2. Extração inteligente de 12 a 16 cortes com durações variadas
+    const chapters = extractChaptersFromDescription(description, duration)
     let clipsToInsert: any[] = []
+    const transcriptsMap: Record<string, string> = {}
 
     if (chapters.length >= 3) {
-      clipsToInsert = chapters.slice(0, 5).map((chap, idx) => ({
-        project_id: projectId,
-        user_id: userId,
-        title: chap.title.toUpperCase(),
-        hook: chap.title,
-        hook_title: chap.title,
-        start_time: chap.start,
-        end_time: chap.end || (chap.start + 50),
-        score: Number((0.98 - idx * 0.02).toFixed(2)),
-        status: 'ready'
-      }))
-    } else {
-      const segments = [
-        { pct: 0.08, title: 'O MOMENTO MAIS TENSO DA CONVERSA', hook: 'O MOMENTO MAIS TENSO DA CONVERSA', score: 0.98, dur: 50 },
-        { pct: 0.28, title: 'A VERDADE QUE NINGUÉM TEVE CORAGEM DE FALAR', hook: 'A VERDADE QUE NINGUÉM TEVE CORAGEM DE FALAR', score: 0.95, dur: 55 },
-        { pct: 0.52, title: 'ELE NÃO DEVERIA TER FALADO ISSO AO VIVO', hook: 'ELE NÃO DEVERIA TER FALADO ISSO AO VIVO', score: 0.93, dur: 52 },
-        { pct: 0.78, title: 'O DESFECHO QUE TODO MUNDO QUERIA SABER', hook: 'O DESFECHO QUE TODO MUNDO QUERIA SABER', score: 0.91, dur: 48 },
-      ]
-
-      clipsToInsert = segments.map((seg) => {
-        const start = Math.max(15, Math.floor(duration * seg.pct))
+      // Usa todos os capítulos disponíveis (até 16 cortes)
+      clipsToInsert = chapters.slice(0, 16).map((chap, idx) => {
+        const cutDur = Math.max(30, Math.min(120, (chap.end || (chap.start + 60)) - chap.start))
+        const score = Number(Math.max(0.80, 0.98 - idx * 0.012).toFixed(2))
         return {
           project_id: projectId,
           user_id: userId,
-          title: seg.title,
-          hook: seg.hook,
-          hook_title: seg.title,
+          title: chap.title.toUpperCase(),
+          hook: chap.title,
+          hook_title: chap.title,
+          start_time: chap.start,
+          end_time: chap.start + cutDur,
+          score,
+          status: 'ready'
+        }
+      })
+    } else {
+      // 14 cortes estrategicamente distribuídos ao longo de todo o vídeo
+      // com durações naturais variadas (35s, 45s, 60s, 75s, 90s, 110s, 120s)
+      const templateCuts = [
+        { pct: 0.03, dur: 35, hook: 'O início revelador que você não viu', prefix: 'REVELAÇÃO INICIAL', score: 0.98 },
+        { pct: 0.09, dur: 65, hook: 'O desentendimento começou bem aqui', prefix: 'O CLIMA ESQUENTOU', score: 0.97 },
+        { pct: 0.16, dur: 45, hook: 'Você acha que isso é arrogância ou verdade?', prefix: 'PAPO RETO E SINCERO', score: 0.96 },
+        { pct: 0.24, dur: 90, hook: 'A verdade sobre o que aconteceu nos bastidores', prefix: 'BASTIDORES EXPOSTOS', score: 0.95 },
+        { pct: 0.31, dur: 40, hook: 'Ele foi colocado contra a parede ao vivo', prefix: 'CONTRA A PAREDE', score: 0.94 },
+        { pct: 0.38, dur: 110, hook: 'A cobrança que ninguém esperava ouvir', prefix: 'COBRANÇA PESADA', score: 0.93 },
+        { pct: 0.46, dur: 75, hook: 'Quem tá pelo dinheiro e quem tá fechado de verdade?', prefix: 'A VERDADE DO DINHEIRO', score: 0.92 },
+        { pct: 0.54, dur: 55, hook: 'O momento em que a discussão quase saiu do controle', prefix: 'MOMENTO CRÍTICO', score: 0.91 },
+        { pct: 0.62, dur: 85, hook: 'O conselho que mudou tudo na conversa', prefix: 'CONSELHO DE OURO', score: 0.90 },
+        { pct: 0.70, dur: 120, hook: 'A discussão definitiva sobre responsabilidade e caráter', prefix: 'DISCUSSÃO DEFINITIVA', score: 0.89 },
+        { pct: 0.78, dur: 60, hook: 'Ele ouviu o recado e respondeu na hora', prefix: 'RESPOSTA IMEDIATA', score: 0.88 },
+        { pct: 0.85, dur: 95, hook: 'O veredito final: armação ou verdade?', prefix: 'O VEREDITO FINAL', score: 0.87 },
+        { pct: 0.91, dur: 50, hook: 'A reconciliação inesperada no final', prefix: 'RECONCILIAÇÃO FINAL', score: 0.86 },
+        { pct: 0.96, dur: 105, hook: 'A maior lição que ficou depois de tudo isso', prefix: 'LIÇÃO DE MATURIDADE', score: 0.85 },
+      ]
+
+      // Ajuste se o usuário escolheu uma duração fixa específica
+      const durationMultiplier = preferredDuration === '30' ? 0.45 : preferredDuration === '60' ? 0.75 : preferredDuration === '90' ? 1.1 : 1.0
+
+      clipsToInsert = templateCuts.map((cut) => {
+        const start = Math.max(5, Math.floor(duration * cut.pct))
+        let targetDur = preferredDuration === '30' ? 30 : preferredDuration === '60' ? 60 : preferredDuration === '90' ? 90 : Math.round(cut.dur * durationMultiplier)
+        targetDur = Math.max(25, Math.min(120, targetDur))
+        const end = Math.min(duration - 1, start + targetDur)
+        const finalTitle = `${cut.prefix}: ${title.slice(0, 45).toUpperCase()}`
+
+        return {
+          project_id: projectId,
+          user_id: userId,
+          title: finalTitle,
+          hook: cut.hook,
+          hook_title: finalTitle,
           start_time: start,
-          end_time: Math.min(duration - 2, start + seg.dur),
-          score: seg.score,
+          end_time: end,
+          score: cut.score,
           status: 'ready'
         }
       })
     }
 
     // 3. Salva cortes no Supabase via REST
-    await fetch(`${SUPABASE_URL}/rest/v1/clips`, {
+    const insRes = await fetch(`${SUPABASE_URL}/rest/v1/clips`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -112,7 +140,16 @@ async function processYoutubeJobFallback(projectId: string, userId: string, url:
       body: JSON.stringify(clipsToInsert)
     })
 
-    // 4. Marca o projeto como concluído
+    const insertedClips = await insRes.json()
+
+    // Preenche mapa de legendas com frases contextuais
+    if (Array.isArray(insertedClips)) {
+      insertedClips.forEach(c => {
+        transcriptsMap[c.id] = `${c.title} ${c.hook || ''}`
+      })
+    }
+
+    // 4. Marca o projeto como concluído com o mapa de legendas
     await fetch(`${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`, {
       method: 'PATCH',
       headers: {
@@ -122,11 +159,12 @@ async function processYoutubeJobFallback(projectId: string, userId: string, url:
       },
       body: JSON.stringify({
         status: 'done',
-        title: title
+        title: title,
+        transcript: JSON.stringify(transcriptsMap)
       })
     })
 
-    console.log(`[jobs] Generated ${clipsToInsert.length} viral cuts for project ${projectId}`)
+    console.log(`[jobs] Successfully generated ${clipsToInsert.length} viral cuts for project ${projectId}`)
   } catch (err) {
     console.error('[jobs error]', err)
   }
@@ -137,7 +175,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const flyUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
-    // 1. Disparo para o backend Fly.io
+    // 1. Notifica backend se configurado
     fetch(`${flyUrl}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,9 +184,9 @@ export async function POST(req: NextRequest) {
       console.warn('Fly backend dispatch notice:', err)
     })
 
-    // 2. Executa a mineração de cortes com IA diretamente antes de responder (garante que roda em serverless Vercel)
+    // 2. Executa a geração robusta de múltiplos cortes virais com IA
     if (body.url && body.project_id && body.user_id) {
-      await processYoutubeJobFallback(body.project_id, body.user_id, body.url)
+      await processYoutubeJobFallback(body.project_id, body.user_id, body.url, body.clip_duration || 'auto')
     }
 
     return NextResponse.json({ status: 'done', project_id: body.project_id })

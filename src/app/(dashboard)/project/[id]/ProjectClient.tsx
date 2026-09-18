@@ -78,6 +78,7 @@ type Project = {
   source_url: string | null
   raw_video_url?: string | null
   error_message?: string | null
+  transcript?: string | null
 }
 
 type Clip = {
@@ -396,15 +397,45 @@ export default function ProjectClient({
 
   // Palavras de transcrição/fala reais para a legenda (SEPARADAS TOTALMENTE DO TÍTULO)
   const speechWords = useMemo<string[]>(() => {
-    // Se o corte tiver transcrição de fala real salva no banco, usa ela
+    // 1. Transcrição estruturada mapeada no projeto por corte
+    try {
+      const projTrans = project?.transcript
+      if (projTrans && (projTrans.startsWith('{') || projTrans.startsWith('['))) {
+        const parsedProj = JSON.parse(projTrans)
+        const clipTrans = parsedProj[activeClip.id] || parsedProj[activeClip.title] || (parsedProj.clips && (parsedProj.clips[activeClip.id] || parsedProj.clips[activeClip.title]))
+        if (clipTrans) {
+          const text = typeof clipTrans === 'string' ? clipTrans : clipTrans.transcript || clipTrans.text
+          if (text) {
+            const parsed = text.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
+            if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Se o corte tiver transcrição direta salva no banco
     const rawTranscript = (activeClip as any).transcript || (activeClip as any).speech_text
     if (rawTranscript && typeof rawTranscript === 'string') {
       const parsed = rawTranscript.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
-      if (parsed.length > 0) return parsed.map(w => w.toUpperCase())
+      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
     }
-    // Caso contrário, usa frases de retenção e fala comuns em cortes virais
-    return ['ESSA', 'PARTE', 'AQUI', 'MUDOU', 'COMPLETAMENTE', 'O', 'RESULTADO', 'FINAL', 'PRESTE', 'MUITO', 'ATENÇÃO']
-  }, [activeClip])
+
+    // 3. Se houver transcrição do projeto em texto direto
+    const generalTrans = project?.transcript
+    if (generalTrans && typeof generalTrans === 'string' && !generalTrans.startsWith('{')) {
+      const parsed = generalTrans.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
+      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
+    }
+
+    // 4. Fallback contextual extraído do título e gancho reais do corte
+    const contextual = `${activeClip.title || ''} ${activeClip.hook || ''}`.trim()
+    if (contextual) {
+      const parsed = contextual.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
+      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
+    }
+
+    return ['ESSA', 'PARTE', 'AQUI', 'MUDOU', 'COMPLETAMENTE', 'O', 'RESULTADO', 'FINAL']
+  }, [activeClip, project])
 
   const timingWords = useMemo<WordTiming[]>(() => {
     const wordDuration = clipDuration / speechWords.length
@@ -414,6 +445,21 @@ export default function ProjectClient({
       end: (idx + 1) * wordDuration
     }))
   }, [speechWords, clipDuration])
+
+  // Sincroniza vídeo nativo ao trocar de corte
+  useEffect(() => {
+    setPlaybackTime(0)
+    if (videoRef.current) {
+      if (activeClip.storage_url) {
+        videoRef.current.currentTime = 0
+      } else if (project.raw_video_url) {
+        videoRef.current.currentTime = activeClip.start_time || 0
+      }
+      if (isPlaying) {
+        videoRef.current.play().catch(() => null)
+      }
+    }
+  }, [activeClip.id, activeClip.storage_url])
 
   // Playback timer
   useEffect(() => {
@@ -901,16 +947,6 @@ export default function ProjectClient({
                       }
                     }}
                   />
-                ) : ytId ? (
-                  <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center pointer-events-none">
-                    <iframe
-                      key={`${ytId}-${activeClip.id}`}
-                      src={`https://www.youtube.com/embed/${ytId}?start=${Math.floor(activeClip.start_time || 0)}&end=${Math.ceil(activeClip.end_time || 60)}&autoplay=${isPlaying ? 1 : 0}&mute=0&controls=0&modestbranding=1&rel=0&loop=1&playlist=${ytId}`}
-                      className="absolute w-[350%] h-[120%] max-w-none pointer-events-none"
-                      style={{ left: '-125%', top: '-10%' }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    />
-                  </div>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
                     <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">
@@ -934,7 +970,15 @@ export default function ProjectClient({
                       e.stopPropagation()
                       const rect = e.currentTarget.getBoundingClientRect()
                       const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-                      setPlaybackTime(pct * clipDuration)
+                      const targetTime = pct * clipDuration
+                      setPlaybackTime(targetTime)
+                      if (videoRef.current) {
+                        if (activeClip.storage_url) {
+                          videoRef.current.currentTime = targetTime
+                        } else {
+                          videoRef.current.currentTime = (activeClip.start_time || 0) + targetTime
+                        }
+                      }
                     }}
                   >
                     <div

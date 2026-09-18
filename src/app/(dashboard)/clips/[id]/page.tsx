@@ -385,19 +385,13 @@ export default function ClipEditorPage() {
                   loop
                 />
               ) : (
-                ytId ? (
-                <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
-                  <iframe
-                    src={'https://www.youtube-nocookie.com/embed/' + ytId + '?start=' + Math.floor(clip.start_time || 0) + '&end=' + Math.floor(clip.end_time || 30) + '&autoplay=0&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1'}
-                    title={clip.title || 'Corte 9:16'}
-                    className="w-[330%] h-[120%] -ml-[115%] object-cover border-0 pointer-events-none select-none"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">
+                    <Sparkles className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-bold text-white tracking-wide">Vídeo 9:16</span>
+                  <span className="text-[10px] text-zinc-400 font-mono mt-0.5">Renderizando corte nativo...</span>
                 </div>
-              ) : (
-                <div className="text-zinc-600 text-xs">Sem prévia disponível</div>
-              )
               )}
 
               {/* Author Badge Overlay */}
