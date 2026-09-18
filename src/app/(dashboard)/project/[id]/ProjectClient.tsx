@@ -395,56 +395,56 @@ export default function ProjectClient({
     )
   }, [activeClip.score, displayedTitle, activeClip.hook, clipDuration])
 
-  // Palavras de transcrição/fala reais para a legenda (SEPARADAS TOTALMENTE DO TÍTULO)
-  const speechWords = useMemo<string[]>(() => {
-    // 1. Transcrição estruturada mapeada no projeto por corte
+  // Legendas e timestamps com precisão de milissegundos
+  const timingWords = useMemo<WordTiming[]>(() => {
+    // 1. Carrega array de palavras com timestamps exatos relativos ao corte
     try {
       const projTrans = project?.transcript
       if (projTrans && (projTrans.startsWith('{') || projTrans.startsWith('['))) {
         const parsedProj = JSON.parse(projTrans)
-        const clipTrans = parsedProj[activeClip.id] || parsedProj[activeClip.title] || (parsedProj.clips && (parsedProj.clips[activeClip.id] || parsedProj.clips[activeClip.title]))
-        if (clipTrans) {
-          const text = typeof clipTrans === 'string' ? clipTrans : clipTrans.transcript || clipTrans.text
-          if (text) {
-            const parsed = text.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
-            if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
-          }
+        const clipData = parsedProj[activeClip.id] || parsedProj[activeClip.title] || (parsedProj.clips && (parsedProj.clips[activeClip.id] || parsedProj.clips[activeClip.title]))
+        if (clipData && Array.isArray(clipData.words) && clipData.words.length > 0) {
+          return clipData.words.map((item: any) => ({
+            word: String(item.word || '').toUpperCase(),
+            start: Number(item.start || 0),
+            end: Number(item.end || (Number(item.start || 0) + 0.35))
+          }))
         }
       }
     } catch {}
 
-    // 2. Se o corte tiver transcrição direta salva no banco
+    // 2. Se o corte tiver palavras salvas diretamente
+    if (Array.isArray((activeClip as any).words) && (activeClip as any).words.length > 0) {
+      return (activeClip as any).words.map((item: any) => ({
+        word: String(item.word || '').toUpperCase(),
+        start: Number(item.start || 0),
+        end: Number(item.end || (Number(item.start || 0) + 0.35))
+      }))
+    }
+
+    // 3. Fallback inteligente com palavras do texto real da conversa
     const rawTranscript = (activeClip as any).transcript || (activeClip as any).speech_text
+    let wordsList: string[] = []
     if (rawTranscript && typeof rawTranscript === 'string') {
-      const parsed = rawTranscript.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
-      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
+      wordsList = rawTranscript.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
+    } else {
+      const contextual = `${activeClip.title || ''} ${activeClip.hook || ''}`.trim()
+      wordsList = contextual.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
     }
-
-    // 3. Se houver transcrição do projeto em texto direto
-    const generalTrans = project?.transcript
-    if (generalTrans && typeof generalTrans === 'string' && !generalTrans.startsWith('{')) {
-      const parsed = generalTrans.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
-      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
+    if (wordsList.length === 0) {
+      wordsList = ['ESSA', 'PARTE', 'AQUI', 'MUDOU', 'COMPLETAMENTE', 'O', 'RESULTADO', 'FINAL']
     }
-
-    // 4. Fallback contextual extraído do título e gancho reais do corte
-    const contextual = `${activeClip.title || ''} ${activeClip.hook || ''}`.trim()
-    if (contextual) {
-      const parsed = contextual.replace(/[^a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').split(/\s+/).filter(Boolean)
-      if (parsed.length > 0) return parsed.map((w: string) => w.toUpperCase())
-    }
-
-    return ['ESSA', 'PARTE', 'AQUI', 'MUDOU', 'COMPLETAMENTE', 'O', 'RESULTADO', 'FINAL']
-  }, [activeClip, project])
-
-  const timingWords = useMemo<WordTiming[]>(() => {
-    const wordDuration = clipDuration / speechWords.length
-    return speechWords.map((w, idx) => ({
-      word: w,
-      start: idx * wordDuration,
-      end: (idx + 1) * wordDuration
+    const wordDuration = clipDuration / wordsList.length
+    return wordsList.map((w, idx) => ({
+      word: w.toUpperCase(),
+      start: Number((idx * wordDuration).toFixed(2)),
+      end: Number(((idx + 1) * wordDuration).toFixed(2))
     }))
-  }, [speechWords, clipDuration])
+  }, [activeClip, project, clipDuration])
+
+  const speechWords = useMemo<string[]>(() => {
+    return timingWords.map(tw => tw.word)
+  }, [timingWords])
 
   // Sincroniza vídeo nativo ao trocar de corte
   useEffect(() => {
@@ -505,9 +505,14 @@ export default function ProjectClient({
   }
 
   const activeWordIndex = useMemo(() => {
-    const idx = timingWords.findIndex(w => playbackTime >= w.start && playbackTime < w.end)
-    return idx !== -1 ? idx : Math.min(timingWords.length - 1, Math.floor((playbackTime / clipDuration) * timingWords.length))
-  }, [playbackTime, timingWords, clipDuration])
+    if (timingWords.length === 0) return 0
+    const idx = timingWords.findIndex(w => playbackTime >= w.start && playbackTime <= w.end)
+    if (idx !== -1) return idx
+    for (let i = timingWords.length - 1; i >= 0; i--) {
+      if (playbackTime >= timingWords[i].start) return i
+    }
+    return 0
+  }, [playbackTime, timingWords])
 
   // Excluir projeto
   const handleDeleteThisProject = async () => {
