@@ -81,6 +81,7 @@ type Project = {
   status: string
   created_at: string
   source_url: string | null
+  raw_video_url?: string | null
   error_message?: string | null
 }
 
@@ -671,43 +672,36 @@ export default function ProjectClient({
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
                 } flex items-center justify-center cursor-pointer`}
               >
-                {activeClip.storage_url ? (
-                  <video
-                    ref={videoRef}
-                    src={activeClip.storage_url}
-                    className="w-full h-full object-cover"
-                    style={{
-                      objectFit: 'cover',
-                      objectPosition: `${cropPanX}% center`,
-                    }}
-                    playsInline
-                    muted
-                    loop
-                  />
-                ) : ytId ? (
-                  <div className="w-full h-full relative overflow-hidden select-none bg-black pointer-events-none">
-                    <iframe
-                      ref={iframeRef}
-                      src={`https://www.youtube-nocookie.com/embed/${ytId}?enablejsapi=1&start=${Math.floor(activeClip.start_time)}&end=${Math.floor(activeClip.end_time)}&autoplay=0&controls=0&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&loop=1`}
-                      className="border-0"
-                      style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        width: '100%',
-                        height: '100%',
-                        transform: `translate(-50%, -50%) scale(${Math.max(2.38, cropZoom / 100)}) translateX(${(50 - cropPanX) * 0.4}%)`,
-                        transformOrigin: 'center center',
+                                  {activeClip.storage_url || project.raw_video_url ? (
+                    <video
+                      ref={videoRef}
+                      src={activeClip.storage_url || project.raw_video_url || ''}
+                      className="w-full h-full object-cover"
+                      playsInline
+                      loop
+                      onTimeUpdate={() => {
+                        if (videoRef.current) {
+                          const cur = videoRef.current.currentTime
+                          if (!activeClip.storage_url) {
+                            if (cur >= activeClip.end_time || cur < activeClip.start_time) {
+                              videoRef.current.currentTime = activeClip.start_time
+                            }
+                            setPlaybackTime(Math.max(0, cur - activeClip.start_time))
+                          } else {
+                            setPlaybackTime(cur)
+                          }
+                        }
                       }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 text-xs">
-                    <Scissors className="w-6 h-6 mb-1 text-zinc-600" />
-                    <span>Prévia do Corte</span>
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">
+                        <Sparkles className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <span className="text-xs font-bold text-white tracking-wide">Processando Corte Nativo</span>
+                      <span className="text-[10px] text-zinc-400 font-mono mt-0.5">Renderizando vídeo em alta resolução...</span>
+                    </div>
+                  )}
 
                 {/* CONTROLES NATIVOS DO PLAYER SOBREPOSTOS DENTRO DO QUADRO (ESTILO YOUTUBE/TIKTOK) */}
                 <div
@@ -766,34 +760,14 @@ export default function ProjectClient({
                 </div>
               </div>
 
-              {/* DECALQUE SAFE ZONE TRANSLÚCIDO (SEM ÍCONES) */}
-              {showReelsSafeZone && (
-                <div className="absolute inset-0 pointer-events-none z-30 select-none overflow-hidden rounded-[42px]">
-                  <div className="absolute bottom-0 left-0 right-0 h-[21%] bg-gradient-to-t from-black/90 via-black/80 to-black/60 border-t border-dashed border-white/25 flex flex-col justify-end pb-3.5 px-4">
-                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest text-center">
-                      Área Segura (Reels 9:16)
-                    </span>
-                  </div>
-                  
-                </div>
-              )}
+
 
               {/* BARRA HOME DO IPHONE */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
             </div>
           </div>
 
-          {/* CONTROLES DE REPRODUÇÃO & DECALQUE REELS */}
-          <div className="w-[290px] sm:w-[320px] mt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowReelsSafeZone(!showReelsSafeZone)}
-              className="w-full py-1 px-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white flex items-center justify-between transition-all cursor-pointer"
-            >
-              <span>Decalque Safe Zone Reels (1080x1440):</span>
-              <LiquidToggle checked={showReelsSafeZone} onChange={setShowReelsSafeZone} activeColor="emerald" />
-            </button>
-          </div>
+
 
           </div>
 
@@ -875,7 +849,7 @@ export default function ProjectClient({
             {/* Botões de Ação Imediata (Limpos e Diretos) */}
             <div className="grid grid-cols-3 gap-2.5 pt-1">
               <a
-                href={activeClip.storage_url || (ytId ? `https://www.youtube.com/watch?v=${ytId}&t=${Math.floor(activeClip.start_time)}s` : '#')}
+                href={activeClip.storage_url || project.raw_video_url || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 download={!!activeClip.storage_url}
@@ -889,7 +863,7 @@ export default function ProjectClient({
                 type="button"
                 onClick={() => setQrModalClip({
                   title: displayedTitle,
-                  url: activeClip.storage_url || (ytId ? `https://youtu.be/${ytId}?t=${Math.floor(activeClip.start_time)}` : window.location.href)
+                  url: activeClip.storage_url || project.raw_video_url || (typeof window !== 'undefined' ? window.location.href : '')
                 })}
                 className="py-2.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
@@ -906,171 +880,7 @@ export default function ProjectClient({
               </Link>
             </div>
 
-            {/* TOGGLE MINIMALISTA: PERSONALIZAR / AJUSTES (MINIMIZADO POR PADRÃO) */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAdjustments(!showAdjustments)}
-                className="w-full py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] text-xs text-zinc-400 hover:text-white flex items-center justify-between transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Sliders className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Ajustes Finos (Legenda, Enquadramento, Template)</span>
-                </div>
-                {showAdjustments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
             </div>
-
-            {/* PAINEL DE AJUSTES (SÓ APARECE QUANDO O USUÁRIO QUER EDITAR) */}
-            {showAdjustments && (
-              <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-4 animate-in fade-in duration-150">
-                
-                {/* Abas dos Ajustes (Segmented Pills) */}
-                <div className="flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.08] gap-1">
-                  {[
-                    { id: 'subtitles', label: 'Legendas' },
-                    { id: 'framing', label: 'Enquadramento & IA' },
-                    { id: 'template', label: 'Template & Layout' },
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setAdjustTab(tab.id as any)}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
-                        adjustTab === tab.id
-                          ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
-                          : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Conteúdo da Aba: Legendas */}
-                {adjustTab === 'subtitles' && (
-                  <div className="space-y-3 text-xs">
-                    {/* TOGGLE LIQUID EMOJIS */}
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
-                      <div>
-                        <span className="text-xs font-semibold text-white block">Emojis Nativos Apple</span>
-                        <span className="text-[10px] text-zinc-400">Insere emojis dinâmicos nas palavras da legenda</span>
-                      </div>
-                      <LiquidToggle
-                        checked={smartEmojisEnabled}
-                        onChange={setSmartEmojisEnabled}
-                        activeLabel="ATIVOS"
-                        inactiveLabel="OCULTOS"
-                        activeColor="indigo"
-                      />
-                    </div>
-                    
-
-                    <div className="space-y-1.5">
-                      <span className="text-zinc-400">Estilo de Legenda:</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {SUBTITLE_STYLES.map(st => (
-                          <button
-                            key={st.id}
-                            type="button"
-                            onClick={() => setActiveSubtitleStyle(st.id)}
-                            className={`p-2 rounded-lg text-center transition-all cursor-pointer text-[11px] font-semibold border ${
-                              activeSubtitleStyle === st.id
-                                ? `${st.border} bg-white/10 text-white`
-                                : 'border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            {st.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Conteúdo da Aba: Enquadramento (100% Automático via IA) */}
-                {adjustTab === 'framing' && (
-                  <div className="space-y-3.5 text-xs">
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/40 via-[#121026]/60 to-purple-950/30 border border-indigo-500/20 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                            <Sparkles className="w-4 h-4" />
-                          </div>
-                          <span className="font-bold text-white block">IA Auto-Tracking (100% Automatizado)</span>
-                        </div>
-                        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Calibrado
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-zinc-300 leading-relaxed">
-                        A Inteligência Artificial analisa o vídeo bruto e calibra o enquadramento dinamicamente. O rosto e os movimentos do falante principal são acompanhados e centralizados de forma 100% autônoma, sem necessidade de ajustes manuais.
-                      </p>
-                    </div>
-
-                    {/* TOGGLE SAFE ZONE REELS */}
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
-                      <div>
-                        <span className="text-xs font-semibold text-white block">Decalque Safe Zone (Reels 9:16)</span>
-                        <span className="text-[10px] text-zinc-400">Exibe margens de segurança na base do vídeo</span>
-                      </div>
-                      <LiquidToggle
-                        checked={showReelsSafeZone}
-                        onChange={setShowReelsSafeZone}
-                        activeColor="indigo"
-                      />
-                    </div>
-
-                    {/* LINK DIRETO PARA TEMPLATE */}
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <span className="text-zinc-300 font-medium block">Dimensões & Posição:</span>
-                        <span className="text-[10px] text-zinc-500 font-mono">
-                          Definido no Template ({videoWidth}% × {videoHeight}%)
-                        </span>
-                      </div>
-                      <Link
-                        href="/templates"
-                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center gap-1.5"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>Editar no Template</span>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* Conteúdo da Aba: Template (Herdado do Editor de Templates) */}
-                {adjustTab === 'template' && (
-                  <div className="space-y-3 text-xs">
-                    <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white">Template do Canal</span>
-                        <span className="text-[10px] text-indigo-400 font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-                          {templateBg === 'white' ? 'Fundo Branco' : 'Fundo Escuro'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        O design, cores, bordas e alinhamentos são gerenciados no Editor de Templates para manter consistência em todos os seus cortes.
-                      </p>
-                      <div className="pt-1">
-                        <Link
-                          href="/templates"
-                          className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/10 flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Abrir Editor Completo de Templates</span>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            )}
-
-          </div>
 
           {/* CARD 2: LISTA DE CORTES EM LOTE (BATCH REVIEW & DOWNLOAD) */}
           <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-3">
@@ -1138,7 +948,7 @@ export default function ProjectClient({
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <a
-                        href={c.storage_url || (ytId ? `https://www.youtube.com/watch?v=${ytId}&t=${Math.floor(c.start_time)}s` : '#')}
+                        href={c.storage_url || project.raw_video_url || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         download={!!c.storage_url}

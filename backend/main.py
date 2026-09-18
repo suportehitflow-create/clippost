@@ -95,7 +95,8 @@ class ProcessRequest(BaseModel):
     user_id: str
     clip_duration: str = "auto"  # "30", "60", "auto"
     project_id: str | None = None
-    remove_silence: bool = True  # projeto já criado pela tela de upload
+    remove_silence: bool = True
+    template_config: dict | None = None
 
 
 class BrandKitRequest(BaseModel):
@@ -454,7 +455,7 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     # 1. Tenta Celery com timeout curto (1.5s) caso Redis esteja rodando
     try:
         task = process_youtube_video.apply_async(
-            args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence],
+            args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config],
             connect_timeout=1.5
         )
         return {"task_id": task.id, "status": "processing"}
@@ -462,7 +463,7 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
         print(f"[jobs] Celery/Redis indisponível ({e}). Executando via BackgroundTasks local!")
 
     # 2. Execução direta em background na máquina (infalível mesmo sem Redis)
-    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence)
+    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config)
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 

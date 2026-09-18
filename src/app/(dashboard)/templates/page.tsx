@@ -897,7 +897,7 @@ export default function TemplatesPage() {
                   <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                        instagramDecal ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-500'
+                        instagramDecal ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
                       }`}>
                         <ShieldCheck className="w-4 h-4" />
                       </div>
@@ -909,7 +909,7 @@ export default function TemplatesPage() {
                     <LiquidToggle
                       checked={instagramDecal}
                       onChange={setInstagramDecal}
-                      activeColor="emerald"
+                      activeColor="indigo"
                     />
                   </div>
                 </div>
@@ -1008,10 +1008,6 @@ export default function TemplatesPage() {
                         { label: 'Branco', color: '#ffffff' },
                         { label: 'Preto', color: '#000000' },
                         { label: 'Amarelo', color: '#facc15' },
-                        { label: 'Ciano', color: '#06b6d4' },
-                        { label: 'Laranja', color: '#fb923c' },
-                        { label: 'Verde', color: '#4ade80' },
-                        { label: 'Rosa', color: '#ec4899' },
                       ].map((c) => (
                         <button
                           key={c.color}
@@ -1783,7 +1779,7 @@ export default function TemplatesPage() {
           <span className="font-mono text-[11px] text-zinc-400">iPhone 18 Pro (19.5:9 Display) • 1080 × 1920 px</span>
           <div className="h-3 w-px bg-white/10" />
           <span className="text-[11px] flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${instagramDecal ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+            <span className={`w-2 h-2 rounded-full ${instagramDecal ? 'bg-indigo-400' : 'bg-zinc-600'}`} />
             <span>Decalque Reels</span>
           </span>
         </div>

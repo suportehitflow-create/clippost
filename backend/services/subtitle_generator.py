@@ -1,9 +1,8 @@
 """
-Subtitle Generator — converte segmentos do faster-whisper em arquivos .srt ou .ass
-formatados para vídeos verticais (2-3 palavras por linha, estilo viral).
+Subtitle Generator — converte transcrições do Whisper em legendas virais .ass
+com suporte aos presets de cores dinâmicas do Clippost (Hormozi, MrBeast, Minimalista, etc.).
 """
 import os
-import textwrap
 import tempfile
 from pathlib import Path
 
@@ -23,53 +22,14 @@ def _seconds_to_ass_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def generate_srt(segments: list[dict], output_path: str | None = None) -> str:
-    """
-    Recebe lista de {'start': float, 'end': float, 'text': str}
-    Grava um .srt com no máximo 3 palavras por linha e retorna o caminho.
-    """
-    if output_path is None:
-        fd, output_path = tempfile.mkstemp(suffix=".srt", prefix="clippost_sub_")
-        os.close(fd)
-
-    lines = []
-    index = 1
-    for seg in segments:
-        text = seg["text"].strip()
-        if not text:
-            continue
-        # quebra em grupos de até 3 palavras
-        words = text.split()
-        chunks = [" ".join(words[i:i+3]) for i in range(0, len(words), 3)]
-        for chunk in chunks:
-            # cada chunk herda proporcionalmente o tempo do segmento
-            chunk_idx = chunks.index(chunk)
-            duration = seg["end"] - seg["start"]
-            chunk_dur = duration / len(chunks)
-            t_start = seg["start"] + chunk_idx * chunk_dur
-            t_end = t_start + chunk_dur
-            lines.append(str(index))
-            lines.append(f"{_seconds_to_srt_time(t_start)} --> {_seconds_to_srt_time(t_end)}")
-            lines.append(chunk)
-            lines.append("")
-            index += 1
-
-    Path(output_path).write_text("\n".join(lines), encoding="utf-8")
-    return output_path
-
-
 def _clip_chunks(segments: list[dict], words: list[dict] | None,
                  clip_start: float, clip_end: float | None) -> list[tuple[float, float, str]]:
-    """Blocos de até 3 palavras com tempos relativos ao início do clipe.
-
-    O corte usa -ss antes do -i, então o vídeo do clipe começa em 0. Legendas com
-    a linha do tempo do vídeo inteiro apareciam fora de sincronia em todo clipe.
-    """
+    """Blocos de até 3 palavras com tempos relativos ao início do clipe."""
     end_limit = clip_end if clip_end is not None else float("inf")
     chunks: list[tuple[float, float, str]] = []
 
     if words:
-        inside = [w for w in words if w["end"] > clip_start and w["start"] < end_limit and w["word"].strip()]
+        inside = [w for w in words if w["end"] > clip_start and w["start"] < end_limit and w.get("word", "").strip()]
         for i in range(0, len(inside), 3):
             group = inside[i:i + 3]
             t0 = max(group[0]["start"], clip_start) - clip_start
@@ -79,9 +39,9 @@ def _clip_chunks(segments: list[dict], words: list[dict] | None,
         return chunks
 
     for seg in segments:
-        if seg["end"] <= clip_start or seg["start"] >= end_limit:
+        if seg.get("end", 0) <= clip_start or seg.get("start", 0) >= end_limit:
             continue
-        seg_words = seg["text"].strip().split()
+        seg_words = seg.get("text", "").strip().split()
         if not seg_words:
             continue
         parts = [" ".join(seg_words[i:i + 3]) for i in range(0, len(seg_words), 3)]
@@ -97,14 +57,28 @@ def _clip_chunks(segments: list[dict], words: list[dict] | None,
 
 def generate_ass(segments: list[dict], output_path: str | None = None,
                  clip_start: float = 0.0, clip_end: float | None = None,
-                 words: list[dict] | None = None) -> str:
+                 words: list[dict] | None = None, margin_v: int = 180,
+                 subtitle_preset: str = "hormozi_yellow") -> str:
     """
-    Gera arquivo .ass com estilo viral: fonte grande, borda preta, centralizado.
-    Com clip_start/clip_end, só inclui a fala do trecho, com tempos relativos ao clipe.
+    Gera arquivo .ass com estilo viral e cores configuradas pelo usuário:
+    - hormozi_yellow: Amarelo vibrante (&H0000FFFF) com contorno preto grosso
+    - beast_green: Verde neon (&H0000FF00) com contorno preto
+    - modern_cyan: Ciano elétrico (&H00FFFF00)
+    - minimal_white: Branco puro (&H00FFFFFF)
     """
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".ass", prefix="clippost_sub_")
         os.close(fd)
+
+    # ASS usa formato BGR em hexadecimal: &H00BBGGRR
+    preset_colors = {
+        "hormozi_yellow": "&H0000FFFF",  # Amarelo puro
+        "beast_green": "&H0000FF00",     # Verde neon
+        "modern_cyan": "&H00FFFF00",     # Ciano vibrante
+        "minimal_white": "&H00FFFFFF",   # Branco
+        "sunset_pink": "&H008000FF",     # Rosa choque
+    }
+    primary_color = preset_colors.get(subtitle_preset, "&H0000FFFF")
 
     header = f"""\
 [Script Info]
@@ -115,14 +89,15 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Viral,Arial Black,88,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,80,80,{margin_v},1
+Style: Viral,Impact,86,{primary_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,0,2,80,80,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     event_lines = []
     for t_start, t_end, chunk in _clip_chunks(segments, words, clip_start, clip_end):
-        escaped = chunk.replace("{", "\\{").replace("}", "\\}")
+        clean_text = chunk.upper()
+        escaped = clean_text.replace("{", "\\{").replace("}", "\\}")
         event_lines.append(
             f"Dialogue: 0,{_seconds_to_ass_time(t_start)},{_seconds_to_ass_time(t_end)},"
             f"Viral,,0,0,0,,{escaped}"

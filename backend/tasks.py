@@ -228,7 +228,7 @@ def parse_vtt_subtitles(vtt_path: Path):
     return {"segments": segments, "words": words}
 
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True, template_config: dict | None = None):
     # Atualiza status imediatamente para processing para a UI avançar e não dar timeout
     if project_id:
         try:
@@ -335,9 +335,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 6. AI Curator — detectar momentos virais
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
 
-        # Brand Kit do usuário (opcional)
+                # Brand Kit e Template Ativo do Usuário (100% integrado)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
-        brand_kit = bk_resp.data if bk_resp and bk_resp.data else None
+        brand_kit = bk_resp.data if bk_resp and bk_resp.data else {}
+        if template_config:
+            existing_cfg = brand_kit.get("layout_config") or {}
+            brand_kit["layout_config"] = {**existing_cfg, **template_config}
+            if template_config.get("brandName"):
+                brand_kit["username"] = template_config.get("brandHandle") or brand_kit.get("username")
 
         # 7, 8, 9. Cortar + upload + salvar cada clipe
         for i, clip in enumerate(clips_meta):
@@ -348,12 +353,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 end = min(end, float(video_duration))
             if end - start < 1:
                 continue
-            sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
+                        sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
             margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
+            sub_preset = ((brand_kit or {}).get("layout_config") or {}).get("subtitle_preset") or "hormozi_yellow"
             subtitle_file = generate_ass(
                 segments, str(tmp_dir / f"subtitles_{i}.ass"),
                 clip_start=start, clip_end=end, words=words,
                 margin_v=margin_v,
+                subtitle_preset=sub_preset,
             )
             try:
                 create_vertical_clip(

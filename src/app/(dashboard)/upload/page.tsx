@@ -80,7 +80,17 @@ export default function CreateClipsPage() {
         sourceUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
       }
 
-      // Dispara job no backend em segundo plano
+      // Recupera o template ativo configurado pelo usuário para aplicar nos cortes
+      let activeTemplateConfig = null
+      try {
+        const savedTpl = localStorage.getItem('clippost_active_template')
+        if (savedTpl) {
+          const parsed = JSON.parse(savedTpl)
+          activeTemplateConfig = parsed.config || parsed
+        }
+      } catch {}
+
+      // Dispara job no backend em segundo plano com template ativo integrado
       fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,6 +100,7 @@ export default function CreateClipsPage() {
           clip_duration: clipDuration,
           project_id: project.id,
           template_preset: 'meme_frame',
+          template_config: activeTemplateConfig,
           remove_silence: removeSilence,
         }),
       }).catch(() => null)
