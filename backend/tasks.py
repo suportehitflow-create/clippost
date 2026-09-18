@@ -412,6 +412,32 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
         increment_clips_used(user_id)
 
+        # Auto-publish: se o perfil tiver auto_publish ativado, agenda os clipes no perfil ativo
+        try:
+            profile_res = supabase.table("profiles").select("auto_publish, active_social_account_id").eq("id", user_id).maybe_single().execute()
+            if profile_res and profile_res.data and profile_res.data.get("auto_publish"):
+                active_acc_id = profile_res.data.get("active_social_account_id")
+                acc_res = None
+                if active_acc_id:
+                    acc_res = supabase.table("social_accounts").select("id, platform").eq("id", active_acc_id).maybe_single().execute()
+                if not acc_res or not acc_res.data:
+                    acc_res = supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
+                if acc_res and acc_res.data:
+                    clips_res = supabase.table("clips").select("id, title").eq("project_id", project_id).eq("status", "ready").execute()
+                    for c in (clips_res.data or []):
+                        supabase.table("scheduled_posts").insert({
+                            "user_id": user_id,
+                            "clip_id": c["id"],
+                            "platform": acc_res.data["platform"],
+                            "social_account_id": acc_res.data["id"],
+                            "caption": c.get("title") or "",
+                            "scheduled_at": datetime.now(timezone.utc).isoformat(),
+                            "status": "scheduled",
+                        }).execute()
+                    print(f"[auto-publish] {len(clips_res.data or [])} clipes agendados")
+        except Exception as auto_err:
+            print(f"[auto-publish] erro (nao critico): {auto_err}")
+
         return {"status": "success", "project_id": project_id, "title": title}
 
     except Exception as e:
