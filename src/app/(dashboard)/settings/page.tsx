@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   User, Shield, Cpu, LogOut, Check, Zap,
@@ -32,7 +32,7 @@ function SearchParamsReader({ onMetaConnected, onMetaError }: {
   onMetaConnected: () => void
   onMetaError: (e: string) => void
 }) {
-  const { useSearchParams } = require('next/navigation')
+  const searchParams = useSearchParams()
   useEffect(() => {
     if (searchParams.get('meta_connected') === '1') onMetaConnected()
     if (searchParams.get('meta_error')) onMetaError(searchParams.get('meta_error') || 'Erro ao conectar')
