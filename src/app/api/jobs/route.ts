@@ -146,15 +146,12 @@ export async function POST(req: NextRequest) {
       console.warn('Fly backend dispatch notice:', err)
     })
 
-    // 2. Disparo resiliente em background para geração instantânea dos cortes com IA
+    // 2. Executa a mineração de cortes com IA diretamente antes de responder (garante que roda em serverless Vercel)
     if (body.url && body.project_id && body.user_id) {
-      // Executa sem travar a resposta HTTP
-      setTimeout(() => {
-        processYoutubeJobFallback(body.project_id, body.user_id, body.url)
-      }, 100)
+      await processYoutubeJobFallback(body.project_id, body.user_id, body.url)
     }
 
-    return NextResponse.json({ status: 'processing', project_id: body.project_id })
+    return NextResponse.json({ status: 'done', project_id: body.project_id })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
