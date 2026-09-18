@@ -223,7 +223,7 @@ export default function SchedulePageV2() {
       }
     }
     setSchedulingAll(false)
-    setSuccessMsg(\ posts agendados com sucesso!)
+    setSuccessMsg(`${count} posts agendados com sucesso!`)
     setTimeout(() => setSuccessMsg(''), 4000)
     loadData(userId)
   }
@@ -306,40 +306,7 @@ export default function SchedulePageV2() {
                 { id: 'youtube_shorts' as Platform, name: 'YouTube', sub: 'Shorts' }
               ].map(dest => {
                 const isSelected = selectedPlatforms.includes(dest.id)
-              
-  const handleScheduleAll = async () => {
-    if (!userId || clips.length === 0) {
-      setErrorMsg('Nenhum clipe disponível para agendar.')
-      return
-    }
-    if (selectedPlatforms.length === 0) {
-      setErrorMsg('Selecione ao menos um destino.')
-      return
-    }
-    setSchedulingAll(true)
-    setErrorMsg('')
-    let count = 0
-    for (const clip of clips) {
-      for (const plat of selectedPlatforms) {
-        try {
-          await supabase.from('scheduled_posts').insert({
-            user_id: userId,
-            clip_id: clip.id,
-            platform: plat,
-            caption: caption || clip.title || clip.hook || '',
-            scheduled_at: new Date(scheduleDateTime).toISOString(),
-            status: 'scheduled',
-          })
-          count++
-        } catch {}
-      }
-    }
-    setSchedulingAll(false)
-    setSuccessMsg(\ posts agendados com sucesso!)
-    setTimeout(() => setSuccessMsg(''), 4000)
-    loadData(userId)
-  }
-  return (
+                return (
                   <button
                     key={dest.id}
                     type="button"
@@ -470,40 +437,7 @@ export default function SchedulePageV2() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {clips.map(c => {
                     const isSelected = selectedClipId === c.id
-                  
-  const handleScheduleAll = async () => {
-    if (!userId || clips.length === 0) {
-      setErrorMsg('Nenhum clipe disponível para agendar.')
-      return
-    }
-    if (selectedPlatforms.length === 0) {
-      setErrorMsg('Selecione ao menos um destino.')
-      return
-    }
-    setSchedulingAll(true)
-    setErrorMsg('')
-    let count = 0
-    for (const clip of clips) {
-      for (const plat of selectedPlatforms) {
-        try {
-          await supabase.from('scheduled_posts').insert({
-            user_id: userId,
-            clip_id: clip.id,
-            platform: plat,
-            caption: caption || clip.title || clip.hook || '',
-            scheduled_at: new Date(scheduleDateTime).toISOString(),
-            status: 'scheduled',
-          })
-          count++
-        } catch {}
-      }
-    }
-    setSchedulingAll(false)
-    setSuccessMsg(\ posts agendados com sucesso!)
-    setTimeout(() => setSuccessMsg(''), 4000)
-    loadData(userId)
-  }
-  return (
+                        return (
                       <div
                         key={c.id}
                         onClick={() => {
