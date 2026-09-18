@@ -71,6 +71,7 @@ export default function SchedulePageV2() {
   const [scheduleDateTime, setScheduleDateTime] = useState('')
 
   const [saving, setSaving] = useState(false)
+  const [schedulingAll, setSchedulingAll] = useState(false)
   const [publishingNow, setPublishingNow] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -193,13 +194,46 @@ export default function SchedulePageV2() {
     }
   }
 
+
+  const handleScheduleAll = async () => {
+    if (!userId || clips.length === 0) {
+      setErrorMsg('Nenhum clipe disponível para agendar.')
+      return
+    }
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Selecione ao menos um destino.')
+      return
+    }
+    setSchedulingAll(true)
+    setErrorMsg('')
+    let count = 0
+    for (const clip of clips) {
+      for (const plat of selectedPlatforms) {
+        try {
+          await supabase.from('scheduled_posts').insert({
+            user_id: userId,
+            clip_id: clip.id,
+            platform: plat,
+            caption: caption || clip.title || clip.hook || '',
+            scheduled_at: new Date(scheduleDateTime).toISOString(),
+            status: 'scheduled',
+          })
+          count++
+        } catch {}
+      }
+    }
+    setSchedulingAll(false)
+    setSuccessMsg(\ posts agendados com sucesso!)
+    setTimeout(() => setSuccessMsg(''), 4000)
+    loadData(userId)
+  }
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
       
       {/* Top Title & Subtitle (Screenshot 1) */}
       <div className="max-w-7xl mx-auto mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white">
-          Programar Posts(V2)
+          Programar Posts
         </h1>
         <p className="text-xs text-zinc-400 mt-0.5">
           Configure profile, destinos, mídia e agenda com clareza
@@ -272,7 +306,40 @@ export default function SchedulePageV2() {
                 { id: 'youtube_shorts' as Platform, name: 'YouTube', sub: 'Shorts' }
               ].map(dest => {
                 const isSelected = selectedPlatforms.includes(dest.id)
-                return (
+              
+  const handleScheduleAll = async () => {
+    if (!userId || clips.length === 0) {
+      setErrorMsg('Nenhum clipe disponível para agendar.')
+      return
+    }
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Selecione ao menos um destino.')
+      return
+    }
+    setSchedulingAll(true)
+    setErrorMsg('')
+    let count = 0
+    for (const clip of clips) {
+      for (const plat of selectedPlatforms) {
+        try {
+          await supabase.from('scheduled_posts').insert({
+            user_id: userId,
+            clip_id: clip.id,
+            platform: plat,
+            caption: caption || clip.title || clip.hook || '',
+            scheduled_at: new Date(scheduleDateTime).toISOString(),
+            status: 'scheduled',
+          })
+          count++
+        } catch {}
+      }
+    }
+    setSchedulingAll(false)
+    setSuccessMsg(\ posts agendados com sucesso!)
+    setTimeout(() => setSuccessMsg(''), 4000)
+    loadData(userId)
+  }
+  return (
                   <button
                     key={dest.id}
                     type="button"
@@ -403,7 +470,40 @@ export default function SchedulePageV2() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {clips.map(c => {
                     const isSelected = selectedClipId === c.id
-                    return (
+                  
+  const handleScheduleAll = async () => {
+    if (!userId || clips.length === 0) {
+      setErrorMsg('Nenhum clipe disponível para agendar.')
+      return
+    }
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Selecione ao menos um destino.')
+      return
+    }
+    setSchedulingAll(true)
+    setErrorMsg('')
+    let count = 0
+    for (const clip of clips) {
+      for (const plat of selectedPlatforms) {
+        try {
+          await supabase.from('scheduled_posts').insert({
+            user_id: userId,
+            clip_id: clip.id,
+            platform: plat,
+            caption: caption || clip.title || clip.hook || '',
+            scheduled_at: new Date(scheduleDateTime).toISOString(),
+            status: 'scheduled',
+          })
+          count++
+        } catch {}
+      }
+    }
+    setSchedulingAll(false)
+    setSuccessMsg(\ posts agendados com sucesso!)
+    setTimeout(() => setSuccessMsg(''), 4000)
+    loadData(userId)
+  }
+  return (
                       <div
                         key={c.id}
                         onClick={() => {
@@ -513,6 +613,17 @@ export default function SchedulePageV2() {
               >
                 ⚡ Publicar Agora
               </button>
+
+              {clips.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleScheduleAll}
+                  disabled={schedulingAll || saving}
+                  className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-zinc-300 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {schedulingAll ? 'Agendando todos...' : 📅 Agendar todos (\ clipes)}
+                </button>
+              )}
             </div>
           </div>
 
