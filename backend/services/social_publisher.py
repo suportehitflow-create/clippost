@@ -98,3 +98,42 @@ def publish_reel(
     permalink = permalink_resp.json().get("permalink", "") if permalink_resp.ok else ""
 
     return {"media_id": media_id, "permalink": permalink}
+
+
+def publish_facebook_page(
+    page_id: str,
+    page_token: str,
+    video_url: str,
+    caption: str,
+    title: str = "",
+) -> dict:
+    """
+    Publica um vídeo em uma Facebook Page via Meta Graph API.
+
+    Args:
+        page_id:    ID da Facebook Page
+        page_token: Page Access Token (permanente)
+        video_url:  URL pública do vídeo MP4 (Supabase Storage)
+        caption:    Descrição / legenda do vídeo
+        title:      Título do vídeo (opcional)
+
+    Returns:
+        {"video_id": "...", "permalink": "..."}
+    """
+    resp = requests.post(
+        f"{GRAPH_BASE}/{page_id}/videos",
+        data={
+            "file_url": video_url,
+            "description": caption,
+            "title": title or caption[:100],
+            "published": "true",
+            "access_token": page_token,
+        },
+        timeout=60,
+    )
+    if not resp.ok:
+        raise InstagramPublishError(
+            f"Erro ao publicar no Facebook: {resp.status_code} — {resp.text}"
+        )
+    video_id = resp.json().get("id", "")
+    return {"video_id": video_id, "permalink": f"https://www.facebook.com/video/{video_id}"}
