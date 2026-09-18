@@ -6,6 +6,27 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles } from 'lucide-react'
 
+function getPlatformInfo(inputUrl: string) {
+  if (!inputUrl.trim()) return null
+  const u = inputUrl.toLowerCase()
+  if (u.includes('youtube.com') || u.includes('youtu.be')) {
+    return { name: 'YouTube', color: 'bg-red-500/10 text-red-400 border-red-500/20' }
+  }
+  if (u.includes('tiktok.com')) {
+    return { name: 'TikTok', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' }
+  }
+  if (u.includes('instagram.com')) {
+    return { name: 'Instagram Reels', color: 'bg-pink-500/10 text-pink-400 border-pink-500/20' }
+  }
+  if (u.includes('twitter.com') || u.includes('x.com')) {
+    return { name: 'X / Twitter', color: 'bg-zinc-400/10 text-zinc-300 border-zinc-500/20' }
+  }
+  if (u.includes('twitch.tv')) {
+    return { name: 'Twitch', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' }
+  }
+  return { name: 'Vídeo Web (yt-dlp)', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' }
+}
+
 export default function CreateClipsPage() {
   const [url, setUrl] = useState('')
   const [clipDuration, setClipDuration] = useState<'30' | '60' | '90' | 'auto'>('auto')
@@ -14,6 +35,9 @@ export default function CreateClipsPage() {
   const [error, setError] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [activeTab, setActiveTab] = useState<'link' | 'file'>('link')
+  const [miningScope, setMiningScope] = useState<'full' | 'range'>('full')
+  const [timeRangeStart, setTimeRangeStart] = useState('')
+  const [timeRangeEnd, setTimeRangeEnd] = useState('')
   
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -172,20 +196,43 @@ export default function CreateClipsPage() {
           )}
 
           {activeTab === 'link' ? (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-300">Link do Vídeo</label>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-300">Link do Vídeo</label>
+                {getPlatformInfo(url) && (
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getPlatformInfo(url)?.color} transition-all`}>
+                    ✓ ${getPlatformInfo(url)?.name} detectado
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
                   <Link2 className="w-4 h-4" />
                 </div>
                 <input
                   type="url"
-                  placeholder="https://www.youtube.com/watch?v=... ou link do TikTok / Instagram"
+                  placeholder="Cole link do YouTube, TikTok, Reels, Twitter/X, Twitch..."
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-[#6366f1] transition-colors"
                 />
+              </div>
+
+              {/* Badges de plataformas suportadas (Reclip / yt-dlp) */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] text-zinc-500">Plataformas suportadas:</span>
+                {[
+                  { name: 'YouTube', color: 'text-red-400 bg-red-500/10' },
+                  { name: 'TikTok', color: 'text-cyan-400 bg-cyan-500/10' },
+                  { name: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
+                  { name: 'X / Twitter', color: 'text-zinc-300 bg-zinc-500/10' },
+                  { name: 'Twitch', color: 'text-purple-400 bg-purple-500/10' },
+                ].map(p => (
+                  <span key={p.name} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.color}`}>
+                    {p.name}
+                  </span>
+                ))}
               </div>
             </div>
           ) : (

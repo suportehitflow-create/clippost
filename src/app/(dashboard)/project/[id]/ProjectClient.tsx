@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Smartphone,
+  Share2,
   Copy,
   Check,
   X,
@@ -1208,12 +1209,15 @@ export default function ProjectClient({
         </div>
       )}
 
-      {/* MODAL QR CODE PARA ENVIAR AO CELULAR */}
+      {/* MODAL ENVIAR AO CELULAR (ESTILO LOCALSEND / AIRDROP SEM COMPRESSÃO) */}
       {qrModalClip && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
           <div className="bg-[#121216] border border-white/10 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <span className="text-xs font-bold text-white uppercase tracking-wider">Enviar p/ Celular</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Enviar p/ Celular (Sem Perda)</span>
+              </div>
               <button
                 type="button"
                 onClick={() => setQrModalClip(null)}
@@ -1223,30 +1227,54 @@ export default function ProjectClient({
               </button>
             </div>
 
-            <p className="text-xs text-zinc-400">
-              Aponte a câmera do seu celular para o QR Code para abrir o vídeo diretamente no aparelho:
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Aponte a câmera do seu celular (iPhone ou Android) para baixar em alta qualidade direto no rolo da câmera:
             </p>
 
-            <div className="flex justify-center p-3 bg-white rounded-xl">
+            <div className="flex justify-center p-3 bg-white rounded-xl shadow-inner">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrModalClip.url)}`}
-                alt="QR Code"
-                className="w-44 h-44"
+                alt="QR Code de Download Direto"
+                className="w-40 h-40"
               />
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(qrModalClip.url)
-                setCopiedUrl(true)
-                setTimeout(() => setCopiedUrl(false), 2000)
-              }}
-              className="w-full py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-zinc-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedUrl ? 'Link Copiado!' : 'Copiar Link Direto'}</span>
-            </button>
+            <p className="text-[11px] text-zinc-500">
+              💡 Dica: Salva o vídeo direto na Galeria / Fotos com 1080p nativo sem passar pelo WhatsApp.
+            </p>
+
+            <div className="space-y-2 pt-1">
+              {typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await (navigator as any).share({
+                        title: qrModalClip.title,
+                        url: qrModalClip.url,
+                      })
+                    } catch {}
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Compartilhar Direto (AirDrop / TikTok)</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(qrModalClip.url)
+                  setCopiedUrl(true)
+                  setTimeout(() => setCopiedUrl(false), 2000)
+                }}
+                className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/[0.08]"
+              >
+                {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedUrl ? 'Link Copiado!' : 'Copiar Link Direto'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
