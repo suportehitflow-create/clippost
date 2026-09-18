@@ -4,6 +4,45 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co'
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM'
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: projectId } = await params
+    if (!projectId) {
+      return NextResponse.json({ error: 'ID do projeto não fornecido.' }, { status: 400 })
+    }
+
+    const admin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      auth: { persistSession: false }
+    })
+
+    const { data: project, error: pErr } = await admin
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (pErr || !project) {
+      return NextResponse.json({ error: 'Projeto não encontrado.' }, { status: 404 })
+    }
+
+    const { data: clips } = await admin
+      .from('clips')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('score', { ascending: false })
+
+    return NextResponse.json(
+      { project, clips: clips || [] },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    )
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Erro interno.' }, { status: 500 })
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

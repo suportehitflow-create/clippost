@@ -384,48 +384,82 @@ export default function ProjectClient({
     fetchRemoteBrand()
   }, [])
 
-  // Polling em tempo real para carregar os cortes REAIS gerados pelo backend
+  // Polling em tempo real contínuo: cortes aparecem um a um conforme são minerados
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null
+    let pollCount = 0
 
     async function fetchClipsAndStatus() {
       try {
-        const { data: dbClips } = await supabase
-          .from('clips')
-          .select('*')
-          .eq('project_id', project.id)
-          .order('score', { ascending: false })
+        pollCount++
+        // 1. Tenta buscar via API direta com service role (sem limitações de RLS)
+        const res = await fetch(`/api/projects/${project.id}`, {
+          headers: { 'Cache-Control': 'no-store' }
+        })
+        
+        if (res.ok) {
+          const data = await res.json()
+          if (data.project) {
+            setStatus(data.project.status)
+          }
+          if (Array.isArray(data.clips)) {
+            setClips(prev => {
+              if (data.clips.length !== prev.length || data.clips.some((c: any, i: number) => c.storage_url !== prev[i]?.storage_url)) {
+                if (prev.length === 0 && data.clips.length > 0) {
+                  setSelectedClipIndex(0)
+                  triggerBulkFeedback('Primeiro corte viral minerado e pronto!')
+                } else if (data.clips.length > prev.length) {
+                  triggerBulkFeedback(`Novo corte viral minerado (#${data.clips.length})!`)
+                }
+                return data.clips
+              }
+              return prev
+            })
+          }
 
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('status, raw_video_url')
-          .eq('id', project.id)
-          .maybeSingle()
-
-        if (projData?.status) {
-          setStatus(projData.status)
-        }
-
-        if (dbClips && dbClips.length > 0) {
-          setClips(dbClips)
-          if (projData?.status === 'done' || projData?.status === 'completed' || dbClips.some(c => !!c.storage_url)) {
-            setStatus('done')
+          // Só encerra o polling se o projeto foi finalizado totalmente pelo backend
+          if (data.project?.status === 'done' || data.project?.status === 'completed' || data.project?.status === 'failed') {
             if (timer) {
               clearInterval(timer)
               timer = null
             }
             return
           }
+        } else {
+          // Fallback via Supabase Client direto
+          const { data: dbClips } = await supabase
+            .from('clips')
+            .select('*')
+            .eq('project_id', project.id)
+            .order('score', { ascending: false })
+
+          const { data: projData } = await supabase
+            .from('projects')
+            .select('status, raw_video_url')
+            .eq('id', project.id)
+            .maybeSingle()
+
+          if (projData?.status) setStatus(projData.status)
+          if (dbClips && dbClips.length > 0) {
+            setClips(dbClips)
+            if (projData?.status === 'done' || projData?.status === 'completed' || projData?.status === 'failed') {
+              if (timer) {
+                clearInterval(timer)
+                timer = null
+              }
+              return
+            }
+          }
         }
       } catch (err) {
-        console.warn('Erro ao atualizar cortes:', err)
+        console.warn('Erro ao atualizar cortes em tempo real:', err)
       }
     }
 
     fetchClipsAndStatus()
 
-    // Mantém polling a cada 3 segundos enquanto processa
-    timer = setInterval(fetchClipsAndStatus, 3000)
+    // Polling contínuo a cada 2.5s para streaming de clipes em tempo real
+    timer = setInterval(fetchClipsAndStatus, 2500)
 
     return () => {
       if (timer) clearInterval(timer)
@@ -627,134 +661,9 @@ export default function ProjectClient({
     })
   }
 
-  // 0. TELA DE PROCESSAMENTO MINIMALISTA ENQUANTO OS CORTES ESTÃO SENDO MINERADOS
-  if (clips.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col min-h-screen bg-[#070709] text-white">
-        {/* Header minimalista */}
-        <header className="h-14 border-b border-white/[0.08] px-6 flex items-center justify-between bg-[#0b0b0e]/90 backdrop-blur-md sticky top-0 z-30">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all flex items-center gap-1.5 text-xs font-medium"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Painel</span>
-            </Link>
-            <div className="h-4 w-px bg-white/10" />
-            <span className="text-xs sm:text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
-              {project.title}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" /> Minerando com IA...
-            </span>
-          </div>
-        </header>
-
-        {/* Card Central Minimalista com as Etapas Reais */}
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-[#0e0e12] border border-white/[0.08] rounded-2xl p-6 sm:p-8 space-y-6">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
-                <Scissors className="w-6 h-6 animate-pulse" />
-              </div>
-              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Minerando Cortes 9:16
-              </h2>
-              <p className="text-xs text-zinc-400 max-w-xs mx-auto line-clamp-2">
-                {project.title}
-              </p>
-            </div>
-
-            {/* Barra de Progresso */}
-            <div className="space-y-2">
-              <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden relative">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-[pulse_2s_ease-in-out_infinite] w-3/4" />
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
-                <span>IA em execução</span>
-                <span>Tempo Real</span>
-              </div>
-            </div>
-
-            {/* Etapas do Processamento */}
-            <div className="space-y-2.5 pt-1">
-              {[
-                { 
-                  title: 'Download & extração de áudio', 
-                  desc: elapsedSecs < 18 ? `Baixando fluxo de vídeo e áudio (${elapsedSecs}s)... ` : 'Vídeo e áudio baixados com sucesso', 
-                  done: elapsedSecs >= 18, 
-                  active: elapsedSecs < 18 
-                },
-                { 
-                  title: 'Transcrição Whisper & timestamps', 
-                  desc: elapsedSecs < 18 ? 'Aguardando download' : elapsedSecs < 45 ? `Mapeando falas e palavras com IA (${elapsedSecs - 18}s)... ` : 'Transcrição e timestamps concluídos', 
-                  done: elapsedSecs >= 45, 
-                  active: elapsedSecs >= 18 && elapsedSecs < 45, 
-                  pending: elapsedSecs < 18 
-                },
-                { 
-                  title: 'Mineração narrativa de ganchos virais', 
-                  desc: elapsedSecs < 45 ? 'Aguardando transcrição' : elapsedSecs < 70 ? 'Calculando retenção e gerando títulos magnéticos...' : 'Ganchos de alta retenção encontrados', 
-                  done: elapsedSecs >= 70, 
-                  active: elapsedSecs >= 45 && elapsedSecs < 70, 
-                  pending: elapsedSecs < 45 
-                },
-                { 
-                  title: 'Renderização 9:16 & template oficial', 
-                  desc: elapsedSecs < 70 ? 'Aguardando ganchos' : 'Renderizando formato vertical e sincronizando legendas...', 
-                  active: elapsedSecs >= 70, 
-                  pending: elapsedSecs < 70 
-                },
-              ].map((step, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                    step.done
-                      ? 'bg-white/[0.02] border-emerald-500/20 text-zinc-300'
-                      : step.active
-                      ? 'bg-indigo-500/[0.06] border-indigo-500/30 text-white'
-                      : 'bg-transparent border-white/[0.04] text-zinc-600 opacity-50'
-                  }`}
-                >
-                  <div className="shrink-0">
-                    {step.done ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    ) : step.active ? (
-                      <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[9px] font-mono">
-                        {idx + 1}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-semibold ${step.active ? 'text-white' : step.done ? 'text-zinc-200' : 'text-zinc-500'}`}>
-                      {step.title}
-                    </p>
-                    <p className="text-[11px] text-zinc-500 truncate">
-                      {step.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-center text-[11px] text-zinc-500">
-              O estúdio abrirá automaticamente assim que os cortes ficarem prontos.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#070709] text-white">
       
+      return (
+    <div className="flex-1 flex flex-col min-h-screen bg-[#070709] text-white">
       {/* 1. BARRA SUPERIOR APPLE PRO (MINIMALISTA, SEM SOMBRAS NEON) */}
       <header className="h-14 border-b border-white/[0.08] px-6 flex items-center justify-between bg-[#0b0b0e]/90 backdrop-blur-md sticky top-0 z-30">
         <div className="flex items-center gap-3">
@@ -852,6 +761,47 @@ export default function ProjectClient({
       </div>
 
       {/* 3. STUDIO PRINCIPAL: 2 COLUNAS LIMPAS E ESPAÇOSAS */}
+      {/* BANNER AO VIVO DE MINERAÇÃO EM TEMPO REAL */}
+      {status === 'processing' && (
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+          <div className="bg-gradient-to-r from-indigo-950/50 via-[#100e24] to-purple-950/40 border border-indigo-500/30 rounded-2xl p-4 shadow-xl shadow-indigo-950/20 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shrink-0">
+                <Scissors className="w-5 h-5 text-indigo-400 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    MINERANDO COM IA AO VIVO
+                  </span>
+                  <span className="text-xs font-bold text-white font-mono">
+                    {clips.length} {clips.length === 1 ? 'corte pronto' : 'cortes prontos'}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300 font-medium mt-1">
+                  {clips.length === 0 
+                    ? 'Transcrevendo áudio e minerando os primeiros momentos virais... O 1º clipe aparecerá aqui em instantes!'
+                    : `Corte #${clips.length} finalizado e pronto para edição! Minerando o próximo clipe em segundo plano...`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 self-end sm:self-center">
+              <div className="text-right hidden sm:block">
+                <span className="text-[10px] text-zinc-400 block uppercase font-mono tracking-wider">Tempo Decorrido</span>
+                <span className="text-xs font-bold text-white font-mono">
+                  {Math.floor(elapsedSecs / 60)}m {(elapsedSecs % 60).toString().padStart(2, '0')}s
+                </span>
+              </div>
+              <div className="w-20 sm:w-28 bg-white/10 h-2 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-[pulse_1.5s_ease-in-out_infinite] w-3/4" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* COLUNA ESQUERDA (5 COLUNAS): PLAYER DO IPHONE 16 PRO */}

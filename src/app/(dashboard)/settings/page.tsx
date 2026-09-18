@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   User, Shield, Cpu, LogOut, Check, Zap,
-  Plus, Trash2, Instagram, Link as LinkIcon, CheckCircle2
+  Plus, Trash2, Link as LinkIcon, CheckCircle2
 } from 'lucide-react'
 import LiquidToggle from '@/components/ui/LiquidToggle'
 
