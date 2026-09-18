@@ -555,7 +555,7 @@ export default function SchedulePageV2() {
                   disabled={schedulingAll || saving}
                   className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-zinc-300 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {schedulingAll ? 'Agendando todos...' : 📅 Agendar todos (\ clipes)}
+                  {schedulingAll ? 'Agendando todos...' : `📅 Agendar todos (${clips.length} clipes)`}
                 </button>
               )}
             </div>
