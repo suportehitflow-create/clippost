@@ -88,6 +88,10 @@ export default function CreateClipsPage() {
           const parsed = JSON.parse(savedTpl)
           activeTemplateConfig = parsed.config || parsed
         }
+        if (!activeTemplateConfig) {
+          const savedCfg = localStorage.getItem('clippost_template_config')
+          if (savedCfg) activeTemplateConfig = JSON.parse(savedCfg)
+        }
       } catch {}
 
       // Dispara job no backend em segundo plano com template ativo integrado

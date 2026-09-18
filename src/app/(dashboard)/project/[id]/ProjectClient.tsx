@@ -52,21 +52,15 @@ function AppleEmojiText({ text, className }: { text: string; className?: string 
   return (
     <span className={className}>
       {parts.map((part, i) => {
+        if (!part) return null
         if (emojiRegex.test(part)) {
-          const codePoints = Array.from(part)
-            .map(c => c.codePointAt(0)!.toString(16))
-            .filter(c => c !== 'fe0f')
-          const hex = codePoints.join('-').toLowerCase()
           return (
-            <img
+            <span
               key={i}
-              src={`https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/${hex}.png`}
-              alt={part}
-              className="inline-block w-[1.15em] h-[1.15em] align-[-0.18em] mx-[1px] select-none pointer-events-none"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none'
-              }}
-            />
+              className="inline-block mx-[1.5px] align-[-0.12em] font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif] leading-none select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)] transform hover:scale-110 transition-transform duration-150"
+            >
+              {part}
+            </span>
           )
         }
         return <span key={i}>{part}</span>
@@ -111,10 +105,11 @@ interface WordTiming {
 const SUBTITLE_STYLES = [
   { id: 'hormozi_orange', name: 'Hormozi Laranja', activeColor: '#ffffff', activeBg: '#ea580c', border: 'border-orange-500/40' },
   { id: 'hormozi_yellow', name: 'Hormozi Amarelo', activeColor: '#000000', activeBg: '#facc15', border: 'border-yellow-400/40' },
-  { id: 'clean_white_box', name: 'Clean White Box', activeColor: '#09090b', activeBg: '#ffffff', border: 'border-white/40' },
+  { id: 'clean_white', name: 'Clean White', activeColor: '#000000', activeBg: '#ffffff', border: 'border-white/40' },
+  { id: 'clean_white_box', name: 'Clean White Box', activeColor: '#000000', activeBg: '#ffffff', border: 'border-white/40' },
   { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', border: 'border-zinc-700' },
-  { id: 'neon_cyan', name: 'Cyan Pro', activeColor: '#000000', activeBg: '#22d3ee', border: 'border-cyan-400/40' },
-  { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#ffffff', activeBg: '#ec4899', border: 'border-pink-500/40' },
+  { id: 'neon_cyan', name: 'Cyan Pro', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(6,182,212,0.8)', border: 'border-cyan-400/40' },
+  { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-pink-500/40' },
 ]
 
 export default function ProjectClient({
@@ -154,16 +149,16 @@ export default function ProjectClient({
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_BRAND_AVATAR)
 
   // Dimensões e Coordenadas do Template
-  const [videoWidth, setVideoWidth] = useState<number>(96)
+  const [videoWidth, setVideoWidth] = useState<number>(92)
   const [videoHeight, setVideoHeight] = useState<number>(48)
-  const [videoPos, setVideoPos] = useState<{ x: number; y: number }>({ x: 50, y: 55 })
+  const [videoPos, setVideoPos] = useState<{ x: number; y: number }>({ x: 50, y: 52 })
   const [headerPos, setHeaderPos] = useState<{ x: number; y: number }>({ x: 50, y: 16 })
-  const [titlePos, setTitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 25 })
-  const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 78 })
+  const [titlePos, setTitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 24 })
+  const [subtitlePos, setSubtitlePos] = useState<{ x: number; y: number }>({ x: 50, y: 75 })
   const [brandAlign, setBrandAlign] = useState<'center' | 'left' | 'right'>('center')
-  const [brandLayout, setBrandLayout] = useState<'row' | 'stacked'>('row')
+  const [brandLayout, setBrandLayout] = useState<'inline' | 'row' | 'stacked'>('inline')
   const [showVerifiedBadge, setShowVerifiedBadge] = useState<boolean>(true)
-  const [fontFamily, setFontFamily] = useState<string>('Inter')
+  const [fontFamily, setFontFamily] = useState<string>("'Instagram Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif")
   const [fontSize, setFontSize] = useState<number>(14)
   const [titleColor, setTitleColor] = useState<string>('#ffffff')
   const [titleStroke, setTitleStroke] = useState<string>('none')
@@ -205,6 +200,34 @@ export default function ProjectClient({
   // Carrega template salvo integrado 100%
   useEffect(() => {
     try {
+      const savedCfgOnly = localStorage.getItem('clippost_template_config')
+      if (savedCfgOnly) {
+        try {
+          const cfg = JSON.parse(savedCfgOnly)
+          if (cfg.templateBg) setTemplateBg(cfg.templateBg)
+          if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
+          if (cfg.brandHandle && cfg.brandHandle !== '@humordaiguana') setBrandHandle(cfg.brandHandle)
+          if (cfg.videoWidth) { setVideoWidth(cfg.videoWidth); setVideoScale(cfg.videoWidth); }
+          if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
+          if (cfg.videoPos) setVideoPos(cfg.videoPos)
+          if (cfg.headerPos) setHeaderPos(cfg.headerPos)
+          if (cfg.titlePos) setTitlePos(cfg.titlePos)
+          if (cfg.subtitlePos) setSubtitlePos(cfg.subtitlePos)
+          if (cfg.brandAlign) setBrandAlign(cfg.brandAlign)
+          if (cfg.brandLayout) setBrandLayout(cfg.brandLayout)
+          if (cfg.showVerifiedBadge !== undefined) setShowVerifiedBadge(cfg.showVerifiedBadge)
+          if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
+          if (cfg.fontSize) setFontSize(cfg.fontSize)
+          if (cfg.titleColor) setTitleColor(cfg.titleColor)
+          if (cfg.titleStroke) setTitleStroke(cfg.titleStroke)
+          if (cfg.titleStrokeColor) setTitleStrokeColor(cfg.titleStrokeColor)
+          if (cfg.brandScale) setBrandScale(cfg.brandScale)
+          if (cfg.videoRounded !== undefined) setVideoRounded(cfg.videoRounded)
+          if (cfg.titleCapsLock !== undefined) setTitleCapsLock(cfg.titleCapsLock)
+          if (cfg.textAlign) setTextAlign(cfg.textAlign)
+          if (cfg.subtitle_preset) setActiveSubtitleStyle(cfg.subtitle_preset)
+        } catch {}
+      }
       const saved = localStorage.getItem('clippost_active_template')
       if (saved) {
         const parsed = JSON.parse(saved)
@@ -472,6 +495,109 @@ export default function ProjectClient({
     })
   }
 
+  // 0. TELA DE PROCESSAMENTO MINIMALISTA ENQUANTO OS CORTES ESTÃO SENDO MINERADOS
+  if (clips.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen bg-[#070709] text-white">
+        {/* Header minimalista */}
+        <header className="h-14 border-b border-white/[0.08] px-6 flex items-center justify-between bg-[#0b0b0e]/90 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all flex items-center gap-1.5 text-xs font-medium"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Painel</span>
+            </Link>
+            <div className="h-4 w-px bg-white/10" />
+            <span className="text-xs sm:text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
+              {project.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Minerando com IA...
+            </span>
+          </div>
+        </header>
+
+        {/* Card Central Minimalista com as Etapas Reais */}
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-[#0e0e12] border border-white/[0.08] rounded-2xl p-6 sm:p-8 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
+                <Scissors className="w-6 h-6 animate-pulse" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Minerando Cortes 9:16
+              </h2>
+              <p className="text-xs text-zinc-400 max-w-xs mx-auto line-clamp-2">
+                {project.title}
+              </p>
+            </div>
+
+            {/* Barra de Progresso */}
+            <div className="space-y-2">
+              <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden relative">
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-[pulse_2s_ease-in-out_infinite] w-3/4" />
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                <span>IA em execução</span>
+                <span>Tempo Real</span>
+              </div>
+            </div>
+
+            {/* Etapas do Processamento */}
+            <div className="space-y-2.5 pt-1">
+              {[
+                { title: 'Download & extração de áudio', desc: 'Processando fluxo do vídeo original', done: true },
+                { title: 'Transcrição Whisper & timestamps', desc: 'Mapeando cada palavra para a legenda', active: true },
+                { title: 'Mineração narrativa de ganchos virais', desc: 'Analisando retenção e tópicos magnéticos', pending: true },
+                { title: 'Renderização 9:16 & template oficial', desc: 'Aplicando cortes verticais e legendas', pending: true },
+              ].map((step, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                    step.done
+                      ? 'bg-white/[0.02] border-emerald-500/20 text-zinc-300'
+                      : step.active
+                      ? 'bg-indigo-500/[0.06] border-indigo-500/30 text-white'
+                      : 'bg-transparent border-white/[0.04] text-zinc-600 opacity-50'
+                  }`}
+                >
+                  <div className="shrink-0">
+                    {step.done ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : step.active ? (
+                      <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[9px] font-mono">
+                        {idx + 1}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-semibold ${step.active ? 'text-white' : step.done ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                      {step.title}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 truncate">
+                      {step.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-[11px] text-zinc-500">
+              O estúdio abrirá automaticamente assim que os cortes ficarem prontos.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#070709] text-white">
       
@@ -490,15 +616,9 @@ export default function ProjectClient({
             <h1 className="text-xs sm:text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
               {project.title}
             </h1>
-            {status === 'processing' || clips.length === 0 ? (
-              <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1.5 whitespace-nowrap">
-                <Loader2 className="w-3 h-3 animate-spin" /> Minerando cortes com IA...
-              </span>
-            ) : (
-              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
-              </span>
-            )}
+            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
+            </span>
           </div>
         </div>
 
@@ -508,7 +628,7 @@ export default function ProjectClient({
             type="button"
             onClick={handleDownloadAll}
             disabled={clips.length === 0 || status === 'processing'}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-1.5 shadow-sm ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-sm ${
               clips.length === 0 || status === 'processing'
                 ? 'opacity-40 cursor-not-allowed pointer-events-none'
                 : 'cursor-pointer'
@@ -542,72 +662,39 @@ export default function ProjectClient({
         </div>
       </header>
 
-      {/* BANNER DINÂMICO DE PROCESSAMENTO EM TEMPO REAL */}
-      {(status === 'processing' || clips.length === 0) && (
-        <div className="border-b border-indigo-500/20 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-indigo-950/40 px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-white flex items-center gap-2">
-                IA Minerando Narrativas & Renderizando Cortes 9:16
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  Tempo Real
-                </span>
-              </p>
-              <p className="text-[11px] text-zinc-400 mt-0.5">
-                Detectando ganchos emocionais, eliminando pausas e aplicando seu template oficial. Os cortes aparecerão aqui automaticamente.
-              </p>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-indigo-300/80 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-            Sincronizando com IA...
-          </div>
-        </div>
-      )}
-
       {/* 2. SELETOR RÁPIDO HORIZONTAL DE CORTES (SEGMENTED APPLE) */}
-      <div className="border-b border-white/[0.06] bg-[#0b0b0e]/40 px-6 py-2.5 overflow-x-auto scrollbar-none flex items-center gap-2">
+      <div className="border-b border-white/[0.06] bg-[#0b0b0e]/40 px-6 py-2 overflow-x-auto scrollbar-none flex items-center gap-2">
         <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap pr-2">
           Cortes:
         </span>
-        {clips.length === 0 ? (
-          <div className="flex items-center gap-2 py-1 px-3 text-xs text-zinc-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-            <span>Minerando cortes e ganchos de alta retenção na linha do tempo...</span>
-          </div>
-        ) : (
-          clips.map((clip, idx) => {
-            const isSelected = selectedClipIndex === idx
-            const scorePercent = Math.round(clip.score * 100)
-            return (
-              <button
-                key={clip.id}
-                onClick={() => {
-                  setSelectedClipIndex(idx)
-                  setCustomTitle('')
-                  setPlaybackTime(0)
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-                  isSelected
-                    ? 'bg-white/10 text-white border border-white/20 shadow-sm'
-                    : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
-                }`}
-              >
-                <span className="font-semibold">#{idx + 1}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                  scorePercent >= 90
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-orange-500/15 text-orange-400'
-                }`}>
-                  {scorePercent}%
-                </span>
-              </button>
-            )
-          })
-        )}
+        {clips.map((clip, idx) => {
+          const isSelected = selectedClipIndex === idx
+          const scorePercent = Math.round(clip.score * 100)
+          return (
+            <button
+              key={clip.id}
+              onClick={() => {
+                setSelectedClipIndex(idx)
+                setCustomTitle('')
+                setPlaybackTime(0)
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                isSelected
+                  ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <span className="font-semibold">#{idx + 1}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                scorePercent >= 90
+                  ? 'bg-emerald-500/15 text-emerald-400'
+                  : 'bg-indigo-500/15 text-indigo-400'
+              }`}>
+                {scorePercent}%
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* 3. STUDIO PRINCIPAL: 2 COLUNAS LIMPAS E ESPAÇOSAS */}
@@ -616,120 +703,142 @@ export default function ProjectClient({
         {/* COLUNA ESQUERDA (5 COLUNAS): PLAYER DO IPHONE 16 PRO */}
         <div className="lg:col-span-5 flex flex-col items-center">
           
-          {/* MOCKUP DO IPHONE 16/18 PRO (TITÂNIO, PROPORÇÃO 19.5:9, STATUS BAR REALISTA, SEM DYNAMIC ISLAND) */}
-          <div className="relative p-[8px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[50px] shadow-[0_25px_80px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.25)] ring-1 ring-white/20 shrink-0 select-none my-auto">
+          {/* MOCKUP DO IPHONE 16 PRO (MINIMALISTA, MENOS SOMBRAS) */}
+          <div className="relative p-[8px] bg-[#1a1a20] rounded-[52px] border border-white/15 shadow-xl shrink-0 select-none my-auto">
             {/* BOTÕES LATERAIS FÍSICOS DO IPHONE */}
-            <div className="absolute -left-[4px] top-[100px] w-[4px] h-[24px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            <div className="absolute -left-[4px] top-[138px] w-[4px] h-[44px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            <div className="absolute -left-[4px] top-[192px] w-[4px] h-[44px] bg-zinc-600 rounded-l-sm shadow-sm" />
-            <div className="absolute -right-[4px] top-[150px] w-[4px] h-[60px] bg-zinc-600 rounded-r-sm shadow-sm" />
+            <div className="absolute -left-[4px] top-[100px] w-[3px] h-[24px] bg-zinc-600 rounded-l-sm" />
+            <div className="absolute -left-[4px] top-[138px] w-[3px] h-[44px] bg-zinc-600 rounded-l-sm" />
+            <div className="absolute -left-[4px] top-[192px] w-[3px] h-[44px] bg-zinc-600 rounded-l-sm" />
+            <div className="absolute -right-[4px] top-[150px] w-[3px] h-[60px] bg-zinc-600 rounded-r-sm" />
 
             {/* TELA OLED DO IPHONE (PROPORÇÃO REAL 19.5:9 -> 310 x 672 px) */}
             <div
-              style={{ width: "310px", height: "672px", aspectRatio: "9 / 19.5" }}
-              className={`relative rounded-[42px] overflow-hidden flex flex-col justify-between transition-colors cursor-pointer ${
+              style={{ width: "324px", height: "702px", aspectRatio: "9 / 19.5" }}
+              className={`relative rounded-[44px] overflow-hidden select-none transition-colors cursor-pointer ${
                 templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white'
               }`}
               onClick={togglePlayback}
               title="Clique para Reproduzir / Pausar"
             >
-              {/* STATUS BAR DO IPHONE (9:41 + SINAL, WI-FI, BATERIA - SEM DYNAMIC ISLAND) */}
-              <div className="h-9 px-5 pt-2 flex items-center justify-between z-50 pointer-events-none text-white select-none">
-                <span className="text-[11px] font-bold tracking-tight text-white/95 drop-shadow">9:41</span>
+              {/* 1. STATUS BAR DO IPHONE */}
+              <div className="h-9 px-5 pt-2 flex items-center justify-between z-50 pointer-events-none select-none">
+                <span className={`text-[11px] font-bold tracking-tight ${templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>9:41</span>
 
-                <div className="flex items-center gap-1.5 text-white/95 drop-shadow">
+                <div className={`flex items-center gap-1.5 ${templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>
                   <div className="flex items-end gap-0.5 h-2">
-                    <div className="w-[2px] h-1 bg-white rounded-xs" />
-                    <div className="w-[2px] h-1.5 bg-white rounded-xs" />
-                    <div className="w-[2px] h-2 bg-white rounded-xs" />
+                    <div className={`w-[2px] h-1 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-1.5 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-2 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                   </div>
                   <Wifi className="w-3 h-3 stroke-[2.4]" />
-                  <div className="w-4 h-2 rounded-[3px] border border-white/80 p-0.5 flex items-center">
-                    <div className="w-2.5 h-full bg-white rounded-[1px]" />
+                  <div className={`w-4 h-2 rounded-[3px] border p-0.5 flex items-center ${templateBg === 'white' ? 'border-zinc-900' : 'border-white/80'}`}>
+                    <div className={`w-2.5 h-full rounded-[1px] ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                   </div>
                 </div>
               </div>
-              
-              {/* TOPO DO TEMPLATE: AVATAR + @HANDLE */}
-                <div className="pt-2 px-4 z-20 flex flex-col items-center text-center pointer-events-none">
+
+              {/* 2. CABEÇALHO DO TEMPLATE: AVATAR + @HANDLE (100% VINCULADO AO TEMPLATE) */}
+              <div
+                style={{ top: `${headerPos.y}%` }}
+                className={`absolute left-5 right-5 -translate-y-1/2 z-30 flex items-center select-none pointer-events-none transition-all ${
+                  brandAlign === 'left' ? 'justify-start' : brandAlign === 'right' ? 'justify-end' : 'justify-center'
+                }`}
+              >
+                <div
+                  className={`flex items-center max-w-full ${brandLayout === 'stacked' ? 'flex-col text-center' : 'flex-row'}`}
+                  style={{ gap: `${Math.max(6, Math.round(brandScale * 0.65))}px` }}
+                >
                   <div
                     style={{
-                      width: `${Math.round(brandScale * 2.4)}px`,
-                      height: `${Math.round(brandScale * 2.4)}px`,
+                      width: `${Math.round(brandScale * 2.85)}px`,
+                      height: `${Math.round(brandScale * 2.85)}px`,
                     }}
-                    className={`rounded-full border overflow-hidden shadow-sm mb-1 transition-all ${
-                      templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/30 bg-zinc-900'
+                    className={`rounded-full border-2 overflow-hidden shadow-sm shrink-0 transition-all ${
+                      templateBg === 'white' ? 'border-zinc-300 bg-zinc-100' : 'border-white/60 bg-zinc-900'
                     }`}
                   >
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    <img
+                      src={avatarUrl}
+                      alt={brandName}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className={`flex flex-col min-w-0 ${brandAlign === 'center' ? 'items-center text-center' : brandAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        style={{ fontSize: `${brandScale}px` }}
+                        className={`font-bold tracking-tight truncate leading-snug transition-all ${
+                          templateBg === 'white' ? 'text-zinc-950' : 'text-white'
+                        }`}
+                      >
+                        {brandName}
+                      </span>
+                      {showVerifiedBadge && (
+                        <svg
+                          style={{
+                            width: `${Math.max(10, Math.round(brandScale * 0.85))}px`,
+                            height: `${Math.max(10, Math.round(brandScale * 0.85))}px`,
+                          }}
+                          className="text-blue-500 fill-current shrink-0"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                      )}
+                    </div>
                     <span
-                      style={{ fontSize: `${Math.round(brandScale * 0.8)}px` }}
-                      className={`font-extrabold uppercase tracking-wide leading-tight transition-all ${
-                        templateBg === 'white' ? 'text-zinc-900' : 'text-white'
+                      style={{ fontSize: `${Math.max(9, Math.round(brandScale * 0.75))}px` }}
+                      className={`font-medium truncate leading-tight transition-all ${
+                        templateBg === 'white' ? 'text-zinc-600' : 'text-zinc-400'
                       }`}
                     >
-                      {brandName}
+                      {brandHandle}
                     </span>
-                    {showVerifiedBadge && (
-                      <svg
-                        style={{
-                          width: `${Math.max(8, Math.round(brandScale * 0.7))}px`,
-                          height: `${Math.max(8, Math.round(brandScale * 0.7))}px`,
-                        }}
-                        className="text-blue-500 fill-current shrink-0"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
-                    )}
                   </div>
-                  <span
-                    style={{ fontSize: `${Math.max(8, Math.round(brandScale * 0.65))}px` }}
-                    className={`font-medium transition-all ${
-                      templateBg === 'white' ? 'text-zinc-500' : 'text-zinc-400'
-                    }`}
-                  >
-                    {brandHandle}
-                  </span>
                 </div>
+              </div>
 
-                              {/* 1. TÍTULO DO VÍDEO (HEADLINE VINCULADA AO TEMPLATE OFICIAL) */}
-                <div className="px-4 py-1.5 z-20 my-auto pointer-events-none w-full" style={{ textAlign: textAlign, fontFamily: fontFamily }}>
-                  <h2
-                    style={{
-                      fontSize: `${fontSize}px`,
-                      color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
-                      textAlign: textAlign,
-                      textTransform: titleCapsLock ? 'uppercase' : 'none',
-                      paintOrder: titleStroke !== 'none' ? 'stroke fill' : 'normal',
-                      textShadow: titleStroke !== 'none'
-                        ? (() => {
-                            const r = titleStroke === 'thin' ? 1.0 : titleStroke === 'medium' ? 1.8 : 2.6
-                            const pts = []
-                            for (let i = 0; i < 16; i++) {
-                              const a = (i * Math.PI) / 8
-                              pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
-                            }
-                            return pts.join(', ')
-                          })()
-                        : 'none',
-                      WebkitTextStroke: titleStroke !== 'none'
-                        ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '2px' : '3px'} ${titleStrokeColor}`
-                        : '0px transparent',
-                    }}
-                    className="font-black leading-snug tracking-tight line-clamp-3"
-                  >
-                    {displayedTitle}
-                  </h2>
-                </div>
-
-              {/* 2. ENQUADRAMENTO DO VÍDEO COM PLAYER INTEGRADO (ÚNICO PLAYER) */}
+              {/* 3. TÍTULO DO VÍDEO (100% VINCULADO AO TEMPLATE) */}
               <div
                 style={{
-                  width: `${videoScale}%`,
-                  margin: '0 auto',
+                  left: `${titlePos.x}%`,
+                  top: `${titlePos.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '88%',
+                  fontFamily: fontFamily,
+                  fontSize: `${fontSize}px`,
+                  color: templateBg === 'white' && titleColor.toLowerCase() === '#ffffff' ? '#000000' : titleColor,
+                  textAlign: textAlign,
+                  textTransform: titleCapsLock ? 'uppercase' : 'none',
+                  paintOrder: titleStroke !== 'none' ? 'stroke fill' : 'normal',
+                  textShadow: titleStroke !== 'none'
+                    ? (() => {
+                        const r = titleStroke === 'thin' ? 1.0 : titleStroke === 'medium' ? 1.8 : 2.6
+                        const pts = []
+                        for (let i = 0; i < 16; i++) {
+                          const a = (i * Math.PI) / 8
+                          pts.push(`${(Math.cos(a) * r).toFixed(1)}px ${(Math.sin(a) * r).toFixed(1)}px 0 ${titleStrokeColor}`)
+                        }
+                        return pts.join(', ')
+                      })()
+                    : 'none',
+                  WebkitTextStroke: titleStroke !== 'none'
+                    ? `${titleStroke === 'thin' ? '1px' : titleStroke === 'medium' ? '2px' : '3px'} ${titleStrokeColor}`
+                    : '0px transparent',
+                }}
+                className="absolute pointer-events-none z-30 font-black leading-tight tracking-tight select-none"
+              >
+                {displayedTitle}
+              </div>
+
+              {/* 4. QUADRO DO VÍDEO (100% VINCULADO AO TEMPLATE) */}
+              <div
+                style={{
+                  left: `${videoPos.x}%`,
+                  top: `${videoPos.y}%`,
+                  width: `${videoWidth}%`,
+                  height: `${videoHeight}%`,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 onMouseEnter={() => setShowVideoControls(true)}
                 onMouseMove={() => {
@@ -738,49 +847,48 @@ export default function ProjectClient({
                   controlsTimeoutRef.current = setTimeout(() => setShowVideoControls(false), 2500)
                 }}
                 onMouseLeave={() => setShowVideoControls(false)}
-                className={`relative aspect-[4/5] ${videoRounded ? "rounded-2xl" : "rounded-none"} overflow-hidden z-10 shadow-md group/player ${
+                className={`absolute z-20 ${videoRounded ? "rounded-2xl" : "rounded-none"} overflow-hidden shadow-md group/player ${
                   templateBg === 'white' ? 'border border-zinc-200/80 bg-black' : 'border border-white/10 bg-black'
                 } flex items-center justify-center cursor-pointer`}
               >
-                                  {activeClip.storage_url || project.raw_video_url ? (
-                    <video
-                      ref={videoRef}
-                      src={activeClip.storage_url || project.raw_video_url || ''}
-                      className="w-full h-full object-cover"
-                      playsInline
-                      loop
-                      onTimeUpdate={() => {
-                        if (videoRef.current) {
-                          const cur = videoRef.current.currentTime
-                          if (!activeClip.storage_url) {
-                            if (cur >= activeClip.end_time || cur < activeClip.start_time) {
-                              videoRef.current.currentTime = activeClip.start_time
-                            }
-                            setPlaybackTime(Math.max(0, cur - activeClip.start_time))
-                          } else {
-                            setPlaybackTime(cur)
+                {activeClip.storage_url || project.raw_video_url ? (
+                  <video
+                    ref={videoRef}
+                    src={activeClip.storage_url || project.raw_video_url || ''}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    loop
+                    onTimeUpdate={() => {
+                      if (videoRef.current) {
+                        const cur = videoRef.current.currentTime
+                        if (!activeClip.storage_url) {
+                          if (cur >= activeClip.end_time || cur < activeClip.start_time) {
+                            videoRef.current.currentTime = activeClip.start_time
                           }
+                          setPlaybackTime(Math.max(0, cur - activeClip.start_time))
+                        } else {
+                          setPlaybackTime(cur)
                         }
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
-                      <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">
-                        <Sparkles className="w-5 h-5 text-indigo-400" />
-                      </div>
-                      <span className="text-xs font-bold text-white tracking-wide">Processando Corte Nativo</span>
-                      <span className="text-[10px] text-zinc-400 font-mono mt-0.5">Renderizando vídeo em alta resolução...</span>
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">
+                      <Sparkles className="w-5 h-5 text-indigo-400" />
                     </div>
-                  )}
+                    <span className="text-xs font-bold text-white tracking-wide">Vídeo 9:16</span>
+                    <span className="text-[10px] text-zinc-400 font-mono mt-0.5">Renderizando corte...</span>
+                  </div>
+                )}
 
-                {/* CONTROLES NATIVOS DO PLAYER SOBREPOSTOS DENTRO DO QUADRO (ESTILO YOUTUBE/TIKTOK) */}
+                {/* CONTROLES NATIVOS DO PLAYER */}
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className={`absolute bottom-0 left-0 right-0 p-2.5 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex flex-col gap-1.5 z-30 transition-opacity duration-200 ${
                     showVideoControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
                   }`}
                 >
-                  {/* Linha da barra de progresso (scrubber) */}
                   <div
                     className="w-full h-1.5 bg-white/20 hover:h-2 rounded-full overflow-hidden cursor-pointer relative transition-all"
                     onClick={(e) => {
@@ -796,7 +904,6 @@ export default function ProjectClient({
                     />
                   </div>
 
-                  {/* Play/Pause e Tempo */}
                   <div className="flex items-center justify-between text-white text-[11px] font-medium select-none">
                     <button
                       type="button"
@@ -815,22 +922,25 @@ export default function ProjectClient({
                 </div>
               </div>
 
-              {/* 3. LEGENDA SINCRONIZADA */}
-              <div className="pb-5 px-3 text-center z-20 pointer-events-none">
+              {/* 5. LEGENDA DINÂMICA (100% VINCULADA AO TEMPLATE) */}
+              <div
+                style={{
+                  left: `${subtitlePos.x}%`,
+                  top: `${subtitlePos.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                className="absolute pointer-events-none z-30 select-none flex justify-center whitespace-nowrap"
+              >
                 <div
                   style={{
                     backgroundColor: activeSubStyle.activeBg,
                     color: activeSubStyle.activeColor,
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs uppercase shadow-md tracking-wider border border-black/10"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight shadow-md border border-white/20 whitespace-nowrap"
                 >
-                  <span>
-                    {speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ')}
-                  </span>
+                  {speechWords.length > 0 ? speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ') : 'SUA LEGENDA APARECERÁ AQUI'}
                 </div>
               </div>
-
-
 
               {/* BARRA HOME DO IPHONE */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
