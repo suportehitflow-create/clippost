@@ -114,7 +114,7 @@ def create_vertical_clip(
         # 4. Áudio transforms
         audio_filters = []
         if remove_silence:
-            audio_filters.append("silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-50dB")
+            audio_filters.append("silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-60dB")
         if speed and speed != 1.0:
             audio_filters.append(f"atempo={min(2.0, speed)}")
         audio_filters += _edge_fades(duration / (speed or 1.0))
