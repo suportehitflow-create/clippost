@@ -201,7 +201,7 @@ export default function CreateClipsPage() {
                 <label className="text-xs font-medium text-zinc-300">Link do Vídeo</label>
                 {getPlatformInfo(url) && (
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getPlatformInfo(url)?.color} transition-all`}>
-                    ✓ ${getPlatformInfo(url)?.name} detectado
+                    ✓ {getPlatformInfo(url)?.name} detectado
                   </span>
                 )}
               </div>
