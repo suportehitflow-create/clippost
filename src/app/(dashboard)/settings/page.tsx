@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   User, Shield, Cpu, LogOut, Check, Zap,
@@ -28,11 +28,20 @@ interface SocialAccount {
   created_at: string
 }
 
+function SearchParamsReader({ onMetaConnected, onMetaError }: {
+  onMetaConnected: () => void
+  onMetaError: (e: string) => void
+}) {
+  const { useSearchParams } = require('next/navigation')
+  useEffect(() => {
+    if (searchParams.get('meta_connected') === '1') onMetaConnected()
+    if (searchParams.get('meta_error')) onMetaError(searchParams.get('meta_error') || 'Erro ao conectar')
+  }, [searchParams])
+  return null
+}
 export default function SettingsPage() {
   const supabase = createClient()
   const router = useRouter()
-  const searchParams = useSearchParams()
-
   const [userEmail, setUserEmail] = useState('')
   const [userId, setUserId] = useState('')
   const [plan, setPlan] = useState('Pro Creator')
@@ -48,10 +57,6 @@ export default function SettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Handle OAuth callbacks
-    if (searchParams.get('meta_connected') === '1') setMetaConnected(true)
-    if (searchParams.get('meta_error')) setMetaError(searchParams.get('meta_error') || 'Erro ao conectar')
-
     async function loadUser() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -152,6 +157,13 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      <Suspense fallback={null}>
+        <SearchParamsReader
+          onMetaConnected={() => setMetaConnected(true)}
+          onMetaError={(e) => setMetaError(e)}
+        />
+      </Suspense>
 
       <div className="space-y-6">
         {/* SEÇÃO: CONTA */}
