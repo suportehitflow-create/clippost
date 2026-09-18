@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, CheckCircle2, Loader2, Video, Trash2, ArrowRight, Play } from 'lucide-react'
+import { Scissors, CheckCircle2, Loader2, Video, Trash2, ArrowRight, Play, LogOut } from 'lucide-react'
 
 interface Project {
   id: string
@@ -35,9 +35,6 @@ export default function CleanDashboard() {
         return
       }
       setUserEmail(user.email || '')
-        router.push('/login')
-        return
-      }
 
       // Busca projetos do usuário no Supabase
       const { data: dbProjs } = await supabase
