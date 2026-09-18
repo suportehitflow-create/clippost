@@ -51,7 +51,7 @@ export default function CleanDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
 
-      setTotalClips(count || (dbProjs?.length ? dbProjs.length * 3 : 0))
+      setTotalClips(typeof count === 'number' ? count : 0)
     } catch (e) {
       console.warn('Erro ao carregar dados do dashboard:', e)
     } finally {
@@ -160,14 +160,14 @@ export default function CleanDashboard() {
                     <div className="flex items-center gap-2.5">
                       <span
                         className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                          proj.status === 'done'
+                          proj.status === 'done' || proj.status === 'completed'
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : proj.status === 'processing'
                             ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                             : 'bg-zinc-800 text-zinc-400 border-zinc-700'
                         }`}
                       >
-                        {proj.status === 'done' ? (
+                        {proj.status === 'done' || proj.status === 'completed' ? (
                           <>
                             <CheckCircle2 className="w-3 h-3" /> Concluído
                           </>

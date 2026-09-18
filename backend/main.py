@@ -677,43 +677,40 @@ async def scrape_profile_reels(req: ProfileScrapeRequest):
             "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"
         ]
 
-        count = Math.min(req.limit || 50, 12);
-        for (let i = 0; i < count; i++) {
-            const factor = (count - i) * 1.3;
-            const v = Math.floor(base_views * factor) + (i * 1337);
-            const l = Math.floor(v * 0.082) + (i * 123);
-            items.push({
-                "id": `mined-${clean_handle}-${i+1}`,
-                "title": sample_titles[i % sample_titles.length],
-                "url": `https://www.instagram.com/${clean_handle}/`,
-                "thumbnail": sample_thumbs[i % sample_thumbs.length],
+        count = min(req.limit or 50, 12)
+        for i in range(count):
+            factor = (count - i) * 1.3
+            v = int(base_views * factor) + (i * 1337)
+            l = int(v * 0.082) + (i * 123)
+            items.append({
+                "id": f"mined-{clean_handle}-{i+1}",
+                "title": sample_titles[i % len(sample_titles)],
+                "url": f"https://www.instagram.com/{clean_handle}/",
+                "thumbnail": sample_thumbs[i % len(sample_thumbs)],
                 "views": v,
                 "likes": l,
-                "comments": Math.floor(l * 0.05) + 12,
+                "comments": int(l * 0.05) + 12,
                 "duration": 25 + (i * 4) % 45,
-                "type": i % 4 !== 0 ? "reel" : "post"
-            });
-        }
-    }
+                "type": "reel" if i % 4 != 0 else "post",
+            })
 
-    if (req.sort_by === "most_viewed") {
-        items.sort((a, b) => (b.views || 0) - (a.views || 0));
-    } else if (req.sort_by === "most_liked") {
-        items.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-    }
+    if req.sort_by == "most_viewed":
+        items.sort(key=lambda x: x.get("views", 0), reverse=True)
+    elif req.sort_by == "most_liked":
+        items.sort(key=lambda x: x.get("likes", 0), reverse=True)
 
-    const total_views = items.reduce((acc, it) => acc + (it.views || 0), 0);
-    const total_likes = items.reduce((acc, it) => acc + (it.likes || 0), 0);
+    total_views = sum(it.get("views", 0) for it in items)
+    total_likes = sum(it.get("likes", 0) for it in items)
 
     return {
         "profile": {
             "handle": clean_handle,
-            "name": clean_handle.replace(".", " ").replace("_", " ").toUpperCase(),
+            "name": clean_handle.replace(".", " ").replace("_", " ").upper(),
             "followers": 38400,
-            "views_total": total_views.toLocaleString("pt-BR"),
-            "likes_total": total_likes.toLocaleString("pt-BR"),
-            "posts_count": items.length,
-            "avatar_url": `https://api.dicebear.com/7.x/bottts/svg?seed=${clean_handle}`
+            "views_total": str(total_views),
+            "likes_total": str(total_likes),
+            "posts_count": len(items),
+            "avatar_url": f"https://api.dicebear.com/7.x/bottts/svg?seed={clean_handle}",
         },
-        "items": items
+        "items": items,
     }

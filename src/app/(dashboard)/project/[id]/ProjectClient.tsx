@@ -238,6 +238,8 @@ export default function ProjectClient({
           if (c.titleColor) setTitleColor(c.titleColor)
           if (c.titleStroke) setTitleStroke(c.titleStroke)
           if (c.titleStrokeColor) setTitleStrokeColor(c.titleStrokeColor)
+          if (c.brandScale) setBrandScale(c.brandScale)
+          if (c.videoRounded !== undefined) setVideoRounded(c.videoRounded)
           if (c.titleCapsLock !== undefined) setTitleCapsLock(c.titleCapsLock)
           if (c.textAlign) setTextAlign(c.textAlign)
         }
@@ -265,12 +267,15 @@ export default function ProjectClient({
               setVideoScale(cfg.videoWidth)
             }
             if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
+            if (cfg.videoRounded !== undefined) setVideoRounded(cfg.videoRounded)
             if (cfg.videoPos) setVideoPos(cfg.videoPos)
             if (cfg.headerPos) setHeaderPos(cfg.headerPos)
             if (cfg.titlePos) setTitlePos(cfg.titlePos)
             if (cfg.subtitlePos) setSubtitlePos(cfg.subtitlePos)
             if (cfg.brandAlign) setBrandAlign(cfg.brandAlign)
             if (cfg.brandLayout) setBrandLayout(cfg.brandLayout)
+            if (cfg.brandScale) setBrandScale(cfg.brandScale)
+            if (cfg.showVerifiedBadge !== undefined) setShowVerifiedBadge(cfg.showVerifiedBadge)
             if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
             if (cfg.fontSize) setFontSize(cfg.fontSize)
             if (cfg.titleColor) setTitleColor(cfg.titleColor)
@@ -285,55 +290,53 @@ export default function ProjectClient({
     fetchRemoteBrand()
   }, [])
 
-  // Inicializa cortes se vazios
+  // Polling em tempo real para carregar os cortes REAIS gerados pelo backend
   useEffect(() => {
-    async function checkDbClips() {
+    let timer: NodeJS.Timeout | null = null
+
+    async function fetchClipsAndStatus() {
       try {
-        const { data } = await supabase
+        const { data: dbClips } = await supabase
           .from('clips')
           .select('*')
           .eq('project_id', project.id)
           .order('score', { ascending: false })
 
-        if (data && data.length > 0) {
-          setClips(data)
-          setStatus('done')
-          return
+        const { data: projData } = await supabase
+          .from('projects')
+          .select('status, raw_video_url')
+          .eq('id', project.id)
+          .maybeSingle()
+
+        if (projData?.status) {
+          setStatus(projData.status)
         }
-      } catch {}
 
-      if (clips.length === 0) {
-        const pId = project.id.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
-        const baseScores = [0.98, 0.94, 0.91, 0.86, 0.81, 0.76, 0.68, 0.59]
-        const starts = [35, 110, 210, 330, 460, 600, 750, 980]
-        const ends = [78, 155, 252, 374, 502, 645, 792, 1025]
-
-        const dynamicClips: Clip[] = magneticSuggestions.map((item, idx) => {
-          const pad = String(idx + 1).padStart(4, '0')
-          return {
-            id: `${pId.slice(0, 8)}-${pId.slice(8, 12)}-${pId.slice(12, 16)}-${pId.slice(16, 20)}-${pId.slice(20, 28)}${pad}`,
-            title: item.title,
-            hook: item.hook,
-            start_time: starts[idx] || 35,
-            end_time: ends[idx] || 78,
-            score: baseScores[idx] || 0.85,
-            storage_url: null,
-            status: 'ready',
-            subtitle_preset: activeSubtitleStyle
+        if (dbClips && dbClips.length > 0) {
+          setClips(dbClips)
+          if (projData?.status === 'done' || projData?.status === 'completed' || dbClips.some(c => !!c.storage_url)) {
+            setStatus('done')
+            if (timer) {
+              clearInterval(timer)
+              timer = null
+            }
+            return
           }
-        })
-
-        setClips(dynamicClips)
-        setStatus('done')
-
-        try {
-          await supabase.from('projects').update({ status: 'done' }).eq('id', project.id)
-        } catch {}
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar cortes:', err)
       }
     }
 
-    checkDbClips()
-  }, [project.id, project.title, activeSubtitleStyle, magneticSuggestions])
+    fetchClipsAndStatus()
+
+    // Mantém polling a cada 3 segundos enquanto processa
+    timer = setInterval(fetchClipsAndStatus, 3000)
+
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [project.id])
 
   const activeClip = clips[selectedClipIndex] || clips[0] || {
     id: 'placeholder',
@@ -451,19 +454,21 @@ export default function ProjectClient({
 
   // Baixar todos os cortes em lote
   const handleDownloadAll = () => {
-    clips.forEach((clip, i) => {
-      const url = clip.storage_url || (ytId ? `https://www.youtube.com/watch?v=${ytId}&t=${Math.floor(clip.start_time)}s` : '#')
-      if (url && url !== '#') {
-        setTimeout(() => {
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `corte_${i + 1}_${extractCoreSubject(project.title)}.mp4`
-          a.target = '_blank'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-        }, i * 300)
-      }
+    const readyClips = clips.filter(c => !!c.storage_url)
+    if (readyClips.length === 0) {
+      alert('Os arquivos de vídeo finais em 9:16 estão sendo renderizados pelo backend. Aguarde alguns instantes!')
+      return
+    }
+    readyClips.forEach((clip, i) => {
+      setTimeout(() => {
+        const a = document.createElement('a')
+        a.href = clip.storage_url!
+        a.download = `corte_${i + 1}_${extractCoreSubject(project.title)}.mp4`
+        a.target = '_blank'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      }, i * 350)
     })
   }
 
@@ -485,9 +490,15 @@ export default function ProjectClient({
             <h1 className="text-xs sm:text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
               {project.title}
             </h1>
-            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
-              {clips.length} cortes prontos
-            </span>
+            {status === 'processing' || clips.length === 0 ? (
+              <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1.5 whitespace-nowrap">
+                <Loader2 className="w-3 h-3 animate-spin" /> Minerando cortes com IA...
+              </span>
+            ) : (
+              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
+              </span>
+            )}
           </div>
         </div>
 
@@ -496,7 +507,12 @@ export default function ProjectClient({
           <button
             type="button"
             onClick={handleDownloadAll}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            disabled={clips.length === 0 || status === 'processing'}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all flex items-center gap-1.5 shadow-sm ${
+              clips.length === 0 || status === 'processing'
+                ? 'opacity-40 cursor-not-allowed pointer-events-none'
+                : 'cursor-pointer'
+            }`}
           >
             <Download className="w-3.5 h-3.5" />
             <span>Baixar Todos ({clips.length})</span>
@@ -526,39 +542,72 @@ export default function ProjectClient({
         </div>
       </header>
 
+      {/* BANNER DINÂMICO DE PROCESSAMENTO EM TEMPO REAL */}
+      {(status === 'processing' || clips.length === 0) && (
+        <div className="border-b border-indigo-500/20 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-indigo-950/40 px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-white flex items-center gap-2">
+                IA Minerando Narrativas & Renderizando Cortes 9:16
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  Tempo Real
+                </span>
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Detectando ganchos emocionais, eliminando pausas e aplicando seu template oficial. Os cortes aparecerão aqui automaticamente.
+              </p>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-indigo-300/80 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            Sincronizando com IA...
+          </div>
+        </div>
+      )}
+
       {/* 2. SELETOR RÁPIDO HORIZONTAL DE CORTES (SEGMENTED APPLE) */}
       <div className="border-b border-white/[0.06] bg-[#0b0b0e]/40 px-6 py-2.5 overflow-x-auto scrollbar-none flex items-center gap-2">
         <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap pr-2">
           Cortes:
         </span>
-        {clips.map((clip, idx) => {
-          const isSelected = selectedClipIndex === idx
-          const scorePercent = Math.round(clip.score * 100)
-          return (
-            <button
-              key={clip.id}
-              onClick={() => {
-                setSelectedClipIndex(idx)
-                setCustomTitle('')
-                setPlaybackTime(0)
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-                isSelected
-                  ? 'bg-white/10 text-white border border-white/20 shadow-sm'
-                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
-              }`}
-            >
-              <span className="font-semibold">#{idx + 1}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                scorePercent >= 90
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : 'bg-orange-500/15 text-orange-400'
-              }`}>
-                {scorePercent}%
-              </span>
-            </button>
-          )
-        })}
+        {clips.length === 0 ? (
+          <div className="flex items-center gap-2 py-1 px-3 text-xs text-zinc-400">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+            <span>Minerando cortes e ganchos de alta retenção na linha do tempo...</span>
+          </div>
+        ) : (
+          clips.map((clip, idx) => {
+            const isSelected = selectedClipIndex === idx
+            const scorePercent = Math.round(clip.score * 100)
+            return (
+              <button
+                key={clip.id}
+                onClick={() => {
+                  setSelectedClipIndex(idx)
+                  setCustomTitle('')
+                  setPlaybackTime(0)
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                  isSelected
+                    ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                    : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
+                }`}
+              >
+                <span className="font-semibold">#{idx + 1}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                  scorePercent >= 90
+                    ? 'bg-emerald-500/15 text-emerald-400'
+                    : 'bg-orange-500/15 text-orange-400'
+                }`}>
+                  {scorePercent}%
+                </span>
+              </button>
+            )
+          })
+        )}
       </div>
 
       {/* 3. STUDIO PRINCIPAL: 2 COLUNAS LIMPAS E ESPAÇOSAS */}

@@ -807,7 +807,7 @@ export default function AutoPilotPage() {
                     <div className="pt-10 flex flex-col items-center text-center">
                       <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-red-500 p-0.5 mb-2 shadow-md">
                         <img
-                          src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&auto=format&fit=crop&q=80"
+                          src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><defs><linearGradient id='cp_grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='50%' stop-color='%238b5cf6'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><rect width='120' height='120' rx='60' fill='url(%23cp_grad)'/><path d='M60 34 A15 15 0 1 0 60 64 A15 15 0 0 0 60 34 Z M40 88 C40 73 50 68 60 68 C70 68 80 73 80 88 Z' fill='white' opacity='0.95'/></svg>"
                           alt="Avatar"
                           className="w-full h-full object-cover rounded-full"
                         />
@@ -818,9 +818,9 @@ export default function AutoPilotPage() {
                           {brandName}
                         </span>
                         {/* Blue Verified Badge */}
-                        <div className="w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[8px] font-black">
-                          ✓
-                        </div>
+                        <svg className="w-3 h-3 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
                       </div>
                       <span className="text-[10px] text-zinc-500 font-mono">
                         {brandHandle}
