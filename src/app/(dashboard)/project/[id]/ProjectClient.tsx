@@ -901,6 +901,16 @@ export default function ProjectClient({
                       }
                     }}
                   />
+                ) : ytId ? (
+                  <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center pointer-events-none">
+                    <iframe
+                      key={`${ytId}-${activeClip.id}`}
+                      src={`https://www.youtube.com/embed/${ytId}?start=${Math.floor(activeClip.start_time || 0)}&end=${Math.ceil(activeClip.end_time || 60)}&autoplay=${isPlaying ? 1 : 0}&mute=0&controls=0&modestbranding=1&rel=0&loop=1&playlist=${ytId}`}
+                      className="absolute w-[350%] h-[120%] max-w-none pointer-events-none"
+                      style={{ left: '-125%', top: '-10%' }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
                     <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">

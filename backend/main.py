@@ -23,6 +23,10 @@ load_dotenv()
 
 app = FastAPI(title="clipost API")
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # Lista explícita de origens permitidas
 ALLOWED_ORIGINS = [
     "https://clippost-three.vercel.app",
@@ -40,25 +44,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
-    origin = request.headers.get("origin", "")
-    if request.method == "OPTIONS":
-        response = JSONResponse(content={"status": "ok"})
-    else:
-        try:
-            response = await call_next(request)
-        except Exception as e:
-            response = JSONResponse(content={"detail": str(e)}, status_code=500)
-
-    # Injeta explicitamente os headers CORS em TODAS as respostas (inclusive erros 500)
-    allowed = origin if origin and ("vercel.app" in origin or "localhost" in origin) else "https://clippost-three.vercel.app"
-    response.headers["Access-Control-Allow-Origin"] = allowed
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
 
 @app.options("/{full_path:path}")
 async def preflight_handler(full_path: str, request: Request):
@@ -82,7 +67,7 @@ SUPABASE_KEY = (
     os.environ.get("SUPABASE_KEY")
     or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    or ""
+    or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM"
 )
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -397,11 +382,6 @@ async def listar_watches(user_id: str):
 async def remover_watch(watch_id: str):
     supabase.table("channel_watches").delete().eq("id", watch_id).execute()
     return {"deleted": True}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
 
 
 @app.post("/api/process-url")
