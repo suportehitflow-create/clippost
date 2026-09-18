@@ -142,6 +142,8 @@ export default function ProjectClient({
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [schedulingAllProject, setSchedulingAllProject] = useState(false)
+  const [scheduleAllMsg, setScheduleAllMsg] = useState('')
 
   // ESTADOS DE EDIÇÃO EM MASSA & ESTÚDIO
   const [applyToAllClips, setApplyToAllClips] = useState<boolean>(true)
@@ -162,6 +164,40 @@ export default function ProjectClient({
   const triggerBulkFeedback = (msg: string) => {
     setBulkFeedback(msg)
     setTimeout(() => setBulkFeedback(null), 3000)
+  }
+
+  const handleScheduleAllProject = async () => {
+    setSchedulingAllProject(true)
+    setScheduleAllMsg('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Nao autenticado')
+      let platform = 'instagram'
+      let socialAccountId: string | null = null
+      const { data: prof } = await supabase.from('profiles').select('active_social_account_id').eq('id', user.id).single()
+      if (prof?.active_social_account_id) {
+        const { data: acc } = await supabase.from('social_accounts').select('id,platform').eq('id', prof.active_social_account_id).single()
+        if (acc) { socialAccountId = acc.id; platform = acc.platform }
+      } else {
+        const { data: acc } = await supabase.from('social_accounts').select('id,platform').eq('user_id', user.id).eq('is_active', true).limit(1).single()
+        if (acc) { socialAccountId = acc.id; platform = acc.platform }
+      }
+      const readyClips = clips.filter(clip => clip.storage_url)
+      for (const clip of readyClips) {
+        await supabase.from('scheduled_posts').insert({
+          user_id: user.id, clip_id: clip.id, platform,
+          social_account_id: socialAccountId,
+          caption: clip.title || clip.hook || '',
+          scheduled_at: new Date().toISOString(), status: 'scheduled',
+        })
+      }
+      setScheduleAllMsg(`${readyClips.length} clipes agendados!`)
+      setTimeout(() => setScheduleAllMsg(''), 4000)
+    } catch (err: any) {
+      setScheduleAllMsg('Erro: ' + err.message)
+    } finally {
+      setSchedulingAllProject(false)
+    }
   }
   const [viralityModalMetrics, setViralityModalMetrics] = useState<ViralityMetrics | null>(null)
 
@@ -1232,6 +1268,25 @@ export default function ProjectClient({
                 <span>Agendar</span>
               </Link>
             </div>
+
+            {clips.length > 1 && (
+              <div className="pt-1.5">
+                {scheduleAllMsg && (
+                  <div className={scheduleAllMsg.startsWith('Erro') ? 'p-2 rounded-lg text-xs text-center bg-red-500/10 text-red-400' : 'p-2 rounded-lg text-xs text-center bg-emerald-500/10 text-emerald-400'}>
+                    {scheduleAllMsg}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleScheduleAllProject}
+                  disabled={schedulingAllProject}
+                  className="w-full py-2.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{schedulingAllProject ? 'Agendando...' : `${clips.filter(cl => cl.storage_url).length > 0 ? clips.filter(cl => cl.storage_url).length : clips.length} clipes`}</span>
+                </button>
+              </div>
+            )}
 
             </div>
 
