@@ -50,7 +50,8 @@ export function SweepStepper({
   valueRef.current = value
 
   const clamp = useCallback((val: number) => {
-    return Math.max(min, Math.min(max, Math.round(val / step) * step))
+    const stepped = Math.round(val / step) * step
+    return Math.max(min, Math.min(max, Number(stepped.toFixed(4))))
   }, [min, max, step])
 
   // Pointer Down handler: Tap for one, hold to sweep
@@ -202,8 +203,9 @@ export function SweepStepper({
             />
           ) : (
             <div className="flex items-center gap-1 font-mono font-bold tracking-tight text-white group-hover:text-indigo-300 transition-colors">
-              <span className={isSmall ? 'text-xs' : 'text-xs'}>{value}</span>
-              {unit && <span className="text-[10px] text-zinc-400 font-normal">{unit}</span>}
+              <span className={isSmall ? 'text-xs' : 'text-xs'}>
+                {formatValue ? formatValue(value) : `${value}${unit ? unit : ''}`}
+              </span>
             </div>
           )}
 

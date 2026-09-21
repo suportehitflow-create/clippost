@@ -1310,16 +1310,6 @@ export default function ProjectClient({
               </div>
             </div>
 
-            {/* FEEDBACK BANNER REATIVO */}
-            {bulkFeedback && (
-              <div className="px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-xs font-medium flex items-center justify-between animate-in fade-in duration-150">
-                <span>{bulkFeedback}</span>
-                <button type="button" onClick={() => setBulkFeedback(null)} className="text-zinc-400 hover:text-white p-0.5 cursor-pointer">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
             {/* ABAS PADRONIZADAS (SEM ARCO-ÍRIS, CORES PADRÃO) */}
             <div className="grid grid-cols-4 gap-1 p-1 bg-black/40 border border-white/[0.06] rounded-xl text-xs select-none">
               <button
@@ -1367,69 +1357,19 @@ export default function ProjectClient({
               </button>
             </div>
 
-            {/* ABA 1: VELOCIDADE DO VÍDEO (COM CONTROLE DE NÍVEL / SLIDER) */}
+            {/* ABA 1: VELOCIDADE DO VÍDEO (PADRONIZADO COM O NÍVEL DO TEMPLATE) */}
             {studioTab === 'speed' && (
               <div className="space-y-3 pt-1 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-medium">Nível de Aceleração (Pitch-Preserved):</span>
-                  <span className="font-mono font-bold text-white px-2.5 py-0.5 rounded bg-indigo-600/20 border border-indigo-500/30 text-xs">
-                    {videoSpeed}x
-                  </span>
-                </div>
-
-                {/* BARRA DESLIZANTE DE NÍVEL */}
-                <div className="space-y-2">
-                  <div className="relative flex items-center py-1">
-                    <input
-                      type="range"
-                      min="1"
-                      max="2"
-                      step="0.05"
-                      value={videoSpeed}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value)
-                        setVideoSpeed(val)
-                        if (applyToAllClips) triggerBulkFeedback(`Nível ${val}x aplicado`)
-                      }}
-                      className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                      style={{
-                        background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((videoSpeed - 1) / 1) * 100}%, rgba(255,255,255,0.08) ${((videoSpeed - 1) / 1) * 100}%, rgba(255,255,255,0.08) 100%)`
-                      }}
-                    />
-                  </div>
-
-                  {/* MARCADORES DE NÍVEL EM LINHA ÚNICA (1.0x a 2.0x) */}
-                  <div className="grid grid-cols-7 gap-1 p-0.5 bg-black/40 border border-white/[0.06] rounded-xl text-xs select-none">
-                    {[
-                      { val: 1.0, label: '1.0x' },
-                      { val: 1.05, label: '1.05x' },
-                      { val: 1.15, label: '1.15x' },
-                      { val: 1.25, label: '1.25x' },
-                      { val: 1.5, label: '1.5x' },
-                      { val: 1.8, label: '1.8x' },
-                      { val: 2.0, label: '2.0x' }
-                    ].map((spd) => {
-                      const isAct = Math.abs(videoSpeed - spd.val) < 0.02
-                      return (
-                        <button
-                          key={spd.val}
-                          type="button"
-                          onClick={() => {
-                            setVideoSpeed(spd.val)
-                            if (applyToAllClips) triggerBulkFeedback(`Nível ${spd.val}x aplicado`)
-                          }}
-                          className={`py-1.5 px-1 text-center font-mono rounded-lg text-[11px] transition-all cursor-pointer ${
-                            isAct
-                              ? 'bg-indigo-600 text-white font-bold shadow-sm'
-                              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                          }`}
-                        >
-                          {spd.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                <SweepStepper
+                  label="Nível de Aceleração (Pitch-Preserved):"
+                  value={videoSpeed}
+                  onChange={(v) => setVideoSpeed(v)}
+                  min={1.0}
+                  max={2.0}
+                  step={0.05}
+                  unit="x"
+                  formatValue={(v) => `${Number(v.toFixed(2))}x`}
+                />
 
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
                   💡 A velocidade <strong className="text-zinc-200">1.05x</strong> remove micro-pausas mantendo o tom natural da voz.
