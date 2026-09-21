@@ -713,23 +713,27 @@ export default function ProjectClient({
   // Polling em tempo real contínuo: cortes aparecem um a um conforme são minerados
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null
-    let pollCount = 0
+    let active = true
+    // Rastreamos localmente para decidir o próximo intervalo sem depender do estado React
+    let localClipsCount = initialClips.length
+    let localStatus = project.status
 
     async function fetchClipsAndStatus() {
       try {
-        pollCount++
         // 1. Tenta buscar via API direta com service role (sem limitações de RLS)
         const res = await fetch(`/api/projects/${project.id}`, {
           headers: { 'Cache-Control': 'no-store' }
         })
-        
+
         if (res.ok) {
           const data = await res.json()
           if (data.project) {
+            localStatus = data.project.status
             setStatus(data.project.status)
             if (data.project.error_message != null) setErrorMessage(data.project.error_message)
           }
           if (Array.isArray(data.clips)) {
+            localClipsCount = data.clips.length
             setClips(prev => {
               if (data.clips.length !== prev.length || data.clips.some((c: any, i: number) => c.storage_url !== prev[i]?.storage_url)) {
                 if (prev.length === 0 && data.clips.length > 0) {
@@ -744,12 +748,8 @@ export default function ProjectClient({
             })
           }
 
-          // Só encerra o polling se o projeto foi finalizado totalmente pelo backend
-          if (data.project?.status === 'done' || data.project?.status === 'completed' || data.project?.status === 'failed') {
-            if (timer) {
-              clearInterval(timer)
-              timer = null
-            }
+          // Encerra polling quando o backend finalizar
+          if (localStatus === 'done' || localStatus === 'completed' || localStatus === 'failed') {
             return
           }
         } else if (res.status === 401) {
@@ -774,30 +774,34 @@ export default function ProjectClient({
             .eq('id', project.id)
             .maybeSingle()
 
-          if (projData?.status) setStatus(projData.status)
-          if (dbClips && dbClips.length > 0) {
-            setClips(dbClips)
-            if (projData?.status === 'done' || projData?.status === 'completed' || projData?.status === 'failed') {
-              if (timer) {
-                clearInterval(timer)
-                timer = null
-              }
-              return
-            }
+          if (projData?.status) {
+            localStatus = projData.status
+            setStatus(projData.status)
+          }
+          if (dbClips) {
+            localClipsCount = dbClips.length
+            if (dbClips.length > 0) setClips(dbClips)
+          }
+          if (localStatus === 'done' || localStatus === 'completed' || localStatus === 'failed') {
+            return
           }
         }
       } catch (err) {
         console.warn('Erro ao atualizar cortes em tempo real:', err)
       }
+
+      // Poll adaptativo: 1s enquanto aguarda o 1º clipe, 2.5s após tê-los
+      if (active) {
+        const delay = (localStatus === 'processing' && localClipsCount === 0) ? 1000 : 2500
+        timer = setTimeout(fetchClipsAndStatus, delay)
+      }
     }
 
     fetchClipsAndStatus()
 
-    // Polling contínuo a cada 2.5s para streaming de clipes em tempo real
-    timer = setInterval(fetchClipsAndStatus, 2500)
-
     return () => {
-      if (timer) clearInterval(timer)
+      active = false
+      if (timer) clearTimeout(timer)
     }
   }, [project.id])
 
@@ -1035,9 +1039,9 @@ export default function ProjectClient({
           <button
             type="button"
             onClick={handleDownloadAll}
-            disabled={clips.length === 0 || status === 'processing'}
+            disabled={clips.length === 0}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-sm ${
-              clips.length === 0 || status === 'processing'
+              clips.length === 0
                 ? 'opacity-40 cursor-not-allowed pointer-events-none'
                 : 'cursor-pointer'
             }`}
