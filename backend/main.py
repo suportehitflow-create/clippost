@@ -23,6 +23,30 @@ load_dotenv()
 
 app = FastAPI(title="clipost API")
 
+
+@app.on_event("startup")
+async def recover_stuck_projects():
+    """Marca como 'failed' projetos que ficaram travados em 'processing'
+    por mais de 8 minutos — causado por redeploys, crashes ou OOM."""
+    try:
+        if not supabase:
+            return
+        cutoff = (datetime.now(timezone.utc) - __import__('datetime').timedelta(minutes=8)).isoformat()
+        result = supabase.table("projects") \
+            .update({
+                "status": "failed",
+                "error_message": "Pipeline interrompido (redeploy ou timeout do servidor). Clique em Tentar Novamente.",
+            }) \
+            .eq("status", "processing") \
+            .lt("created_at", cutoff) \
+            .execute()
+        rows = result.data or []
+        if rows:
+            print(f"[startup] {len(rows)} projeto(s) travado(s) marcado(s) como failed")
+    except Exception as e:
+        print(f"[startup] erro ao limpar projetos travados: {e}")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

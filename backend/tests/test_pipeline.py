@@ -254,23 +254,22 @@ class TestValidateClip:
         assert any("9:16" in i for i in result["issues"])
 
     def test_duration_mismatch_within_tolerance(self):
-        """Duração dentro da tolerância de 2s deve ser aceita."""
+        """Duração dentro da tolerância de 15s (silenceremove pode remover vários segundos)."""
         streams = [
             {"codec_type": "video", "width": 1080, "height": 1920},
             {"codec_type": "audio"},
         ]
-        result = self._run(streams, duration=43.5, expected=45.0)  # Δ = 1.5s < 2.0s
+        result = self._run(streams, duration=38.0, expected=45.0)  # Δ = 7s < 15s → aceito
         assert result["ok"] is True
 
     def test_duration_mismatch_outside_tolerance(self):
-        """Duração fora da tolerância (silence removed por 5s) deve falhar."""
+        """Duração fora da tolerância de 15s deve falhar (clipe corrompido ou errado)."""
         streams = [
             {"codec_type": "video", "width": 1080, "height": 1920},
             {"codec_type": "audio"},
         ]
-        result = self._run(streams, duration=38.0, expected=45.0)  # Δ = 7s > 2.0s
+        result = self._run(streams, duration=25.0, expected=45.0)  # Δ = 20s > 15s → rejeitado
         assert result["ok"] is False
-        # DOCUMENTA O BUG: silenceremove legítimo produz Δ > 2s e o clipe é descartado
 
     def test_ffprobe_failure(self):
         mock_result = SimpleNamespace(returncode=1, stdout="", stderr="no such file")
@@ -605,28 +604,18 @@ class TestPipelineLogic:
 
         assert result["status"] == "success"
 
-    def test_signal_alarm_in_finally(self):
+    def test_no_signal_in_pipeline(self):
         """
-        Verifica que _signal.alarm(0) está no bloco finally do pipeline.
-        Se estiver só no try, uma exceção antes deixa o alarme ativo.
+        Verifica que signal.signal() NÃO está no pipeline.
+        SIGALRM não funciona em threads (BackgroundTasks roda em thread)
+        e levanta ValueError que pode mascarar o erro real.
         """
         import ast
         src = (Path(__file__).parent.parent / "tasks.py").read_text(encoding="utf-8")
-        tree = ast.parse(src)
-
-        # Procura o bloco finally da função process_youtube_video
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "process_youtube_video":
-                for child in ast.walk(node):
-                    if isinstance(child, ast.Try) and child.finalbody:
-                        # Converte o finalbody em texto para verificar se alarm(0) está lá
-                        final_src = ast.unparse(child.finalbody)
-                        assert "alarm(0)" in final_src, (
-                            "BUG: _signal.alarm(0) não está no bloco finally! "
-                            "O worker pode ser morto pelo SIGALRM quando o pipeline falha."
-                        )
-                        return
-        pytest.fail("Não encontrou bloco finally em process_youtube_video")
+        assert "signal.signal(" not in src and "_signal.signal(" not in src, (
+            "BUG: signal.signal() encontrado em tasks.py. "
+            "Remova-o: BackgroundTasks roda em thread e lança ValueError."
+        )
 
     def test_video_path_discovered_before_upload(self):
         """

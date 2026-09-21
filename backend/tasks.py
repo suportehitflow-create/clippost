@@ -280,16 +280,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             'ignoreerrors': True,
         }
 
-        # Timeout global de 15 minutos para o pipeline inteiro (Linux/Fly.io)
-        import signal as _signal
-        def _timeout_handler(signum, frame):
-            raise TimeoutError("TimeoutError: pipeline excedeu 15 minutos — vídeo muito longo ou Whisper travou")
-        try:
-            _signal.signal(_signal.SIGALRM, _timeout_handler)
-            _signal.alarm(900)  # 15 minutos
-        except (AttributeError, OSError):
-            pass  # Windows não tem SIGALRM
-
         # 1. Download do vídeo (sem legendas — evita 429 fatal nas subs)
         print(f"[pipeline] baixando vídeo: {url[:80]}")
         with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
@@ -523,10 +513,5 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         return {"status": "error", "message": str(e)}
 
     finally:
-        # Cancela o timeout global (deve estar no finally para cobrir exceções também)
-        try:
-            _signal.alarm(0)
-        except (AttributeError, OSError, NameError):
-            pass
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
