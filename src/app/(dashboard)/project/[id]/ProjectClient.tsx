@@ -120,6 +120,116 @@ const SUBTITLE_STYLES = [
   { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-pink-500/40' },
 ]
 
+const PIPELINE_STEPS = [
+  { label: 'Baixando vídeo', detail: 'yt-dlp + Deno runtime', thresholdSecs: 0 },
+  { label: 'Transcrevendo áudio', detail: 'Turbo VTT ou Whisper', thresholdSecs: 40 },
+  { label: 'IA identificando momentos virais', detail: 'Claude analisando o conteúdo', thresholdSecs: 90 },
+  { label: 'Criando cortes 9:16', detail: 'FFmpeg renderizando com legenda', thresholdSecs: 160 },
+]
+
+function PipelineProgress({ elapsedSecs, clipsReady }: { elapsedSecs: number; clipsReady: number }) {
+  const activeIdx = clipsReady > 0
+    ? PIPELINE_STEPS.length - 1
+    : (() => {
+        let idx = 0
+        for (let i = PIPELINE_STEPS.length - 1; i >= 0; i--) {
+          if (elapsedSecs >= PIPELINE_STEPS[i].thresholdSecs) { idx = i; break }
+        }
+        return idx
+      })()
+
+  const elapsed = `${Math.floor(elapsedSecs / 60)}m ${(elapsedSecs % 60).toString().padStart(2, '0')}s`
+
+  return (
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+      <div className="bg-[#0d0d14] border border-indigo-500/25 rounded-2xl p-5 space-y-4">
+        {/* cabeçalho */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center">
+              <Scissors className="w-4 h-4 text-indigo-400 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-white">Processando com IA</span>
+                {clipsReady > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    {clipsReady} {clipsReady === 1 ? 'corte pronto' : 'cortes prontos'}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                {clipsReady === 0
+                  ? 'Configure o template abaixo enquanto os cortes são gerados'
+                  : `Corte #${clipsReady} pronto! Gerando mais em segundo plano...`}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-wider block">Tempo</span>
+            <span className="text-sm font-bold text-white font-mono">{elapsed}</span>
+          </div>
+        </div>
+
+        {/* barra de progresso geral */}
+        <div className="w-full bg-white/[0.06] h-1.5 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000"
+            style={{ width: `${clipsReady > 0 ? 90 : Math.min(85, (activeIdx / (PIPELINE_STEPS.length - 1)) * 80 + 5)}%` }}
+          />
+        </div>
+
+        {/* steps */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {PIPELINE_STEPS.map((step, i) => {
+            const isDone = i < activeIdx || (i === activeIdx && clipsReady > 0 && i === PIPELINE_STEPS.length - 1)
+            const isActive = i === activeIdx && !(clipsReady > 0 && i === PIPELINE_STEPS.length - 1)
+            const isPending = i > activeIdx
+
+            return (
+              <div
+                key={i}
+                className={`flex flex-col gap-1.5 p-3 rounded-xl border transition-all ${
+                  isDone
+                    ? 'bg-emerald-500/8 border-emerald-500/20'
+                    : isActive
+                    ? 'bg-indigo-500/10 border-indigo-500/30'
+                    : 'bg-white/[0.02] border-white/[0.05]'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                    isDone ? 'bg-emerald-500/20' : isActive ? 'bg-indigo-500/20' : 'bg-white/[0.06]'
+                  }`}>
+                    {isDone ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    ) : isActive ? (
+                      <Loader2 className="w-3 h-3 text-indigo-400 animate-spin" />
+                    ) : (
+                      <span className="text-[9px] font-mono text-zinc-500">{i + 1}</span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                    isDone ? 'text-emerald-400' : isActive ? 'text-indigo-300' : 'text-zinc-600'
+                  }`}>
+                    {isDone ? 'Concluído' : isActive ? 'Em andamento' : 'Aguardando'}
+                  </span>
+                </div>
+                <span className={`text-xs font-semibold leading-tight ${
+                  isDone ? 'text-zinc-200' : isActive ? 'text-white' : 'text-zinc-500'
+                }`}>
+                  {step.label}
+                </span>
+                <span className="text-[10px] text-zinc-600 font-mono leading-tight">{step.detail}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectClient({
   project,
   clips: initialClips,
@@ -698,9 +808,15 @@ export default function ProjectClient({
             <h1 className="text-xs sm:text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
               {project.title}
             </h1>
-            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
-            </span>
+            {status === 'processing' ? (
+              <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 whitespace-nowrap flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Processando
+              </span>
+            ) : (
+              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
+              </span>
+            )}
           </div>
         </div>
 
@@ -749,6 +865,9 @@ export default function ProjectClient({
         <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap pr-2">
           Cortes:
         </span>
+        {status === 'processing' && clips.length === 0 && (
+          <span className="text-[11px] text-zinc-600 font-mono italic">gerando cortes...</span>
+        )}
         {clips.map((clip, idx) => {
           const isSelected = selectedClipIndex === idx
           const scorePercent = Math.round(clip.score * 100)
@@ -780,45 +899,9 @@ export default function ProjectClient({
       </div>
 
       {/* 3. STUDIO PRINCIPAL: 2 COLUNAS LIMPAS E ESPAÇOSAS */}
-      {/* BANNER AO VIVO DE MINERAÇÃO EM TEMPO REAL */}
+      {/* PAINEL DE PROGRESSO PASSO A PASSO */}
       {status === 'processing' && (
-        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
-          <div className="bg-gradient-to-r from-indigo-950/50 via-[#100e24] to-purple-950/40 border border-indigo-500/30 rounded-2xl p-4 shadow-xl shadow-indigo-950/20 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shrink-0">
-                <Scissors className="w-5 h-5 text-indigo-400 animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                    MINERANDO COM IA AO VIVO
-                  </span>
-                  <span className="text-xs font-bold text-white font-mono">
-                    {clips.length} {clips.length === 1 ? 'corte pronto' : 'cortes prontos'}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-300 font-medium mt-1">
-                  {clips.length === 0 
-                    ? 'Transcrevendo áudio e minerando os primeiros momentos virais... O 1º clipe aparecerá aqui em instantes!'
-                    : `Corte #${clips.length} finalizado e pronto para edição! Minerando o próximo clipe em segundo plano...`}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 self-end sm:self-center">
-              <div className="text-right hidden sm:block">
-                <span className="text-[10px] text-zinc-400 block uppercase font-mono tracking-wider">Tempo Decorrido</span>
-                <span className="text-xs font-bold text-white font-mono">
-                  {Math.floor(elapsedSecs / 60)}m {(elapsedSecs % 60).toString().padStart(2, '0')}s
-                </span>
-              </div>
-              <div className="w-20 sm:w-28 bg-white/10 h-2 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-[pulse_1.5s_ease-in-out_infinite] w-3/4" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
