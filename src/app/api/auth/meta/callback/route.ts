@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   const state = searchParams.get('state')
   const error = searchParams.get('error')
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://clippost-three.vercel.app'
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://clippost-three.vercel.app'
 
   if (error) return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent(error)}`)
   if (!code || !state) return NextResponse.redirect(`${siteUrl}/settings?meta_error=missing_params`)
