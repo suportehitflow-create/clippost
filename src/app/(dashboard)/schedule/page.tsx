@@ -83,11 +83,13 @@ export default function SchedulePageV2() {
     tomorrow.setHours(18, 0, 0, 0)
     setScheduleDateTime(tomorrow.toISOString().slice(0, 16))
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return
-      setUserId(data.user.id)
-      loadData(data.user.id)
-    })
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (!data?.user) return
+        setUserId(data.user.id)
+        loadData(data.user.id).catch(err => console.warn('loadData error:', err))
+      })
+      .catch(() => {})
   }, [])
 
   async function loadData(uid: string) {

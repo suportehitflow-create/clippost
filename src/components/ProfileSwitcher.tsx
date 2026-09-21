@@ -33,9 +33,9 @@ export default function ProfileSwitcher({ userId: userIdProp }: { userId?: strin
 
   useEffect(() => {
     if (!userIdProp) {
-      supabase.auth.getUser().then(({ data }) => {
-        if (data.user) setUserId(data.user.id)
-      })
+      supabase.auth.getUser()
+        .then(({ data }) => { if (data?.user) setUserId(data.user.id) })
+        .catch(() => {})
     }
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)

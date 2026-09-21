@@ -21,6 +21,7 @@ export default function CleanDashboard() {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [totalClips, setTotalClips] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function CleanDashboard() {
         router.push('/login')
         return
       }
+      setCurrentUserId(user.id)
 
       // Busca projetos do usuário no Supabase
       const { data: dbProjs } = await supabase
@@ -98,7 +100,7 @@ export default function CleanDashboard() {
       <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
         <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clippost</h1>
         <div className="flex items-center gap-3">
-          <ProfileSwitcher />
+          {currentUserId && <ProfileSwitcher userId={currentUserId} />}
           <Link
             href="/upload"
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer"

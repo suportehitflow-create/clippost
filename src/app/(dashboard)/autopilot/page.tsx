@@ -107,12 +107,14 @@ export default function AutoPilotPage() {
   const [aviso, setAviso] = useState('')
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserId(data.user.id)
-        loadWatches(data.user.id)
-      }
-    })
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (data?.user) {
+          setUserId(data.user.id)
+          loadWatches(data.user.id)
+        }
+      })
+      .catch(() => {})
     // Auto-run initial demo search so the UI shows the rich experience immediately
     handleSearchProfile('@modotorque')
   }, [])
