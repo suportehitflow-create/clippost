@@ -201,6 +201,10 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
 }) {
   const [retrying, setRetrying] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [errorTime, setErrorTime] = useState('')
+  useEffect(() => {
+    setErrorTime(new Date().toLocaleTimeString('pt-BR'))
+  }, [])
 
   const errLower = (errorMessage || '').toLowerCase()
   const category = ERROR_CATEGORIES.find(c => c.match(errLower)) || {
@@ -278,7 +282,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
           <div className="rounded-xl bg-black/50 border border-white/[0.08] overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
               <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Código de erro do servidor</span>
-              <span className="text-[10px] font-mono text-zinc-600">{new Date().toLocaleTimeString('pt-BR')}</span>
+              <span className="text-[10px] font-mono text-zinc-600" suppressHydrationWarning>{errorTime}</span>
             </div>
             <pre className="px-3 py-3 text-[11px] font-mono text-zinc-300 break-all whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
               {errorMessage}
