@@ -11,13 +11,9 @@ import {
   Cpu,
   Brain,
   Smile,
-  ExternalLink,
   Scissors,
-  CheckCircle2,
   Sparkles,
   ShieldCheck,
-  Play,
-  Share2,
   RefreshCw,
   Eye,
   Radio

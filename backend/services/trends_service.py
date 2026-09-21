@@ -3,9 +3,6 @@ Trends & Viral Radar Service
 Descobre, agrega e ranqueia tendências de vídeos e temas virais para conversão em cortes.
 Inspirado na arquitetura do Agent-Reach e Scrapling.
 """
-import subprocess
-import json
-import re
 from typing import List, Dict, Any
 
 TREND_CATEGORIES = [

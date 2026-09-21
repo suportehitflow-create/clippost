@@ -1,8 +1,8 @@
 'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles } from 'lucide-react'
 
@@ -41,7 +41,17 @@ export default function CreateClipsPage() {
   
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Pré-preenche a URL se vier da página de Trends (?url=...)
+  useEffect(() => {
+    const prefilledUrl = searchParams.get('url')
+    if (prefilledUrl) {
+      setUrl(decodeURIComponent(prefilledUrl))
+      setActiveTab('link')
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

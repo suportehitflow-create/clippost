@@ -4,22 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  PenTool,
   Sparkles,
   Flame,
   Copy,
   Check,
-  Download,
   Scissors,
   Clock,
   Volume2,
   Video,
-  Layers,
-  HelpCircle,
-  Play,
-  ArrowRight,
-  BookOpen,
-  MessageSquare,
   Wand2
 } from 'lucide-react'
 
