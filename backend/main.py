@@ -24,6 +24,22 @@ load_dotenv()
 app = FastAPI(title="clipost API")
 
 
+def _setup_youtube_cookies():
+    """Decodifica YOUTUBE_COOKIES_B64 (base64) para /tmp/yt_cookies.txt e seta YOUTUBE_COOKIES_FILE."""
+    b64 = os.environ.get("YOUTUBE_COOKIES_B64")
+    if not b64:
+        return
+    try:
+        import base64
+        cookies_path = "/tmp/yt_cookies.txt"
+        with open(cookies_path, "wb") as f:
+            f.write(base64.b64decode(b64))
+        os.environ["YOUTUBE_COOKIES_FILE"] = cookies_path
+        print("[startup] cookies do YouTube carregados — bot-detection contornado")
+    except Exception as e:
+        print(f"[startup] falha ao carregar cookies do YouTube: {e}")
+
+
 _STEP_MESSAGES = {
     "step:download": "YouTube bloqueou o download (detecção de bot). Tente novamente ou use outro vídeo.",
     "step:transcricao": "Falhou durante a transcrição do áudio. Tente com um vídeo mais curto.",
@@ -71,6 +87,7 @@ async def _periodic_recovery_loop():
 @app.on_event("startup")
 async def recover_stuck_projects():
     import asyncio
+    _setup_youtube_cookies()
     await _mark_stuck_projects("startup")
     asyncio.create_task(_periodic_recovery_loop())
 
