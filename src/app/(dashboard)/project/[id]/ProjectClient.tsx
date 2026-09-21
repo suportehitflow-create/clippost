@@ -747,13 +747,21 @@ export default function ProjectClient({
             }
             return
           }
+        } else if (res.status === 401) {
+          // Sessão expirada — não faz fallback com Supabase client (causaria 401 em cadeia)
+          console.warn('[polling] sessão expirada, aguardando renovação automática...')
         } else {
-          // Fallback via Supabase Client direto
-          const { data: dbClips } = await supabase
+          // Fallback via Supabase Client direto (apenas para erros não-auth)
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) return  // sem sessão, não adianta tentar
+
+          const { data: dbClips, error: clipsErr } = await supabase
             .from('clips')
             .select('*')
             .eq('project_id', project.id)
             .order('score', { ascending: false })
+
+          if (clipsErr) { console.warn('[polling] supabase clips:', clipsErr.message); return }
 
           const { data: projData } = await supabase
             .from('projects')
