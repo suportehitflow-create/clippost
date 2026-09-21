@@ -25,23 +25,9 @@ export async function POST(req: NextRequest) {
         platform,
         account_id: acc.account_id || acc.handle || platform,
         username: acc.handle,
-        display_name: acc.handle,
       }, { onConflict: 'user_id,platform,account_id' })
       synced++
     } catch {}
-  }
-
-  // Set first account as active if none is
-  const { data: existing } = await supabase
-    .from('social_accounts')
-    .select('id, is_active')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
-
-  const hasActive = (existing || []).some(a => a.is_active)
-  if (!hasActive && existing && existing.length > 0) {
-    await supabase.from('social_accounts').update({ is_active: true }).eq('id', existing[0].id)
-    await supabase.from('profiles').update({ active_social_account_id: existing[0].id }).eq('id', user.id)
   }
 
   return NextResponse.json({ synced })

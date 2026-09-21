@@ -63,18 +63,14 @@ export default function SettingsPage() {
         setUserEmail(user.email || '')
         setUserId(user.id)
         // Load profile settings
-        let profile: any = null
-        const { data: pWithAuto, error: pErr } = await supabase.from('profiles').select('plan, auto_publish').eq('id', user.id).maybeSingle()
-        if (pErr) {
-          const { data: pSimple } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
-          profile = pSimple
-        } else {
-          profile = pWithAuto
+        const { data: pSimple } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+        if (pSimple) {
+          setPlan(pSimple.plan === 'pro' ? 'Pro Creator' : pSimple.plan === 'free' ? 'Gratuito' : pSimple.plan)
         }
-        if (profile) {
-          setPlan(profile.plan === 'pro' ? 'Pro Creator' : profile.plan === 'free' ? 'Gratuito' : profile.plan)
-          setAutoPublish(profile.auto_publish ?? false)
-        }
+        try {
+          const saved = localStorage.getItem('clippost_auto_publish')
+          if (saved !== null) setAutoPublish(saved === 'true')
+        } catch {}
         // Load social accounts
         loadAccounts(user.id)
       }
@@ -83,12 +79,37 @@ export default function SettingsPage() {
   }, [])
 
   async function loadAccounts(uid: string) {
-    const { data } = await supabase
-      .from('social_accounts')
-      .select('id, platform, username, display_name, avatar_url, is_active, created_at')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: true })
-    setAccounts((data as SocialAccount[]) || [])
+    try {
+      const { data } = await supabase
+        .from('social_accounts')
+        .select('id, platform, username, created_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: true })
+
+      let savedActiveId: string | null = null
+      try {
+        const saved = localStorage.getItem('clippost_active_account')
+        if (saved) savedActiveId = JSON.parse(saved)?.id
+      } catch {}
+
+      const mapped: SocialAccount[] = (data || []).map((acc: any) => ({
+        id: acc.id,
+        platform: acc.platform,
+        username: acc.username,
+        display_name: acc.username ? `@${acc.username}` : 'Conta',
+        avatar_url: null,
+        is_active: savedActiveId ? acc.id === savedActiveId : false,
+        created_at: acc.created_at
+      }))
+
+      if (mapped.length > 0 && !mapped.some(a => a.is_active)) {
+        mapped[0].is_active = true
+      }
+
+      setAccounts(mapped)
+    } catch {
+      setAccounts([])
+    }
   }
 
   async function toggleAutoPublish(val: boolean) {

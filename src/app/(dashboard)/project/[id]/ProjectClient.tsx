@@ -172,12 +172,31 @@ export default function ProjectClient({
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Nao autenticado')
-      let platform = 'instagram'
+            let platform = 'instagram'
       let socialAccountId: string | null = null
-      const { data: prof } = await supabase.from('profiles').select('active_social_account_id').eq('id', user.id).single()
-      if (prof?.active_social_account_id) {
-        const { data: acc } = await supabase.from('social_accounts').select('id,platform').eq('id', prof.active_social_account_id).single()
-        if (acc) { socialAccountId = acc.id; platform = acc.platform }
+      try {
+        const saved = localStorage.getItem('clippost_active_account')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed?.id) {
+            socialAccountId = parsed.id
+            if (parsed.platform) platform = parsed.platform
+          }
+        }
+      } catch {}
+      if (!socialAccountId) {
+        try {
+          const { data: acc } = await supabase
+            .from('social_accounts')
+            .select('id, platform')
+            .eq('user_id', user.id)
+            .limit(1)
+            .maybeSingle()
+          if (acc) {
+            socialAccountId = acc.id
+            platform = acc.platform || 'instagram'
+          }
+        } catch {}
       } else {
         const { data: acc } = await supabase.from('social_accounts').select('id,platform').eq('user_id', user.id).eq('is_active', true).limit(1).single()
         if (acc) { socialAccountId = acc.id; platform = acc.platform }
@@ -1240,138 +1259,163 @@ export default function ProjectClient({
 
             </div>
 
-          {/* CARD INTERMEDIÁRIO: ESTÚDIO DE EDIÇÃO EM MASSA */}
-          <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-4">
-            
-            {/* CABEÇALHO DO ESTÚDIO COM TOGGLE DE EDIÇÃO EM MASSA */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+          {/* CARD INTERMEDIÁRIO: ESTÚDIO DE EDIÇÃO PREMIUM */}
+          <div className="bg-[#0e0e13]/95 border border-white/[0.08] rounded-2xl p-5 sm:p-6 space-y-5 shadow-2xl shadow-black/50 backdrop-blur-xl relative overflow-hidden">
+            {/* Ambient subtle glow */}
+            <div className="absolute top-0 right-1/4 w-96 h-28 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* CABEÇALHO DO ESTÚDIO COM TOGGLE APPLE PRO */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.06] relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-pink-500/20 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
                   <Sliders className="w-4 h-4 text-indigo-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     <span>Estúdio de Edição</span>
                     {applyToAllClips ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-                        EM MASSA ({clips.length} CORTES)
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>Em Lote {clips.length > 0 ? `(${clips.length})` : ''}</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-400 border border-zinc-700 font-mono">
-                        CORTE #{selectedClipIndex + 1} APENAS
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-white/[0.06] text-zinc-400 border border-white/[0.08]">
+                        Corte #{selectedClipIndex + 1}
                       </span>
                     )}
                   </h3>
                   <p className="text-[11px] text-zinc-400">
-                    Ajuste velocidade, formato, emojis, marca d'água e silêncio
+                    Ajuste velocidade, enquadramento dinâmico, emojis e marca d'água
                   </p>
                 </div>
               </div>
 
-              {/* TOGGLE CHECKBOX: APLICAR A TODOS OS CLIPES */}
-              <label className="flex items-center gap-2.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] px-3.5 py-2 rounded-xl cursor-pointer transition-all shrink-0 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyToAllClips}
-                  onChange={(e) => {
-                    const checked = e.target.checked
-                    setApplyToAllClips(checked)
-                    triggerBulkFeedback(checked ? `Edição em massa ativada para todos os ${clips.length} clipes!` : 'Modo individual ativado para este corte')
+              {/* SEGMENTED SWITCH: CORTE ATUAL VS TODOS OS CORTES */}
+              <div className="flex items-center p-1 bg-black/40 border border-white/[0.08] rounded-xl text-xs shrink-0 select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApplyToAllClips(false)
+                    triggerBulkFeedback(`Modo individual: corte #${selectedClipIndex + 1}`)
                   }}
-                  className="w-4 h-4 rounded border-zinc-600 text-indigo-600 focus:ring-indigo-500 bg-zinc-900 cursor-pointer accent-indigo-600"
-                />
-                <span className="text-xs font-semibold text-zinc-200">
-                  Aplicar a todos os clipes
-                </span>
-              </label>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    !applyToAllClips
+                      ? 'bg-white/15 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Corte Atual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApplyToAllClips(true)
+                    triggerBulkFeedback(clips.length > 0 ? `Edição em massa ativada para ${clips.length} clipes` : 'Edição em lote ativada')
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    applyToAllClips
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Todos os Clipes</span>
+                  {clips.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.2 bg-white/20 rounded-full font-mono">{clips.length}</span>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* FEEDBACK BANNER (SE HOUVER AÇÃO EM MASSA) */}
+            {/* FEEDBACK BANNER REATIVO */}
             {bulkFeedback && (
-              <div className="px-3.5 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 text-xs font-medium flex items-center justify-between animate-in fade-in duration-150">
+              <div className="px-3.5 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 text-xs font-medium flex items-center justify-between animate-in fade-in duration-150">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
                   <span>{bulkFeedback}</span>
                 </div>
-                <button type="button" onClick={() => setBulkFeedback(null)} className="text-zinc-400 hover:text-white p-0.5">
+                <button type="button" onClick={() => setBulkFeedback(null)} className="text-zinc-400 hover:text-white p-0.5 cursor-pointer">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
 
-            {/* ABAS SEGMENTADAS (PILLS) */}
-            <div className="grid grid-cols-5 gap-1.5 p-1 bg-black/40 border border-white/[0.06] rounded-xl text-xs select-none">
+            {/* ABAS SEGMENTADAS COM SCROLL SUAVE (SEM TRUNCAMENTO) */}
+            <div className="flex items-center gap-1.5 p-1.5 bg-black/40 border border-white/[0.07] rounded-xl overflow-x-auto scrollbar-none text-xs select-none">
               <button
                 type="button"
                 onClick={() => setStudioTab('speed')}
-                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  studioTab === 'speed' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                className={`px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  studioTab === 'speed' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <Zap className="w-3.5 h-3.5" />
-                <span className="truncate">Velocidade</span>
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Velocidade</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStudioTab('format')}
-                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  studioTab === 'format' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                className={`px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  studioTab === 'format' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span className="truncate">Formato</span>
+                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Formato</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStudioTab('text')}
-                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  studioTab === 'text' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                className={`px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  studioTab === 'text' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <Smile className="w-3.5 h-3.5" />
-                <span className="truncate">Emojis</span>
+                <Smile className="w-3.5 h-3.5 text-pink-400" />
+                <span>Emojis & Texto</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStudioTab('watermark')}
-                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  studioTab === 'watermark' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                className={`px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  studioTab === 'watermark' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <Shield className="w-3.5 h-3.5" />
-                <span className="truncate">Marca D'água</span>
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Marca D'água</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStudioTab('silence')}
-                className={`py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  studioTab === 'silence' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                className={`px-3.5 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  studioTab === 'silence' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <Scissors className="w-3.5 h-3.5" />
-                <span className="truncate">Silêncio</span>
+                <Scissors className="w-3.5 h-3.5 text-purple-400" />
+                <span>Silêncio & Áudio</span>
               </button>
             </div>
 
             {/* ABA 1: VELOCIDADE DO VÍDEO */}
             {studioTab === 'speed' && (
-              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+              <div className="space-y-4 pt-1 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-300 font-medium">Aceleração de Retenção (Pitch-Preserved):</span>
-                  <span className="text-xs font-bold font-mono text-indigo-400 px-2 py-0.5 bg-indigo-500/10 rounded-md border border-indigo-500/20">
-                    Velocidade: {videoSpeed}x
+                  <div>
+                    <span className="text-xs text-white font-semibold block">Aceleração de Retenção (Pitch-Preserved)</span>
+                    <span className="text-[11px] text-zinc-400">Mantém o tom natural da voz com fluidez contínua</span>
+                  </div>
+                  <span className="text-xs font-bold font-mono text-indigo-300 px-2.5 py-1 bg-indigo-500/15 rounded-lg border border-indigo-500/30">
+                    {videoSpeed}x
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                   {[
-                    { val: 1.0, label: '1.0x', desc: 'Normal' },
-                    { val: 1.05, label: '1.05x', desc: 'Viral' },
-                    { val: 1.15, label: '1.15x', desc: 'Rápido' },
+                    { val: 1.0, label: '1.0x', desc: 'Original' },
+                    { val: 1.05, label: '1.05x', desc: '🔥 Viral' },
+                    { val: 1.15, label: '1.15x', desc: 'Ágil' },
                     { val: 1.25, label: '1.25x', desc: 'Dinâmico' },
                     { val: 1.5, label: '1.5x', desc: 'Acelerado' },
                     { val: 1.8, label: '1.8x', desc: 'Turbo' },
@@ -1385,33 +1429,37 @@ export default function ProjectClient({
                         onClick={() => {
                           setVideoSpeed(spd.val)
                           if (applyToAllClips) {
-                            triggerBulkFeedback(`Velocidade ${spd.val}x aplicada a todos os ${clips.length} clipes!`)
+                            triggerBulkFeedback(`Velocidade ${spd.val}x aplicada aos clipes`)
                           }
                         }}
-                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
                           isAct
-                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm shadow-indigo-500/20'
+                            ? 'bg-gradient-to-b from-indigo-600/30 to-purple-600/20 text-indigo-200 border-indigo-500/50 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-500/30'
                             : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
                         }`}
                       >
-                        <strong className={`block text-xs ${isAct ? 'text-white' : 'text-zinc-200'}`}>{spd.label}</strong>
-                        <span className="text-[9px] text-zinc-500 block leading-tight">{spd.desc}</span>
+                        <strong className={`block text-xs font-bold ${isAct ? 'text-white' : 'text-zinc-200'}`}>{spd.label}</strong>
+                        <span className={`text-[10px] block leading-tight mt-0.5 ${isAct ? 'text-indigo-300 font-medium' : 'text-zinc-500'}`}>{spd.desc}</span>
                       </button>
                     )
                   })}
                 </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  💡 <strong>Dica de Retenção:</strong> A velocidade 1.05x elimina micro-pausas mantendo o tom natural da voz, aumentando a taxa de retenção dos Shorts/Reels em até 18%.
-                </p>
+
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-500/[0.08] via-purple-500/[0.05] to-transparent border border-indigo-500/20 text-xs">
+                  <span className="text-base shrink-0">💡</span>
+                  <p className="text-zinc-300 text-[11px] leading-relaxed">
+                    <strong className="text-white font-semibold">Algoritmo de Retenção:</strong> A velocidade <span className="text-indigo-300 font-mono font-bold">1.05x</span> elimina micro-pausas mantendo o tom natural da voz, aumentando a taxa de retenção dos Shorts/Reels em até <span className="text-emerald-400 font-bold">+18%</span>.
+                  </p>
+                </div>
               </div>
             )}
 
             {/* ABA 2: FORMATO & LAYOUT */}
             {studioTab === 'format' && (
-              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
-                <div className="space-y-1.5">
-                  <span className="text-xs text-zinc-300 font-medium block">Proporção de Tela:</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="space-y-4 pt-1 animate-in fade-in duration-150">
+                <div className="space-y-2">
+                  <span className="text-xs text-zinc-300 font-semibold block">Proporção de Tela:</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {[
                       { id: '9:16' as VideoAspectRatio, label: '9:16 (Vertical)', desc: 'Reels / TikTok / Shorts' },
                       { id: '1:1' as VideoAspectRatio, label: '1:1 (Quadrado)', desc: 'Feed Instagram / LinkedIn' },
@@ -1424,28 +1472,28 @@ export default function ProjectClient({
                         onClick={() => {
                           setVideoAspect(asp.id)
                           if (applyToAllClips) {
-                            triggerBulkFeedback(`Formato ${asp.id} aplicado a todos os ${clips.length} clipes!`)
+                            triggerBulkFeedback(`Formato ${asp.id} aplicado aos clipes`)
                           }
                         }}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                           videoAspect === asp.id
-                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                            ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm shadow-indigo-500/20 ring-1 ring-indigo-500/30'
                             : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
                         }`}
                       >
                         <span className="text-xs font-bold block text-white">{asp.label}</span>
-                        <span className="text-[10px] text-zinc-500 block leading-tight">{asp.desc}</span>
+                        <span className="text-[10px] text-zinc-500 block leading-tight mt-0.5">{asp.desc}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                  <span className="text-xs text-zinc-300 font-medium block">Modelo de Layout do Template:</span>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+                  <span className="text-xs text-zinc-300 font-semibold block">Modelo de Enquadramento do Template:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     {[
-                      { id: 'meme_frame' as LayoutFormat, label: 'Meme Frame', desc: 'Canal no topo + título + vídeo' },
-                      { id: 'split_screen' as LayoutFormat, label: 'Split Screen', desc: '2 vídeos / Reações' },
+                      { id: 'meme_frame' as LayoutFormat, label: 'Meme Frame', desc: 'Canal no topo + título + vídeo central' },
+                      { id: 'split_screen' as LayoutFormat, label: 'Split Screen', desc: '2 vídeos simultâneos / Reações' },
                       { id: 'single_speaker' as LayoutFormat, label: 'Single Speaker', desc: '9:16 Imersivo sem bordas' }
                     ].map((lay) => (
                       <button
@@ -1454,17 +1502,17 @@ export default function ProjectClient({
                         onClick={() => {
                           setActiveLayout(lay.id)
                           if (applyToAllClips) {
-                            triggerBulkFeedback(`Layout ${lay.label} aplicado a todos os ${clips.length} clipes!`)
+                            triggerBulkFeedback(`Layout ${lay.label} aplicado aos clipes`)
                           }
                         }}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                           activeLayout === lay.id
-                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                            ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm shadow-indigo-500/20 ring-1 ring-indigo-500/30'
                             : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
                         }`}
                       >
                         <span className="text-xs font-bold block text-white">{lay.label}</span>
-                        <span className="text-[10px] text-zinc-500 block leading-tight">{lay.desc}</span>
+                        <span className="text-[10px] text-zinc-500 block leading-tight mt-0.5">{lay.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -1474,21 +1522,21 @@ export default function ProjectClient({
 
             {/* ABA 3: TEXTO & EMOJIS */}
             {studioTab === 'text' && (
-              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
-                <div className="space-y-1.5">
-                  <span className="text-xs text-zinc-300 font-medium block">Emojis Dinâmicos no Título / Gancho:</span>
-                  <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-4 pt-1 animate-in fade-in duration-150">
+                <div className="space-y-2">
+                  <span className="text-xs text-zinc-300 font-semibold block">Emojis Dinâmicos no Título / Gancho:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => {
                         setShowTitleEmojis(true)
                         if (applyToAllClips) {
-                          triggerBulkFeedback(`Emojis no título ativados em todos os ${clips.length} cortes!`)
+                          triggerBulkFeedback(`Emojis no título ativados nos cortes`)
                         }
                       }}
-                      className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      className={`p-3 rounded-xl border flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
                         showTitleEmojis
-                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm ring-1 ring-indigo-500/30'
                           : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
                       }`}
                     >
@@ -1501,12 +1549,12 @@ export default function ProjectClient({
                       onClick={() => {
                         setShowTitleEmojis(false)
                         if (applyToAllClips) {
-                          triggerBulkFeedback(`Emojis removidos do título em todos os ${clips.length} cortes!`)
+                          triggerBulkFeedback(`Emojis removidos do título nos cortes`)
                         }
                       }}
-                      className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      className={`p-3 rounded-xl border flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
                         !showTitleEmojis
-                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm ring-1 ring-indigo-500/30'
                           : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] text-zinc-400 hover:text-white'
                       }`}
                     >
@@ -1516,18 +1564,18 @@ export default function ProjectClient({
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-                  <span className="text-xs text-zinc-300 font-medium block">Estilo do Texto do Título:</span>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+                  <span className="text-xs text-zinc-300 font-semibold block">Estilo e Alinhamento do Título:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => {
                         setTitleCapsLock(!titleCapsLock)
                         if (applyToAllClips) {
-                          triggerBulkFeedback(titleCapsLock ? 'Texto em caixa normal aplicado' : 'CAIXA ALTA aplicada a todos')
+                          triggerBulkFeedback(titleCapsLock ? 'Texto em caixa normal aplicado' : 'CAIXA ALTA aplicada')
                         }
                       }}
-                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                      className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
                         titleCapsLock
                           ? 'bg-white/[0.08] text-white border-white/20'
                           : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
@@ -1536,7 +1584,7 @@ export default function ProjectClient({
                       <span className="text-xs font-bold">{titleCapsLock ? 'ABC CAIXA ALTA' : 'Abc Normal'}</span>
                     </button>
 
-                    <div className="flex items-center justify-center gap-1 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                    <div className="flex items-center justify-center gap-1.5 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl">
                       {(['left', 'center', 'right'] as const).map((al) => (
                         <button
                           key={al}
@@ -1545,11 +1593,11 @@ export default function ProjectClient({
                             setTextAlign(al)
                             if (applyToAllClips) triggerBulkFeedback(`Alinhamento ${al} aplicado`)
                           }}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
-                            textAlign === al ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-white'
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                            textAlign === al ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
                           }`}
                         >
-                          {al === 'left' ? 'Esq' : al === 'center' ? 'Centro' : 'Dir'}
+                          {al === 'left' ? 'Esquerda' : al === 'center' ? 'Centro' : 'Direita'}
                         </button>
                       ))}
                     </div>
@@ -1560,10 +1608,10 @@ export default function ProjectClient({
 
             {/* ABA 4: MARCA D'ÁGUA ANTI-FURTO */}
             {studioTab === 'watermark' && (
-              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                   <div>
-                    <span className="text-xs text-zinc-200 font-bold block">Marca D'água Anti-Furto</span>
+                    <span className="text-xs text-white font-bold block">Marca D'água Anti-Furto</span>
                     <span className="text-[11px] text-zinc-400">Proteja seus cortes contra repostagens não autorizadas</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -1573,51 +1621,48 @@ export default function ProjectClient({
                       onChange={(e) => {
                         const en = e.target.checked
                         setWatermarkEnabled(en)
-                        if (applyToAllClips) triggerBulkFeedback(en ? 'Marca d\'água ativada em todos' : 'Marca d\'água desativada')
+                        if (applyToAllClips) triggerBulkFeedback(en ? 'Marca d\'água ativada nos cortes' : 'Marca d\'água desativada')
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
+                    <div className="w-10 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
                   </label>
                 </div>
 
                 {watermarkEnabled && (
-                  <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+                  <div className="space-y-3.5 pt-2 border-t border-white/[0.06]">
                     {/* TIPO: TEXTO VS IMAGEM */}
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setWatermarkType('text')}
-                        className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
-                          watermarkType === 'text' ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
+                          watermarkType === 'text' ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
                         }`}
                       >
-                        @ da Página (Texto)
+                        @ Perfil (Texto)
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setWatermarkType('image')}
-                        className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
-                          watermarkType === 'image' ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
+                          watermarkType === 'image' ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-sm' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
                         }`}
                       >
-                        Logo / Imagem
+                        Logo Imagem (PNG)
                       </button>
                     </div>
 
                     {watermarkType === 'text' ? (
                       <div className="space-y-1">
-                        <label className="text-[11px] text-zinc-400">Texto do @ ou Nome do Canal:</label>
+                        <label className="text-[11px] text-zinc-400">Texto ou @ da sua página:</label>
                         <input
                           type="text"
                           value={watermarkText}
-                          onChange={(e) => {
-                            setWatermarkText(e.target.value)
-                            if (applyToAllClips) triggerBulkFeedback('Texto da marca d\'água atualizado')
-                          }}
-                          placeholder="@meucanal_cortes"
-                          className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                          onChange={(e) => setWatermarkText(e.target.value)}
+                          placeholder="@seucanal"
+                          className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/60"
                         />
                       </div>
                     ) : (
@@ -1661,7 +1706,7 @@ export default function ProjectClient({
                     {/* POSIÇÃO DA MARCA D'ÁGUA */}
                     <div className="space-y-1 pt-1">
                       <span className="text-[11px] text-zinc-400 block">Posição no Vídeo:</span>
-                      <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                      <div className="grid grid-cols-3 gap-2 text-[11px]">
                         {[
                           { id: 'center' as const, label: 'Centro (Anti-Furto)' },
                           { id: 'bottom_center' as const, label: 'Inferior Centro' },
@@ -1674,8 +1719,8 @@ export default function ProjectClient({
                               setWatermarkPosition(pos.id)
                               if (applyToAllClips) triggerBulkFeedback(`Posição da marca d'água alterada`)
                             }}
-                            className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                              watermarkPosition === pos.id ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/40 font-semibold' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                            className={`py-2 px-2.5 rounded-lg border text-center transition-all cursor-pointer ${
+                              watermarkPosition === pos.id ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 font-semibold shadow-sm' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
                             }`}
                           >
                             {pos.label}
@@ -1690,11 +1735,11 @@ export default function ProjectClient({
 
             {/* ABA 5: SILÊNCIO & ÁUDIO */}
             {studioTab === 'silence' && (
-              <div className="space-y-3 pt-1 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="space-y-4 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                   <div>
                     <span className="text-xs font-bold text-white block">Remover Silêncios Automaticamente</span>
-                    <span className="text-[11px] text-zinc-400">Corta pausas e hesitações acima de 0.3s</span>
+                    <span className="text-[11px] text-zinc-400">Corta pausas e hesitações acima de 0.3s para ritmo acelerado</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -1703,27 +1748,27 @@ export default function ProjectClient({
                       onChange={(e) => {
                         const en = e.target.checked
                         setRemoveSilence(en)
-                        if (applyToAllClips) triggerBulkFeedback(en ? 'Remoção de silêncio ativada em todos' : 'Remoção de silêncio desativada')
+                        if (applyToAllClips) triggerBulkFeedback(en ? 'Corte de silêncio ativado' : 'Corte de silêncio desativado')
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
+                    <div className="w-10 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600" />
                   </label>
                 </div>
 
-                <div className="space-y-1.5 pt-2">
-                  <span className="text-xs text-zinc-300 font-medium block">Estilo de Legenda Rápido:</span>
-                  <div className="grid grid-cols-3 gap-1.5 text-xs">
+                <div className="space-y-2 pt-2 border-t border-white/[0.06]">
+                  <span className="text-xs text-zinc-300 font-semibold block">Estilo de Legenda Rápido:</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                     {SUBTITLE_STYLES.map((st) => (
                       <button
                         key={st.id}
                         type="button"
                         onClick={() => {
                           setActiveSubtitleStyle(st.id)
-                          if (applyToAllClips) triggerBulkFeedback(`Estilo ${st.name} aplicado a todos os ${clips.length} clipes`)
+                          if (applyToAllClips) triggerBulkFeedback(`Estilo ${st.name} aplicado aos clipes`)
                         }}
-                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                          activeSubtitleStyle === st.id ? 'bg-indigo-600/20 text-white border-indigo-500/40 font-bold' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
+                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                          activeSubtitleStyle === st.id ? 'bg-indigo-600/25 text-white border-indigo-500/50 font-bold shadow-sm' : 'bg-white/[0.02] border-white/[0.06] text-zinc-400'
                         }`}
                       >
                         <span className="block truncate">{st.name}</span>
@@ -1734,11 +1779,16 @@ export default function ProjectClient({
               </div>
             )}
 
-            {/* BOTÃO MESTRE: SINCRONIZAR TUDO EM MASSA */}
-            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-3">
-              <span className="text-[11px] text-zinc-500">
-                {applyToAllClips ? `⚡ Modo de lote ativo: alterações aplicadas a todos os ${clips.length} cortes.` : `Modo individual ativo para o corte #${selectedClipIndex + 1}.`}
-              </span>
+            {/* RODAPÉ DO ESTÚDIO: STATUS EM TEMPO REAL & SALVAMENTO */}
+            <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>
+                  {applyToAllClips
+                    ? (clips.length > 0 ? `Alterações aplicadas a todos os ${clips.length} cortes` : 'Alterações sincronizadas no preset global')
+                    : `Modo individual ativo para o corte #${selectedClipIndex + 1}`}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1760,13 +1810,13 @@ export default function ProjectClient({
                       activeSubtitleStyle
                     }
                     localStorage.setItem('clippost_active_template', JSON.stringify({ config: currentCfg, layout: activeLayout, subtitle_preset: activeSubtitleStyle }))
-                    triggerBulkFeedback(`Configurações gravadas e aplicadas a todos os ${clips.length} clipes com sucesso!`)
+                    triggerBulkFeedback('Predefinição gravada e aplicada com sucesso!')
                   } catch {}
                 }}
-                className="py-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
+                className="py-2 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-md shadow-indigo-600/30"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Aplicar a Todos ({clips.length})</span>
+                <span>Salvar Predefinição</span>
               </button>
             </div>
 

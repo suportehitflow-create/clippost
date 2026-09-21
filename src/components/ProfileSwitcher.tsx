@@ -40,46 +40,56 @@ export default function ProfileSwitcher({ userId }: { userId: string }) {
   }, [userId])
 
   async function loadAccounts() {
-    const { data } = await supabase
-      .from('social_accounts')
-      .select('id, platform, username, display_name, avatar_url, is_active')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true })
+    try {
+      // Query ONLY existing columns in Supabase to avoid 400 errors
+      const { data, error } = await supabase
+        .from('social_accounts')
+        .select('id, platform, username, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
 
-    if (!data || data.length === 0) {
-      // Try syncing from Upload-Post
+      if (error || !data || data.length === 0) {
+        setAccounts([])
+        setActive(null)
+        return
+      }
+
+      // Read locally selected account id
+      let savedActiveId: string | null = null
       try {
-        await fetch('/api/social/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId }),
-        })
-        const { data: synced } = await supabase
-          .from('social_accounts')
-          .select('id, platform, username, display_name, avatar_url, is_active')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
-        if (synced) applyAccounts(synced as SocialAccount[])
+        const saved = localStorage.getItem('clippost_active_account')
+        if (saved) savedActiveId = JSON.parse(saved)?.id
       } catch {}
-      return
+
+      const mapped: SocialAccount[] = data.map((acc: any) => ({
+        id: acc.id,
+        platform: acc.platform,
+        username: acc.username,
+        display_name: acc.username ? `@${acc.username}` : 'Conta',
+        avatar_url: null,
+        is_active: savedActiveId ? acc.id === savedActiveId : false
+      }))
+
+      const activeAcc = mapped.find(a => a.is_active) || mapped[0]
+      if (activeAcc) activeAcc.is_active = true
+
+      setAccounts(mapped)
+      setActive(activeAcc || null)
+      if (activeAcc) {
+        try { localStorage.setItem('clippost_active_account', JSON.stringify(activeAcc)) } catch {}
+      }
+    } catch {
+      setAccounts([])
+      setActive(null)
     }
-    applyAccounts(data as SocialAccount[])
   }
 
-  function applyAccounts(data: SocialAccount[]) {
-    setAccounts(data)
-    const activeAcc = data.find(a => a.is_active) || data[0]
-    setActive(activeAcc)
-    try { localStorage.setItem('clippost_active_account', JSON.stringify(activeAcc)) } catch {}
-  }
-
-  async function switchAccount(account: SocialAccount) {
-    await supabase.from('social_accounts').update({ is_active: false }).eq('user_id', userId)
-    await supabase.from('social_accounts').update({ is_active: true }).eq('id', account.id)
-    await supabase.from('profiles').update({ active_social_account_id: account.id }).eq('id', userId)
-    setActive(account)
-    setAccounts(prev => prev.map(a => ({ ...a, is_active: a.id === account.id })))
-    try { localStorage.setItem('clippost_active_account', JSON.stringify(account)) } catch {}
+  function switchAccount(account: SocialAccount) {
+    const updated = accounts.map(a => ({ ...a, is_active: a.id === account.id }))
+    setAccounts(updated)
+    const newActive = { ...account, is_active: true }
+    setActive(newActive)
+    try { localStorage.setItem('clippost_active_account', JSON.stringify(newActive)) } catch {}
     setOpen(false)
   }
 
