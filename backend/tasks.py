@@ -264,13 +264,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         },
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'web'],
+                # tv_embedded não exige PO token (server-side safe)
+                'player_client': ['ios', 'tv_embedded', 'mweb'],
+                'player_skip': ['configs'],
             },
         },
     }
 
     try:
         # 1. Download do vídeo
+        print(f"[pipeline] tentando download: {url[:80]}")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             video_id = info.get('id', 'video')

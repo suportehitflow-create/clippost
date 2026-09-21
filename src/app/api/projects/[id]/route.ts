@@ -43,6 +43,24 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: projectId } = await params
+    const body = await req.json()
+    const admin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      auth: { persistSession: false }
+    })
+    const { error } = await admin.from('projects').update(body).eq('id', projectId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

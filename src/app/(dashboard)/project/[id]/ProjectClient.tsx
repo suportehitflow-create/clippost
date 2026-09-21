@@ -127,6 +127,93 @@ const PIPELINE_STEPS = [
   { label: 'Criando cortes 9:16', detail: 'FFmpeg renderizando com legenda', thresholdSecs: 160 },
 ]
 
+function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
+  projectId: string
+  sourceUrl: string | null
+  errorMessage?: string | null
+  onRetrying: () => void
+}) {
+  const [retrying, setRetrying] = useState(false)
+  const [retryMsg, setRetryMsg] = useState('')
+
+  async function handleRetry() {
+    if (!sourceUrl) return
+    setRetrying(true)
+    setRetryMsg('')
+    try {
+      // Atualiza status para processing no Supabase antes de resubmeter
+      await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'processing', error_message: null }),
+      }).catch(() => null)
+
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl, project_id: projectId }),
+      })
+      if (res.ok) {
+        onRetrying()
+        setRetryMsg('Reprocessando...')
+      } else {
+        setRetryMsg('Erro ao reenviar. Tente novamente.')
+      }
+    } catch {
+      setRetryMsg('Erro de conexão.')
+    }
+    setRetrying(false)
+  }
+
+  const isYouTubeBot = errorMessage?.toLowerCase().includes('sign in') || errorMessage?.toLowerCase().includes('bot')
+  const isUnavailable = errorMessage?.toLowerCase().includes('unavailable') || errorMessage?.toLowerCase().includes('private')
+  const isTimeout = errorMessage?.toLowerCase().includes('timeout') || errorMessage?.toLowerCase().includes('socket')
+
+  const hint = isYouTubeBot
+    ? 'O YouTube bloqueou o download automático. Tente novamente (às vezes funciona na segunda tentativa) ou use um vídeo de canal menor.'
+    : isUnavailable
+    ? 'O vídeo pode ser privado, com restrição de idade ou removido.'
+    : isTimeout
+    ? 'Timeout de conexão. O servidor pode estar sobrecarregado. Tente novamente.'
+    : 'Ocorreu um erro inesperado durante o processamento.'
+
+  return (
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+      <div className="bg-red-950/20 border border-red-500/25 rounded-2xl p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center shrink-0 mt-0.5">
+            <X className="w-4.5 h-4.5 text-red-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-semibold text-red-300">Processamento falhou</span>
+            </div>
+            <p className="text-xs text-zinc-400 leading-relaxed">{hint}</p>
+            {errorMessage && (
+              <div className="mt-2 px-3 py-2 rounded-lg bg-black/40 border border-white/[0.06]">
+                <span className="text-[10px] font-mono text-zinc-500 break-all leading-relaxed">{errorMessage}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={retrying || !sourceUrl}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          >
+            {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+            {retrying ? 'Reprocessando...' : 'Tentar novamente'}
+          </button>
+          {retryMsg && <span className="text-xs text-zinc-400">{retryMsg}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PipelineProgress({ elapsedSecs, clipsReady }: { elapsedSecs: number; clipsReady: number }) {
   const activeIdx = clipsReady > 0
     ? PIPELINE_STEPS.length - 1
@@ -812,6 +899,10 @@ export default function ProjectClient({
               <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 whitespace-nowrap flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" /> Processando
               </span>
+            ) : status === 'failed' ? (
+              <span className="text-[10px] font-medium text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20 whitespace-nowrap flex items-center gap-1">
+                <X className="w-3 h-3" /> Falhou
+              </span>
             ) : (
               <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
@@ -902,6 +993,16 @@ export default function ProjectClient({
       {/* PAINEL DE PROGRESSO PASSO A PASSO */}
       {status === 'processing' && (
         <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
+      )}
+
+      {/* PAINEL DE ERRO COM CAUSA E BOTÃO DE RETENTAR */}
+      {status === 'failed' && (
+        <FailedPanel
+          projectId={project.id}
+          sourceUrl={project.source_url}
+          errorMessage={(project as any).error_message}
+          onRetrying={() => setStatus('processing')}
+        />
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
