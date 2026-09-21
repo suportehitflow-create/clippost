@@ -244,16 +244,12 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
 
-    ydl_opts = {
+    _ydl_base = {
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': str(tmp_dir / "original.%(ext)s"),
         'noprogress': True,
         'noplaylist': True,
         'merge_output_format': 'mp4',
-        'writesubtitles': True,
-        'writeautomaticsub': True,
-        'subtitlesformat': 'vtt',
-        'subtitleslangs': ['pt', 'pt-BR', 'pt-pt', 'en'],
         'socket_timeout': 30,
         'retries': 3,
         'fragment_retries': 3,
@@ -264,21 +260,49 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         },
         'extractor_args': {
             'youtube': {
-                # tv_embedded não exige PO token (server-side safe)
                 'player_client': ['ios', 'tv_embedded', 'mweb'],
                 'player_skip': ['configs'],
             },
         },
     }
 
+    # Fase 1: baixa só o vídeo (sem legendas para evitar 429 nas subs)
+    ydl_opts_video = {**_ydl_base}
+
+    # Fase 2: busca legendas separadamente, silenciosamente (best-effort)
+    ydl_opts_subs = {
+        **_ydl_base,
+        'skip_download': True,
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitlesformat': 'vtt',
+        'subtitleslangs': ['pt', 'pt-BR', 'en'],
+        'ignoreerrors': True,
+    }
+
     try:
-        # 1. Download do vídeo
-        print(f"[pipeline] tentando download: {url[:80]}")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # 1. Download do vídeo (sem legendas — evita 429 fatal nas subs)
+        print(f"[pipeline] baixando vídeo: {url[:80]}")
+        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
             info = ydl.extract_info(url, download=True)
+            if not info:
+                raise Exception("yt-dlp não retornou informações — URL inválida ou vídeo indisponível")
             video_id = info.get('id', 'video')
             title = info.get('title', 'Sem título')
             video_duration = info.get('duration')
+
+        # Verifica se o arquivo foi realmente baixado
+        mp4_check = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
+        if not mp4_check:
+            raise Exception(f"yt-dlp não gerou arquivo de vídeo para '{title}'")
+
+        # 1b. Tenta buscar legendas separadamente (falha silenciosa → Whisper)
+        print(f"[pipeline] buscando legendas nativas (best-effort)...")
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts_subs) as ydl:
+                ydl.extract_info(url, download=True)
+        except Exception as sub_err:
+            print(f"[pipeline] legendas nativas indisponíveis ({sub_err}), usando Whisper")
 
         # 2. Upload vídeo raw para Supabase Storage
         storage_path = f"{user_id}/{video_id}.mp4"
