@@ -189,8 +189,8 @@ def create_vertical_clip(
         user_color = "black" if template_bg == "white" else "white"
         handle_color = "0x71717a" if template_bg == "white" else "0xa1a1aa"
 
-        safe_user = display_user.replace("'", "\'").replace(":", "\:")
-        safe_handle = brand_handle.replace("'", "\'").replace(":", "\:")
+        safe_user = display_user.replace("'", r"\'").replace(":", r"\:")
+        safe_handle = brand_handle.replace("'", r"\'").replace(":", r"\:")
 
         text_filters.append(
             f"drawtext=text='{safe_user}':fontcolor={user_color}:fontsize=34:"

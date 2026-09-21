@@ -178,7 +178,7 @@ Retorne ESTRITAMENTE um array JSON válido contendo exatamente 3 objetos, sem ma
     try:
         clips = json.loads(raw)
     except json.JSONDecodeError:
-        match = re.search(r'\[.*\]', raw, re.DOTALL)
+        match = re.search(r'\[\s*\{.*?\}\s*\]', raw, re.DOTALL)
         if match:
             try:
                 clips = json.loads(match.group())

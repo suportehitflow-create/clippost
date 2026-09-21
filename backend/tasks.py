@@ -236,48 +236,50 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as e:
             print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
 
-    check_clip_limit(user_id)  # levanta Exception se limite gratuito atingido
-    tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
-    video_path = str(tmp_dir / "original.mp4")
-    audio_path = str(tmp_dir / "audio.mp3")
-
-    _ydl_base = {
-        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-        'outtmpl': str(tmp_dir / "original.%(ext)s"),
-        'noprogress': True,
-        'noplaylist': True,
-        'merge_output_format': 'mp4',
-        'socket_timeout': 30,
-        'retries': 3,
-        'fragment_retries': 3,
-        'extractor_retries': 3,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-        },
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'tv_embedded', 'mweb'],
-                'player_skip': ['configs'],
-            },
-        },
-    }
-
-    # Fase 1: baixa só o vídeo (sem legendas para evitar 429 nas subs)
-    ydl_opts_video = {**_ydl_base}
-
-    # Fase 2: busca legendas separadamente, silenciosamente (best-effort)
-    ydl_opts_subs = {
-        **_ydl_base,
-        'skip_download': True,
-        'writesubtitles': True,
-        'writeautomaticsub': True,
-        'subtitlesformat': 'vtt',
-        'subtitleslangs': ['pt', 'pt-BR', 'en'],
-        'ignoreerrors': True,
-    }
+    tmp_dir = None
 
     try:
+        check_clip_limit(user_id)  # levanta Exception se limite gratuito atingido
+        tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
+        video_path = str(tmp_dir / "original.mp4")
+        audio_path = str(tmp_dir / "audio.mp3")
+
+        _ydl_base = {
+            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            'outtmpl': str(tmp_dir / "original.%(ext)s"),
+            'noprogress': True,
+            'noplaylist': True,
+            'merge_output_format': 'mp4',
+            'socket_timeout': 30,
+            'retries': 3,
+            'fragment_retries': 3,
+            'extractor_retries': 3,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            },
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'tv_embedded', 'mweb'],
+                    'player_skip': ['configs'],
+                },
+            },
+        }
+
+        # Fase 1: baixa só o vídeo (sem legendas para evitar 429 nas subs)
+        ydl_opts_video = {**_ydl_base}
+
+        # Fase 2: busca legendas separadamente, silenciosamente (best-effort)
+        ydl_opts_subs = {
+            **_ydl_base,
+            'skip_download': True,
+            'writesubtitles': True,
+            'writeautomaticsub': True,
+            'subtitlesformat': 'vtt',
+            'subtitleslangs': ['pt', 'pt-BR', 'en'],
+            'ignoreerrors': True,
+        }
+
         # Timeout global de 15 minutos para o pipeline inteiro (Linux/Fly.io)
         import signal as _signal
         def _timeout_handler(signum, frame):
@@ -526,4 +528,5 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             _signal.alarm(0)
         except (AttributeError, OSError, NameError):
             pass
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)

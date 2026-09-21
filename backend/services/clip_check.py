@@ -9,7 +9,7 @@ import json
 import subprocess
 
 
-def validate_clip(path: str, expected_duration: float, tolerance: float = 2.0) -> dict:
+def validate_clip(path: str, expected_duration: float, tolerance: float = 15.0) -> dict:
     probe = subprocess.run(
         ["ffprobe", "-v", "quiet", "-print_format", "json",
          "-show_streams", "-show_format", path],

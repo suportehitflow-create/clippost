@@ -10,7 +10,7 @@ mediapipe==0.10.14
 opencv-python-headless==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
-supabase==2.9.0
+supabase==2.15.2
 anthropic==0.34.2
 python-multipart==0.0.9
 python-dotenv==1.0.1

@@ -415,7 +415,7 @@ class TestPlatformUrls:
         "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         "https://youtu.be/dQw4w9WgXcQ",
         "https://youtube.com/watch?v=dQw4w9WgXcQ&t=120",
-        "https://www.youtube.com/shorts/abc123XYZ",
+        "https://www.youtube.com/shorts/abc123XYZAB",
         "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
     ]
     TIKTOK_URLS = [
@@ -442,18 +442,16 @@ class TestPlatformUrls:
     def _check_ydlp_extractable(self, url: str) -> bool:
         """
         Verifica se yt-dlp reconhece o extrator sem fazer download.
-        Retorna True se extrator encontrado, False se URL não suportada.
+        Usa gen_extractors() que retorna instâncias com .suitable(url).
         """
         try:
-            import yt_dlp
-            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-                ie = ydl._ies_instances
-                for extractor in (ie.values() if hasattr(ie, "values") else ie):
-                    try:
-                        if extractor.suitable(url):
-                            return True
-                    except Exception:
-                        pass
+            from yt_dlp.extractor import gen_extractors
+            for ie in gen_extractors():
+                try:
+                    if ie.ie_key() != 'Generic' and ie.suitable(url):
+                        return True
+                except Exception:
+                    pass
             return False
         except ImportError:
             pytest.skip("yt-dlp não instalado")
