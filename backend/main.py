@@ -24,22 +24,36 @@ load_dotenv()
 app = FastAPI(title="clipost API")
 
 
+_STEP_MESSAGES = {
+    "step:download": "YouTube bloqueou o download (detecção de bot). Tente novamente ou use outro vídeo.",
+    "step:transcricao": "Falhou durante a transcrição do áudio. Tente com um vídeo mais curto.",
+    "step:ia_curator": "Falhou durante a análise por IA. Serviço temporariamente indisponível.",
+    "step:gerando_clipes": "Falhou durante a criação dos clipes. Tente novamente em alguns minutos.",
+}
+
+
 async def _mark_stuck_projects(label: str = "recovery"):
-    """Marca projetos stuck em 'processing' há mais de 8 minutos como failed."""
+    """Marca projetos stuck em 'processing' há mais de 10 minutos como failed,
+    usando o step gravado para mostrar onde travou."""
     try:
         if not supabase:
             return
         from datetime import timedelta
-        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
         result = supabase.table("projects") \
-            .update({
-                "status": "failed",
-                "error_message": "Pipeline interrompido (timeout do servidor). Clique em Tentar Novamente.",
-            }) \
+            .select("id, error_message") \
             .eq("status", "processing") \
             .lt("created_at", cutoff) \
             .execute()
         rows = result.data or []
+        for row in rows:
+            step_key = (row.get("error_message") or "").strip()
+            friendly = _STEP_MESSAGES.get(step_key,
+                "Pipeline interrompido. Clique em Tentar Novamente.")
+            supabase.table("projects").update({
+                "status": "failed",
+                "error_message": friendly,
+            }).eq("id", row["id"]).execute()
         if rows:
             print(f"[{label}] {len(rows)} projeto(s) travado(s) marcado(s) como failed")
     except Exception as e:

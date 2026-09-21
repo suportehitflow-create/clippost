@@ -30,7 +30,7 @@ def _call_free_model(prompt: str) -> str:
             "max_tokens": MAX_TOKENS,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=180.0,
+        timeout=60.0,  # 1min por tentativa — max total 2min, não 9min
     )
     resp.raise_for_status()
     body = resp.json()
@@ -161,14 +161,14 @@ Retorne ESTRITAMENTE um array JSON válido contendo exatamente 3 objetos, sem ma
 
     raw = ""
     if API_KEY:
-        for tentativa in range(3):
+        for tentativa in range(2):  # max 2×60s = 2min, não 3×180s = 9min
             try:
                 raw = _call_free_model(prompt)
                 break
             except Exception as e:
-                print(f"[ai_curator] tentativa {tentativa + 1}/3 falhou ({type(e).__name__}: {e})")
-                if tentativa < 2:
-                    time.sleep(2 * (tentativa + 1))
+                print(f"[ai_curator] tentativa {tentativa + 1}/2 falhou ({type(e).__name__}: {e})")
+                if tentativa < 1:
+                    time.sleep(3)
 
     if not raw and os.environ.get("ANTHROPIC_API_KEY"):
         print("[ai_curator] usando Anthropic como reserva")

@@ -227,12 +227,22 @@ def parse_vtt_subtitles(vtt_path: Path):
 
     return {"segments": segments, "words": words}
 
+def _set_step(pid: str | None, step: str):
+    """Grava o passo atual do pipeline no DB para identificar onde travou se o recovery rodar."""
+    if not pid or not supabase:
+        return
+    try:
+        supabase.table("projects").update({"error_message": f"step:{step}"}).eq("id", pid).execute()
+    except Exception:
+        pass
+
+
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True, template_config: dict | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
     if project_id:
         try:
-            supabase.table("projects").update({"status": "processing"}).eq("id", project_id).execute()
+            supabase.table("projects").update({"status": "processing", "error_message": None}).eq("id", project_id).execute()
         except Exception as e:
             print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
 
@@ -244,26 +254,33 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         video_path = str(tmp_dir / "original.mp4")
         audio_path = str(tmp_dir / "audio.mp3")
 
+        # Cookies do YouTube (opcional — reduz muito a detecção de bot)
+        cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE")  # caminho para cookies.txt montado no Fly
+        po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
+
         _ydl_base = {
             'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
             'merge_output_format': 'mp4',
-            'socket_timeout': 30,
-            'retries': 3,
-            'fragment_retries': 3,
-            'extractor_retries': 3,
+            'socket_timeout': 60,
+            'retries': 2,
+            'fragment_retries': 2,
+            'extractor_retries': 2,
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.135 Mobile Safari/537.36',
                 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'tv_embedded', 'mweb'],
-                    'player_skip': ['configs'],
+                    'player_client': ['ios', 'android', 'tv_embedded'],
+                    'player_skip': ['webpage', 'configs'],
+                    **({"po_token": [f"web+{po_token}"]} if po_token else {}),
                 },
             },
+            **({"cookiefile": cookies_file} if cookies_file and os.path.exists(cookies_file) else {}),
         }
 
         # Fase 1: baixa só o vídeo (sem legendas para evitar 429 nas subs)
@@ -280,15 +297,25 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             'ignoreerrors': True,
         }
 
-        # 1. Download do vídeo (sem legendas — evita 429 fatal nas subs)
+        # 1. Download do vídeo
+        _set_step(project_id, "download")
         print(f"[pipeline] baixando vídeo: {url[:80]}")
-        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if not info:
-                raise Exception("yt-dlp não retornou informações — URL inválida ou vídeo indisponível")
-            video_id = info.get('id', 'video')
-            title = info.get('title', 'Sem título')
-            video_duration = info.get('duration')
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if not info:
+                    raise Exception("yt-dlp não retornou informações — URL inválida ou vídeo indisponível")
+                video_id = info.get('id', 'video')
+                title = info.get('title', 'Sem título')
+                video_duration = info.get('duration')
+        except yt_dlp.utils.DownloadError as de:
+            err = str(de).lower()
+            if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig")):
+                raise Exception(
+                    "YouTubeBlockError: YouTube bloqueou o download (detecção de bot ou restrição de idade). "
+                    "Tente novamente em alguns minutos ou use outro vídeo."
+                )
+            raise
 
         # Verifica se o arquivo foi realmente baixado
         mp4_check = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
@@ -343,6 +370,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         if not transcript_data or not transcript_data.get("segments"):
             # Fallback: extração de áudio + Whisper tiny (3x mais rápido que base)
+            _set_step(project_id, "transcricao")
             print(f"[pipeline] sem legendas nativas — extraindo áudio para Whisper...")
             subprocess.run([
                 "ffmpeg", "-y", "-i", video_path,
@@ -389,6 +417,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             project_id = db_response.data[0]['id']
 
         # 6. AI Curator — detectar momentos virais
+        _set_step(project_id, "ia_curator")
         print(f"[pipeline] transcrição: {len(segments)} segmentos — enviando para IA Curator...")
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
         print(f"[pipeline] IA Curator retornou {len(clips_meta)} clipes candidatos")
@@ -403,6 +432,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 brand_kit["username"] = template_config.get("brandHandle") or brand_kit.get("username")
 
         # 7, 8, 9. Cortar + upload + salvar cada clipe
+        _set_step(project_id, "gerando_clipes")
         for i, clip in enumerate(clips_meta):
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
