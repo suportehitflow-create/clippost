@@ -387,16 +387,14 @@ async def remover_watch(watch_id: str):
 @app.post("/api/process-url")
 async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
     from tasks import process_youtube_video
-    try:
-        task = process_youtube_video.apply_async(
-            args=[req.url, req.user_id, req.clip_duration],
-            connect_timeout=1.5
-        )
-        return {"task_id": task.id, "status": "processing"}
-    except Exception as e:
-        print(f"[process-url] Celery/Redis indisponível ({e}). Executando local!")
-        background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration)
-        return {"task_id": "bg_process", "status": "processing"}
+    if CELERY_ENABLED:
+        try:
+            task = process_youtube_video.apply_async(args=[req.url, req.user_id, req.clip_duration])
+            return {"task_id": task.id, "status": "processing"}
+        except Exception as e:
+            print(f"[process-url] Celery falhou ({e}), usando BackgroundTasks")
+    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration)
+    return {"task_id": "bg_process", "status": "processing"}
 
 
 @app.post("/api/process-bulk")
@@ -422,28 +420,35 @@ async def instagram_list(req: InstagramListRequest):
         return {"videos": [], "count": 0, "error": str(e)}
 
 
+CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
+
+
 @app.post("/api/jobs")
 async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     from tasks import process_youtube_video
-    """Alias de /api/process-url com execução híbrida (Celery + BackgroundTasks local)."""
+    """Dispara processamento: Celery se CELERY_ENABLED=true, senão BackgroundTasks."""
     if req.project_id:
         try:
             supabase.table("projects").update({"status": "processing"}).eq("id", req.project_id).execute()
         except Exception:
             pass
 
-    # 1. Tenta Celery com timeout curto (1.5s) caso Redis esteja rodando
-    try:
-        task = process_youtube_video.apply_async(
-            args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config],
-            connect_timeout=1.5
-        )
-        return {"task_id": task.id, "status": "processing"}
-    except Exception as e:
-        print(f"[jobs] Celery/Redis indisponível ({e}). Executando via BackgroundTasks local!")
+    if CELERY_ENABLED:
+        try:
+            task = process_youtube_video.apply_async(
+                args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config],
+            )
+            print(f"[jobs] Tarefa enfileirada no Celery: {task.id}")
+            return {"task_id": task.id, "status": "processing"}
+        except Exception as e:
+            print(f"[jobs] Celery falhou ({e}), usando BackgroundTasks")
 
-    # 2. Execução direta em background na máquina (infalível mesmo sem Redis)
-    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config)
+    background_tasks.add_task(
+        process_youtube_video,
+        req.url, req.user_id, req.clip_duration,
+        req.project_id, req.remove_silence, req.template_config,
+    )
+    print(f"[jobs] BackgroundTask iniciada para projeto {req.project_id}")
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 

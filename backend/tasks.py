@@ -229,7 +229,7 @@ def parse_vtt_subtitles(vtt_path: Path):
 
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True, template_config: dict | None = None):
-    # Atualiza status imediatamente para processing para a UI avançar e não dar timeout
+    print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
     if project_id:
         try:
             supabase.table("projects").update({"status": "processing"}).eq("id", project_id).execute()
@@ -247,13 +247,26 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
     ydl_opts = {
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': str(tmp_dir / "original.%(ext)s"),
-        'quiet': True,
+        'noprogress': True,
         'noplaylist': True,
         'merge_output_format': 'mp4',
         'writesubtitles': True,
         'writeautomaticsub': True,
         'subtitlesformat': 'vtt',
         'subtitleslangs': ['pt', 'pt-BR', 'pt-pt', 'en'],
+        'socket_timeout': 30,
+        'retries': 3,
+        'fragment_retries': 3,
+        'extractor_retries': 3,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        },
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],
+            },
+        },
     }
 
     try:
@@ -441,14 +454,18 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         return {"status": "success", "project_id": project_id, "title": title}
 
     except Exception as e:
+        import traceback
+        print(f"[pipeline] ERRO ao processar {url}: {type(e).__name__}: {e}")
+        traceback.print_exc()
         if project_id:
             try:
                 supabase.table("projects").update({
-                    "status": "failed", "error_message": str(e)[:1000],
+                    "status": "failed",
+                    "error_message": f"{type(e).__name__}: {str(e)[:900]}",
                 }).eq("id", project_id).execute()
+                print(f"[pipeline] projeto {project_id} marcado como falho")
             except Exception as update_err:
                 print(f"[pipeline] não consegui marcar o projeto {project_id} como falho: {update_err}")
-        print(f"[pipeline] erro processando {url}: {e}")
         return {"status": "error", "message": str(e)}
 
     finally:
