@@ -39,7 +39,8 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
-  Flame
+  Flame,
+  AlertCircle
 } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import Link from 'next/link'
@@ -1112,10 +1113,44 @@ export default function ProjectClient({
       {/* 3. TELA DE ESPERA: processando sem nenhum corte pronto ainda */}
       {status === 'processing' && clips.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center py-20 px-4">
-          <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
-          <p className="mt-5 text-xs text-zinc-500 text-center max-w-sm">
-            O estúdio abrirá automaticamente quando o primeiro corte ficar pronto.
-          </p>
+          {elapsedSecs < 1200 ? (
+            <>
+              <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
+              <p className="mt-5 text-xs text-zinc-500 text-center max-w-sm">
+                O estúdio abrirá automaticamente quando o primeiro corte ficar pronto.
+              </p>
+            </>
+          ) : (
+            /* Timeout de 20 min: pipeline travado — oferece retry automático */
+            <div className="max-w-md w-full bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6 space-y-4 text-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Pipeline demorou demais</h3>
+                <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                  O processamento não foi concluído em 20 minutos — pode ter sido interrompido pelo servidor. Tente novamente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await fetch(`/api/projects/${project.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'failed', error_message: 'Timeout: pipeline não concluído em 20 minutos.' }),
+                    })
+                    setStatus('failed')
+                    setErrorMessage('Timeout: pipeline não concluído em 20 minutos.')
+                  } catch { setStatus('failed') }
+                }}
+                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
         </div>
       )}
 
