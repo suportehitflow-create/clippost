@@ -192,6 +192,14 @@ const ERROR_CATEGORIES: Array<{
     hint: 'Falha ao salvar o vídeo no Supabase Storage. Verifique as permissões do bucket.',
     canRetry: true,
   },
+  {
+    match: e => /durationerror|longo demais|limite.*minuto|minutos por v/i.test(e),
+    label: 'Vídeo muito longo',
+    color: 'orange',
+    icon: '⏱️',
+    hint: 'O vídeo ultrapassa o limite de 30 minutos. Envie um trecho menor ou escolha um vídeo mais curto.',
+    canRetry: false,
+  },
 ]
 
 function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {

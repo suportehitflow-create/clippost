@@ -503,9 +503,13 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         traceback.print_exc()
         if project_id:
             try:
+                msg = str(e)[:900]
+                # Evita duplicar o tipo quando a mensagem já começa com ele (ex: "DurationError: ...")
+                err_type = type(e).__name__
+                error_message = msg if (msg.startswith(err_type) or err_type == "Exception") else f"{err_type}: {msg}"
                 supabase.table("projects").update({
                     "status": "failed",
-                    "error_message": f"{type(e).__name__}: {str(e)[:900]}",
+                    "error_message": error_message,
                 }).eq("id", project_id).execute()
                 print(f"[pipeline] projeto {project_id} marcado como falho")
             except Exception as update_err:
