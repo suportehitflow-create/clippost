@@ -317,15 +317,19 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if mp4_candidates:
             video_path = str(mp4_candidates[0])
 
-        # 2. Upload vídeo raw para Supabase Storage
+        # 2. Upload vídeo raw para Supabase Storage (best-effort, não bloqueia pipeline)
         storage_path = f"{user_id}/{video_id}.mp4"
-        with open(video_path, 'rb') as f:
-            supabase.storage.from_("videos").upload(
-                path=storage_path,
-                file=f.read(),
-                file_options={"content-type": "video/mp4", "upsert": "true"},
-            )
-        raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+        raw_video_url = None
+        try:
+            with open(video_path, 'rb') as f:
+                supabase.storage.from_("videos").upload(
+                    path=storage_path,
+                    file=f.read(),
+                    file_options={"content-type": "video/mp4", "upsert": "true"},
+                )
+            raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+        except Exception as upload_err:
+            print(f"[pipeline] upload vídeo raw falhou (não crítico): {upload_err}")
 
         # 3. Transcrição: Procura legendas nativas do YouTube (.vtt) para Modo Turbo (~15s)
         vtt_candidates = list(tmp_dir.glob("*.vtt"))

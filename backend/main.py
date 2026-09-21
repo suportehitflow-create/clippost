@@ -24,27 +24,41 @@ load_dotenv()
 app = FastAPI(title="clipost API")
 
 
-@app.on_event("startup")
-async def recover_stuck_projects():
-    """Marca como 'failed' projetos que ficaram travados em 'processing'
-    por mais de 8 minutos — causado por redeploys, crashes ou OOM."""
+async def _mark_stuck_projects(label: str = "recovery"):
+    """Marca projetos stuck em 'processing' há mais de 8 minutos como failed."""
     try:
         if not supabase:
             return
-        cutoff = (datetime.now(timezone.utc) - __import__('datetime').timedelta(minutes=8)).isoformat()
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat()
         result = supabase.table("projects") \
             .update({
                 "status": "failed",
-                "error_message": "Pipeline interrompido (redeploy ou timeout do servidor). Clique em Tentar Novamente.",
+                "error_message": "Pipeline interrompido (timeout do servidor). Clique em Tentar Novamente.",
             }) \
             .eq("status", "processing") \
             .lt("created_at", cutoff) \
             .execute()
         rows = result.data or []
         if rows:
-            print(f"[startup] {len(rows)} projeto(s) travado(s) marcado(s) como failed")
+            print(f"[{label}] {len(rows)} projeto(s) travado(s) marcado(s) como failed")
     except Exception as e:
-        print(f"[startup] erro ao limpar projetos travados: {e}")
+        print(f"[{label}] erro ao limpar projetos travados: {e}")
+
+
+async def _periodic_recovery_loop():
+    """Roda a cada 5 minutos para marcar pipelines travados — cobre crashes sem restart."""
+    import asyncio
+    while True:
+        await asyncio.sleep(300)
+        await _mark_stuck_projects("recovery")
+
+
+@app.on_event("startup")
+async def recover_stuck_projects():
+    import asyncio
+    await _mark_stuck_projects("startup")
+    asyncio.create_task(_periodic_recovery_loop())
 
 
 @app.get("/health")
