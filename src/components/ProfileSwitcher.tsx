@@ -22,8 +22,9 @@ const PLATFORM_ICONS: Record<string, string> = {
   youtube_shorts: '▶️',
 }
 
-export default function ProfileSwitcher({ userId }: { userId: string }) {
+export default function ProfileSwitcher({ userId: userIdProp }: { userId?: string }) {
   const supabase = createClient()
+  const [userId, setUserId] = useState<string | null>(userIdProp || null)
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [active, setActive] = useState<SocialAccount | null>(null)
   const [open, setOpen] = useState(false)
@@ -31,12 +32,20 @@ export default function ProfileSwitcher({ userId }: { userId: string }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadAccounts()
+    if (!userIdProp) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) setUserId(data.user.id)
+      })
+    }
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    if (userId) loadAccounts()
   }, [userId])
 
   async function loadAccounts() {

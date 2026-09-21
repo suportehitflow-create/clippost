@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Scissors, CheckCircle2, Loader2, Video, Trash2, ArrowRight, Play } from 'lucide-react'
+import ProfileSwitcher from '@/components/ProfileSwitcher'
 
 interface Project {
   id: string
@@ -95,13 +96,16 @@ export default function CleanDashboard() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
       <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clipost</h1>
-        <Link
-          href="/upload"
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
-        >
-          <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
-        </Link>
+        <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clippost</h1>
+        <div className="flex items-center gap-3">
+          <ProfileSwitcher />
+          <Link
+            href="/upload"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+          >
+            <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
+          </Link>
+        </div>
       </header>
 
       <div className="max-w-5xl w-full mx-auto p-6 md:p-10 space-y-8">
