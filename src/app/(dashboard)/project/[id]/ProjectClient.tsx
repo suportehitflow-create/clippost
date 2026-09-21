@@ -447,6 +447,8 @@ export default function ProjectClient({
   const [status, setStatus] = useState(project.status)
   const [errorMessage, setErrorMessage] = useState<string | null>((project as any).error_message || null)
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
+  // Ref para rastrear contagem de clips sem stale closure no polling
+  const clipsCountRef = useRef(initialClips.length)
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [schedulingAllProject, setSchedulingAllProject] = useState(false)
@@ -734,14 +736,20 @@ export default function ProjectClient({
           }
           if (Array.isArray(data.clips)) {
             localClipsCount = data.clips.length
+            const prevCount = clipsCountRef.current
+            const changed = data.clips.length !== prevCount
+            if (changed) {
+              clipsCountRef.current = data.clips.length
+              // Feedback FORA do updater — chamar setState dentro de setState updater causa TypeError no React
+              if (prevCount === 0 && data.clips.length > 0) {
+                setSelectedClipIndex(0)
+                triggerBulkFeedback('Primeiro corte viral minerado e pronto!')
+              } else if (data.clips.length > prevCount) {
+                triggerBulkFeedback(`Novo corte viral minerado (#${data.clips.length})!`)
+              }
+            }
             setClips(prev => {
               if (data.clips.length !== prev.length || data.clips.some((c: any, i: number) => c.storage_url !== prev[i]?.storage_url)) {
-                if (prev.length === 0 && data.clips.length > 0) {
-                  setSelectedClipIndex(0)
-                  triggerBulkFeedback('Primeiro corte viral minerado e pronto!')
-                } else if (data.clips.length > prev.length) {
-                  triggerBulkFeedback(`Novo corte viral minerado (#${data.clips.length})!`)
-                }
                 return data.clips
               }
               return prev
