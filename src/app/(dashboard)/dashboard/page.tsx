@@ -103,7 +103,7 @@ export default function CleanDashboard() {
           {currentUserId && <ProfileSwitcher userId={currentUserId} />}
           <Link
             href="/upload"
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <Scissors className="w-3.5 h-3.5" /> Criar Novos Cortes
           </Link>
@@ -133,12 +133,12 @@ export default function CleanDashboard() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl">
-              <Loader2 className="w-6 h-6 text-orange-400 animate-spin mb-2" />
+              <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-2" />
               <p className="text-xs text-zinc-400">Carregando seus vídeos...</p>
             </div>
           ) : projects.length === 0 ? (
             <div className="text-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center mx-auto text-white shadow-lg shadow-indigo-500/25">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto text-white">
                 <Video className="w-6 h-6" />
               </div>
               <div>
@@ -149,7 +149,7 @@ export default function CleanDashboard() {
               </div>
               <Link
                 href="/upload"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer"
               >
                 <Scissors className="w-4 h-4" /> Começar Agora
               </Link>

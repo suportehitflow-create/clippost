@@ -160,7 +160,7 @@ export default function CreateClipsPage() {
 
       <div className="max-w-2xl w-full mx-auto p-6 md:p-10 space-y-8">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center mx-auto text-white mb-4 shadow-lg shadow-indigo-500/25">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto text-white mb-4">
             <Scissors className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Criar Cortes 9:16 com IA</h2>
@@ -237,7 +237,7 @@ export default function CreateClipsPage() {
                   { name: 'TikTok', color: 'text-cyan-400 bg-cyan-500/10' },
                   { name: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
                   { name: 'X / Twitter', color: 'text-zinc-300 bg-zinc-500/10' },
-                  { name: 'Twitch', color: 'text-purple-400 bg-purple-500/10' },
+                  { name: 'Twitch', color: 'text-indigo-400 bg-indigo-500/10' },
                 ].map(p => (
                   <span key={p.name} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.color}`}>
                     {p.name}
@@ -334,7 +334,7 @@ export default function CreateClipsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>

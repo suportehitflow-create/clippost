@@ -365,7 +365,7 @@ function PipelineProgress({ elapsedSecs, clipsReady }: { elapsedSecs: number; cl
         {/* barra de progresso geral */}
         <div className="w-full bg-white/[0.06] h-1.5 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000"
+            className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
             style={{ width: `${clipsReady > 0 ? 90 : Math.min(85, (activeIdx / (PIPELINE_STEPS.length - 1)) * 80 + 5)}%` }}
           />
         </div>
@@ -1058,11 +1058,12 @@ export default function ProjectClient({
       </header>
 
       {/* 2. SELETOR RÁPIDO HORIZONTAL DE CORTES (SEGMENTED APPLE) */}
+      {clips.length > 0 && (
       <div className="border-b border-white/[0.06] bg-[#0b0b0e]/40 px-6 py-2 overflow-x-auto scrollbar-none flex items-center gap-2">
         <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap pr-2">
           Cortes:
         </span>
-        {status === 'processing' && clips.length === 0 && (
+        {false && (
           <span className="text-[11px] text-zinc-600 font-mono italic">gerando cortes...</span>
         )}
         {clips.map((clip, idx) => {
@@ -1094,10 +1095,20 @@ export default function ProjectClient({
           )
         })}
       </div>
+      )}
 
-      {/* 3. STUDIO PRINCIPAL: 2 COLUNAS LIMPAS E ESPAÇOSAS */}
-      {/* PAINEL DE PROGRESSO PASSO A PASSO */}
-      {status === 'processing' && (
+      {/* 3. TELA DE ESPERA: processando sem nenhum corte pronto ainda */}
+      {status === 'processing' && clips.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center py-20 px-4">
+          <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
+          <p className="mt-5 text-xs text-zinc-500 text-center max-w-sm">
+            O estúdio abrirá automaticamente quando o primeiro corte ficar pronto.
+          </p>
+        </div>
+      )}
+
+      {/* BANNER DE PROGRESSO: processando com clips já disponíveis */}
+      {status === 'processing' && clips.length > 0 && (
         <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
       )}
 
@@ -1111,6 +1122,8 @@ export default function ProjectClient({
         />
       )}
 
+      {/* STUDIO: exibido apenas quando há cortes prontos */}
+      {clips.length > 0 && (
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* COLUNA ESQUERDA (5 COLUNAS): PLAYER DO IPHONE 16 PRO */}
@@ -1454,7 +1467,7 @@ export default function ProjectClient({
                 <button
                   type="button"
                   onClick={() => setShowMagneticSuggestions(!showMagneticSuggestions)}
-                  className="text-xs text-orange-400 hover:text-orange-300 font-medium flex items-center gap-1 cursor-pointer"
+                  className="text-xs text-zinc-400 hover:text-white font-medium flex items-center gap-1 cursor-pointer"
                 >
                   <Wand2 className="w-3 h-3" />
                   <span>Sugerir Ganchos</span>
@@ -1465,7 +1478,7 @@ export default function ProjectClient({
                 value={displayedTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
                 placeholder="Digite o título do corte..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] focus:border-orange-500/50 text-sm text-white focus:outline-none transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] focus:border-indigo-500/50 text-sm text-white focus:outline-none transition-all"
               />
             </div>
 
@@ -1501,7 +1514,7 @@ export default function ProjectClient({
                 target="_blank"
                 rel="noopener noreferrer"
                 download={!!activeClip.storage_url}
-                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-500/20"
+                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Baixar Vídeo</span>
@@ -1845,7 +1858,7 @@ export default function ProjectClient({
                           <span>{formatDuration(Math.floor(duration))}</span>
                           <span>•</span>
                           <span className={`${
-                            scoreP >= 90 ? 'text-emerald-400' : 'text-orange-400'
+                            scoreP >= 90 ? 'text-emerald-400' : 'text-indigo-400'
                           }`}>
                             {scoreP}% Viral
                           </span>
@@ -1876,6 +1889,7 @@ export default function ProjectClient({
         </div>
 
       </main>
+      )}
 
       {/* MODAL APPLE VIRALITY SCORE (MOTIVO COMPLETO) */}
       {viralityModalMetrics && (
