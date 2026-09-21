@@ -237,6 +237,37 @@ def _set_step(pid: str | None, step: str):
         pass
 
 
+def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
+    """Fallback de download via cobalt quando yt-dlp é bloqueado pelo YouTube."""
+    cobalt_base = os.environ.get("COBALT_URL", "https://clippost-cobalt.fly.dev")
+    print(f"[cobalt] tentando download via cobalt: {cobalt_base}")
+    resp = httpx.post(
+        f"{cobalt_base}/",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        json={"url": url, "videoQuality": "1080", "youtubeVideoCodec": "h264", "downloadMode": "auto"},
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") == "error":
+        code = (data.get("error") or {}).get("code", "unknown")
+        raise Exception(f"CobaltError: {code}")
+
+    download_url = data.get("url")
+    if not download_url:
+        raise Exception("CobaltError: sem URL de download na resposta")
+
+    video_path = tmp_dir / "original.mp4"
+    print(f"[cobalt] baixando de {download_url[:80]}...")
+    with httpx.stream("GET", download_url, timeout=300.0, follow_redirects=True) as stream:
+        stream.raise_for_status()
+        with open(video_path, "wb") as f:
+            for chunk in stream.iter_bytes(chunk_size=1024 * 1024):
+                f.write(chunk)
+    print(f"[cobalt] download OK — {video_path.stat().st_size // 1024}KB")
+    return str(video_path), {}
+
+
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True, template_config: dict | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
@@ -311,11 +342,40 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except yt_dlp.utils.DownloadError as de:
             err = str(de).lower()
             if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig")):
-                raise Exception(
-                    "YouTubeBlockError: YouTube bloqueou o download (detecção de bot ou restrição de idade). "
-                    "Tente novamente em alguns minutos ou use outro vídeo."
-                )
-            raise
+                print(f"[pipeline] yt-dlp bloqueado — tentando cobalt como fallback...")
+                try:
+                    video_path, _ = _download_via_cobalt(url, tmp_dir)
+                    # Extrair info básica sem re-download
+                    mp4_check_cobalt = list(tmp_dir.glob("*.mp4"))
+                    if not mp4_check_cobalt:
+                        raise Exception("cobalt não gerou arquivo")
+                    video_id = "cobalt"
+                    title = url.split("v=")[-1].split("&")[0] if "v=" in url else "video"
+                    video_duration = None  # será detectado via ffprobe abaixo
+                    print(f"[pipeline] cobalt OK — prosseguindo pipeline")
+                except Exception as cobalt_err:
+                    print(f"[pipeline] cobalt também falhou: {cobalt_err}")
+                    raise Exception(
+                        "YouTubeBlockError: YouTube bloqueou o download e o fallback também falhou. "
+                        "Configure os cookies do YouTube ou tente novamente mais tarde."
+                    )
+            else:
+                raise
+
+        # Detecta duração via ffprobe se não disponível (download via cobalt)
+        if video_duration is None:
+            mp4_list = list(tmp_dir.glob("*.mp4"))
+            if mp4_list:
+                try:
+                    probe = subprocess.run(
+                        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", mp4_list[0]],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    import json as _json
+                    fmt = _json.loads(probe.stdout).get("format", {})
+                    video_duration = float(fmt.get("duration", 0)) or None
+                except Exception:
+                    pass
 
         # Verifica se o arquivo foi realmente baixado
         mp4_check = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
