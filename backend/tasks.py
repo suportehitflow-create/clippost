@@ -236,10 +236,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as e:
             print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
 
-    try:
-        check_clip_limit(user_id)
-    except Exception as limit_err:
-        print(f"[tasks] check_clip_limit warning: {limit_err}")
+    check_clip_limit(user_id)  # levanta Exception se limite gratuito atingido
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_"))
     video_path = str(tmp_dir / "original.mp4")
     audio_path = str(tmp_dir / "audio.mp3")
@@ -281,6 +278,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
     }
 
     try:
+        # Timeout global de 15 minutos para o pipeline inteiro (Linux/Fly.io)
+        import signal as _signal
+        def _timeout_handler(signum, frame):
+            raise TimeoutError("TimeoutError: pipeline excedeu 15 minutos — vídeo muito longo ou Whisper travou")
+        try:
+            _signal.signal(_signal.SIGALRM, _timeout_handler)
+            _signal.alarm(900)  # 15 minutos
+        except (AttributeError, OSError):
+            pass  # Windows não tem SIGALRM
+
         # 1. Download do vídeo (sem legendas — evita 429 fatal nas subs)
         print(f"[pipeline] baixando vídeo: {url[:80]}")
         with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
@@ -296,6 +303,15 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if not mp4_check:
             raise Exception(f"yt-dlp não gerou arquivo de vídeo para '{title}'")
 
+        # Rejeita vídeos muito longos (evita Whisper demorar horas)
+        MAX_DURATION_SECS = 30 * 60  # 30 minutos
+        if video_duration and video_duration > MAX_DURATION_SECS:
+            raise Exception(
+                f"DurationError: vídeo longo demais ({int(video_duration // 60)} min). "
+                "Limite máximo: 30 minutos por vídeo."
+            )
+        print(f"[pipeline] vídeo baixado OK — duração: {int((video_duration or 0) // 60)}min {int((video_duration or 0) % 60)}s")
+
         # 1b. Tenta buscar legendas separadamente (falha silenciosa → Whisper)
         print(f"[pipeline] buscando legendas nativas (best-effort)...")
         try:
@@ -303,6 +319,11 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 ydl.extract_info(url, download=True)
         except Exception as sub_err:
             print(f"[pipeline] legendas nativas indisponíveis ({sub_err}), usando Whisper")
+
+        # Localiza o arquivo de vídeo final mesclado (pode ser .mkv ou .webm se merge falhou)
+        mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4")) or list(tmp_dir.glob("*.mkv")) or list(tmp_dir.glob("*.webm"))
+        if mp4_candidates:
+            video_path = str(mp4_candidates[0])
 
         # 2. Upload vídeo raw para Supabase Storage
         storage_path = f"{user_id}/{video_id}.mp4"
@@ -313,11 +334,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 file_options={"content-type": "video/mp4", "upsert": "true"},
             )
         raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
-
-        # Localiza o arquivo de vídeo final mesclado
-        mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4"))
-        if mp4_candidates:
-            video_path = str(mp4_candidates[0])
 
         # 3. Transcrição: Procura legendas nativas do YouTube (.vtt) para Modo Turbo (~15s)
         vtt_candidates = list(tmp_dir.glob("*.vtt"))
@@ -330,16 +346,20 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 print(f"[tasks] falha ao ler legenda nativa .vtt: {e}")
 
         if not transcript_data or not transcript_data.get("segments"):
-            # Fallback transparente para extração de áudio + Whisper
+            # Fallback: extração de áudio + Whisper tiny (3x mais rápido que base)
+            print(f"[pipeline] sem legendas nativas — extraindo áudio para Whisper...")
             subprocess.run([
                 "ffmpeg", "-y", "-i", video_path,
                 "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k", "-f", "mp3",
                 audio_path,
-            ], check=True, capture_output=True)
+            ], check=True, capture_output=True, timeout=300)  # 5 min max
 
             from faster_whisper import WhisperModel
-            model = WhisperModel("base", device="cpu", compute_type="int8")
-            fw_segments, _ = model.transcribe(audio_path, word_timestamps=True)
+            print(f"[pipeline] iniciando transcrição Whisper tiny...")
+            model = WhisperModel("tiny", device="cpu", compute_type="int8")
+            fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+            fw_segments = list(fw_segments_gen)  # força avaliação completa agora
+            print(f"[pipeline] Whisper concluído — {len(fw_segments)} segmentos transcritos")
 
             segments = []
             words = []
@@ -373,7 +393,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             project_id = db_response.data[0]['id']
 
         # 6. AI Curator — detectar momentos virais
+        print(f"[pipeline] transcrição: {len(segments)} segmentos — enviando para IA Curator...")
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
+        print(f"[pipeline] IA Curator retornou {len(clips_meta)} clipes candidatos")
 
                 # Brand Kit e Template Ativo do Usuário (100% integrado)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
@@ -450,7 +472,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         # Atualizar status final
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
-        increment_clips_used(user_id)
+        try:
+            increment_clips_used(user_id)
+        except Exception as inc_err:
+            print(f"[pipeline] increment_clips_used falhou (não crítico): {inc_err}")
 
         # Auto-publish: se o perfil tiver auto_publish ativado, agenda os clipes no perfil ativo
         try:
@@ -496,4 +521,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         return {"status": "error", "message": str(e)}
 
     finally:
+        # Cancela o timeout global (deve estar no finally para cobrir exceções também)
+        try:
+            _signal.alarm(0)
+        except (AttributeError, OSError, NameError):
+            pass
         shutil.rmtree(tmp_dir, ignore_errors=True)

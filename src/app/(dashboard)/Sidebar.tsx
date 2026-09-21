@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Scissors,
+  Flame,
+  PenTool,
   Layers,
   Sparkles,
   Zap,
@@ -16,6 +18,8 @@ import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
+  { label: 'Radar Viral', href: '/trends', icon: Flame },
+  { label: 'Roteiros IA', href: '/creator', icon: PenTool },
   { label: 'Edição em Massa', href: '/bulk', icon: Layers },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Autopilot', href: '/autopilot', icon: Zap },

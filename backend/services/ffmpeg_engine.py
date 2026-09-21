@@ -15,6 +15,8 @@ def _download_avatar(url: str, dest_dir: str) -> str | None:
     if not url:
         return None
     try:
+        import socket
+        socket.setdefaulttimeout(8)
         ext = url.split("?")[0].rsplit(".", 1)[-1] or "png"
         dest = os.path.join(dest_dir, f"avatar.{ext}")
         urllib.request.urlretrieve(url, dest)
@@ -22,6 +24,27 @@ def _download_avatar(url: str, dest_dir: str) -> str | None:
     except Exception as e:
         print(f"[ffmpeg_engine] avatar download falhou: {e}")
         return None
+
+
+def _detect_hdr_filter(video_path: str) -> str:
+    """Detecta se o video de entrada esta em HDR (HLG smpte2084 ou arib-std-b67) e aplica tone-mapping para Rec.709 SDR."""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=color_transfer,color_space,color_primaries",
+            "-of", "json", video_path
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        import json
+        data = json.loads(res.stdout)
+        streams = data.get("streams") or [{}]
+        color_transfer = streams[0].get("color_transfer", "")
+        if color_transfer in ("smpte2084", "arib-std-b67"):
+            print(f"[ffmpeg_engine] HDR detectado ({color_transfer}) -> aplicando tone-mapping para Rec.709 SDR")
+            return "zscale=t=linear:npl=100,tonemap=tonemap=hable:desat=0.5,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
+    except Exception as e:
+        print(f"[ffmpeg_engine] aviso ffprobe hdr check: {e}")
+    return ""
 
 
 def create_vertical_clip(
@@ -100,6 +123,9 @@ def create_vertical_clip(
 
         # Transformações adicionais do vídeo (hflip, speed)
         vbox_filters = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}", f"scale={target_w}:{target_h}"]
+        hdr_filter = _detect_hdr_filter(input_video)
+        if hdr_filter:
+            vbox_filters.insert(0, hdr_filter)
         if hflip:
             vbox_filters.append("hflip")
         if speed and speed != 1.0:
@@ -240,7 +266,7 @@ def create_vertical_clip(
             ]
         )
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
         if result.returncode != 0:
             print(f"[ffmpeg_engine] filter_complex falhou, tentando fallback simples:\n{result.stderr[-800:]}")
             _simple_render(input_video, output_video, start, duration)

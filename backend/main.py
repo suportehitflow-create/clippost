@@ -705,3 +705,38 @@ async def scrape_profile_reels(req: ProfileScrapeRequest):
         },
         "items": items,
     }
+
+# ==========================================
+# Rotas: Radar de Tendências & Creator Studio
+# ==========================================
+from services.trends_service import get_trend_categories, explore_trends
+from services.creator_service import get_creator_templates, generate_ai_script
+
+@app.get("/api/trends/categories")
+async def api_trend_categories():
+    return {"categories": get_trend_categories()}
+
+@app.get("/api/trends/explore")
+async def api_explore_trends(category: str = "all", query: str = ""):
+    return {"items": explore_trends(category=category, query=query)}
+
+class ScriptRequest(BaseModel):
+    topic: str
+    template_id: str = "hormozi"
+    tone: str = "Direto e enérgico"
+    duration_secs: int = 45
+    target_audience: str = "Empreendedores e Criadores"
+
+@app.get("/api/creator/templates")
+async def api_creator_templates():
+    return {"templates": get_creator_templates()}
+
+@app.post("/api/creator/generate-script")
+async def api_generate_script(req: ScriptRequest):
+    return generate_ai_script(
+        topic=req.topic,
+        template_id=req.template_id,
+        tone=req.tone,
+        duration_secs=req.duration_secs,
+        target_audience=req.target_audience
+    )
