@@ -38,28 +38,6 @@ jobs:
           npm i -g vercel@latest
           vercel --token "$VERCEL_TOKEN" --prod --yes 2>&1
 
-        - name: Verify health
-        run: |
-          sleep 30
-          FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
-          echo "Fly.io health: $FLY_STATUS"
-          [ "$FLY_STATUS" = "200" ] && echo "Backend OK" || echo "Backend not responding yet"
-
-  deploy-cobalt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy Cobalt (Fly.io)
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          curl -L https://fly.io/install.sh | sh
-          export PATH="$HOME/.fly/bin:$PATH"
-          cd cobalt
-          flyctl deploy --remote-only --ha=false
-
   deploy-backend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -81,3 +59,18 @@ jobs:
           FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
           echo "Fly.io health: $FLY_STATUS"
           [ "$FLY_STATUS" = "200" ] && echo "Backend OK" || echo "Backend not responding yet"
+
+  deploy-cobalt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Cobalt (Fly.io)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export PATH="$HOME/.fly/bin:$PATH"
+          cd cobalt
+          flyctl deploy --remote-only --ha=false
