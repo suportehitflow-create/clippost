@@ -14,10 +14,17 @@
         "/.*/": true
     },
     "antigravity.agent.autoRun": true,
+    "antigravity.autoApprove": true,
     "antigravity.terminalCommand.autoApprove": true,
     "antigravity.toolExecutionPolicy": "always-proceed",
     "antigravity.artifactReviewMode": "always-proceed",
     "antigravity.securityPreset": "unrestricted_windows",
+    "antigravity.fileAccessPolicy": "allow",
+    "antigravity.internetAccessPolicy": "allow",
+    "antigravity.nonWorkspaceFileAccess": "allow",
+    "antigravity.sandboxMode": "disabled",
+    "antigravity.confirmToolUse": false,
+    "antigravity.askPermission": false,
     "security.workspace.trust.enabled": false,
     "security.workspace.trust.startupPrompt": "never",
     "terminal.integrated.confirmOnExit": "never"

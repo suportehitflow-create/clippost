@@ -127,6 +127,72 @@ const PIPELINE_STEPS = [
   { label: 'Criando cortes 9:16', detail: 'FFmpeg renderizando com legenda', thresholdSecs: 160 },
 ]
 
+const ERROR_CATEGORIES: Array<{
+  match: (e: string) => boolean
+  label: string
+  color: string
+  icon: string
+  hint: string
+  canRetry: boolean
+}> = [
+  {
+    match: e => /sign in|bot|confirm|po.?token|nsig/i.test(e),
+    label: 'Bloqueio anti-bot do YouTube',
+    color: 'amber',
+    icon: '🤖',
+    hint: 'O YouTube detectou que o download veio de um servidor. Tente novamente — na segunda tentativa costuma funcionar (cliente iOS/tv_embedded).',
+    canRetry: true,
+  },
+  {
+    match: e => /unavailable|private|removed|age.?restrict|login.?required/i.test(e),
+    label: 'Vídeo indisponível',
+    color: 'orange',
+    icon: '🔒',
+    hint: 'O vídeo é privado, removido, tem restrição de idade ou não está disponível na região do servidor.',
+    canRetry: false,
+  },
+  {
+    match: e => /429|rate.?limit|too many/i.test(e),
+    label: 'Limite de requisições (429)',
+    color: 'amber',
+    icon: '⏳',
+    hint: 'O YouTube está bloqueando temporariamente. Aguarde alguns minutos e tente novamente.',
+    canRetry: true,
+  },
+  {
+    match: e => /timeout|socket|connection|timed out/i.test(e),
+    label: 'Timeout de conexão',
+    color: 'zinc',
+    icon: '🔌',
+    hint: 'A conexão com o YouTube expirou. O servidor pode estar sobrecarregado. Tente novamente.',
+    canRetry: true,
+  },
+  {
+    match: e => /openai|anthropic|claude|api.*key|quota/i.test(e),
+    label: 'Erro na API de IA',
+    color: 'purple',
+    icon: '🧠',
+    hint: 'Falha ao chamar a IA (Claude/OpenAI). Verifique se a chave de API está configurada no Fly.io.',
+    canRetry: false,
+  },
+  {
+    match: e => /ffmpeg|render|clip|vertical/i.test(e),
+    label: 'Erro ao renderizar corte',
+    color: 'red',
+    icon: '🎬',
+    hint: 'O FFmpeg falhou ao criar o vídeo 9:16. Pode ser falta de memória no servidor.',
+    canRetry: true,
+  },
+  {
+    match: e => /supabase|storage|bucket|upload/i.test(e),
+    label: 'Erro de armazenamento',
+    color: 'blue',
+    icon: '💾',
+    hint: 'Falha ao salvar o vídeo no Supabase Storage. Verifique as permissões do bucket.',
+    canRetry: true,
+  },
+]
+
 function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
   projectId: string
   sourceUrl: string | null
@@ -134,80 +200,118 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
   onRetrying: () => void
 }) {
   const [retrying, setRetrying] = useState(false)
-  const [retryMsg, setRetryMsg] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const errLower = (errorMessage || '').toLowerCase()
+  const category = ERROR_CATEGORIES.find(c => c.match(errLower)) || {
+    label: 'Erro inesperado',
+    color: 'red',
+    icon: '❌',
+    hint: 'Ocorreu um erro não categorizado. Copie o código abaixo e compartilhe para diagnóstico.',
+    canRetry: true,
+  }
 
   async function handleRetry() {
     if (!sourceUrl) return
     setRetrying(true)
-    setRetryMsg('')
     try {
-      // Atualiza status para processing no Supabase antes de resubmeter
       await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'processing', error_message: null }),
       }).catch(() => null)
-
-      const res = await fetch('/api/jobs', {
+      await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: sourceUrl, project_id: projectId }),
       })
-      if (res.ok) {
-        onRetrying()
-        setRetryMsg('Reprocessando...')
-      } else {
-        setRetryMsg('Erro ao reenviar. Tente novamente.')
-      }
+      onRetrying()
     } catch {
-      setRetryMsg('Erro de conexão.')
+      // silently fail — status will stay failed
     }
     setRetrying(false)
   }
 
-  const isYouTubeBot = errorMessage?.toLowerCase().includes('sign in') || errorMessage?.toLowerCase().includes('bot')
-  const isUnavailable = errorMessage?.toLowerCase().includes('unavailable') || errorMessage?.toLowerCase().includes('private')
-  const isTimeout = errorMessage?.toLowerCase().includes('timeout') || errorMessage?.toLowerCase().includes('socket')
+  function copyError() {
+    const text = `Erro Clippost — ${new Date().toLocaleString('pt-BR')}\nProjeto: ${projectId}\nURL: ${sourceUrl || '—'}\nCategoria: ${category.label}\nDetalhe: ${errorMessage || '(sem detalhe)'}`
+    navigator.clipboard.writeText(text).catch(() => null)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
 
-  const hint = isYouTubeBot
-    ? 'O YouTube bloqueou o download automático. Tente novamente (às vezes funciona na segunda tentativa) ou use um vídeo de canal menor.'
-    : isUnavailable
-    ? 'O vídeo pode ser privado, com restrição de idade ou removido.'
-    : isTimeout
-    ? 'Timeout de conexão. O servidor pode estar sobrecarregado. Tente novamente.'
-    : 'Ocorreu um erro inesperado durante o processamento.'
+  const colorMap: Record<string, string> = {
+    amber:  'bg-amber-500/10 border-amber-500/25 text-amber-300',
+    orange: 'bg-orange-500/10 border-orange-500/25 text-orange-300',
+    red:    'bg-red-500/10 border-red-500/25 text-red-300',
+    purple: 'bg-purple-500/10 border-purple-500/25 text-purple-300',
+    blue:   'bg-blue-500/10 border-blue-500/25 text-blue-300',
+    zinc:   'bg-zinc-500/10 border-zinc-500/25 text-zinc-300',
+  }
+  const colorClass = colorMap[category.color] || colorMap.red
 
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
-      <div className="bg-red-950/20 border border-red-500/25 rounded-2xl p-5 space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center shrink-0 mt-0.5">
-            <X className="w-4.5 h-4.5 text-red-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-red-300">Processamento falhou</span>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">{hint}</p>
-            {errorMessage && (
-              <div className="mt-2 px-3 py-2 rounded-lg bg-black/40 border border-white/[0.06]">
-                <span className="text-[10px] font-mono text-zinc-500 break-all leading-relaxed">{errorMessage}</span>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className={`border rounded-2xl p-5 space-y-4 ${colorClass}`}>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Cabeçalho da categoria */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl leading-none mt-0.5 select-none">{category.icon}</span>
+            <div>
+              <span className="text-sm font-bold text-white">{category.label}</span>
+              <p className="text-xs text-zinc-300 mt-0.5 leading-relaxed max-w-xl">{category.hint}</p>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={handleRetry}
-            disabled={retrying || !sourceUrl}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+            onClick={copyError}
+            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.10] text-zinc-400 hover:text-white text-[11px] font-medium transition-all cursor-pointer border border-white/[0.08]"
+            title="Copiar erro para diagnóstico"
           >
-            {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-            {retrying ? 'Reprocessando...' : 'Tentar novamente'}
+            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copiado!' : 'Copiar erro'}
           </button>
-          {retryMsg && <span className="text-xs text-zinc-400">{retryMsg}</span>}
+        </div>
+
+        {/* Código de erro técnico */}
+        {errorMessage ? (
+          <div className="rounded-xl bg-black/50 border border-white/[0.08] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Código de erro do servidor</span>
+              <span className="text-[10px] font-mono text-zinc-600">{new Date().toLocaleTimeString('pt-BR')}</span>
+            </div>
+            <pre className="px-3 py-3 text-[11px] font-mono text-zinc-300 break-all whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
+              {errorMessage}
+            </pre>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-black/40 border border-white/[0.06] px-3 py-2.5">
+            <span className="text-[11px] font-mono text-zinc-600 italic">Nenhum detalhe retornado pelo servidor. Verifique os logs do Fly.io.</span>
+          </div>
+        )}
+
+        {/* Ações */}
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          {category.canRetry && (
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying || !sourceUrl}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+            >
+              {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+              {retrying ? 'Reprocessando...' : 'Tentar novamente'}
+            </button>
+          )}
+          <Link
+            href="/upload"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-zinc-300 text-xs font-medium transition-all"
+          >
+            <Scissors className="w-3.5 h-3.5" /> Novo vídeo
+          </Link>
+          <span className="text-[10px] text-zinc-600 font-mono ml-auto hidden sm:block">
+            projeto: {projectId.slice(0, 8)}…
+          </span>
         </div>
       </div>
     </div>
@@ -336,6 +440,7 @@ export default function ProjectClient({
 
   const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
+  const [errorMessage, setErrorMessage] = useState<string | null>((project as any).error_message || null)
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
   const [qrModalClip, setQrModalClip] = useState<{ title: string; url: string } | null>(null)
   const [copiedUrl, setCopiedUrl] = useState(false)
@@ -617,6 +722,7 @@ export default function ProjectClient({
           const data = await res.json()
           if (data.project) {
             setStatus(data.project.status)
+            if (data.project.error_message != null) setErrorMessage(data.project.error_message)
           }
           if (Array.isArray(data.clips)) {
             setClips(prev => {
@@ -1000,8 +1106,8 @@ export default function ProjectClient({
         <FailedPanel
           projectId={project.id}
           sourceUrl={project.source_url}
-          errorMessage={(project as any).error_message}
-          onRetrying={() => setStatus('processing')}
+          errorMessage={errorMessage}
+          onRetrying={() => { setStatus('processing'); setErrorMessage(null) }}
         />
       )}
 
