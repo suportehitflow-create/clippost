@@ -172,7 +172,10 @@ Retorne ESTRITAMENTE um array JSON válido contendo exatamente 3 objetos, sem ma
 
     if not raw and os.environ.get("ANTHROPIC_API_KEY"):
         print("[ai_curator] usando Anthropic como reserva")
-        raw = _call_anthropic(prompt)
+        try:
+            raw = _call_anthropic(prompt)
+        except Exception as e:
+            print(f"[ai_curator] Anthropic também falhou: {e}")
 
     if not raw:
         print("[ai_curator] nenhum provedor disponível")
