@@ -114,6 +114,7 @@ export default function SettingsPage() {
 
   async function toggleAutoPublish(val: boolean) {
     setAutoPublish(val)
+    try { localStorage.setItem('clippost_auto_publish', String(val)) } catch {}
     if (userId) {
       try {
         await supabase.from('profiles').update({ auto_publish: val }).eq('id', userId)

@@ -130,8 +130,6 @@ const CATEGORIES = [
   { id: 'humor', label: 'Humor & Entretenimento', icon: Smile },
 ]
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://clippost-backend.fly.dev'
-
 export default function TrendsPage() {
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -143,7 +141,7 @@ export default function TrendsPage() {
     try {
       const params = new URLSearchParams({ category })
       if (query.trim()) params.set('query', query.trim())
-      const res = await fetch(`${BACKEND}/api/trends/explore?${params}`)
+      const res = await fetch(`/api/trends/explore?${params}`)
       if (res.ok) {
         const data = await res.json()
         if (Array.isArray(data.items) && data.items.length > 0) {

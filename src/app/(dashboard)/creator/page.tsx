@@ -127,62 +127,47 @@ export default function CreatorPage() {
     ],
   })
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true)
-    setTimeout(() => {
-      // Simulação local veloz ou conexão com backend
-      let generatedHook = `Se você fizer isso sobre ${topic} da forma tradicional, você vai falhar.`
-      if (selectedTemplate === 'storytelling') {
-        generatedHook = `O dia que eu descobri esse segredo sobre ${topic}, nunca mais precisei trabalhar da mesma forma.`
-      } else if (selectedTemplate === 'news_tech') {
-        generatedHook = `Acabou de ser lançado um método revolucionário de ${topic} e quase ninguém viu.`
+    try {
+      const res = await fetch('/api/creator/generate-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          template_id: selectedTemplate,
+          tone,
+          duration_secs: durationSecs,
+          target_audience: targetAudience,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setScript(data)
+      } else {
+        throw new Error('Erro no servidor')
       }
-
+    } catch {
+      // fallback local rápido
+      const hook = `Se você fizer isso sobre ${topic} da forma tradicional, você vai falhar.`
       setScript({
-        topic: topic,
+        topic,
         title: `Roteiro Viral: ${topic}`,
-        hook: generatedHook,
-        tone: tone,
+        hook,
+        tone,
         total_duration_secs: durationSecs,
         total_words: Math.round(durationSecs * 2.2),
         estimated_retention_score: 96,
         scenes: [
-          {
-            time: '00:00 - 00:03',
-            label: 'Gancho Irresistível (Hook)',
-            spoken_text: generatedHook,
-            b_roll: 'Zoom in no rosto do apresentador com texto em negrito de alto contraste.',
-            sound_fx: 'Woosh pesado + efeito de parada repentina.',
-            duration: 3,
-          },
-          {
-            time: '00:04 - 00:18',
-            label: 'O Problema Oculto',
-            spoken_text: `A maioria das pessoas tenta resolver ${topic} gastando tempo e dinheiro desnecessários, sem perceber o gargalo real do processo.`,
-            b_roll: 'Exemplo visual de erro comum ou pessoa confusa na frente do monitor.',
-            sound_fx: 'Trilha sonora moderna com batida contínua.',
-            duration: 14,
-          },
-          {
-            time: '00:19 - 00:35',
-            label: 'A Solução em 3 Etapas',
-            spoken_text: 'Aqui está a fórmula: Primeiro identifique a demanda. Segundo automatize a produção repetitiva. Terceiro distribua o resultado com consistência diária.',
-            b_roll: 'Ícones animados subindo com os 3 passos em destaque.',
-            sound_fx: 'Pop de confirmação a cada passo.',
-            duration: 16,
-          },
-          {
-            time: '00:36 - 00:45',
-            label: 'Fechamento & Chamada',
-            spoken_text: 'Compartilhe com quem precisa ver isso hoje e clique em salvar para consultar depois.',
-            b_roll: 'Animação de botão de compartilhamento e follow.',
-            sound_fx: 'Efeito sonoro de sino final.',
-            duration: 9,
-          },
+          { time: '00:00 - 00:03', label: 'Gancho', spoken_text: hook, b_roll: 'Zoom in dramático.', sound_fx: 'Impacto grave.', duration: 3 },
+          { time: '00:04 - 00:18', label: 'O Problema', spoken_text: `A maioria falha com ${topic} por um motivo simples: insiste no método errado.`, b_roll: 'Pessoa frustrada no monitor.', sound_fx: 'Trilha com batida contínua.', duration: 14 },
+          { time: '00:19 - 00:35', label: 'A Solução', spoken_text: 'Passo 1: identifique o gargalo. Passo 2: automatize. Passo 3: distribua com consistência diária.', b_roll: 'Ícones dos 3 passos.', sound_fx: 'Pop de confirmação.', duration: 16 },
+          { time: '00:36 - 00:45', label: 'Chamada', spoken_text: 'Salve esse vídeo e aplique hoje.', b_roll: 'Botão de salvar animado.', sound_fx: 'Sino final.', duration: 9 },
         ],
       })
+    } finally {
       setIsGenerating(false)
-    }, 600)
+    }
   }
 
   const handleCopy = () => {

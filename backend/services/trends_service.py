@@ -3,7 +3,62 @@ Trends & Viral Radar Service
 Descobre, agrega e ranqueia tendências de vídeos e temas virais para conversão em cortes.
 Inspirado na arquitetura do Agent-Reach e Scrapling.
 """
+import os
 from typing import List, Dict, Any
+
+_YT_CATEGORY_MAP = {
+    "podcasts": "25",   # News & Politics
+    "business": "22",   # People & Blogs
+    "tech_ai": "28",    # Science & Technology
+    "mindset": "26",    # Howto & Style
+    "humor": "23",      # Comedy
+    "all": None,
+}
+
+
+def _fetch_youtube_trending(category_id: str | None, max_results: int = 12) -> List[Dict]:
+    """Busca vídeos em alta via YouTube Data API v3. Requer YOUTUBE_API_KEY no ambiente."""
+    api_key = os.environ.get("YOUTUBE_API_KEY")
+    if not api_key:
+        return []
+    try:
+        import httpx
+        params = {
+            "part": "snippet,statistics",
+            "chart": "mostPopular",
+            "regionCode": "BR",
+            "maxResults": max_results,
+            "key": api_key,
+        }
+        if category_id:
+            params["videoCategoryId"] = category_id
+        r = httpx.get("https://www.googleapis.com/youtube/v3/videos", params=params, timeout=8)
+        r.raise_for_status()
+        items = []
+        for v in r.json().get("items", []):
+            sn = v.get("snippet", {})
+            st = v.get("statistics", {})
+            vid_id = v.get("id", "")
+            views = int(st.get("viewCount", 0))
+            duration_str = "?"
+            items.append({
+                "id": f"yt-{vid_id}",
+                "title": sn.get("title", ""),
+                "channel": sn.get("channelTitle", ""),
+                "platform": "youtube",
+                "url": f"https://www.youtube.com/watch?v={vid_id}",
+                "thumbnail": (sn.get("thumbnails", {}).get("high") or sn.get("thumbnails", {}).get("default") or {}).get("url", ""),
+                "views": views,
+                "virality_score": min(99, max(70, int(views / 50000))),
+                "estimated_clips": max(2, min(12, views // 500000 + 2)),
+                "category": category_id or "all",
+                "hook_analysis": sn.get("description", "")[:120] or "Vídeo em alta no Brasil agora.",
+                "duration_str": duration_str,
+            })
+        return items
+    except Exception as e:
+        print(f"[trends] YouTube API falhou: {e}")
+        return []
 
 TREND_CATEGORIES = [
     {
@@ -183,21 +238,11 @@ def get_trend_categories() -> List[Dict[str, Any]]:
 
 
 def explore_trends(category: str | None = None, query: str | None = None) -> List[Dict[str, Any]]:
-    """Retorna itens em alta, filtrados por categoria ou termo de busca."""
-    all_items = []
-    for cat_items in CURATED_TRENDS.values():
-        all_items.extend(cat_items)
+    """Retorna itens em alta: YouTube Data API v3 (se YOUTUBE_API_KEY) ou CURATED_TRENDS."""
 
-    if category and category in CURATED_TRENDS:
-        items = CURATED_TRENDS[category]
-    elif category == "all" or not category:
-        items = all_items
-    else:
-        items = all_items
-
+    # Link direto → retorna imediatamente
     if query and query.strip():
         q = query.lower().strip()
-        # Se for link direto, tenta extrair metadados imediatos
         if "youtube.com" in q or "youtu.be" in q or "instagram.com" in q:
             return [{
                 "id": "custom-input",
@@ -213,6 +258,28 @@ def explore_trends(category: str | None = None, query: str | None = None) -> Lis
                 "hook_analysis": "Vídeo sob demanda pronto para processamento com IA.",
                 "duration_str": "Custom",
             }]
+
+    # Tenta YouTube Data API v3 com dados reais
+    yt_category_id = _YT_CATEGORY_MAP.get(category or "all")
+    live_items = _fetch_youtube_trending(yt_category_id, max_results=12)
+    if live_items:
+        if query:
+            q = query.lower().strip()
+            live_items = [it for it in live_items if q in it["title"].lower() or q in it["channel"].lower()]
+        return live_items
+
+    # Fallback: CURATED_TRENDS
+    all_items = []
+    for cat_items in CURATED_TRENDS.values():
+        all_items.extend(cat_items)
+
+    if category and category in CURATED_TRENDS:
+        items = list(CURATED_TRENDS[category])
+    else:
+        items = all_items
+
+    if query and query.strip():
+        q = query.lower().strip()
         items = [it for it in items if q in it["title"].lower() or q in it["channel"].lower()]
 
     return items

@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const body = await req.json()
-    const flyUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
 
-    const res = await fetch(`${flyUrl}/api/clips/${id}/re-render`, {
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const res = await fetch(`${BACKEND}/api/creator/generate-script`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const data = await res.json().catch(() => ({}))
+    const data = await res.json()
     return NextResponse.json(data, { status: res.status })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

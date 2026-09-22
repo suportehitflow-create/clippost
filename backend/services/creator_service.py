@@ -90,6 +90,84 @@ def get_creator_templates() -> List[Dict[str, Any]]:
     return CREATOR_TEMPLATES
 
 
+def _generate_with_ai(topic: str, template_id: str, tone: str, duration_secs: int, target_audience: str) -> Dict[str, Any] | None:
+    """Tenta gerar roteiro real com Gemini 1.5 Flash. Retorna None se falhar."""
+    import os, json, re
+    import httpx
+
+    api_key = (
+        os.environ.get("AI_CURATOR_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+    )
+    if not api_key:
+        return None
+
+    base_url = os.environ.get("AI_CURATOR_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
+    model = os.environ.get("AI_CURATOR_MODEL", "gemini-1.5-flash")
+
+    tmpl = next((t for t in CREATOR_TEMPLATES if t["id"] == template_id), CREATOR_TEMPLATES[0])
+    structure_txt = "\n".join(f"- {s}" for s in tmpl["structure"])
+
+    prompt = f"""Você é um roteirista especialista em vídeos curtos virais para Instagram Reels, TikTok e YouTube Shorts.
+
+Crie um roteiro detalhado usando o template "{tmpl['name']}" para o seguinte tema:
+TEMA: {topic}
+TOM: {tone}
+PÚBLICO: {target_audience}
+DURAÇÃO TOTAL: {duration_secs} segundos
+
+ESTRUTURA DO TEMPLATE:
+{structure_txt}
+
+Retorne APENAS um JSON válido (sem markdown) com esta estrutura exata:
+{{
+  "title": "<Título chamativo para o vídeo>",
+  "hook": "<Frase de gancho dos primeiros 3 segundos>",
+  "scenes": [
+    {{
+      "time": "<00:00 - 00:03>",
+      "label": "<Nome da cena>",
+      "spoken_text": "<O que será falado em voz alta>",
+      "b_roll": "<Sugestão visual para a cena>",
+      "sound_fx": "<Efeito sonoro sugerido>",
+      "duration": <duração em segundos como número>
+    }}
+  ]
+}}"""
+
+    try:
+        resp = httpx.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": model, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        raw = (resp.json().get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+        # Remove markdown fences if present
+        raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+        parsed = json.loads(raw)
+        scenes = parsed.get("scenes", [])
+        total_words = sum(len(s["spoken_text"].split()) for s in scenes)
+        total_duration = sum(s.get("duration", 0) for s in scenes) or duration_secs
+        return {
+            "topic": topic,
+            "template_id": template_id,
+            "title": parsed.get("title", f"Roteiro Viral: {topic}"),
+            "hook": parsed.get("hook", ""),
+            "tone": tone,
+            "target_audience": target_audience,
+            "total_duration_secs": total_duration,
+            "total_words": total_words,
+            "estimated_retention_score": 96,
+            "scenes": scenes,
+        }
+    except Exception as e:
+        print(f"[creator] IA falhou: {e}")
+        return None
+
+
 def generate_ai_script(
     topic: str,
     template_id: str = "hormozi",
@@ -98,10 +176,14 @@ def generate_ai_script(
     target_audience: str = "Empreendedores e Criadores"
 ) -> Dict[str, Any]:
     """
-    Gera um roteiro detalhado e estruturado com minutagem, visual sugerido e gancho irresistível.
+    Gera um roteiro detalhado. Usa Gemini 1.5 Flash se disponível, senão usa templates locais.
     """
     clean_topic = topic.strip() or "Como triplicar seu faturamento criando vídeos curtos"
-    
+
+    ai_result = _generate_with_ai(clean_topic, template_id, tone, duration_secs, target_audience)
+    if ai_result:
+        return ai_result
+
     # Roteiros dinâmicos baseados no template
     if template_id == "storytelling":
         hook = f"No dia que eu percebi isso sobre {clean_topic}, tudo mudou para sempre."

@@ -138,6 +138,8 @@ export default function AutoPilotPage() {
     const target = overrideHandle || searchHandle
     if (!target.trim()) return
     setSearching(true)
+    setVideos([])
+    setProfile(null)
     try {
       const res = await fetch('/api/sources/profile', {
         method: 'POST',
@@ -149,17 +151,21 @@ export default function AutoPilotPage() {
           period: timePeriod
         })
       })
-      if (res.ok) {
-        const data = await res.json()
+      const data = await res.json()
+      if (!res.ok) {
+        const msg = data?.detail || data?.error || 'Instagram bloqueou o acesso. Tente colar a URL direta de um Reel.'
+        setAviso(msg)
+        setTimeout(() => setAviso(''), 7000)
+      } else {
         setProfile(data.profile)
         setVideos(data.items || [])
-        // Select first item by default
         if (data.items?.length) {
           setSelectedVideoIds([data.items[0].id])
         }
       }
     } catch (err) {
-      console.error('Erro na mineração:', err)
+      setAviso('Erro de conexão ao buscar o perfil.')
+      setTimeout(() => setAviso(''), 5000)
     } finally {
       setSearching(false)
     }
@@ -189,7 +195,18 @@ export default function AutoPilotPage() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
-      
+
+      {/* Toast global */}
+      {aviso && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium max-w-xs transition-all ${
+          aviso.startsWith('Erro') || aviso.startsWith('erro') || aviso.includes('Falha')
+            ? 'bg-red-950 border-red-700 text-red-300'
+            : 'bg-emerald-950 border-emerald-700 text-emerald-300'
+        }`}>
+          {aviso}
+        </div>
+      )}
+
       {/* Top Header & Badges */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-white/[0.08]">
         <div>
@@ -615,7 +632,7 @@ export default function AutoPilotPage() {
                 {salvandoWatch ? 'Conectando...' : 'Monitorar'}
               </button>
             </form>
-            {aviso && <span className="text-xs text-emerald-400 mt-2 block">{aviso}</span>}
+            {/* aviso shown via global toast above */}
           </div>
 
           <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6">
