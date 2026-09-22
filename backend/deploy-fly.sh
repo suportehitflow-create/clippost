@@ -1,14 +1,15 @@
 #!/bin/bash
 # Deploy ClipPost backend to Fly.io
 # Requires: flyctl installed + logged in
-# Usage: bash deploy-fly.sh <ANTHROPIC_API_KEY>
+# Usage: bash deploy-fly.sh <SUPABASE_SERVICE_ROLE_KEY> <ANTHROPIC_API_KEY>
 
 set -e
 
-ANTHROPIC_API_KEY=${1:-""}
+SUPABASE_SERVICE_ROLE_KEY=${1:-""}
+ANTHROPIC_API_KEY=${2:-""}
 
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-  echo "Usage: bash deploy-fly.sh <ANTHROPIC_API_KEY>"
+if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
+  echo "Usage: bash deploy-fly.sh <SUPABASE_SERVICE_ROLE_KEY> <ANTHROPIC_API_KEY>"
   exit 1
 fi
 
@@ -22,7 +23,7 @@ REDIS_URL=$(flyctl ext upstash redis status clippost-redis --json 2>/dev/null | 
 echo ">>> Configurando variáveis de ambiente..."
 flyctl secrets set \
   SUPABASE_URL="https://alntulecjshpbrhesaoo.supabase.co" \
-  SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM" \
+  SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
   ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   STORAGE_BUCKET="videos" \
   TEMP_DIR="/tmp/clippost" \

@@ -238,16 +238,21 @@ export default function ClipEditorPage() {
         })
         .eq('id', clipId)
 
-      await fetch(`/api/clips/${clipId}/re-render`, {
+      const rerenderRes = await fetch(`/api/clips/${clipId}/re-render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subtitle_preset: selectedStyle,
           subtitle_y: subtitleY,
           smart_emojis: smartEmojisEnabled,
-          words: words.map(w => ({ word: w.word, start: w.start, end: w.end })),
+          // pass null so backend uses the project's real transcript words
+          words: null,
         })
-      }).catch(() => null)
+      })
+      if (!rerenderRes.ok) {
+        const errData = await rerenderRes.json().catch(() => ({}))
+        throw new Error(errData.detail || errData.error || 'Erro no re-render')
+      }
 
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)

@@ -194,7 +194,7 @@ export default function BulkStudioPage() {
         setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'processing', projectId: project.id, progress: 60 } : it))
 
         // 3. Dispatch to backend Celery worker
-        await fetch('/api/jobs', {
+        const jobRes = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -205,8 +205,11 @@ export default function BulkStudioPage() {
             template_id: selectedTemplate
           })
         })
+        if (!jobRes.ok) {
+          const errData = await jobRes.json().catch(() => ({}))
+          throw new Error(errData.detail || errData.error || `HTTP ${jobRes.status}`)
+        }
 
-        // Mark item as queued/processing
         setBatchItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'done', progress: 100 } : it))
       } catch (err: any) {
         console.error('Erro no item do lote:', err)

@@ -110,7 +110,8 @@ export default function CreateClipsPage() {
       let sourceUrl = url.trim()
       if (activeTab === 'file' && file) {
         const path = `${user.id}/${project.id}/original.${file.name.split('.').pop()}`
-        await supabase.storage.from('videos').upload(path, file).catch(() => null)
+        const { error: upErr } = await supabase.storage.from('videos').upload(path, file)
+        if (upErr) throw new Error('Falha no upload do vídeo: ' + upErr.message)
         sourceUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
       }
 
