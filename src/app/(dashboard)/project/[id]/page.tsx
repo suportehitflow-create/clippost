@@ -11,9 +11,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const admin = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { persistSession: false }
-  })
+  // Se não tiver service key configurada, usa o client do usuário autenticado
+  const admin = SUPABASE_SERVICE_KEY
+    ? createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
+    : supabase as any
 
   // 1. Tenta buscar o projeto do usuário autenticado
   if (user) {
