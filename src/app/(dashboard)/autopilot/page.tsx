@@ -448,17 +448,43 @@ export default function AutoPilotPage() {
 
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 transition-all cursor-pointer"
+                    disabled={!userId || filteredVideos.length === 0}
+                    onClick={async () => {
+                      if (!userId) return
+                      for (const v of filteredVideos) {
+                        await fetch('/api/jobs', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ url: v.url, user_id: userId, clip_duration: 'auto' })
+                        })
+                      }
+                      setAviso(`${filteredVideos.length} vídeos enviados para processamento!`)
+                      setTimeout(() => setAviso(''), 5000)
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 disabled:opacity-40 transition-all cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" /> Baixar todos ({filteredVideos.length})
+                    <Download className="w-3.5 h-3.5" /> Processar todos ({filteredVideos.length})
                   </button>
 
                   <button
                     type="button"
-                    disabled={selectedVideoIds.length === 0}
+                    disabled={!userId || selectedVideoIds.length === 0}
+                    onClick={async () => {
+                      if (!userId) return
+                      const selected = filteredVideos.filter(v => selectedVideoIds.includes(v.id))
+                      for (const v of selected) {
+                        await fetch('/api/jobs', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ url: v.url, user_id: userId, clip_duration: 'auto' })
+                        })
+                      }
+                      setAviso(`${selected.length} vídeos enviados para processamento!`)
+                      setTimeout(() => setAviso(''), 5000)
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-zinc-300 disabled:opacity-40 transition-all cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" /> Baixar selecionados ({selectedVideoIds.length})
+                    <Download className="w-3.5 h-3.5" /> Processar selecionados ({selectedVideoIds.length})
                   </button>
 
                   {/* Primary Trigger: Agendar com Template */}
@@ -554,25 +580,22 @@ export default function AutoPilotPage() {
               if (!userId || !canal.trim()) return
               setSalvandoWatch(true)
               try {
-                const clean = canal.trim()
-                await supabase
-                  .from('channel_watches')
-                  .insert({
-                    user_id: userId,
-                    channel_id: clean,
-                    channel_handle: clean,
-                    channel_name: clean.replace('@', ''),
-                    clip_duration: 'auto',
-                    num_clips: 3,
-                    is_active: true
-                  })
-
+                const res = await fetch('/api/autopilot/watches', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: userId, canal: canal.trim(), clip_duration: 'auto' })
+                })
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({}))
+                  throw new Error(err.detail || 'Erro ao conectar canal')
+                }
                 setCanal('')
                 setAviso('Canal conectado para monitoramento!')
                 setTimeout(() => setAviso(''), 4000)
                 loadWatches(userId)
-              } catch (err) {
-                console.error(err)
+              } catch (err: any) {
+                setAviso(err.message || 'Erro ao conectar canal')
+                setTimeout(() => setAviso(''), 5000)
               } finally {
                 setSalvandoWatch(false)
               }
@@ -882,22 +905,46 @@ export default function AutoPilotPage() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setSchedulingSuccess(true)
-                  setTimeout(() => {
-                    setSchedulingSuccess(false)
-                    setShowTemplateModal(false)
-                  }, 2000)
+                disabled={!userId || selectedVideoIds.length === 0 || schedulingSuccess}
+                onClick={async () => {
+                  if (!userId) return
+                  const selected = filteredVideos.filter(v => selectedVideoIds.includes(v.id))
+                  const templateConfig = {
+                    subtitle_preset: 'hormozi_yellow',
+                    subtitlePos: { y: videoYOffset },
+                    videoScale,
+                    hookText,
+                    brandName,
+                    brandHandle,
+                  }
+                  let sent = 0
+                  for (const v of selected) {
+                    try {
+                      const r = await fetch('/api/jobs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: v.url, user_id: userId, clip_duration: 'auto', template_config: templateConfig })
+                      })
+                      if (r.ok) sent++
+                    } catch { /* continue */ }
+                  }
+                  if (sent > 0) {
+                    setSchedulingSuccess(true)
+                    setTimeout(() => {
+                      setSchedulingSuccess(false)
+                      setShowTemplateModal(false)
+                    }, 2000)
+                  }
                 }}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
               >
                 {schedulingSuccess ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4" /> Agendado com Sucesso!
+                    <CheckCircle2 className="w-4 h-4" /> Enviado para processamento!
                   </>
                 ) : (
                   <>
-                    Próximo: Confirmar Agendamento ({selectedVideoIds.length} vídeos) <ArrowRight className="w-4 h-4" />
+                    Confirmar — Processar {selectedVideoIds.length} vídeos <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>

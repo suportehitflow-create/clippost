@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -130,14 +130,37 @@ const CATEGORIES = [
   { id: 'humor', label: 'Humor & Entretenimento', icon: Smile },
 ]
 
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://clippost-backend.fly.dev'
+
 export default function TrendsPage() {
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [trends, setTrends] = useState<TrendItem[]>(INITIAL_TRENDS)
+
+  const fetchTrends = async (category: string, query: string) => {
+    try {
+      const params = new URLSearchParams({ category })
+      if (query.trim()) params.set('query', query.trim())
+      const res = await fetch(`${BACKEND}/api/trends/explore?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          setTrends(data.items)
+        }
+      }
+    } catch {
+      // keep existing trends
+    }
+  }
+
+  useEffect(() => {
+    fetchTrends(selectedCategory, searchQuery)
+  }, [selectedCategory])
 
   const filteredTrends = useMemo(() => {
-    return INITIAL_TRENDS.filter(item => {
+    return trends.filter(item => {
       const matchCat = selectedCategory === 'all' || item.category === selectedCategory
       const matchQuery = !searchQuery.trim() ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -145,11 +168,12 @@ export default function TrendsPage() {
         item.hook_analysis.toLowerCase().includes(searchQuery.toLowerCase())
       return matchCat && matchQuery
     })
-  }, [selectedCategory, searchQuery])
+  }, [trends, selectedCategory, searchQuery])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => setIsRefreshing(false), 800)
+    await fetchTrends(selectedCategory, searchQuery)
+    setTimeout(() => setIsRefreshing(false), 400)
   }
 
   const handleQuickCut = (videoUrl: string) => {

@@ -613,3 +613,106 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
     finally:
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@celery.task(name="tasks.rerender_clip_task")
+def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | None, words: list | None):
+    """Re-renderiza um clipe existente com novo preset de legenda via FFmpeg."""
+    tmp_dir = None
+    try:
+        clip_res = supabase.table("clips").select("*").eq("id", clip_id).maybe_single().execute()
+        if not clip_res or not clip_res.data:
+            print(f"[re-render] clip {clip_id} não encontrado")
+            return {"status": "error", "message": "clip not found"}
+
+        clip = clip_res.data
+        project_id = clip.get("project_id")
+        user_id = clip.get("user_id")
+        start = float(clip.get("start_time", 0))
+        end = float(clip.get("end_time", start + 60))
+
+        proj_res = supabase.table("projects").select("raw_video_url,transcript").eq("id", project_id).maybe_single().execute()
+        if not proj_res or not proj_res.data or not proj_res.data.get("raw_video_url"):
+            supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
+            print(f"[re-render] raw_video_url não encontrada para projeto {project_id}")
+            return {"status": "error", "message": "raw video not found"}
+
+        raw_video_url = proj_res.data["raw_video_url"]
+        transcript_data = proj_res.data.get("transcript") or {}
+
+        tmp_dir = Path(tempfile.mkdtemp())
+        video_path = str(tmp_dir / "raw.mp4")
+
+        with httpx.Client(timeout=120) as client:
+            with client.stream("GET", raw_video_url) as resp:
+                resp.raise_for_status()
+                with open(video_path, "wb") as f:
+                    for chunk in resp.iter_bytes(65536):
+                        f.write(chunk)
+
+        seg_words = words or (transcript_data.get("words") if isinstance(transcript_data, dict) else None) or []
+        segments = transcript_data.get("segments", []) if isinstance(transcript_data, dict) else []
+
+        start_snapped, end_snapped = snap_to_words(start, end, seg_words)
+
+        sub_y = subtitle_y if subtitle_y is not None else 80.0
+        margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
+        subtitle_file = generate_ass(
+            segments, str(tmp_dir / "sub.ass"),
+            clip_start=start_snapped, clip_end=end_snapped, words=seg_words,
+            margin_v=margin_v,
+            subtitle_preset=subtitle_preset,
+        )
+
+        brand_kit_res = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+        brand_kit = (brand_kit_res.data if brand_kit_res else None) or {}
+
+        clip_out = str(tmp_dir / "rerendered.mp4")
+        create_vertical_clip(
+            input_video=video_path,
+            output_video=clip_out,
+            start=start_snapped,
+            end=end_snapped,
+            brand_kit=brand_kit,
+            subtitle_file=subtitle_file,
+            hook_title=clip.get("hook") or clip.get("title") or "",
+            remove_silence=False,
+        )
+
+        if not os.path.exists(clip_out):
+            raise RuntimeError("FFmpeg não gerou o arquivo de saída")
+
+        check = validate_clip(clip_out, expected_duration=end_snapped - start_snapped)
+        if not check["ok"]:
+            raise RuntimeError(f"clip inválido após re-render: {'; '.join(check['issues'])}")
+
+        clip_key = f"{user_id}/{project_id}/clip_rerender_{clip_id[:8]}.mp4"
+        with open(clip_out, "rb") as f:
+            supabase.storage.from_("videos").upload(
+                path=clip_key,
+                file=f.read(),
+                file_options={"content-type": "video/mp4", "upsert": "true"},
+            )
+        new_url = supabase.storage.from_("videos").get_public_url(clip_key)
+
+        supabase.table("clips").update({
+            "storage_url": new_url,
+            "subtitle_preset": subtitle_preset,
+            "status": "ready",
+        }).eq("id", clip_id).execute()
+
+        print(f"[re-render] clip {clip_id} re-renderizado com sucesso: {new_url}")
+        return {"status": "success", "clip_id": clip_id, "url": new_url}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
+        except Exception:
+            pass
+        return {"status": "error", "message": str(e)}
+
+    finally:
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)

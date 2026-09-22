@@ -158,12 +158,23 @@ export default function SchedulePageV2() {
         if (upErr) throw upErr
         
         const pubUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
+        const { data: projData } = await supabase
+          .from('projects')
+          .insert({ user_id: userId, title: uploadedFile.name, source_type: 'file', status: 'done' })
+          .select('id')
+          .single()
+
         const { data: newClip, error: clipErr } = await supabase
           .from('clips')
           .insert({
+            user_id: userId,
+            project_id: projData?.id,
             title: uploadedFile.name,
             storage_url: pubUrl,
-            score: 95
+            start_time: 0,
+            end_time: 0,
+            score: 95,
+            status: 'ready'
           })
           .select()
           .single()

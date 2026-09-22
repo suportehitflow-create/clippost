@@ -136,7 +136,7 @@ SUPABASE_KEY = (
     os.environ.get("SUPABASE_KEY")
     or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM"
+    or ""
 )
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -467,15 +467,22 @@ async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
 
 
 @app.post("/api/process-bulk")
-async def process_bulk(req: BulkProcessRequest):
-    from tasks import process_bulk_videos
+async def process_bulk(req: BulkProcessRequest, background_tasks: BackgroundTasks):
+    from tasks import process_bulk_videos, process_youtube_video
     """Fila de processamento em massa — apenas Pro."""
     if not req.urls:
         raise HTTPException(status_code=400, detail="Nenhuma URL fornecida")
     if len(req.urls) > 20:
         raise HTTPException(status_code=400, detail="Máximo de 20 URLs por vez")
-    task = process_bulk_videos.delay(req.urls, req.user_id, req.clip_duration)
-    return {"task_id": task.id, "status": "queued", "count": len(req.urls)}
+    if CELERY_ENABLED:
+        try:
+            task = process_bulk_videos.delay(req.urls, req.user_id, req.clip_duration)
+            return {"task_id": task.id, "status": "queued", "count": len(req.urls)}
+        except Exception as e:
+            print(f"[bulk] Celery falhou ({e}), usando BackgroundTasks")
+    for url in req.urls:
+        background_tasks.add_task(process_youtube_video, url, req.user_id, req.clip_duration, None, True, None)
+    return {"task_id": "bg_bulk", "status": "queued", "count": len(req.urls)}
 
 
 @app.post("/api/instagram/list")
@@ -544,21 +551,34 @@ class RerenderRequest(BaseModel):
 
 
 @app.post("/api/clips/{clip_id}/re-render")
-async def rerender_clip(clip_id: str, req: RerenderRequest):
-    """Atualiza estilo/palavras e agenda re-renderização do clipe individual."""
+async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: BackgroundTasks):
+    """Atualiza estilo/palavras e re-renderiza o clipe com FFmpeg."""
     clip_res = maybe_one(supabase.table("clips").select("*").eq("id", clip_id))
     if not clip_res.data:
         raise HTTPException(status_code=404, detail="Clipe não encontrado")
 
-    update_data = {
-        "subtitle_preset": req.subtitle_preset,
-    }
+    clip = clip_res.data
+
+    update_data: dict = {"subtitle_preset": req.subtitle_preset, "status": "rerendering"}
+    if req.subtitle_y is not None:
+        update_data["subtitle_y"] = req.subtitle_y
+    if req.words:
+        update_data["words"] = req.words
     try:
         supabase.table("clips").update(update_data).eq("id", clip_id).execute()
     except Exception as e:
-        print(f"Error updating clip: {e}")
+        print(f"[re-render] erro ao atualizar clip: {e}")
 
-    return {"status": "ok", "clip_id": clip_id, "message": "Clipe atualizado com sucesso"}
+    from tasks import rerender_clip_task
+    if CELERY_ENABLED:
+        try:
+            rerender_clip_task.delay(clip_id, req.subtitle_preset, req.subtitle_y, req.words)
+            return {"status": "queued", "clip_id": clip_id}
+        except Exception as e:
+            print(f"[re-render] Celery falhou ({e}), usando BackgroundTasks")
+
+    background_tasks.add_task(rerender_clip_task, clip_id, req.subtitle_preset, req.subtitle_y, req.words)
+    return {"status": "rerendering", "clip_id": clip_id}
 
 
 @app.get("/api/clips/{project_id}")
@@ -710,49 +730,13 @@ async def scrape_profile_reels(req: ProfileScrapeRequest):
     except Exception as e:
         print(f"Scrape attempt error: {e}")
 
-    # Fallback robusto e viral para perfis
     if not items:
-        base_views = 142000
-        sample_titles = [
-            f"O maior segredo para viralizar com cortes de @{clean_handle}",
-            f"Voce nunca percebeu isso no podcast de @{clean_handle}",
-            f"Essa resposta deixou todo mundo sem reacao 🤯",
-            f"A estrategia que os maiores influenciadores usam em segredo",
-            f"O erro numero 1 que destroi a retencao do seu video",
-            f"Como faturar com audiencia qualificada em 2026",
-            f"Ele explicou isso em 45 segundos e fez todo sentido",
-            f"O conselho mais valioso que voce vai ouvir hoje",
-            f"Isso aconteceu ao vivo nos bastidores...",
-            f"A verdade que ninguem tem coragem de falar sobre negocios",
-            f"Corte epico: a historia que mudou a trajetoria dele",
-            f"Pare de cometer esse erro nos seus videos verticais"
-        ]
-        
-        sample_thumbs = [
-            "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=600&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80"
-        ]
-
-        count = min(req.limit or 50, 12)
-        for i in range(count):
-            factor = (count - i) * 1.3
-            v = int(base_views * factor) + (i * 1337)
-            l = int(v * 0.082) + (i * 123)
-            items.append({
-                "id": f"mined-{clean_handle}-{i+1}",
-                "title": sample_titles[i % len(sample_titles)],
-                "url": f"https://www.instagram.com/{clean_handle}/",
-                "thumbnail": sample_thumbs[i % len(sample_thumbs)],
-                "views": v,
-                "likes": l,
-                "comments": int(l * 0.05) + 12,
-                "duration": 25 + (i * 4) % 45,
-                "type": "reel" if i % 4 != 0 else "post",
-            })
+        raise HTTPException(
+            status_code=404,
+            detail=f"Não foi possível listar vídeos do perfil @{clean_handle}. "
+                   "O Instagram bloqueia scraping automatizado. "
+                   "Tente colar a URL diretamente de um Reel específico."
+        )
 
     if req.sort_by == "most_viewed":
         items.sort(key=lambda x: x.get("views", 0), reverse=True)
