@@ -452,12 +452,18 @@ export default function ProjectClient({
   const supabase = createClient()
   const router = useRouter()
   const [isDeletingProject, setIsDeletingProject] = useState(false)
-  const [elapsedSecs, setElapsedSecs] = useState(0)
+  const [elapsedSecs, setElapsedSecs] = useState(() => {
+    const start = new Date(project.created_at).getTime()
+    return Math.max(0, Math.floor((Date.now() - start) / 1000))
+  })
 
   useEffect(() => {
-    const t = setInterval(() => setElapsedSecs(s => s + 1), 1000)
+    const start = new Date(project.created_at).getTime()
+    const t = setInterval(() => {
+      setElapsedSecs(Math.max(0, Math.floor((Date.now() - start) / 1000)))
+    }, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [project.created_at])
 
   const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
