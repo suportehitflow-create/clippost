@@ -1197,6 +1197,44 @@ export default function ProjectClient({
         />
       )}
 
+      {/* ESTADO VAZIO: processamento concluído mas sem cortes gerados */}
+      {(status === 'done' || status === 'completed') && clips.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
+            <svg className="w-8 h-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+            </svg>
+          </div>
+          <h3 className="text-base font-semibold text-white mb-2">Nenhum corte viral encontrado</h3>
+          <p className="text-sm text-zinc-400 max-w-sm mb-6">
+            O backend não gerou cortes para este vídeo. Isso pode acontecer se o vídeo for muito curto, se o processamento falhou silenciosamente, ou se o worker do Fly.io não estava disponível.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setStatus('processing')
+                await fetch(`/api/projects/${project.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'processing', error_message: null }),
+                })
+                await fetch('/api/jobs', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url: project.source_url, project_id: project.id }),
+                })
+              }}
+              className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-400 rounded-xl transition-all cursor-pointer"
+            >
+              Reprocessar Vídeo
+            </button>
+            <a href="/upload" className="px-4 py-2 text-xs font-semibold text-zinc-300 bg-white/[0.06] hover:bg-white/[0.1] rounded-xl transition-all">
+              Enviar Outro Vídeo
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* STUDIO: exibido apenas quando há cortes prontos */}
       {clips.length > 0 && (
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

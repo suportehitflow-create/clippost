@@ -482,6 +482,13 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
         print(f"[pipeline] IA Curator retornou {len(clips_meta)} clipes candidatos")
 
+        if not clips_meta:
+            supabase.table("projects").update({
+                "status": "failed",
+                "error_message": "IA Curator não encontrou momentos virais. Verifique se AI_CURATOR_API_KEY está configurada no Fly.io."
+            }).eq("id", project_id).execute()
+            return {"status": "failed", "reason": "no_clips_from_ai"}
+
                 # Brand Kit e Template Ativo do Usuário (100% integrado)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
         brand_kit = bk_resp.data if bk_resp and bk_resp.data else {}
