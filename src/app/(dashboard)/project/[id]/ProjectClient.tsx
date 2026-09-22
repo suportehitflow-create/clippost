@@ -236,6 +236,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
     if (!sourceUrl) return
     setRetrying(true)
     try {
+      const { data: { user } } = await supabase.auth.getUser()
       await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -244,7 +245,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
       await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: sourceUrl, project_id: projectId }),
+        body: JSON.stringify({ url: sourceUrl, project_id: projectId, user_id: user?.id }),
       })
       onRetrying()
     } catch {
@@ -1218,6 +1219,7 @@ export default function ProjectClient({
           <div className="flex gap-3">
             <button
               onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser()
                 setStatus('processing')
                 await fetch(`/api/projects/${project.id}`, {
                   method: 'PATCH',
@@ -1227,7 +1229,7 @@ export default function ProjectClient({
                 await fetch('/api/jobs', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url: project.source_url, project_id: project.id }),
+                  body: JSON.stringify({ url: project.source_url, project_id: project.id, user_id: user?.id }),
                 })
               }}
               className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-400 rounded-xl transition-all cursor-pointer"
