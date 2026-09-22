@@ -55,7 +55,7 @@ async def _mark_stuck_projects(label: str = "recovery"):
         if not supabase:
             return
         from datetime import timedelta
-        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=180)).isoformat()
         result = supabase.table("projects") \
             .select("id, error_message") \
             .eq("status", "processing") \
@@ -76,12 +76,45 @@ async def _mark_stuck_projects(label: str = "recovery"):
         print(f"[{label}] erro ao limpar projetos travados: {e}")
 
 
+async def _cleanup_old_projects():
+    """Apaga projetos e clipes: failed imediatamente + done/processing há mais de 24h."""
+    try:
+        if not supabase:
+            return
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        cutoff_24h = (now - timedelta(hours=24)).isoformat()
+
+        # Projetos failed (qualquer idade) + projetos done/others com mais de 24h
+        failed_res = supabase.table("projects").select("id").eq("status", "failed").execute()
+        old_res = supabase.table("projects").select("id").lt("created_at", cutoff_24h).execute()
+
+        ids_to_delete = list({r["id"] for r in (failed_res.data or [])} | {r["id"] for r in (old_res.data or [])})
+        if not ids_to_delete:
+            return
+
+        deleted = 0
+        for pid in ids_to_delete:
+            try:
+                supabase.table("clips").delete().eq("project_id", pid).execute()
+                supabase.table("projects").delete().eq("id", pid).execute()
+                deleted += 1
+            except Exception as e:
+                print(f"[cleanup] erro ao deletar projeto {pid}: {e}")
+
+        if deleted:
+            print(f"[cleanup] {deleted} projeto(s) antigos/falhos removidos")
+    except Exception as e:
+        print(f"[cleanup] erro: {e}")
+
+
 async def _periodic_recovery_loop():
-    """Roda a cada 5 minutos para marcar pipelines travados — cobre crashes sem restart."""
+    """Roda a cada 5 minutos para marcar pipelines travados e limpar projetos antigos."""
     import asyncio
     while True:
         await asyncio.sleep(300)
         await _mark_stuck_projects("recovery")
+        await _cleanup_old_projects()
 
 
 @app.on_event("startup")
@@ -89,6 +122,7 @@ async def recover_stuck_projects():
     import asyncio
     _setup_youtube_cookies()
     await _mark_stuck_projects("startup")
+    await _cleanup_old_projects()
     asyncio.create_task(_periodic_recovery_loop())
 
 

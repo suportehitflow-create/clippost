@@ -6,9 +6,115 @@ import os
 import shutil
 import subprocess
 import tempfile
-import textwrap
+import threading
 import urllib.request
 from pathlib import Path
+
+# Semáforo global: apenas 1 FFmpeg por vez para não saturar a CPU do Fly.io.
+_FFMPEG_SEMAPHORE = threading.Semaphore(1)
+
+
+# ─── Remoção de Silêncio Sincronizada ────────────────────────────────────────
+
+def _detect_silences(input_video: str, start: float, duration: float,
+                     noise_db: float = -55.0, min_dur: float = 0.4) -> list[tuple[float, float]]:
+    """
+    Detecta intervalos silenciosos no trecho [start, start+duration] do vídeo.
+    Retorna lista de (sil_start, sil_end) em tempo RELATIVO ao início do clipe.
+    """
+    try:
+        result = subprocess.run([
+            "ffmpeg", "-y",
+            "-ss", str(start), "-t", str(duration), "-i", input_video,
+            "-af", f"silencedetect=noise={noise_db}dB:duration={min_dur}",
+            "-f", "null", "-"
+        ], capture_output=True, text=True, timeout=30)
+        silences: list[tuple[float, float]] = []
+        for line in result.stderr.split("\n"):
+            if "silence_end" in line and "|" in line:
+                try:
+                    end = float(line.split("silence_end:")[1].split("|")[0].strip())
+                    dur = float(line.split("silence_duration:")[1].strip())
+                    s_start = max(0.0, end - dur)
+                    silences.append((round(s_start, 4), round(end, 4)))
+                except Exception:
+                    pass
+        return silences
+    except Exception as e:
+        print(f"[ffmpeg_engine] silencedetect erro: {e}")
+        return []
+
+
+def _keep_segments(duration: float, silences: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Retorna lista de segmentos a manter (não-silenciosos) dentro de [0, duration]."""
+    if not silences:
+        return [(0.0, duration)]
+    merged: list[tuple[float, float]] = []
+    for s, e in sorted(silences):
+        if merged and s <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+        else:
+            merged.append((s, e))
+    keep: list[tuple[float, float]] = []
+    cursor = 0.0
+    for s, e in merged:
+        if s > cursor + 0.05:
+            keep.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < duration - 0.05:
+        keep.append((cursor, duration))
+    return keep if keep else [(0.0, duration)]
+
+
+def _remap_time(t: float, keep_segs: list[tuple[float, float]]) -> float:
+    """Mapeia um timestamp original para o novo tempo após remoção de silêncios."""
+    new_t = 0.0
+    for ks, ke in keep_segs:
+        if t <= ks:
+            break
+        seg_contrib = min(t, ke) - ks
+        new_t += max(0.0, seg_contrib)
+    return round(new_t, 4)
+
+
+def _remap_ass(ass_path: str, keep_segs: list[tuple[float, float]]) -> str:
+    """Reescreve os timestamps do ASS com base nos segmentos mantidos."""
+    content = Path(ass_path).read_text(encoding="utf-8")
+    lines = content.split("\n")
+    new_lines = []
+    for line in lines:
+        if line.startswith("Dialogue:"):
+            parts = line.split(",", 9)
+            if len(parts) >= 3:
+                t0 = _ass_to_sec(parts[1])
+                t1 = _ass_to_sec(parts[2])
+                new_t0 = _remap_time(t0, keep_segs)
+                new_t1 = _remap_time(t1, keep_segs)
+                if new_t1 > new_t0:
+                    parts[1] = _sec_to_ass(new_t0)
+                    parts[2] = _sec_to_ass(new_t1)
+                    line = ",".join(parts)
+                else:
+                    continue
+        new_lines.append(line)
+    out = ass_path.replace(".ass", "_sync.ass")
+    Path(out).write_text("\n".join(new_lines), encoding="utf-8")
+    return out
+
+
+def _ass_to_sec(t: str) -> float:
+    try:
+        h, m, s = t.strip().split(":")
+        return int(h) * 3600 + int(m) * 60 + float(s)
+    except Exception:
+        return 0.0
+
+
+def _sec_to_ass(sec: float) -> str:
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = sec % 60
+    return f"{h}:{m:02d}:{s:05.2f}"
 
 
 def _download_avatar(url: str, dest_dir: str) -> str | None:
@@ -56,7 +162,7 @@ def create_vertical_clip(
     subtitle_file: str | None = None,
     hook_title: str | None = None,
     hflip: bool = False,
-    remove_silence: bool = True,
+    remove_silence: bool = False,
     speed: float = 1.0,
 ) -> str:
     """
@@ -72,8 +178,6 @@ def create_vertical_clip(
 
     try:
         layout = (brand_kit or {}).get("layout_config", {})
-        username = (brand_kit or {}).get("username", "")
-        avatar_url = (brand_kit or {}).get("avatar_url", "")
 
         # 1. Dimensões do quadrado/retângulo de vídeo do template
         video_w_pct = float(layout.get("videoWidth", 96))
@@ -121,129 +225,80 @@ def create_vertical_clip(
         else:
             bg_color = "black"
 
-        # Transformações adicionais do vídeo (hflip, speed)
-        vbox_filters = [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}", f"scale={target_w}:{target_h}"]
-        hdr_filter = _detect_hdr_filter(input_video)
-        if hdr_filter:
-            vbox_filters.insert(0, hdr_filter)
-        if hflip:
-            vbox_filters.append("hflip")
-        if speed and speed != 1.0:
-            vbox_filters.append(f"setpts={round(1/speed, 4)}*PTS")
-
-        filter_parts = [
-            f"color=c={bg_color}:s=1080x1920:d={duration}[bg]",
-            f"[0:v]{','.join(vbox_filters)}[vbox]",
-            f"[bg][vbox]overlay={box_x}:{box_y}[base]"
-        ]
-
-        # 4. Áudio transforms
-        audio_filters = []
+        # 4. Remoção de silêncio sincronizada (trim+concat): detecta silêncios ANTES de renderizar
+        # e usa trim/atrim no filter_complex para cortar vídeo+áudio juntos.
+        # As legendas ASS são remapeadas para os novos timestamps — zero dessincronia.
+        keep_segs: list[tuple[float, float]] = [(0.0, duration)]
+        actual_duration = duration
         if remove_silence:
-            audio_filters.append("silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-60dB")
+            try:
+                silences = _detect_silences(input_video, start, duration)
+                if silences:
+                    keep_segs = _keep_segments(duration, silences)
+                    actual_duration = round(sum(ke - ks for ks, ke in keep_segs), 3)
+                    print(f"[ffmpeg_engine] silêncio: {len(silences)} intervalos → duração {duration:.1f}s → {actual_duration:.1f}s")
+                    if subtitle_file and os.path.exists(subtitle_file):
+                        subtitle_file = _remap_ass(subtitle_file, keep_segs)
+            except Exception as sil_err:
+                print(f"[ffmpeg_engine] silencedetect aviso: {sil_err}, renderizando sem corte de silêncio")
+                keep_segs = [(0.0, duration)]
+                actual_duration = duration
+
+        # Transformações adicionais do vídeo (hflip, speed)
+        hdr_filter = _detect_hdr_filter(input_video)
+        vbox_transforms = []
+        if hdr_filter:
+            vbox_transforms.append(hdr_filter)
+        vbox_transforms += [f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}", f"scale={target_w}:{target_h}"]
+        if hflip:
+            vbox_transforms.append("hflip")
         if speed and speed != 1.0:
-            audio_filters.append(f"atempo={min(2.0, speed)}")
-        audio_filters += _edge_fades(duration / (speed or 1.0))
-        filter_parts.append(f"[0:a]{','.join(audio_filters)}[aout]")
+            vbox_transforms.append(f"setpts={round(1/speed, 4)}*PTS")
+
+        filter_parts: list[str] = []
+        input_files = ["-ss", str(start), "-t", str(duration), "-i", input_video]
+
+        # Trim+concat dos segmentos não-silenciosos
+        n_segs = len(keep_segs)
+        if n_segs == 1 and keep_segs[0] == (0.0, duration):
+            # Sem corte de silêncio: usa [0:v] e [0:a] diretamente
+            v_src = "[0:v]"
+            a_src = "[0:a]"
+        else:
+            for i, (ks, ke) in enumerate(keep_segs):
+                seg_dur = round(ke - ks, 4)
+                filter_parts.append(
+                    f"[0:v]trim=start={ks:.4f}:duration={seg_dur:.4f},setpts=PTS-STARTPTS[vs{i}]"
+                )
+                filter_parts.append(
+                    f"[0:a]atrim=start={ks:.4f}:duration={seg_dur:.4f},asetpts=PTS-STARTPTS[as{i}]"
+                )
+            vs_in = "".join(f"[vs{i}]" for i in range(n_segs))
+            as_in = "".join(f"[as{i}]" for i in range(n_segs))
+            filter_parts.append(f"{vs_in}concat=n={n_segs}:v=1:a=0[vcomb]")
+            filter_parts.append(f"{as_in}concat=n={n_segs}:v=0:a=1[acomb]")
+            v_src = "[vcomb]"
+            a_src = "[acomb]"
+
+        # Canvas de fundo com a duração final (após corte de silêncio)
+        filter_parts.append(f"color=c={bg_color}:s=1080x1920:d={actual_duration}[bg]")
+        filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
+        filter_parts.append(f"[bg][vbox]overlay={box_x}:{box_y}[base]")
+
+        # Fades de áudio
+        speed_adj = speed or 1.0
+        audio_filters = []
+        if speed_adj != 1.0:
+            audio_filters.append(f"atempo={min(2.0, speed_adj)}")
+        audio_filters += _edge_fades(actual_duration / speed_adj)
+        filter_parts.append(f"{a_src}{','.join(audio_filters)}[aout]")
         audio_map = "[aout]"
         last_video = "[base]"
 
-        input_files = [
-            "-ss", str(start), "-t", str(duration), "-i", input_video,
-        ]
-        input_count = 1
-
-        # 5. Header: Perfil da Marca (Avatar + Nome + @handle)
-        header_pos = layout.get("headerPos", {"x": 50, "y": 16})
-        hy_pct = float(header_pos.get("y", 16))
-        hx_pct = float(header_pos.get("x", 50))
-        header_center_y = int(round(1920 * (hy_pct / 100.0)))
-
-        avatar_local = None
-        if avatar_url:
-            avatar_local = _download_avatar(avatar_url, tmp_dir)
-
-        brand_name = layout.get("brandName") or "Nome da Página"
-        display_user = brand_name
-        brand_handle = username or layout.get("brandHandle") or "@nomedapagina"
-
-        if avatar_local and os.path.exists(avatar_local):
-            aw, ah = 96, 96
-            ax = int(round(1080 * (hx_pct / 100.0) - 220)) if hx_pct > 35 else int(round(1080 * 0.08))
-            ay = header_center_y - 48
-            input_files += ["-i", avatar_local]
-            filter_parts.append(f"[{input_count}:v]scale={aw}:{ah}[avatar]")
-            filter_parts.append(f"{last_video}[avatar]overlay={ax}:{ay}[withavatar]")
-            last_video = "[withavatar]"
-            input_count += 1
-            user_text_x = ax + aw + 24
-            user_text_y = header_center_y - 28
-            handle_text_y = header_center_y + 12
-        else:
-            user_text_x = int(round(1080 * (hx_pct / 100.0)))
-            user_text_y = header_center_y - 20
-            handle_text_y = header_center_y + 16
-
-        # Drawtext: Nome da marca e arroba
-        text_filters = []
-        user_color = "black" if template_bg == "white" else "white"
-        handle_color = "0x71717a" if template_bg == "white" else "0xa1a1aa"
-
-        safe_user = display_user.replace("'", r"\'").replace(":", r"\:")
-        safe_handle = brand_handle.replace("'", r"\'").replace(":", r"\:")
-
-        text_filters.append(
-            f"drawtext=text='{safe_user}':fontcolor={user_color}:fontsize=34:"
-            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x={user_text_x}:y={user_text_y}"
-        )
-        text_filters.append(
-            f"drawtext=text='{safe_handle}':fontcolor={handle_color}:fontsize=26:"
-            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
-            f"x={user_text_x}:y={handle_text_y}"
-        )
-
-        # 6. Gancho / Título do vídeo
-        title_pos = layout.get("titlePos", {"x": 50, "y": 25})
-        title_y_pct = float(title_pos.get("y", 25))
-        target_title_y = int(round(1920 * (title_y_pct / 100.0)))
-
-        displayed_title = hook_title or layout.get("titleText")
-        if displayed_title:
-            title_color_hex = layout.get("titleColor", "#ffffff")
-            title_color = "white" if title_color_hex == "#ffffff" else "black" if title_color_hex == "#000000" else f"0x{title_color_hex.replace('#', '')}"
-
-            font_size = int(layout.get("fontSize", 15) * 3.2)
-            font_size = max(38, min(68, font_size))
-
-            is_caps = layout.get("titleCapsLock", True)
-            clean_title = displayed_title.upper() if is_caps else displayed_title
-
-            lines = textwrap.wrap(clean_title, width=24)[:3]
-            line_h = int(font_size * 1.25)
-            top_y = target_title_y - int((len(lines) * line_h) / 2)
-
-            border_w = 4 if template_bg != "white" else 0
-            border_color = "black" if template_bg != "white" else "white"
-
-            for n, line in enumerate(lines):
-                safe_line = (line.replace("\\", "\\\\").replace("'", "’")
-                             .replace(":", "\\:").replace("%", "\\%"))
-                text_filters.append(
-                    f"drawtext=text='{safe_line}':fontcolor={title_color}:fontsize={font_size}:"
-                    f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                    f"borderw={border_w}:bordercolor={border_color}:x=(w-text_w)/2:y={top_y + n * line_h}"
-                )
-
-        if text_filters:
-            combined = ",".join(text_filters)
-            filter_parts.append(f"{last_video}{combined}[textout]")
-            last_video = "[textout]"
-
-        # 7. Subtitles / Legendas Queimadas
+        # 5. Legendas queimadas
         if subtitle_file and os.path.exists(subtitle_file):
-            ext = Path(subtitle_file).suffix.lower()
             safe_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
+            ext = Path(subtitle_file).suffix.lower()
             if ext == ".ass":
                 filter_parts.append(f"{last_video}ass='{safe_path}'[subout]")
             else:
@@ -259,17 +314,19 @@ def create_vertical_clip(
                 "-filter_complex", filter_complex,
                 "-map", last_video,
                 "-map", audio_map,
-                "-vcodec", "libx264", "-preset", "fast", "-crf", "23",
+                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "26",
                 "-acodec", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
                 output_video,
             ]
         )
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
+        with _FFMPEG_SEMAPHORE:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=480)
         if result.returncode != 0:
             print(f"[ffmpeg_engine] filter_complex falhou, tentando fallback simples:\n{result.stderr[-800:]}")
-            _simple_render(input_video, output_video, start, duration)
+            with _FFMPEG_SEMAPHORE:
+                _simple_render(input_video, output_video, start, duration)
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -295,7 +352,7 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
         "-ss", str(start), "-t", str(duration), "-i", input_video,
         "-vf", "crop=ih*9/16:ih,scale=1080:1920",
         "-af", ",".join(_edge_fades(duration)),
-        "-vcodec", "libx264", "-preset", "fast", "-crf", "23",
+        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "26",
         "-acodec", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         output_video,

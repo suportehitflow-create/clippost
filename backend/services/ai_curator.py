@@ -1,8 +1,16 @@
 """
 AI Curator — Diretor de Criação e Roteirista de Cortes Virais para Reels, TikTok e Shorts.
 
-Analisa a narrativa completa do vídeo longo, identifica histórias completas (início, meio e fim)
-e gera clipes com alta retenção e ganchos magnéticos.
+Suporte multi-provedor (em ordem de prioridade):
+  1. Groq  — llama-3.3-70b, grátis, ultra-rápido (GROQ_API_KEY)
+  2. OpenRouter — modelos grátis (:free) (OPENROUTER_API_KEY)
+  3. Gemini — gemini-flash-lite-latest (GEMINI_API_KEY)
+  4. Anthropic — claude-haiku (ANTHROPIC_API_KEY + ANTHROPIC_WORKSPACE_ID)
+
+Lógica de seleção inspirada no OpenMontage clip-factory:
+  - Scoring multidimensional: hook, coherence, value, energy, platform_fit
+  - Standalone test: clipe deve fazer sentido para espectador sem contexto
+  - Cobertura do vídeo: evitar clustering numa mesma seção
 """
 import json
 import os
@@ -11,89 +19,181 @@ import time
 
 import httpx
 
-BASE_URL = os.environ.get("AI_CURATOR_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
-MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-1.5-flash")
+# ─── configuração por env vars ───────────────────────────────────────────────
 MAX_TOKENS = int(os.environ.get("AI_CURATOR_MAX_TOKENS", "4096"))
-API_KEY = (
-    os.environ.get("AI_CURATOR_API_KEY")
-    or os.environ.get("GEMINI_API_KEY")
-    or os.environ.get("OPENROUTER_API_KEY", "")
-)
+TIMEOUT = float(os.environ.get("AI_CURATOR_TIMEOUT", "90"))
+
+# Gemini
+GEMINI_MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-flash-lite-latest")
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+# Groq
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_BASE = "https://api.groq.com/openai/v1"
+
+# OpenRouter
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 
-def _call_free_model(prompt: str) -> str:
-    resp = httpx.post(
-        f"{BASE_URL}/chat/completions",
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        json={
-            "model": MODEL,
+# ─── chamadas por provedor ────────────────────────────────────────────────────
+
+def _call_openai_compat(base_url: str, api_key: str, model: str, prompt: str) -> str:
+    """Chama qualquer API OpenAI-compatível (Groq, OpenRouter, Mistral…)."""
+    payload = json.dumps(
+        {
+            "model": model,
             "max_tokens": MAX_TOKENS,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=60.0,  # 1min por tentativa — max total 2min, não 9min
+        ensure_ascii=False,
+    ).encode("utf-8")
+    resp = httpx.post(
+        f"{base_url}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+        content=payload,
+        timeout=TIMEOUT,
     )
     resp.raise_for_status()
     body = resp.json()
-    if not isinstance(body, dict):
-        raise RuntimeError(f"resposta inesperada da API: {str(body)[:200]}")
     choices = body.get("choices") or []
     if not choices:
         return ""
     if choices[0].get("finish_reason") == "length":
-        raise RuntimeError(
-            f"resposta truncada em max_tokens={MAX_TOKENS}; aumente AI_CURATOR_MAX_TOKENS"
-        )
+        raise RuntimeError(f"resposta truncada; aumente AI_CURATOR_MAX_TOKENS (atual={MAX_TOKENS})")
     return (choices[0]["message"].get("content") or "").strip()
+
+
+def _call_gemini(prompt: str) -> str:
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY não configurada")
+    payload = json.dumps(
+        {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": MAX_TOKENS},
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    resp = httpx.post(
+        f"{GEMINI_BASE}/{GEMINI_MODEL}:generateContent",
+        headers={"Content-Type": "application/json; charset=utf-8", "x-goog-api-key": api_key},
+        content=payload,
+        timeout=TIMEOUT,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    candidates = body.get("candidates") or []
+    if not candidates:
+        return ""
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+    if not text and candidates[0].get("finishReason") == "MAX_TOKENS":
+        raise RuntimeError(f"resposta truncada; aumente AI_CURATOR_MAX_TOKENS (atual={MAX_TOKENS})")
+    return text
 
 
 def _call_anthropic(prompt: str) -> str:
     import anthropic
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID", "")
     client = anthropic.Anthropic(
         api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
-        timeout=120.0,  # 2 minutos max — fallback de último recurso
+        default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else {},
+        timeout=120.0,
     )
-    message = client.messages.create(
+    msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
-    return message.content[0].text.strip()
+    return msg.content[0].text.strip()
 
 
-def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 45000) -> str:
-    """
-    Compacta a transcrição do vídeo INTEIRO com timestamps claros para o modelo analisar
-    a narrativa completa de ponta a ponta, sem descartar o meio ou o final do vídeo.
-    """
+def _try_providers(prompt: str) -> str:
+    """Tenta provedores em ordem, com retries e backoff."""
+    providers = []
+
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if groq_key:
+        providers.append(("groq", lambda p: _call_openai_compat(GROQ_BASE, groq_key, GROQ_MODEL, p)))
+
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if openrouter_key:
+        providers.append(("openrouter", lambda p: _call_openai_compat(OPENROUTER_BASE, openrouter_key, OPENROUTER_MODEL, p)))
+
+    if os.environ.get("GEMINI_API_KEY", ""):
+        providers.append(("gemini", _call_gemini))
+
+    if os.environ.get("ANTHROPIC_API_KEY", "") and os.environ.get("ANTHROPIC_WORKSPACE_ID", ""):
+        providers.append(("anthropic", _call_anthropic))
+
+    if not providers:
+        print("[ai_curator] nenhuma chave de IA configurada")
+        return ""
+
+    for name, fn in providers:
+        for tentativa in range(2):
+            try:
+                raw = fn(prompt)
+                if raw:
+                    print(f"[ai_curator] sucesso via {name}")
+                    return raw
+            except Exception as e:
+                err_str = str(e)[:180]
+                print(f"[ai_curator] {name} tentativa {tentativa + 1}/2 falhou: {type(e).__name__}: {err_str}")
+                if "429" in err_str:
+                    # Rate limit: espera mais antes de tentar o próximo
+                    time.sleep(20 if tentativa == 0 else 0)
+                elif tentativa == 0:
+                    time.sleep(5)
+        print(f"[ai_curator] {name} esgotado, tentando próximo provedor...")
+
+    return ""
+
+
+# ─── preparação da transcrição ────────────────────────────────────────────────
+
+def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 12000) -> str:
     if not segments:
         return "[]"
 
     lines = []
-    total_len = 0
     for s in segments:
         start_sec = round(float(s.get("start", 0)), 1)
         end_sec = round(float(s.get("end", 0)), 1)
         text = str(s.get("text", "")).strip()
         if not text:
             continue
-        line = f"[{start_sec}s - {end_sec}s] {text}"
-        total_len += len(line) + 1
-        lines.append(line)
+        lines.append(f"[{start_sec}s - {end_sec}s] {text}")
+
+    if not lines:
+        return "[]"
 
     full_text = "\n".join(lines)
     if len(full_text) <= max_chars:
         return full_text
 
-    # Se o vídeo for gigantesco (horas), seleciona amostras uniformes cobrindo 100% da linha do tempo
-    step = max(1, len(lines) // 400)
-    sampled = lines[::step]
-    return "\n".join(sampled)
+    # Amostragem uniforme — calcula quantas linhas cabem em max_chars
+    avg_chars = max(1, len(full_text) // len(lines))
+    target_lines = max(10, max_chars // avg_chars)
+    step = max(1, len(lines) // target_lines)
+    sampled = "\n".join(lines[::step])
+    # Truncagem de segurança: nunca exceder max_chars (corta na última \n completa)
+    if len(sampled) > max_chars:
+        cut = sampled.rfind("\n", 0, max_chars)
+        sampled = sampled[:cut] if cut > 0 else sampled[:max_chars]
+    return sampled
 
+
+# ─── curadoria principal ──────────────────────────────────────────────────────
 
 def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters: list[dict] | None = None) -> list[dict]:
     """
-    Recebe transcript_data (dict com 'segments' e 'words') e retorna
-    uma lista de cortes virais estruturados com narrativa completa (início, meio e fim).
+    Retorna lista de cortes virais usando scoring multidimensional.
+    Prompt inspirado no OpenMontage clip-factory/script-director.
     """
     segments = transcript_data.get("segments", [])
     if not segments:
@@ -102,89 +202,71 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     if chapters is None:
         chapters = transcript_data.get("chapters") or []
 
-    # Configuração de duração conforme a intenção do usuário
     if clip_duration == "30":
         duration_desc = "Cortes curtos de 25 a 45 segundos (dinâmicos, direto ao ponto)."
-        min_duration = 20
-        max_duration = 45
+        min_duration, max_duration = 20, 45
     elif clip_duration == "60":
         duration_desc = "Cortes médios de 50 a 90 segundos (ideias desenvolvidas com clareza)."
-        min_duration = 40
-        max_duration = 90
-    else:  # auto
+        min_duration, max_duration = 40, 90
+    else:
         duration_desc = (
-            "Modo Automático Narrativo: A IA decide a duração IDEAL da história completa "
-            "(de 30 segundos até 300 segundos / 5 minutos). "
-            "Se for uma história longa cativante, mantenha o início, meio e conclusão completa sem cortar a história pela metade!"
+            "Modo Automático Narrativo: escolha a duração ideal para cada história "
+            "(mínimo 30s, máximo 300s / 5 min). Preserve início, desenvolvimento e conclusão completos."
         )
-        min_duration = 25
-        max_duration = 300  # até 5 minutos no automático!
+        min_duration, max_duration = 25, 300
 
-    chapters_context = ""
-    if chapters and len(chapters) > 0:
-        chapters_context = f"\nCapítulos do Vídeo:\n{json.dumps(chapters[:15], ensure_ascii=False)}\n"
+    chapters_ctx = ""
+    if chapters:
+        chapters_ctx = f"\nCAPÍTULOS DO VÍDEO:\n{json.dumps(chapters[:15], ensure_ascii=False)}\n"
 
-    timeline_text = prepare_full_transcript_timeline(segments)
+    timeline = prepare_full_transcript_timeline(segments)
+    video_end = float(segments[-1].get("end", 600)) if segments else 600.0
 
-    prompt = f"""Você é o Diretor de Criação e Especialista em Conteúdo Viral para Instagram Reels, TikTok e YouTube Shorts.
+    prompt = f"""Você é um editor de vídeo especializado em fragmentar vídeos longos em partes coerentes e compreensíveis.
 
-Sua missão é ler a transcrição abaixo e extrair os 3 MELHORES CORTES NARRATIVOS do vídeo.
+TAREFA: Segmente o vídeo em TODOS os blocos de conteúdo com sentido próprio. Gere tantos clipes quanto existirem blocos naturais no vídeo — pode ser 3, pode ser 10 ou mais.
 
-O QUE É UM CORTE VIRAL DE SUCESSO:
-1. GANCHO PODEROSO (Primeiros 3 segundos):
-   - Deve começar com uma quebra de padrão, pergunta contundente, afirmação polêmica ou choque de curiosidade.
-   - NUNCA comece com introduções vazias ("Oi pessoal", "Então galera", "No vídeo de hoje").
-2. NARRATIVA COMPLETA (Desenvolvimento sem enrolação):
-   - O corte DEVE contar uma história ou raciocínio completo com início, meio e fim.
-   - Não corte no meio de uma frase ou no clímax do assunto!
-3. DESFECHO / CONCLUSÃO / LIÇÃO (Final satisfatório):
-   - O corte deve terminar quando a ideia atinge sua conclusão, lição moral ou desfecho emocionante.
+COMO SEGMENTAR:
+1. Comece do início. Quando o locutor termina um assunto/história, esse é o fim do primeiro clipe.
+2. Quando começa um novo assunto, começa um novo clipe. E assim por diante até o fim do vídeo.
+3. Cada clipe deve ter começo, meio e fim dentro de seu próprio contexto — deve ser compreensível sozinho.
+4. Se no meio de uma história o locutor se desviar para outro assunto e depois voltar, você pode ignorar esse desvio nos timestamps (o clipe cobre a história principal, o desvio pode ficar de fora).
+5. Não pule nenhuma parte — cubra o vídeo inteiro do início ao fim, sem deixar buracos.
 
-DURAÇÃO SOLICITADA:
-{duration_desc}
-(Mínimo aceitável: {min_duration}s, Máximo aceitável: {max_duration}s)
+REGRAS:
+- Cada clipe deve fazer sentido para quem assiste sem ter visto o restante do vídeo.
+- Nunca comece um clipe no meio de uma frase ou raciocínio.
+- Para cada clipe, escreva um hook_title em MAIÚSCULAS que seja um gancho viral para redes sociais. Use emoção, suspense, curiosidade ou impacto — como se fosse o título de um Reels ou Short que precisa parar o dedo de quem está rolando o feed. Exemplos bons: "ELE CHOROU AO VIVO QUANDO OUVIU ISSO", "NINGUÉM ESPERAVA ESSA RESPOSTA", "ISSO MUDA TUDO", "A VERDADE QUE NINGUÉM TE CONTA". NUNCA use títulos descritivos ou jornalísticos tipo "FULANO EXPLICA SEU PONTO DE VISTA".
+- O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
 
-{chapters_context}
-TRANSCRIÇÃO COMPLETA DO VÍDEO COM TIMESTAMPS:
-{timeline_text}
+DURAÇÃO: {duration_desc}
+(Mínimo: {min_duration}s | Máximo: {max_duration}s | Duração do vídeo: {int(video_end)}s)
+{chapters_ctx}
+TRANSCRIÇÃO COM TIMESTAMPS:
+{timeline}
 
-INSTRUÇÃO DE RESPOSTA:
-Retorne ESTRITAMENTE um array JSON válido contendo exatamente 3 objetos, sem markdown, sem explicações adicionais:
+RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cubra o vídeo inteiro:
 [
   {{
-    "start_time": <float com o segundo exato onde começa o gancho>,
-    "end_time": <float com o segundo exato onde termina a conclusão>,
-    "hook_title": "<Título magnético em caixa alta para a headline do Reels, máx 60 caracteres>",
-    "ai_score": <float entre 0.70 e 0.99 estimando a taxa de retenção/viralidade>
+    "start_time": <segundo exato de início>,
+    "end_time": <segundo exato do fim>,
+    "hook_title": "<GANCHO VIRAL EM MAIÚSCULAS, máx 60 chars — provoca curiosidade ou emoção>",
+    "ai_score": <float 0.70-0.99>,
+    "scores": {{"hook": <0-10>, "coherence": <0-10>, "value": <0-10>, "energy": <0-10>, "platform_fit": <0-10>}}
   }}
 ]"""
 
-    raw = ""
-    if API_KEY:
-        for tentativa in range(2):  # max 2×60s = 2min, não 3×180s = 9min
-            try:
-                raw = _call_free_model(prompt)
-                break
-            except Exception as e:
-                print(f"[ai_curator] tentativa {tentativa + 1}/2 falhou ({type(e).__name__}: {e})")
-                if tentativa < 1:
-                    time.sleep(3)
-
-    if not raw and os.environ.get("ANTHROPIC_API_KEY"):
-        print("[ai_curator] usando Anthropic como reserva")
-        try:
-            raw = _call_anthropic(prompt)
-        except Exception as e:
-            print(f"[ai_curator] Anthropic também falhou: {e}")
+    raw = _try_providers(prompt)
 
     if not raw:
         print("[ai_curator] nenhum provedor disponível")
         return []
 
+    # Parse do JSON
     try:
         clips = json.loads(raw)
     except json.JSONDecodeError:
-        match = re.search(r'\[\s*\{.*?\}\s*\]', raw, re.DOTALL)
+        match = re.search(r'\[[\s\S]*?\]', raw)
         if match:
             try:
                 clips = json.loads(match.group())
@@ -193,34 +275,27 @@ Retorne ESTRITAMENTE um array JSON válido contendo exatamente 3 objetos, sem ma
         else:
             clips = []
 
-    # Validação e saneamento dos cortes
+    # Validação e saneamento
     validated = []
-    video_max_time = float(segments[-1].get("end", 600)) if segments else 600.0
-
-    for c in clips[:3]:
+    for c in clips[:15]:
         try:
             start = max(0.0, float(c.get("start_time", 0)))
             end = float(c.get("end_time", start + 60))
             if end <= start:
                 end = start + 60
 
-            # Limites flexíveis respeitando o modo automático
             dur = end - start
             if dur > max_duration:
                 end = start + max_duration
             elif dur < min_duration:
-                end = min(video_max_time, start + min_duration)
+                end = min(video_end, start + min_duration)
+            end = min(end, video_end)
 
-            end = min(end, video_max_time)
-
-            hook_title = str(c.get("hook_title", "CORTE VIRAL EXCLUSIVO")).strip()
-            # Limpa aspas
-            hook_title = hook_title.replace('"', '').replace("'", "")
+            hook_title = str(c.get("hook_title", "CORTE VIRAL")).strip().replace('"', '').replace("'", "")
             if len(hook_title) > 60:
                 hook_title = hook_title[:57] + "..."
 
-            ai_score = float(c.get("ai_score", 0.85))
-            ai_score = round(min(0.99, max(0.60, ai_score)), 2)
+            ai_score = round(min(0.99, max(0.60, float(c.get("ai_score", 0.85)))), 2)
 
             validated.append({
                 "start_time": round(start, 2),

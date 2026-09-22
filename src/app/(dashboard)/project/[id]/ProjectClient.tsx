@@ -216,6 +216,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
   errorMessage?: string | null
   onRetrying: () => void
 }) {
+  const supabase = createClient()
   const [retrying, setRetrying] = useState(false)
   const [copied, setCopied] = useState(false)
   const [errorTime, setErrorTime] = useState('')
@@ -758,31 +759,36 @@ export default function ProjectClient({
             if (data.project.error_message != null) setErrorMessage(data.project.error_message)
           }
           if (Array.isArray(data.clips)) {
-            localClipsCount = data.clips.length
+            const readyClips = data.clips.filter((c: any) => c.status === 'ready' || c.storage_url)
+            localClipsCount = readyClips.length
             const prevCount = clipsCountRef.current
-            const changed = data.clips.length !== prevCount
+            const changed = readyClips.length !== prevCount
             if (changed) {
-              clipsCountRef.current = data.clips.length
-              // Feedback FORA do updater — chamar setState dentro de setState updater causa TypeError no React
-              if (prevCount === 0 && data.clips.length > 0) {
-                setSelectedClipIndex(0)
-                triggerBulkFeedback('Primeiro corte viral minerado e pronto!')
-              } else if (data.clips.length > prevCount) {
-                triggerBulkFeedback(`Novo corte viral minerado (#${data.clips.length})!`)
+              clipsCountRef.current = readyClips.length
+              if (prevCount === 0 && readyClips.length > 0) {
+                // Auto-seleciona o primeiro clip PRONTO
+                const firstReadyIdx = data.clips.findIndex((c: any) => c.status === 'ready' || c.storage_url)
+                if (firstReadyIdx >= 0) setSelectedClipIndex(firstReadyIdx)
+                triggerBulkFeedback('Primeiro corte viral pronto!')
+              } else if (readyClips.length > prevCount) {
+                triggerBulkFeedback(`Corte #${readyClips.length} pronto!`)
               }
             }
             setClips(prev => {
-              if (data.clips.length !== prev.length || data.clips.some((c: any, i: number) => c.storage_url !== prev[i]?.storage_url)) {
+              if (data.clips.length !== prev.length || data.clips.some((c: any, i: number) => c.storage_url !== prev[i]?.storage_url || c.status !== prev[i]?.status)) {
                 return data.clips
               }
               return prev
             })
           }
 
-          // Encerra polling quando o backend finalizar
+          // Encerra polling quando o backend finalizar E não houver clips pendentes
           if (localStatus === 'done' || localStatus === 'completed' || localStatus === 'failed') {
             return
           }
+          // Continua polling enquanto houver clips em rendering, mesmo que status seja done
+          // (raro: projeto marcado done antes de todos clips atualizarem)
+
         } else if (res.status === 401) {
           // Sessão expirada — não faz fallback com Supabase client (causaria 401 em cadeia)
           console.warn('[polling] sessão expirada, aguardando renovação automática...')
@@ -836,16 +842,20 @@ export default function ProjectClient({
     }
   }, [project.id])
 
-  const activeClip = clips[selectedClipIndex] || clips[0] || {
-    id: 'placeholder',
-    title: project.title,
-    start_time: 35,
-    end_time: 78,
-    score: 0.95,
-    storage_url: null,
-    hook: null,
-    status: 'ready'
-  }
+  const readyClips = clips.filter(c => c.status === 'ready' || c.storage_url)
+  // activeClip sempre aponta para um clip pronto; se o índice selecionado for "rendering", usa o primeiro pronto
+  const activeClip = (clips[selectedClipIndex]?.status === 'ready' || clips[selectedClipIndex]?.storage_url)
+    ? clips[selectedClipIndex]
+    : readyClips[0] || clips[0] || {
+        id: 'placeholder',
+        title: project.title,
+        start_time: 35,
+        end_time: 78,
+        score: 0.95,
+        storage_url: null,
+        hook: null,
+        status: 'ready'
+      }
 
   // Duração
   const clipDuration = Math.max(1, (activeClip.end_time || 45) - (activeClip.start_time || 0))
@@ -994,7 +1004,6 @@ export default function ProjectClient({
 
   // Excluir projeto
   const handleDeleteThisProject = async () => {
-    if (!confirm('Deseja realmente excluir permanentemente este projeto e todos os seus cortes? Esta ação não pode ser desfeita.')) return
     setIsDeletingProject(true)
     try {
       const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
@@ -1111,42 +1120,61 @@ export default function ProjectClient({
         <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap pr-2">
           Cortes:
         </span>
-        {false && (
-          <span className="text-[11px] text-zinc-600 font-mono italic">gerando cortes...</span>
-        )}
         {clips.map((clip, idx) => {
           const isSelected = selectedClipIndex === idx
+          const isRendering = !clip.storage_url && clip.status === 'ready'
           const scorePercent = Math.round(clip.score * 100)
           return (
             <button
               key={clip.id}
               onClick={() => {
-                setSelectedClipIndex(idx)
-                setCustomTitle('')
-                setPlaybackTime(0)
+                if (!isRendering) {
+                  setSelectedClipIndex(idx)
+                  setCustomTitle('')
+                  setPlaybackTime(0)
+                }
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-                isSelected
-                  ? 'bg-white/10 text-white border border-white/20 shadow-sm'
-                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
+              disabled={isRendering}
+              title={isRendering ? 'Gerando corte...' : clip.title}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+                isRendering
+                  ? 'bg-indigo-500/8 border border-indigo-500/20 text-indigo-400/50 cursor-default'
+                  : isSelected
+                  ? 'bg-white/10 text-white border border-white/20 shadow-sm cursor-pointer'
+                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer'
               }`}
             >
-              <span className="font-semibold">#{idx + 1}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                scorePercent >= 90
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : 'bg-indigo-500/15 text-indigo-400'
-              }`}>
-                {scorePercent}%
-              </span>
+              {isRendering ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin text-indigo-400/60" />
+                  <span className="font-semibold text-indigo-400/50">#{idx + 1}</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">#{idx + 1}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                    scorePercent >= 90
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'bg-indigo-500/15 text-indigo-400'
+                  }`}>
+                    {scorePercent}%
+                  </span>
+                </>
+              )}
             </button>
           )
         })}
+        {status === 'processing' && clips.some(c => !c.storage_url) && (
+          <span className="text-[10px] text-indigo-400/60 font-mono italic whitespace-nowrap ml-1 flex items-center gap-1">
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+            cortando...
+          </span>
+        )}
       </div>
       )}
 
-      {/* 3. TELA DE ESPERA: processando sem nenhum corte pronto ainda */}
-      {status === 'processing' && clips.length === 0 && (
+      {/* 3. TELA DE ESPERA: processando sem nenhum corte PRONTO ainda */}
+      {status === 'processing' && !clips.some(c => c.status === 'ready' || c.storage_url) && (
         <div className="flex-1 flex flex-col items-center justify-center py-20 px-4">
           {elapsedSecs < 480 ? (
             <>
@@ -1189,9 +1217,9 @@ export default function ProjectClient({
         </div>
       )}
 
-      {/* BANNER DE PROGRESSO: processando com clips já disponíveis */}
-      {status === 'processing' && clips.length > 0 && (
-        <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
+      {/* BANNER DE PROGRESSO: processando com ao menos 1 corte pronto */}
+      {status === 'processing' && clips.some(c => c.status === 'ready' || c.storage_url) && (
+        <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.filter(c => c.status === 'ready' || c.storage_url).length} />
       )}
 
       {/* PAINEL DE ERRO COM CAUSA E BOTÃO DE RETENTAR */}
@@ -1204,8 +1232,8 @@ export default function ProjectClient({
         />
       )}
 
-      {/* ESTADO VAZIO: processamento concluído mas sem cortes gerados */}
-      {(status === 'done' || status === 'completed') && clips.length === 0 && (
+      {/* ESTADO VAZIO: processamento concluído mas sem cortes gerados com sucesso */}
+      {(status === 'done' || status === 'completed') && !clips.some(c => c.status === 'ready' || c.storage_url) && (
         <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
           <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
             <svg className="w-8 h-8 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1243,8 +1271,8 @@ export default function ProjectClient({
         </div>
       )}
 
-      {/* STUDIO: exibido apenas quando há cortes prontos */}
-      {clips.length > 0 && (
+      {/* STUDIO: exibido apenas quando há ao menos um corte pronto */}
+      {clips.some(c => c.status === 'ready' || c.storage_url) && (
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* COLUNA ESQUERDA (5 COLUNAS): PLAYER DO IPHONE 16 PRO */}
@@ -1524,25 +1552,28 @@ export default function ProjectClient({
                 </div>
               </div>
 
-              {/* 5. LEGENDA DINÂMICA (100% VINCULADA AO TEMPLATE) */}
-              <div
-                style={{
-                  left: `${subtitlePos.x}%`,
-                  top: `${subtitlePos.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                className="absolute pointer-events-none z-30 select-none flex justify-center whitespace-nowrap"
-              >
+              {/* 5. LEGENDA DINÂMICA — só mostra quando não há vídeo renderizado.
+                  Quando storage_url existe, a legenda já está queimada no vídeo. */}
+              {!activeClip.storage_url && (
                 <div
                   style={{
-                    backgroundColor: activeSubStyle.activeBg,
-                    color: activeSubStyle.activeColor,
+                    left: `${subtitlePos.x}%`,
+                    top: `${subtitlePos.y}%`,
+                    transform: 'translate(-50%, -50%)',
                   }}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight shadow-md border border-white/20 whitespace-nowrap"
+                  className="absolute pointer-events-none z-30 select-none flex justify-center whitespace-nowrap"
                 >
-                  {speechWords.length > 0 ? speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ') : 'SUA LEGENDA APARECERÁ AQUI'}
+                  <div
+                    style={{
+                      backgroundColor: activeSubStyle.activeBg,
+                      color: activeSubStyle.activeColor,
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight shadow-md border border-white/20 whitespace-nowrap"
+                  >
+                    {speechWords.length > 0 ? speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ') : 'SUA LEGENDA APARECERÁ AQUI'}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* BARRA HOME DO IPHONE */}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white/70 rounded-full pointer-events-none z-50 shadow-sm" />
