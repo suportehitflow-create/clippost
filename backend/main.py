@@ -562,6 +562,18 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 
+@app.delete("/api/admin/test-projects")
+async def delete_test_projects(user_id: str, video_id: str):
+    """Remove projetos e clips de um vídeo específico para re-teste."""
+    projs = supabase.table("projects").select("id").eq("user_id", user_id).like("source_url", f"%{video_id}%").execute()
+    deleted = 0
+    for p in (projs.data or []):
+        supabase.table("clips").delete().eq("project_id", p["id"]).execute()
+        supabase.table("projects").delete().eq("id", p["id"]).execute()
+        deleted += 1
+    return {"deleted": deleted, "video_id": video_id}
+
+
 @app.get("/api/projects/{user_id}")
 async def list_projects(user_id: str):
     try:
