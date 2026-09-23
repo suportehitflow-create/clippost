@@ -739,8 +739,15 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             supabase.table("projects").update(project_data).eq("id", project_id).execute()
         else:
             project_data.update({"user_id": user_id, "source_type": "url"})
-            db_response = supabase.table("projects").insert(project_data).execute()
-            project_id = db_response.data[0]['id']
+            try:
+                db_response = supabase.table("projects").insert(project_data).execute()
+                project_id = db_response.data[0]['id']
+            except Exception as proj_err:
+                _e = str(proj_err).lower()
+                if "foreign" in _e or "fk" in _e or "violates" in _e or "user" in _e:
+                    print(f"[pipeline] FK error ao criar projeto (user_id={user_id} não cadastrado): {proj_err} — continuando sem project_id")
+                else:
+                    raise
 
         # 6. AI Curator — detectar momentos virais
         _set_step(project_id, "ia_curator")
