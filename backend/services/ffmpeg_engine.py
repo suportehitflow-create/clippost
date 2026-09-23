@@ -180,11 +180,12 @@ def create_vertical_clip(
         layout = (brand_kit or {}).get("layout_config", {})
 
         # 1. Dimensões do quadrado/retângulo de vídeo do template
-        video_w_pct = float(layout.get("videoWidth", 96))
-        video_h_pct = float(layout.get("videoHeight", 48))
-        video_pos = layout.get("videoPos", {"x": 50, "y": 55})
+        # Default: preenche tela completa (sem brand_kit configurado)
+        video_w_pct = float(layout.get("videoWidth", 100))
+        video_h_pct = float(layout.get("videoHeight", 92))
+        video_pos = layout.get("videoPos", {"x": 50, "y": 50})
         video_pos_x = float(video_pos.get("x", 50))
-        video_pos_y = float(video_pos.get("y", 55))
+        video_pos_y = float(video_pos.get("y", 50))
 
         target_w = int(round(1080 * (video_w_pct / 100.0)))
         target_h = int(round(1920 * (video_h_pct / 100.0)))
