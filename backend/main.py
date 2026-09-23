@@ -624,6 +624,47 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 
+@app.post("/api/admin/set-youtube-cookies")
+async def set_youtube_cookies(request: Request):
+    """Carrega cookies do YouTube via HTTP (contorna limitação de injeção de secrets do Fly.io)."""
+    admin_key = os.environ.get("ADMIN_SECRET", "")
+    if not admin_key or request.headers.get("X-Admin-Token") != admin_key:
+        raise HTTPException(status_code=403, detail="admin token inválido")
+    body = await request.json()
+    cookies_b64 = body.get("cookies_b64", "").strip()
+    if not cookies_b64:
+        raise HTTPException(status_code=400, detail="cookies_b64 é obrigatório")
+    try:
+        import base64
+        cookies_path = "/tmp/yt_cookies.txt"
+        with open(cookies_path, "wb") as f:
+            f.write(base64.b64decode(cookies_b64))
+        os.environ["YOUTUBE_COOKIES_FILE"] = cookies_path
+        os.environ["YOUTUBE_COOKIES_B64"] = cookies_b64
+        lines = cookies_b64.count("youtube") + cookies_b64.count("google")
+        print(f"[admin] cookies do YouTube atualizados via HTTP — {len(cookies_b64)} chars b64")
+        return {"ok": True, "bytes_written": len(base64.b64decode(cookies_b64)), "path": cookies_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"falha ao salvar cookies: {e}")
+
+
+@app.get("/api/admin/youtube-cookies-status")
+async def youtube_cookies_status():
+    """Verifica se cookies do YouTube estão carregados (sem expor o conteúdo)."""
+    cookies_path = os.environ.get("YOUTUBE_COOKIES_FILE", "/tmp/yt_cookies.txt")
+    import pathlib
+    p = pathlib.Path(cookies_path)
+    exists = p.exists()
+    size = p.stat().st_size if exists else 0
+    b64_set = bool(os.environ.get("YOUTUBE_COOKIES_B64"))
+    return {
+        "cookies_file_exists": exists,
+        "cookies_file_size_bytes": size,
+        "youtube_cookies_b64_in_env": b64_set,
+        "cookies_path": cookies_path,
+    }
+
+
 @app.delete("/api/admin/test-projects")
 async def delete_test_projects(user_id: str, video_id: str):
     """Remove projetos e clips de um vídeo específico para re-teste."""
