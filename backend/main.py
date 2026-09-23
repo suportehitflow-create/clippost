@@ -721,15 +721,10 @@ async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: Ba
 
     clip = clip_res.data
 
-    update_data: dict = {"subtitle_preset": req.subtitle_preset, "status": "rerendering"}
-    if req.subtitle_y is not None:
-        update_data["subtitle_y"] = req.subtitle_y
-    if req.words:
-        update_data["words"] = req.words
     try:
-        supabase.table("clips").update(update_data).eq("id", clip_id).execute()
+        supabase.table("clips").update({"status": "processing"}).eq("id", clip_id).execute()
     except Exception as e:
-        print(f"[re-render] erro ao atualizar clip: {e}")
+        print(f"[re-render] erro ao atualizar status do clip: {e}")
 
     from tasks import rerender_clip_task
     if CELERY_ENABLED:

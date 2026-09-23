@@ -562,7 +562,7 @@ def _download_via_piped(url: str, tmp_dir: Path) -> tuple[str, dict]:
 
 
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = True, template_config: dict | None = None):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = False, template_config: dict | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
     if project_id:
         try:
@@ -628,10 +628,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # Download unificado: baixa o vídeo e legendas simultaneamente no mesmo request
         ydl_opts_video = {
             **_ydl_base,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitlesformat': 'vtt',
-            'subtitleslangs': ['pt', 'pt-BR', 'en'],
             'ignoreerrors': True,
         }
 
@@ -806,22 +802,11 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as upload_err:
             print(f"[pipeline] upload vídeo raw falhou (não crítico): {upload_err}")
 
-        # 3. Transcrição: Procura legendas nativas do YouTube (.vtt) para Modo Turbo (~15s)
-        # Ordena candidatos por tamanho decrescente para selecionar a legenda mais completa
-        vtt_candidates = sorted(tmp_dir.glob("*.vtt"), key=lambda p: p.stat().st_size, reverse=True)
+        # 3. Transcrição: Sempre usa Groq Whisper com timestamps acústicos precisos por palavra
+        _set_step(project_id, "transcricao")
+        print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
         transcript_data = None
-        for vtt_file in vtt_candidates:
-            try:
-                cand = parse_vtt_subtitles(vtt_file)
-                if cand and len(cand.get("segments", [])) >= 5:
-                    transcript_data = cand
-                    print(f"[tasks] Modo Turbo ativo ({vtt_file.name}): {len(transcript_data.get('segments', []))} falas nativas extraídas")
-                    break
-            except Exception as e:
-                print(f"[tasks] falha ao ler legenda nativa {vtt_file.name}: {e}")
-
-        if not transcript_data or not transcript_data.get("segments"):
-            _set_step(project_id, "transcricao")
+        if True:
             print(f"[pipeline] sem legendas nativas — extraindo áudio para transcrição...")
             # Usa 64kbps mono para manter arquivo <25MB (limite Groq Whisper API)
             subprocess.run([
@@ -971,11 +956,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
             margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
             sub_preset = ((brand_kit or {}).get("layout_config") or {}).get("subtitle_preset") or "hormozi_yellow"
+            layout_cfg = (brand_kit or {}).get("layout_config") or {}
+            sub_font_family = layout_cfg.get("fontFamily")
+            sub_font_size = layout_cfg.get("fontSize")
             subtitle_file = generate_ass(
                 segments, str(tmp_dir / f"subtitles_{i}.ass"),
                 clip_start=start, clip_end=end, words=words,
                 margin_v=margin_v,
                 subtitle_preset=sub_preset,
+                font_family=sub_font_family,
+                font_size=sub_font_size,
             )
             try:
                 create_vertical_clip(
@@ -1102,6 +1092,18 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         source_url = proj_res.data.get("source_url")
         transcript_data = proj_res.data.get("transcript") or {}
 
+        # Garante cookies do YouTube em qualquer máquina do cluster Fly
+        b64_cookies = os.environ.get("YOUTUBE_COOKIES_B64")
+        if b64_cookies and not os.path.exists("/tmp/yt_cookies.txt"):
+            try:
+                import base64
+                with open("/tmp/yt_cookies.txt", "wb") as f:
+                    f.write(base64.b64decode(b64_cookies))
+                os.environ["YOUTUBE_COOKIES_FILE"] = "/tmp/yt_cookies.txt"
+                print("[tasks] cookies do YouTube decodificados para /tmp/yt_cookies.txt")
+            except Exception as ck_err:
+                print(f"[tasks] erro ao decodificar cookies: {ck_err}")
+
         tmp_dir = Path(tempfile.mkdtemp())
         video_path = str(tmp_dir / "raw.mp4")
         video_downloaded = False
@@ -1120,16 +1122,31 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
                 print(f"[re-render] download de raw_video_url falhou: {dl_err}, tentando fallback source_url...")
 
         if not video_downloaded and source_url:
-            print(f"[re-render] baixando vÃ­deo da fonte: {source_url[:80]}...")
+            print(f"[re-render] baixando vídeo da fonte com cookies: {source_url[:80]}...")
+            _fallback_cookies = "/tmp/yt_cookies.txt"
+            cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE") or (
+                _fallback_cookies if os.path.exists(_fallback_cookies) else None
+            )
+            ydl_opts = {
+                "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+                "outtmpl": str(tmp_dir / "raw.%(ext)s"),
+                "merge_output_format": "mp4",
+                "quiet": True,
+                "no_warnings": True,
+                "nocheckcertificate": True,
+                "socket_timeout": 60,
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.135 Mobile Safari/537.36",
+                    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+                },
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["ios", "android", "tv_embedded", "web"],
+                    },
+                },
+                **({"cookiefile": cookies_file} if cookies_file and os.path.exists(cookies_file) else {}),
+            }
             try:
-                ydl_opts = {
-                    "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                    "outtmpl": str(tmp_dir / "raw.%(ext)s"),
-                    "merge_output_format": "mp4",
-                    "quiet": True,
-                    "no_warnings": True,
-                    "nocheckcertificate": True,
-                }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.extract_info(source_url, download=True)
                 v_cands = list(tmp_dir.glob("raw.mp4")) + list(tmp_dir.glob("raw.mkv")) + list(tmp_dir.glob("raw.webm"))
@@ -1137,29 +1154,85 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
                     video_path = str(v_cands[0])
                     video_downloaded = True
             except Exception as ytdl_err:
-                print(f"[re-render] fallback source_url falhou: {ytdl_err}")
+                print(f"[re-render] yt-dlp falhou ({ytdl_err}), tentando Cobalt...")
+                try:
+                    video_path, _ = _download_via_cobalt_public(source_url, tmp_dir)
+                    video_downloaded = True
+                except Exception as c_err:
+                    print(f"[re-render] cobalt público falhou: {c_err}")
+                    try:
+                        video_path, _ = _download_via_cobalt(source_url, tmp_dir)
+                        video_downloaded = True
+                    except Exception as c2_err:
+                        print(f"[re-render] cobalt privado falhou: {c2_err}")
 
         if not video_downloaded or not os.path.exists(video_path):
             supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
             print(f"[re-render] vÃ­deo nÃ£o encontrado para projeto {project_id}")
             return {"status": "error", "message": "raw video not found"}
 
+        # Obtém brand_kit do usuário antes de gerar legendas
+        brand_kit_res = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+        brand_kit = (brand_kit_res.data if brand_kit_res else None) or {}
+        layout_cfg = (brand_kit or {}).get("layout_config") or {}
+
+        active_preset = subtitle_preset or layout_cfg.get("subtitle_preset") or "hormozi_yellow"
+        font_family = layout_cfg.get("fontFamily")
+        font_size = layout_cfg.get("fontSize")
+        sub_y = subtitle_y if subtitle_y is not None else layout_cfg.get("subtitlePos", {}).get("y", 78.0)
+        margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
+
         seg_words = words or (transcript_data.get("words") if isinstance(transcript_data, dict) else None) or []
         segments = transcript_data.get("segments", []) if isinstance(transcript_data, dict) else []
 
-        start_snapped, end_snapped = snap_to_words(start, end, seg_words)
+        # Sempre transcreve o áudio do clipe com Groq Whisper para garantir 100% de precisão acústica e sincronia
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        if groq_key:
+            try:
+                print(f"[re-render] Transcrevendo áudio do clipe via Groq Whisper ({start:.1f}s a {end:.1f}s)...")
+                clip_audio_path = str(tmp_dir / "clip_audio.mp3")
+                dur = max(1.0, end - start)
+                subprocess.run([
+                    "ffmpeg", "-y", "-ss", str(start), "-t", str(dur),
+                    "-i", video_path, "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k",
+                    clip_audio_path
+                ], check=True, capture_output=True, timeout=60)
+                with open(clip_audio_path, "rb") as af:
+                    a_bytes = af.read()
+                resp = httpx.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files=[
+                        ("model", (None, "whisper-large-v3-turbo")),
+                        ("language", (None, "pt")),
+                        ("response_format", (None, "verbose_json")),
+                        ("timestamp_granularities[]", (None, "word")),
+                        ("timestamp_granularities[]", (None, "segment")),
+                        ("file", ("audio.mp3", a_bytes, "audio/mpeg")),
+                    ],
+                    timeout=60.0
+                )
+                if resp.status_code == 200:
+                    gr = resp.json()
+                    c_words = gr.get("words", [])
+                    c_segs = gr.get("segments", [])
+                    if c_words:
+                        seg_words = [{"start": round(w["start"] + start, 2), "end": round(w["end"] + start, 2), "word": w["word"]} for w in c_words]
+                        segments = [{"start": round(s["start"] + start, 2), "end": round(s["end"] + start, 2), "text": s["text"]} for s in c_segs]
+                        print(f"[re-render] Groq Whisper gerou {len(seg_words)} palavras acústicas perfeitas para o clipe")
+            except Exception as tr_err:
+                print(f"[re-render] Fallback de áudio Groq falhou: {tr_err}")
 
-        sub_y = subtitle_y if subtitle_y is not None else 80.0
-        margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
+        start_snapped, end_snapped = snap_to_words(start, end, seg_words) if seg_words else (start, end)
+
         subtitle_file = generate_ass(
             segments, str(tmp_dir / "sub.ass"),
             clip_start=start_snapped, clip_end=end_snapped, words=seg_words,
             margin_v=margin_v,
-            subtitle_preset=subtitle_preset,
+            subtitle_preset=active_preset,
+            font_family=font_family,
+            font_size=font_size,
         )
-
-        brand_kit_res = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
-        brand_kit = (brand_kit_res.data if brand_kit_res else None) or {}
 
         clip_out = str(tmp_dir / "rerendered.mp4")
         create_vertical_clip(
@@ -1185,11 +1258,14 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         data = _recompress_if_needed(clip_out)
         new_url = _upload_clip_to_storage(clip_key, data)
 
-        supabase.table("clips").update({
+        update_payload = {
             "storage_url": new_url,
-            "subtitle_preset": subtitle_preset,
             "status": "ready",
-        }).eq("id", clip_id).execute()
+        }
+        try:
+            supabase.table("clips").update({**update_payload, "subtitle_preset": active_preset}).eq("id", clip_id).execute()
+        except Exception:
+            supabase.table("clips").update(update_payload).eq("id", clip_id).execute()
 
         print(f"[re-render] clip {clip_id} re-renderizado com sucesso: {new_url}")
         return {"status": "success", "clip_id": clip_id, "url": new_url}

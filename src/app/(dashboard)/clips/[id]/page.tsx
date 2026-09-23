@@ -32,7 +32,7 @@ import Link from 'next/link'
 import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 
-type SubtitleStyle = 'hormozi_yellow' | 'neon_glow' | 'clean_box' | 'minimal_apple'
+type SubtitleStyle = 'hormozi_yellow' | 'hormozi_orange' | 'clean_white' | 'dark_box' | 'neon_cyan' | 'neon_magenta' | 'neon_glow' | 'clean_box' | 'minimal_apple'
 
 interface WordItem {
   id: string
@@ -44,17 +44,69 @@ interface WordItem {
 const STYLES_CAROUSEL = [
   {
     id: 'hormozi_yellow' as SubtitleStyle,
-    name: 'Hormozi Viral',
+    name: 'Hormozi Amarelo',
     accentColor: '#FACC15',
-    bgColor: 'rgba(0,0,0,0.85)',
-    border: 'border-yellow-400/40',
+    textColor: '#000000',
+    bgColor: '#facc15',
+    border: 'border-yellow-400',
     font: 'font-black uppercase',
-    desc: 'Amarelo neon com borda preta grossa.'
+    desc: 'Amarelo ouro com texto preto (Mais Viral).'
+  },
+  {
+    id: 'hormozi_orange' as SubtitleStyle,
+    name: 'Hormozi Laranja',
+    accentColor: '#EA580C',
+    textColor: '#ffffff',
+    bgColor: '#ea580c',
+    border: 'border-orange-500',
+    font: 'font-black uppercase',
+    desc: 'Caixa laranja vibrante com texto branco.'
+  },
+  {
+    id: 'clean_white' as SubtitleStyle,
+    name: 'Clean White',
+    accentColor: '#FFFFFF',
+    textColor: '#09090b',
+    bgColor: '#ffffff',
+    border: 'border-white',
+    font: 'font-black uppercase',
+    desc: 'Caixa branca pura com texto escuro.'
+  },
+  {
+    id: 'dark_box' as SubtitleStyle,
+    name: 'Dark Box',
+    accentColor: '#F97316',
+    textColor: '#f97316',
+    bgColor: '#18181b',
+    border: 'border-zinc-700',
+    font: 'font-black uppercase',
+    desc: 'Caixa escura de alto contraste com texto laranja.'
+  },
+  {
+    id: 'neon_cyan' as SubtitleStyle,
+    name: 'Neon Cyan',
+    accentColor: '#22D3EE',
+    textColor: '#22d3ee',
+    bgColor: 'rgba(0,0,0,0.85)',
+    border: 'border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.5)]',
+    font: 'font-extrabold uppercase',
+    desc: 'Brilho ciano fluorescente tech.'
+  },
+  {
+    id: 'neon_magenta' as SubtitleStyle,
+    name: 'Neon Magenta',
+    accentColor: '#F472B6',
+    textColor: '#f472b6',
+    bgColor: 'rgba(0,0,0,0.85)',
+    border: 'border-pink-400/50 shadow-[0_0_12px_rgba(236,72,153,0.5)]',
+    font: 'font-extrabold uppercase',
+    desc: 'Rosa neon vibrante de alto hype.'
   },
   {
     id: 'neon_glow' as SubtitleStyle,
     name: 'Neon Glow',
     accentColor: '#06B6D4',
+    textColor: '#06b6d4',
     bgColor: 'rgba(0,0,0,0.85)',
     border: 'border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.3)]',
     font: 'font-extrabold uppercase',
@@ -64,6 +116,7 @@ const STYLES_CAROUSEL = [
     id: 'clean_box' as SubtitleStyle,
     name: 'Clean Box',
     accentColor: '#FFFFFF',
+    textColor: '#ffffff',
     bgColor: 'rgba(24,24,27,0.95)',
     border: 'border-white/10',
     font: 'font-semibold',
@@ -73,6 +126,7 @@ const STYLES_CAROUSEL = [
     id: 'minimal_apple' as SubtitleStyle,
     name: 'Minimal Apple',
     accentColor: '#F4F4F5',
+    textColor: '#f4f4f5',
     bgColor: 'transparent',
     border: 'border-transparent drop-shadow-md',
     font: 'font-sans font-medium',
@@ -489,7 +543,7 @@ export default function ClipEditorPage() {
                 >
                   <span
                     className={`text-xs ${activeStyleObj.font}`}
-                    style={{ color: activeStyleObj.accentColor }}
+                    style={{ color: (activeStyleObj as any).textColor || activeStyleObj.accentColor }}
                   >
                     {(() => {
                       const rawWord = activeWord ? activeWord.word : (words[0]?.word || 'LEGENDA DINÂMICA')
