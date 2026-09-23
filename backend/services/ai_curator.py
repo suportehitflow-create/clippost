@@ -160,7 +160,7 @@ def _try_providers(prompt: str) -> str:
 _call_free_model = _try_providers
 
 
-def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 12000) -> str:
+def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 60000) -> str:
     if not segments:
         return "[]"
 

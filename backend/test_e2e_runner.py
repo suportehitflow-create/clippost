@@ -68,6 +68,9 @@ if __name__ == '__main__':
     elif t == 'medium':
         u = target_url or 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
         run_test('VIDEO MEDIO', u, '60')
+    elif t == 'podcast':
+        u = target_url or 'https://www.youtube.com/watch?v=qp0HIF3SfI4'
+        run_test('PODCAST LONGO', u, 'auto')
     elif t == 'long':
         u = target_url or 'https://www.youtube.com/watch?v=qp0HIF3SfI4'
         run_test('VIDEO LONGO', u, 'auto')
