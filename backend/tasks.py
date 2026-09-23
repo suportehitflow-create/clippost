@@ -1,4 +1,4 @@
-"""
+﻿"""
 clipost — Worker Celery (processo completo)
 1. Download (yt-dlp)
 2. Upload vídeo raw → Supabase Storage
@@ -499,36 +499,45 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if mp4_candidates:
             video_path = str(mp4_candidates[0])
 
-        # 2. Upload vídeo raw para Supabase Storage (best-effort, com timeout de 90s)
-        storage_path = f"{user_id}/{video_id}.mp4"
+        # 2. Upload vídeo raw para Supabase Storage (best-effort, em background e sem bloquear o pipeline)
         raw_video_url = None
         try:
-            import concurrent.futures
-            def _upload_raw():
-                with open(video_path, 'rb') as f:
-                    supabase.storage.from_("videos").upload(
-                        path=storage_path,
-                        file=f.read(),
-                        file_options={"content-type": "video/mp4", "upsert": "true"},
-                    )
-                return supabase.storage.from_("videos").get_public_url(storage_path)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_upload_raw)
-                raw_video_url = future.result(timeout=90)
-        except concurrent.futures.TimeoutError:
-            print(f"[pipeline] upload vídeo raw timeout (não crítico), continuando")
+            raw_size_mb = Path(video_path).stat().st_size / (1024 * 1024)
+            if raw_size_mb <= 45:
+                storage_path = f"{user_id}/{video_id}.mp4"
+                def _bg_upload_raw(vpath, spath):
+                    try:
+                        with open(vpath, 'rb') as f:
+                            supabase.storage.from_("videos").upload(
+                                path=spath,
+                                file=f.read(),
+                                file_options={"content-type": "video/mp4", "upsert": "true"},
+                            )
+                        print(f"[pipeline] raw video upload concluído em background: {spath}")
+                    except Exception as e:
+                        print(f"[pipeline] raw upload background ignorado: {e}")
+
+                import threading
+                threading.Thread(target=_bg_upload_raw, args=(video_path, storage_path), daemon=True).start()
+                raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+            else:
+                print(f"[pipeline] vídeo original {raw_size_mb:.1f}MB > 45MB — pulando upload raw para economizar storage e acelerar processamento")
         except Exception as upload_err:
             print(f"[pipeline] upload vídeo raw falhou (não crítico): {upload_err}")
 
         # 3. Transcrição: Procura legendas nativas do YouTube (.vtt) para Modo Turbo (~15s)
-        vtt_candidates = list(tmp_dir.glob("*.vtt"))
+        # Ordena candidatos por tamanho decrescente para selecionar a legenda mais completa
+        vtt_candidates = sorted(tmp_dir.glob("*.vtt"), key=lambda p: p.stat().st_size, reverse=True)
         transcript_data = None
-        if vtt_candidates:
+        for vtt_file in vtt_candidates:
             try:
-                transcript_data = parse_vtt_subtitles(vtt_candidates[0])
-                print(f"[tasks] Modo Turbo ativo: {len(transcript_data.get('segments', []))} falas nativas extraídas")
+                cand = parse_vtt_subtitles(vtt_file)
+                if cand and len(cand.get("segments", [])) >= 5:
+                    transcript_data = cand
+                    print(f"[tasks] Modo Turbo ativo ({vtt_file.name}): {len(transcript_data.get('segments', []))} falas nativas extraídas")
+                    break
             except Exception as e:
-                print(f"[tasks] falha ao ler legenda nativa .vtt: {e}")
+                print(f"[tasks] falha ao ler legenda nativa {vtt_file.name}: {e}")
 
         if not transcript_data or not transcript_data.get("segments"):
             _set_step(project_id, "transcricao")
