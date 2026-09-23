@@ -32,7 +32,7 @@ from services.cut_rules import snap_to_words
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
 from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
-from services.scene_detector import detect_scenes, scene_timestamps
+from services.scene_detector import detect_scenes
 
 load_dotenv()
 
@@ -548,49 +548,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                             words.append({"start": w.start, "end": w.end, "word": w.word})
                 transcript_data = {"segments": segments, "words": words}
 
-            # Fallback 3: autocut (se faster-whisper também falhou ou retornou 0 segmentos)
-            if not transcript_data or not transcript_data.get("segments"):
-                print(f"[pipeline] tentando autocut como fallback de transcrição...")
-                try:
-                    import tempfile, json as _json
-                    from autocut.transcribe import Transcribe
-                    import argparse as _ap
-                    _args = _ap.Namespace(
-                        inputs=[audio_path],
-                        whisper_model="tiny",
-                        lang=None,
-                        prompt="",
-                        output_dir=str(Path(audio_path).parent),
-                        encoding="utf-8",
-                        device="cpu",
-                        whisper_mode="faster",
-                        openai_rpm=3,
-                    )
-                    t = Transcribe(_args)
-                    t.run()
-                    # autocut gera .srt ao lado do arquivo de áudio
-                    srt_path = audio_path.replace(".mp3", ".srt")
-                    if Path(srt_path).exists():
-                        import re as _re
-                        srt_text = Path(srt_path).read_text(encoding="utf-8", errors="ignore")
-                        segs = []
-                        for block in _re.split(r"\n\n+", srt_text.strip()):
-                            lines = block.strip().split("\n")
-                            if len(lines) >= 3:
-                                times = lines[1].replace(",", ".").split(" --> ")
-                                def _tc(s):
-                                    h, m, rest = s.strip().split(":")
-                                    sec, ms = rest.split(".")
-                                    return int(h)*3600 + int(m)*60 + int(sec) + int(ms[:3])/1000
-                                try:
-                                    segs.append({"start": _tc(times[0]), "end": _tc(times[1]), "text": " ".join(lines[2:])})
-                                except Exception:
-                                    pass
-                        if segs:
-                            transcript_data = {"segments": segs, "words": []}
-                            print(f"[pipeline] autocut fallback OK — {len(segs)} segmentos")
-                except Exception as ac_err:
-                    print(f"[pipeline] autocut fallback falhou: {ac_err}")
 
         chapters = info.get("chapters") or []
         transcript_data["chapters"] = chapters
