@@ -94,7 +94,8 @@ async def _mark_stuck_projects(label: str = "recovery"):
 
 
 async def _cleanup_old_projects():
-    """Apaga projetos e clipes: failed imediatamente + done/processing há mais de 24h."""
+    """Apaga projetos e clipes: failed sem clips imediatamente + done/others há mais de 24h.
+    Projetos failed COM clips prontos (storage_url) são resgatados como done."""
     try:
         if not supabase:
             return
@@ -102,12 +103,27 @@ async def _cleanup_old_projects():
         now = datetime.now(timezone.utc)
         cutoff_24h = (now - timedelta(hours=24)).isoformat()
 
-        # Projetos failed (qualquer idade) + projetos done/others com mais de 24h
         failed_res = supabase.table("projects").select("id").eq("status", "failed").execute()
         old_res = supabase.table("projects").select("id").lt("created_at", cutoff_24h).execute()
 
-        ids_to_delete = list({r["id"] for r in (failed_res.data or [])} | {r["id"] for r in (old_res.data or [])})
+        failed_ids = {r["id"] for r in (failed_res.data or [])}
+        old_ids = {r["id"] for r in (old_res.data or [])}
+
+        # Salvar projetos failed que têm clips prontos
+        saved = 0
+        for pid in list(failed_ids):
+            clips_res = supabase.table("clips").select("id, storage_url").eq("project_id", pid).execute()
+            ready = [c for c in (clips_res.data or []) if c.get("storage_url")]
+            if ready:
+                supabase.table("projects").update({"status": "done"}).eq("id", pid).execute()
+                failed_ids.discard(pid)
+                saved += 1
+                print(f"[cleanup] projeto {pid[:8]} resgatado: {len(ready)} clips prontos → done")
+
+        ids_to_delete = list(failed_ids | old_ids)
         if not ids_to_delete:
+            if saved:
+                print(f"[cleanup] {saved} projeto(s) resgatados de failed para done")
             return
 
         deleted = 0
@@ -119,6 +135,8 @@ async def _cleanup_old_projects():
             except Exception as e:
                 print(f"[cleanup] erro ao deletar projeto {pid}: {e}")
 
+        if saved:
+            print(f"[cleanup] {saved} projeto(s) resgatados de failed para done")
         if deleted:
             print(f"[cleanup] {deleted} projeto(s) antigos/falhos removidos")
     except Exception as e:

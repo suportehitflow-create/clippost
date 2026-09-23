@@ -64,10 +64,24 @@ def _recompress_if_needed(file_path: str) -> bytes:
     if size_mb <= _MAX_UPLOAD_MB:
         return data
 
+    # Obter duração para calcular maxrate seguro no 4º passe
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", file_path],
+            capture_output=True, text=True, timeout=30
+        )
+        clip_secs = max(1.0, float(probe.stdout.strip()))
+    except Exception:
+        clip_secs = 60.0
+    # maxrate para garantir <= 42MB com margem de 15% (bufsize 2× pode gerar picos)
+    safe_vbr = max(150, int(42 * 8 * 1024 * 0.85 / clip_secs) - 48)
+
     passes = [
         ("scale=min(720\\,iw):-2", "32", "2200k", "64k"),
         ("scale=min(720\\,iw):-2", "36", "1600k", "48k"),
         ("scale=min(480\\,iw):-2", "40", "1000k", "48k"),
+        ("scale=min(360\\,iw):-2", "51", f"{safe_vbr}k", "32k"),  # 4º passe: bitrate calculado pela duração
     ]
     out = tempfile.mktemp(suffix=".mp4")
     try:
