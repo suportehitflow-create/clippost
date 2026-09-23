@@ -661,41 +661,15 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # "rendering" para o frontend mostrar progresso, atualiza para "ready" ao concluir)
         _set_step(project_id, "gerando_clipes")
 
-        # Fase A: prepara tempos e pre-insere todos os clips como "rendering"
         _MAX_CLIP_DURATION = 300.0  # 5 min — clips mais longos causam arquivos >50 MB
-        prepared_clips = []
         for i, clip in enumerate(clips_meta):
             start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
             if video_duration:
                 end = min(end, float(video_duration))
-            # Cap: nunca mais que 5 min por clip (evita 100+ MB e recompressão lenta)
             end = min(end, start + _MAX_CLIP_DURATION)
             if end - start < 1:
                 continue
-            try:
-                row = supabase.table("clips").insert({
-                    "project_id": project_id,
-                    "user_id": user_id,
-                    "title": clip["hook_title"],
-                    "hook": clip["hook_title"],
-                    "start_time": start,
-                    "end_time": end,
-                    "score": clip["ai_score"],
-                    "storage_url": None,
-                    "status": "pending",
-                }).execute()
-                clip_db_id = row.data[0]["id"] if row.data else None
-            except Exception as pre_err:
-                print(f"[pipeline] erro ao pre-inserir clip {i}: {pre_err}")
-                clip_db_id = None
-            prepared_clips.append({
-                "clip_meta": clip, "start": start, "end": end, "index": i, "db_id": clip_db_id,
-            })
-        print(f"[pipeline] {len(prepared_clips)} clips pré-criados no DB como 'pending'")
 
-        # Fase B: renderiza cada clip e atualiza para "ready" conforme conclui
-        for pc in prepared_clips:
-            i, start, end, clip, clip_db_id = pc["index"], pc["start"], pc["end"], pc["clip_meta"], pc["db_id"]
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
             margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
@@ -719,54 +693,33 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 )
             except Exception as e:
                 print(f"[ffmpeg] erro no clipe {i}: {e}")
-                if clip_db_id:
-                    try:
-                        supabase.table("clips").delete().eq("id", clip_db_id).execute()
-                    except Exception:
-                        pass
                 continue
 
             if not os.path.exists(clip_out):
-                if clip_db_id:
-                    try:
-                        supabase.table("clips").delete().eq("id", clip_db_id).execute()
-                    except Exception:
-                        pass
                 continue
 
             check = validate_clip(clip_out, expected_duration=end - start)
             if not check["ok"]:
                 print(f"[clip {i}] descartado: {'; '.join(check['issues'])}")
-                if clip_db_id:
-                    try:
-                        supabase.table("clips").delete().eq("id", clip_db_id).execute()
-                    except Exception:
-                        pass
                 continue
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
             clip_data = _recompress_if_needed(clip_out)
             clip_url = _upload_clip_to_storage(clip_key, clip_data)
 
-            if clip_db_id:
-                supabase.table("clips").update({
-                    "storage_url": clip_url,
-                    "status": "ready",
-                }).eq("id", clip_db_id).execute()
-            else:
-                supabase.table("clips").insert({
-                    "project_id": project_id,
-                    "user_id": user_id,
-                    "title": clip["hook_title"],
-                    "hook": clip["hook_title"],
-                    "start_time": start,
-                    "end_time": end,
-                    "score": clip["ai_score"],
-                    "storage_url": clip_url,
-                    "status": "ready",
-                }).execute()
-            print(f"[pipeline] clip {i+1}/{len(prepared_clips)} pronto — '{clip['hook_title'][:40]}'")
-
+            supabase.table("clips").insert({
+                "project_id": project_id,
+                "user_id": user_id,
+                "title": clip["hook_title"],
+                "hook": clip["hook_title"],
+                "start_time": start,
+                "end_time": end,
+                "score": clip["ai_score"],
+                "storage_url": clip_url,
+                "subtitle_preset": sub_preset,
+                "status": "ready",
+            }).execute()
+            print(f"[pipeline] clip {i+1} pronto — '{clip['hook_title'][:40]}'")
 
         # Atualizar status final
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
