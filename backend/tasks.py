@@ -1005,7 +1005,8 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
 
         check = validate_clip(clip_out, expected_duration=end_snapped - start_snapped)
         if not check["ok"]:
-            raise RuntimeError(f"clip invÃ¡lido apÃ³s re-render: {\x27; \x27.join(check[\x27issues\x27])}")
+            _issues = "; ".join(check["issues"])
+            raise RuntimeError(f"clip inválido após re-render: {_issues}")
 
         clip_key = f"{user_id}/{project_id}/clip_rerender_{clip_id[:8]}.mp4"
         data = _recompress_if_needed(clip_out)
