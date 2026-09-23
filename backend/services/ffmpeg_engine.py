@@ -314,8 +314,8 @@ def create_vertical_clip(
                 "-filter_complex", filter_complex,
                 "-map", last_video,
                 "-map", audio_map,
-                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "26",
-                "-acodec", "aac", "-b:a", "128k",
+                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28",
+                "-acodec", "aac", "-b:a", "96k",
                 "-movflags", "+faststart",
                 output_video,
             ]
@@ -354,8 +354,8 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
         "-ss", str(start), "-t", str(duration), "-i", input_video,
         "-vf", "crop=ih*9/16:ih,scale=1080:1920",
         "-af", ",".join(_edge_fades(duration)),
-        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "26",
-        "-acodec", "aac", "-b:a", "128k",
+        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-acodec", "aac", "-b:a", "96k",
         "-movflags", "+faststart",
         output_video,
     ], check=True, capture_output=True, timeout=fallback_timeout)

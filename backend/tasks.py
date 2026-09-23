@@ -53,6 +53,35 @@ except Exception:
     supabase = None
 
 
+_MAX_UPLOAD_MB = 45.0
+
+
+def _recompress_if_needed(file_path: str) -> bytes:
+    """Se o arquivo > 45 MB, re-codifica com CRF 32 para caber no limite do Supabase."""
+    data = open(file_path, "rb").read()
+    size_mb = len(data) / (1024 * 1024)
+    if size_mb <= _MAX_UPLOAD_MB:
+        return data
+    print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — recomprimindo com CRF 32...")
+    import tempfile
+    out = tempfile.mktemp(suffix=".mp4")
+    try:
+        subprocess.run([
+            "ffmpeg", "-y", "-i", file_path,
+            "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "32",
+            "-acodec", "aac", "-b:a", "64k",
+            "-movflags", "+faststart", out,
+        ], check=True, capture_output=True, timeout=300)
+        data = open(out, "rb").read()
+        print(f"[upload] recomprimido para {len(data)/(1024*1024):.1f} MB")
+    except Exception as e:
+        print(f"[upload] recompressão falhou: {e} — tentando original")
+    finally:
+        if os.path.exists(out):
+            os.unlink(out)
+    return data
+
+
 def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
     """Upload via httpx direto com timeout de 5 minutos — evita ReadTimeout do SDK."""
     size_mb = len(data) / (1024 * 1024)
@@ -684,8 +713,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 continue
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
-            with open(clip_out, "rb") as f:
-                clip_data = f.read()
+            clip_data = _recompress_if_needed(clip_out)
             clip_url = _upload_clip_to_storage(clip_key, clip_data)
 
             if clip_db_id:
