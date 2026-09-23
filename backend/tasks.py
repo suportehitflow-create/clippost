@@ -57,30 +57,41 @@ _MAX_UPLOAD_MB = 45.0
 
 
 def _recompress_if_needed(file_path: str) -> bytes:
-    """Garante que o clipe fique estritamente <= 45MB para evitar 413 do Supabase."""
+    """Garante que o clipe fique estritamente <= 45MB; compressao progressiva ate caber."""
     import tempfile
     data = open(file_path, "rb").read()
     size_mb = len(data) / (1024 * 1024)
     if size_mb <= _MAX_UPLOAD_MB:
         return data
 
-    print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — comprimindo rapido para 720p...")
+    passes = [
+        ("scale=min(720\\,iw):-2", "32", "2200k", "64k"),
+        ("scale=min(720\\,iw):-2", "36", "1600k", "48k"),
+        ("scale=min(480\\,iw):-2", "40", "1000k", "48k"),
+    ]
     out = tempfile.mktemp(suffix=".mp4")
     try:
-        subprocess.run([
-            "ffmpeg", "-y", "-i", file_path,
-            "-vf", "scale=min(720\\,iw):-2",
-            "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "32",
-            "-maxrate", "2200k", "-bufsize", "4400k",
-            "-acodec", "aac", "-b:a", "64k",
-            "-movflags", "+faststart", out,
-        ], check=True, capture_output=True, timeout=180)
-        compressed = open(out, "rb").read()
-        new_mb = len(compressed) / (1024 * 1024)
-        print(f"[upload] comprimido para {new_mb:.1f} MB")
-        return compressed
-    except Exception as e:
-        print(f"[upload] compressao falhou: {e} — enviando original")
+        for vf, crf, maxrate, ba in passes:
+            print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — recomprimindo CRF {crf} scale {vf[:12]}...")
+            try:
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", file_path,
+                    "-vf", vf,
+                    "-vcodec", "libx264", "-preset", "ultrafast", "-crf", crf,
+                    "-maxrate", maxrate, "-bufsize", str(int(maxrate[:-1]) * 2) + "k",
+                    "-acodec", "aac", "-b:a", ba,
+                    "-movflags", "+faststart", out,
+                ], check=True, capture_output=True, timeout=240)
+                compressed = open(out, "rb").read()
+                new_mb = len(compressed) / (1024 * 1024)
+                print(f"[upload] recomprimido para {new_mb:.1f} MB (CRF {crf})")
+                if new_mb <= _MAX_UPLOAD_MB:
+                    return compressed
+                data = compressed
+                file_path = out
+            except Exception as e:
+                print(f"[upload] passagem CRF {crf} falhou: {e}")
+        print(f"[upload] AVISO: nao conseguiu comprimir abaixo de {_MAX_UPLOAD_MB} MB — enviando {len(data)/(1024*1024):.1f} MB")
         return data
     finally:
         if os.path.exists(out):
