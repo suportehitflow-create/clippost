@@ -321,9 +321,9 @@ def _set_step(pid: str | None, step: str):
 
 
 def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
-    """Fallback de download via cobalt quando yt-dlp é bloqueado pelo YouTube."""
+    """Fallback via cobalt (máquina Frankfurt — IP europeu não bloqueado pelo YouTube)."""
     cobalt_base = os.environ.get("COBALT_URL", "https://clippost-cobalt.fly.dev")
-    print(f"[cobalt] tentando download via cobalt: {cobalt_base}")
+    print(f"[cobalt] tentando download: {cobalt_base}")
     resp = httpx.post(
         f"{cobalt_base}/",
         headers={"Accept": "application/json", "Content-Type": "application/json"},
@@ -340,7 +340,7 @@ def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
     if not download_url:
         raise Exception("CobaltError: sem URL de download na resposta")
 
-    video_path = tmp_dir / "original.mp4"
+    video_path = tmp_dir / "original_cobalt.mp4"
     print(f"[cobalt] baixando de {download_url[:80]}...")
     with httpx.stream("GET", download_url, timeout=300.0, follow_redirects=True) as stream:
         stream.raise_for_status()
@@ -348,9 +348,10 @@ def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
             for chunk in stream.iter_bytes(chunk_size=1024 * 1024):
                 f.write(chunk)
     file_size = video_path.stat().st_size
-    print(f"[cobalt] download OK — {file_size // 1024}KB")
+    print(f"[cobalt] download — {file_size // 1024}KB")
     if file_size < 100 * 1024:
-        raise Exception(f"CobaltError: arquivo muito pequeno ({file_size} bytes), provável falha no tunnel")
+        raise Exception(f"CobaltError: arquivo muito pequeno ({file_size} bytes), provável YouTube bloqueando")
+    print(f"[cobalt] OK!")
     return str(video_path), {}
 
 
@@ -893,7 +894,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
     try:
         clip_res = supabase.table("clips").select("*").eq("id", clip_id).maybe_single().execute()
         if not clip_res or not clip_res.data:
-            print(f"[re-render] clip {clip_id} não encontrado")
+            print(f"[re-render] clip {clip_id} nÃ£o encontrado")
             return {"status": "error", "message": "clip not found"}
 
         clip = clip_res.data
@@ -902,24 +903,57 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         start = float(clip.get("start_time", 0))
         end = float(clip.get("end_time", start + 60))
 
-        proj_res = supabase.table("projects").select("raw_video_url,transcript").eq("id", project_id).maybe_single().execute()
-        if not proj_res or not proj_res.data or not proj_res.data.get("raw_video_url"):
+        proj_res = supabase.table("projects").select("raw_video_url,transcript,source_url").eq("id", project_id).maybe_single().execute()
+        if not proj_res or not proj_res.data:
             supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
-            print(f"[re-render] raw_video_url não encontrada para projeto {project_id}")
-            return {"status": "error", "message": "raw video not found"}
+            print(f"[re-render] projeto {project_id} nÃ£o encontrado")
+            return {"status": "error", "message": "project not found"}
 
-        raw_video_url = proj_res.data["raw_video_url"]
+        raw_video_url = proj_res.data.get("raw_video_url")
+        source_url = proj_res.data.get("source_url")
         transcript_data = proj_res.data.get("transcript") or {}
 
         tmp_dir = Path(tempfile.mkdtemp())
         video_path = str(tmp_dir / "raw.mp4")
+        video_downloaded = False
 
-        with httpx.Client(timeout=120) as client:
-            with client.stream("GET", raw_video_url) as resp:
-                resp.raise_for_status()
-                with open(video_path, "wb") as f:
-                    for chunk in resp.iter_bytes(65536):
-                        f.write(chunk)
+        if raw_video_url:
+            try:
+                with httpx.Client(timeout=120) as client:
+                    with client.stream("GET", raw_video_url) as resp:
+                        resp.raise_for_status()
+                        with open(video_path, "wb") as f:
+                            for chunk in resp.iter_bytes(65536):
+                                f.write(chunk)
+                if os.path.exists(video_path) and os.path.getsize(video_path) > 1000:
+                    video_downloaded = True
+            except Exception as dl_err:
+                print(f"[re-render] download de raw_video_url falhou: {dl_err}, tentando fallback source_url...")
+
+        if not video_downloaded and source_url:
+            print(f"[re-render] baixando vÃ­deo da fonte: {source_url[:80]}...")
+            try:
+                ydl_opts = {
+                    "format": "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                    "outtmpl": str(tmp_dir / "raw.%(ext)s"),
+                    "merge_output_format": "mp4",
+                    "quiet": True,
+                    "no_warnings": True,
+                    "nocheckcertificate": True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.extract_info(source_url, download=True)
+                v_cands = list(tmp_dir.glob("raw.mp4")) + list(tmp_dir.glob("raw.mkv")) + list(tmp_dir.glob("raw.webm"))
+                if v_cands:
+                    video_path = str(v_cands[0])
+                    video_downloaded = True
+            except Exception as ytdl_err:
+                print(f"[re-render] fallback source_url falhou: {ytdl_err}")
+
+        if not video_downloaded or not os.path.exists(video_path):
+            supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
+            print(f"[re-render] vÃ­deo nÃ£o encontrado para projeto {project_id}")
+            return {"status": "error", "message": "raw video not found"}
 
         seg_words = words or (transcript_data.get("words") if isinstance(transcript_data, dict) else None) or []
         segments = transcript_data.get("segments", []) if isinstance(transcript_data, dict) else []
@@ -951,20 +985,15 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         )
 
         if not os.path.exists(clip_out):
-            raise RuntimeError("FFmpeg não gerou o arquivo de saída")
+            raise RuntimeError("FFmpeg nÃ£o gerou o arquivo de saÃ­da")
 
         check = validate_clip(clip_out, expected_duration=end_snapped - start_snapped)
         if not check["ok"]:
-            raise RuntimeError(f"clip inválido após re-render: {'; '.join(check['issues'])}")
+            raise RuntimeError(f"clip invÃ¡lido apÃ³s re-render: {\x27; \x27.join(check[\x27issues\x27])}")
 
         clip_key = f"{user_id}/{project_id}/clip_rerender_{clip_id[:8]}.mp4"
-        with open(clip_out, "rb") as f:
-            supabase.storage.from_("videos").upload(
-                path=clip_key,
-                file=f.read(),
-                file_options={"content-type": "video/mp4", "upsert": "true"},
-            )
-        new_url = supabase.storage.from_("videos").get_public_url(clip_key)
+        data = _recompress_if_needed(clip_out)
+        new_url = _upload_clip_to_storage(clip_key, data)
 
         supabase.table("clips").update({
             "storage_url": new_url,
@@ -987,3 +1016,4 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
     finally:
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
