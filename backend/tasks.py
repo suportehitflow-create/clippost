@@ -601,7 +601,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
@@ -618,7 +618,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android', 'tv_embedded', 'web'],
+                    'player_client': ['tv_embedded', 'ios', 'android', 'web'],
                     **({"po_token": [f"web+{po_token}"]} if po_token else {}),
                 },
             },
@@ -664,6 +664,23 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             fallback_ok = False
             _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
             _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
+
+            # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
+            print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
+            try:
+                _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
+                with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
+                    _f18_info = ydl.extract_info(url, download=True) or {}
+                _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
+                if _f18_info.get("id") and _f18_files:
+                    video_path = str(_f18_files[0])
+                    video_id = _f18_info.get("id", _vid_id)
+                    title = _f18_info.get("title", _vid_id)
+                    video_duration = _f18_info.get("duration")
+                    fallback_ok = True
+                    print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
+            except Exception as f18_err:
+                print(f"[pipeline] format 18 falhou: {f18_err}")
 
             # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
             print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")

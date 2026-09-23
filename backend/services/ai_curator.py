@@ -144,7 +144,11 @@ def _try_providers(prompt: str) -> str:
             except Exception as e:
                 err_str = str(e)[:180]
                 print(f"[ai_curator] {name} tentativa {tentativa + 1}/2 falhou: {type(e).__name__}: {err_str}")
-                if "429" in err_str:
+                if "413" in err_str or "payload" in err_str.lower() or "too large" in err_str.lower():
+                    # Payload too large: não faz retry, pula direto para próximo provedor
+                    print(f"[ai_curator] {name} payload muito grande (413) — pulando para próximo provedor")
+                    break
+                elif "429" in err_str:
                     # Rate limit: espera mais antes de tentar o próximo
                     time.sleep(20 if tentativa == 0 else 0)
                 elif tentativa == 0:
@@ -160,7 +164,7 @@ def _try_providers(prompt: str) -> str:
 _call_free_model = _try_providers
 
 
-def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 60000) -> str:
+def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 35000) -> str:
     if not segments:
         return "[]"
 
