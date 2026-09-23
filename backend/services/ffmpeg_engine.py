@@ -306,6 +306,23 @@ def create_vertical_clip(
                 filter_parts.append(f"{last_video}subtitles='{safe_path}'[subout]")
             last_video = "[subout]"
 
+        # 6. Watermark: @username no canto inferior esquerdo
+        username = (brand_kit or {}).get("username", "")
+        if username:
+            # Garante que começa com @ e escapa caracteres especiais para drawtext
+            if not username.startswith("@"):
+                username = "@" + username
+            wm_text = username.replace("'", "\\'").replace(":", "\\:")
+            wm_font_size = layout.get("watermarkSize", 38)
+            wm_color = layout.get("watermarkColor", "white")
+            wm_opacity = layout.get("watermarkOpacity", 0.85)
+            filter_parts.append(
+                f"{last_video}drawtext=text='{wm_text}'"
+                f":fontsize={wm_font_size}:fontcolor={wm_color}@{wm_opacity}"
+                f":x=40:y=h-60:shadowcolor=black@0.6:shadowx=2:shadowy=2[wmout]"
+            )
+            last_video = "[wmout]"
+
         filter_complex = ";".join(filter_parts)
 
         cmd = (
