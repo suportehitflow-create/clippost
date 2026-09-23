@@ -308,9 +308,14 @@ class TestGetViralClips:
         assert result == []
 
     def test_no_api_key_returns_empty(self):
-        with patch.dict(os.environ, {"AI_CURATOR_API_KEY": "", "GEMINI_API_KEY": "", "ANTHROPIC_API_KEY": ""}):
-            with patch("services.ai_curator.API_KEY", ""):
-                result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
+        with patch.dict(os.environ, {
+            "GROQ_API_KEY": "",
+            "OPENROUTER_API_KEY": "",
+            "GEMINI_API_KEY": "",
+            "ANTHROPIC_API_KEY": "",
+            "AI_CURATOR_API_KEY": "",
+        }):
+            result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert result == []
 
     def test_valid_response_parsed(self):
@@ -319,7 +324,7 @@ class TestGetViralClips:
             {"start_time": 30.0, "end_time": 90.0, "hook_title": "3 MESES DE ESTUDO NA GRANDE EMPRESA", "ai_score": 0.88},
             {"start_time": 5.0, "end_time": 50.0, "hook_title": "PYTHON MUDOU MINHA VIDA", "ai_score": 0.85},
         ])
-        with patch("services.ai_curator._call_free_model", return_value=clips_json):
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
             result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert len(result) == 3
         assert all("start_time" in c and "end_time" in c for c in result)
@@ -331,7 +336,7 @@ class TestGetViralClips:
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "TESTE2", "ai_score": 0.1},  # < 0.60
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "TESTE3", "ai_score": 0.85},
         ])
-        with patch("services.ai_curator._call_free_model", return_value=clips_json):
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
             result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert all(0.60 <= c["ai_score"] <= 0.99 for c in result)
 
@@ -342,7 +347,7 @@ class TestGetViralClips:
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "OK", "ai_score": 0.8},
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "OK2", "ai_score": 0.8},
         ])
-        with patch("services.ai_curator._call_free_model", return_value=clips_json):
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
             result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert all(len(c["hook_title"]) <= 60 for c in result)
 
@@ -352,7 +357,7 @@ class TestGetViralClips:
         ao último ] resultando em JSON inválido. Resultado: lista vazia.
         """
         bad_response = 'Nota: [ver docs]. Resultado: [{"start_time":0,"end_time":30,"hook_title":"X","ai_score":0.8}]'
-        with patch("services.ai_curator._call_free_model", return_value=bad_response):
+        with patch("services.ai_curator._try_providers", return_value=bad_response):
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):
                 result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         # Com o bug atual, result == [] mesmo tendo dados válidos no segundo array
@@ -365,28 +370,32 @@ class TestGetViralClips:
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "B", "ai_score": 0.8},
             {"start_time": 0.0, "end_time": 60.0, "hook_title": "C", "ai_score": 0.8},
         ])
-        with patch("services.ai_curator._call_free_model", return_value=clips_json):
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
             result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         video_max = SAMPLE_SEGMENTS[-1]["end"]
         for c in result:
             assert c["end_time"] <= video_max + 0.1
 
     def test_malformed_json_falls_back_to_empty(self):
-        with patch("services.ai_curator._call_free_model", return_value="não é JSON"):
+        with patch("services.ai_curator._try_providers", return_value="não é JSON"):
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):
                 result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert result == []
 
     def test_anthropic_fallback_called_when_primary_fails(self):
-        with patch("services.ai_curator._call_free_model", side_effect=Exception("timeout")):
-            with patch("services.ai_curator._call_anthropic") as mock_anthropic:
-                mock_anthropic.return_value = json.dumps([
-                    {"start_time": 5.0, "end_time": 60.0, "hook_title": "VIA ANTHROPIC", "ai_score": 0.9},
-                    {"start_time": 10.0, "end_time": 70.0, "hook_title": "VIA ANTHROPIC 2", "ai_score": 0.85},
-                    {"start_time": 15.0, "end_time": 80.0, "hook_title": "VIA ANTHROPIC 3", "ai_score": 0.80},
-                ])
-                with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-ant-fake"}):
-                    result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
+        with patch("services.ai_curator._call_anthropic") as mock_anthropic:
+            mock_anthropic.return_value = json.dumps([
+                {"start_time": 5.0, "end_time": 60.0, "hook_title": "VIA ANTHROPIC", "ai_score": 0.9},
+                {"start_time": 10.0, "end_time": 70.0, "hook_title": "VIA ANTHROPIC 2", "ai_score": 0.85},
+                {"start_time": 15.0, "end_time": 80.0, "hook_title": "VIA ANTHROPIC 3", "ai_score": 0.80},
+            ])
+            with patch.dict(os.environ, {
+                "GROQ_API_KEY": "",
+                "OPENROUTER_API_KEY": "",
+                "GEMINI_API_KEY": "",
+                "ANTHROPIC_API_KEY": "sk-ant-fake",
+            }):
+                result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert len(result) > 0
 
     def test_clip_duration_30_respects_limits(self):
@@ -395,7 +404,7 @@ class TestGetViralClips:
             {"start_time": 0.0, "end_time": 5.0, "hook_title": "CURTO", "ai_score": 0.8},   # deve ser expandido para 20s
             {"start_time": 0.0, "end_time": 30.0, "hook_title": "OK", "ai_score": 0.8},
         ])
-        with patch("services.ai_curator._call_free_model", return_value=clips_json):
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
             result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []}, clip_duration="30")
         for c in result:
             dur = c["end_time"] - c["start_time"]
@@ -521,7 +530,7 @@ class TestPipelineLogic:
         mock_limit.return_value = None
 
         import yt_dlp as _ydlp
-        fake_info = self._make_info(duration=35 * 60)  # 35 minutos
+        fake_info = self._make_info(duration=95 * 60)  # 95 minutos (> 90 min)
 
         with tempfile.TemporaryDirectory() as td:
             # cria arquivo fake para não falhar no glob
@@ -565,7 +574,7 @@ class TestPipelineLogic:
     @patch("tasks.supabase")
     @patch("tasks.check_clip_limit")
     @patch("tasks.get_viral_clips", return_value=[])
-    def test_zero_clips_from_ai_marks_done(self, mock_curator, mock_limit, mock_supa):
+    def test_zero_clips_from_ai_marks_failed(self, mock_curator, mock_limit, mock_supa):
         """IA retornando 0 clipes deve marcar o projeto como done (não failed)."""
         mock_limit.return_value = None
         mock_supa.configure_mock(**{
@@ -602,7 +611,8 @@ class TestPipelineLogic:
                             project_id="proj-empty",
                         )
 
-        assert result["status"] == "success"
+        assert result["status"] == "failed"
+        assert result.get("reason") == "no_clips_from_ai_or_scenes"
 
     def test_no_signal_in_pipeline(self):
         """

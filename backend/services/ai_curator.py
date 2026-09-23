@@ -127,7 +127,7 @@ def _try_providers(prompt: str) -> str:
     if os.environ.get("GEMINI_API_KEY", ""):
         providers.append(("gemini", _call_gemini))
 
-    if os.environ.get("ANTHROPIC_API_KEY", "") and os.environ.get("ANTHROPIC_WORKSPACE_ID", ""):
+    if os.environ.get("ANTHROPIC_API_KEY", ""):
         providers.append(("anthropic", _call_anthropic))
 
     if not providers:
@@ -155,6 +155,10 @@ def _try_providers(prompt: str) -> str:
 
 
 # ─── preparação da transcrição ────────────────────────────────────────────────
+
+# Alias para compatibilidade e testes legados
+_call_free_model = _try_providers
+
 
 def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 12000) -> str:
     if not segments:
