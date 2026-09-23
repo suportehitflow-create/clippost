@@ -117,18 +117,8 @@ async def _periodic_recovery_loop():
         await _cleanup_old_projects()
 
 
-@app.on_event("startup")
-async def recover_stuck_projects():
-    import asyncio
-    _setup_youtube_cookies()
-    await _mark_stuck_projects("startup")
-    await _cleanup_old_projects()
-    asyncio.create_task(_periodic_recovery_loop())
-
-
-@app.on_event("shutdown")
-async def graceful_shutdown():
-    """Ao desligar (deploy/restart): salva projetos processing com clipes como done."""
+def _sync_save_processing_projects():
+    """Chamado pelo atexit: salva projetos 'processing' com clips como 'done'."""
     try:
         if not supabase:
             return
@@ -140,9 +130,22 @@ async def graceful_shutdown():
             new_status = "done" if ready else "failed"
             msg = None if ready else "Pipeline interrompido por deploy. Clique em Tentar Novamente."
             supabase.table("projects").update({"status": new_status, "error_message": msg}).eq("id", pid).execute()
-            print(f"[shutdown] projeto {pid[:8]} → {new_status} ({len(ready)} clips)")
+            print(f"[shutdown] projeto {pid[:8]} -> {new_status} ({len(ready)} clips)")
     except Exception as e:
-        print(f"[shutdown] erro ao salvar estado: {e}")
+        print(f"[shutdown] erro: {e}")
+
+
+import atexit
+atexit.register(_sync_save_processing_projects)
+
+
+@app.on_event("startup")
+async def recover_stuck_projects():
+    import asyncio
+    _setup_youtube_cookies()
+    await _mark_stuck_projects("startup")
+    await _cleanup_old_projects()
+    asyncio.create_task(_periodic_recovery_loop())
 
 
 @app.get("/health")
