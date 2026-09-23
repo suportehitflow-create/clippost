@@ -57,30 +57,30 @@ _MAX_UPLOAD_MB = 45.0
 
 
 def _recompress_if_needed(file_path: str) -> bytes:
-    “””Garante que o clipe fique estritamente <= 45MB para evitar 413 do Supabase.”””
+    """Garante que o clipe fique estritamente <= 45MB para evitar 413 do Supabase."""
     import tempfile
-    data = open(file_path, “rb”).read()
+    data = open(file_path, "rb").read()
     size_mb = len(data) / (1024 * 1024)
     if size_mb <= _MAX_UPLOAD_MB:
         return data
 
-    print(f”[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — comprimindo rapido para 720p...”)
-    out = tempfile.mktemp(suffix=”.mp4”)
+    print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — comprimindo rapido para 720p...")
+    out = tempfile.mktemp(suffix=".mp4")
     try:
         subprocess.run([
-            “ffmpeg”, “-y”, “-i”, file_path,
-            “-vf”, “scale=min(720\\,iw):-2”,
-            “-vcodec”, “libx264”, “-preset”, “ultrafast”, “-crf”, “32”,
-            “-maxrate”, “2200k”, “-bufsize”, “4400k”,
-            “-acodec”, “aac”, “-b:a”, “64k”,
-            “-movflags”, “+faststart”, out,
+            "ffmpeg", "-y", "-i", file_path,
+            "-vf", "scale=min(720\\,iw):-2",
+            "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "32",
+            "-maxrate", "2200k", "-bufsize", "4400k",
+            "-acodec", "aac", "-b:a", "64k",
+            "-movflags", "+faststart", out,
         ], check=True, capture_output=True, timeout=180)
-        compressed = open(out, “rb”).read()
+        compressed = open(out, "rb").read()
         new_mb = len(compressed) / (1024 * 1024)
-        print(f”[upload] comprimido para {new_mb:.1f} MB”)
+        print(f"[upload] comprimido para {new_mb:.1f} MB")
         return compressed
     except Exception as e:
-        print(f”[upload] compressao falhou: {e} — enviando original”)
+        print(f"[upload] compressao falhou: {e} — enviando original")
         return data
     finally:
         if os.path.exists(out):
