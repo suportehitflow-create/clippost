@@ -24,10 +24,10 @@ primary_region = "gru"
   processes = ["app"]
 
   [[http_service.checks]]
-    grace_period = "30s"
-    interval = "15s"
+    grace_period = "60s"
+    interval = "30s"
     method = "GET"
-    timeout = "5s"
+    timeout = "10s"
     path = "/health"
 
 [[vm]]
