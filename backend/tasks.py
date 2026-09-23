@@ -444,7 +444,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         audio_path = str(tmp_dir / "audio.mp3")
 
         # Cookies do YouTube (opcional — reduz muito a detecção de bot)
-        cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE")  # caminho para cookies.txt montado no Fly
+        _fallback_cookies = "/tmp/yt_cookies.txt"
+        cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE") or (
+            _fallback_cookies if os.path.exists(_fallback_cookies) else None
+        )
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {

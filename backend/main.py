@@ -27,15 +27,20 @@ app = FastAPI(title="clipost API")
 def _setup_youtube_cookies():
     """Decodifica YOUTUBE_COOKIES_B64 (base64) para /tmp/yt_cookies.txt e seta YOUTUBE_COOKIES_FILE."""
     b64 = os.environ.get("YOUTUBE_COOKIES_B64")
+    cookies_path = "/tmp/yt_cookies.txt"
     if not b64:
+        if os.path.exists(cookies_path):
+            os.environ["YOUTUBE_COOKIES_FILE"] = cookies_path
+            print("[startup] cookies do YouTube encontrados em /tmp/yt_cookies.txt (sem YOUTUBE_COOKIES_B64)")
+        else:
+            print("[startup] YOUTUBE_COOKIES_B64 não definido — downloads do YouTube podem ser bloqueados por bot-detection")
         return
     try:
         import base64
-        cookies_path = "/tmp/yt_cookies.txt"
         with open(cookies_path, "wb") as f:
             f.write(base64.b64decode(b64))
         os.environ["YOUTUBE_COOKIES_FILE"] = cookies_path
-        print("[startup] cookies do YouTube carregados — bot-detection contornado")
+        print(f"[startup] cookies do YouTube carregados ({len(b64)} bytes b64) — bot-detection contornado")
     except Exception as e:
         print(f"[startup] falha ao carregar cookies do YouTube: {e}")
 
