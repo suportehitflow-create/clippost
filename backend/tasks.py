@@ -402,7 +402,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web', 'tv_embedded', 'ios', 'android'],
+                    'player_client': ['web', 'tv', 'ios', 'android'],
                     **({"po_token": [f"web+{po_token}"]} if po_token else {}),
                 },
             },

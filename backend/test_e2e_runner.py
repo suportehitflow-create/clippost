@@ -54,11 +54,11 @@ if __name__ == '__main__':
     t = sys.argv[1] if len(sys.argv) > 1 else 'short'
     target_url = sys.argv[2] if len(sys.argv) > 2 else ''
     if t == 'short':
-        u = target_url or 'https://www.youtube.com/watch?v=21X5lGlDOfg'
+        u = target_url or 'https://www.youtube.com/watch?v=ZXsQAXx_ao0'
         run_test('VIDEO CURTO', u, '30')
     elif t == 'medium':
         u = target_url or 'https://www.youtube.com/watch?v=UF8uR6Z6KLc'
         run_test('VIDEO MEDIO', u, '60')
     elif t == 'long':
-        u = target_url or 'https://www.youtube.com/watch?v=kNNk_8g0R74'
+        u = target_url or 'https://www.youtube.com/watch?v=7sxpKhIbr0E'
         run_test('VIDEO LONGO', u, 'auto')
