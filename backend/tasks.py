@@ -55,6 +55,8 @@ except Exception:
 
 def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
     """Upload via httpx direto com timeout de 5 minutos — evita ReadTimeout do SDK."""
+    size_mb = len(data) / (1024 * 1024)
+    print(f"[upload] {clip_key} — {size_mb:.1f} MB")
     endpoint = f"{SUPABASE_URL}/storage/v1/object/videos/{clip_key}"
     headers = {
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -63,7 +65,10 @@ def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
     }
     with httpx.Client(timeout=httpx.Timeout(300.0)) as client:
         resp = client.post(endpoint, headers=headers, content=data)
-        resp.raise_for_status()
+        if not resp.is_success:
+            raise RuntimeError(
+                f"Upload falhou {resp.status_code} para {clip_key}: {resp.text[:400]}"
+            )
     return f"{SUPABASE_URL}/storage/v1/object/public/videos/{clip_key}"
 
 
