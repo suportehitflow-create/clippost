@@ -12,6 +12,7 @@ clipost — Worker Celery (processo completo)
 10. Cleanup
 """
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -256,7 +257,6 @@ def parse_vtt_subtitles(vtt_path: Path):
     """Lê legendas nativas do YouTube (.vtt) e extrai segments e words."""
     segments = []
     words = []
-    import re
     time_pattern = re.compile(r"(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})")
     
     current_start = None
@@ -349,8 +349,62 @@ def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
                 f.write(chunk)
     file_size = video_path.stat().st_size
     print(f"[cobalt] download OK — {file_size // 1024}KB")
-    if file_size < 100 * 1024:  # arquivo menor que 100KB é claramente inválido
+    if file_size < 100 * 1024:
         raise Exception(f"CobaltError: arquivo muito pequeno ({file_size} bytes), provável falha no tunnel")
+    return str(video_path), {}
+
+
+_INVIDIOUS_INSTANCES = [
+    "https://invidious.privacydev.net",
+    "https://yt.cdaut.de",
+    "https://inv.nadeko.net",
+    "https://invidious.nerdvpn.de",
+]
+
+
+def _download_via_invidious(url: str, tmp_dir: Path) -> tuple[str, dict]:
+    """Terceiro fallback via API pública do Invidious — IP completamente diferente."""
+    import re
+    m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+    if not m:
+        raise Exception("InvidiousError: não foi possível extrair video_id da URL")
+    vid = m.group(1)
+
+    api_data = None
+    for inst in _INVIDIOUS_INSTANCES:
+        try:
+            r = httpx.get(f"{inst}/api/v1/videos/{vid}", timeout=15.0)
+            if r.status_code == 200:
+                api_data = r.json()
+                print(f"[invidious] usando instância {inst}")
+                break
+        except Exception as e:
+            print(f"[invidious] {inst} falhou: {e}")
+
+    if not api_data:
+        raise Exception("InvidiousError: nenhuma instância disponível")
+
+    # formatStreams = video+audio combinado (sem necessidade de merge)
+    streams = sorted(
+        [s for s in api_data.get("formatStreams", []) if s.get("url")],
+        key=lambda s: int(s.get("resolution", "0p").rstrip("p") or 0),
+        reverse=True,
+    )
+    if not streams:
+        raise Exception("InvidiousError: sem streams combinados disponíveis")
+
+    stream_url = streams[0]["url"]
+    print(f"[invidious] baixando {streams[0].get('resolution', '?')} de {stream_url[:80]}...")
+    video_path = tmp_dir / "original_inv.mp4"
+    with httpx.stream("GET", stream_url, timeout=300.0, follow_redirects=True) as resp:
+        resp.raise_for_status()
+        with open(video_path, "wb") as f:
+            for chunk in resp.iter_bytes(1024 * 1024):
+                f.write(chunk)
+    size = video_path.stat().st_size
+    if size < 100 * 1024:
+        raise Exception(f"InvidiousError: arquivo muito pequeno ({size} bytes)")
+    print(f"[invidious] download OK — {size // 1024}KB")
     return str(video_path), {}
 
 
@@ -439,23 +493,40 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 video_duration = info.get('duration')
         except yt_dlp.utils.DownloadError as de:
             err = str(de).lower()
-            if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig")):
-                print(f"[pipeline] yt-dlp bloqueado — tentando cobalt como fallback...")
+            if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
+                fallback_ok = False
+                _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+                _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
+
+                # Fallback 1: Cobalt (IP diferente do worker)
+                print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt...")
                 try:
                     video_path, _ = _download_via_cobalt(url, tmp_dir)
-                    # Extrair info básica sem re-download
-                    mp4_check_cobalt = list(tmp_dir.glob("*.mp4"))
-                    if not mp4_check_cobalt:
-                        raise Exception("cobalt não gerou arquivo")
                     video_id = "cobalt"
-                    title = url.split("v=")[-1].split("&")[0] if "v=" in url else "video"
-                    video_duration = None  # será detectado via ffprobe abaixo
-                    print(f"[pipeline] cobalt OK — prosseguindo pipeline")
+                    title = _vid_id
+                    video_duration = None
+                    fallback_ok = True
+                    print(f"[pipeline] cobalt OK")
                 except Exception as cobalt_err:
-                    print(f"[pipeline] cobalt também falhou: {cobalt_err}")
+                    print(f"[pipeline] cobalt falhou: {cobalt_err}")
+
+                # Fallback 2: Invidious (API pública, IP diferente)
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 2: invidious...")
+                    try:
+                        video_path, _ = _download_via_invidious(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] invidious OK")
+                    except Exception as inv_err:
+                        print(f"[pipeline] invidious falhou: {inv_err}")
+
+                if not fallback_ok:
                     raise Exception(
-                        "YouTubeBlockError: YouTube bloqueou o download e o fallback também falhou. "
-                        "Configure os cookies do YouTube ou tente novamente mais tarde."
+                        "YouTubeBlockError: yt-dlp, Cobalt e Invidious falharam. "
+                        "Configure cookies do YouTube (YOUTUBE_COOKIES_FILE) para contornar."
                     )
             else:
                 raise
