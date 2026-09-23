@@ -53,7 +53,16 @@ def run_test(name, url, clip_duration='auto'):
 if __name__ == '__main__':
     t = sys.argv[1] if len(sys.argv) > 1 else 'short'
     target_url = sys.argv[2] if len(sys.argv) > 2 else ''
-    if t == 'short':
+    if t == 'check':
+        for test_s in ['processing', 'rendering', 'pending', 'draft', 'creating', 'queued', 'ready', 'failed', 'done']:
+            try:
+                r = supabase.table('clips').insert({'title': 'test', 'user_id': get_test_user_id(), 'status': test_s}).execute()
+                print('STATUS ' + test_s + ' is ALLOWED!')
+                supabase.table('clips').delete().eq('id', r.data[0]['id']).execute()
+            except Exception as e:
+                print('STATUS ' + test_s + ' is REJECTED: ' + str(e))
+        sys.exit(0)
+    elif t == 'short':
         u = target_url or 'https://www.youtube.com/watch?v=ZXsQAXx_ao0'
         run_test('VIDEO CURTO', u, '30')
     elif t == 'medium':
