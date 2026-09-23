@@ -409,13 +409,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             **({"cookiefile": cookies_file} if cookies_file and os.path.exists(cookies_file) else {}),
         }
 
-        # Fase 1: baixa só o vídeo (sem legendas para evitar 429 nas subs)
-        ydl_opts_video = {**_ydl_base}
-
-        # Fase 2: busca legendas separadamente, silenciosamente (best-effort)
-        ydl_opts_subs = {
+        # Download unificado: baixa o vídeo e legendas simultaneamente no mesmo request
+        ydl_opts_video = {
             **_ydl_base,
-            'skip_download': True,
             'writesubtitles': True,
             'writeautomaticsub': True,
             'subtitlesformat': 'vtt',
@@ -486,13 +482,24 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             )
         print(f"[pipeline] vídeo baixado OK — duração: {int((video_duration or 0) // 60)}min {int((video_duration or 0) % 60)}s")
 
-        # 1b. Tenta buscar legendas separadamente (falha silenciosa → Whisper)
-        print(f"[pipeline] buscando legendas nativas (best-effort)...")
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts_subs) as ydl:
-                ydl.extract_info(url, download=True)
-        except Exception as sub_err:
-            print(f"[pipeline] legendas nativas indisponíveis ({sub_err}), usando Whisper")
+        # 1b. Busca legendas nativas em fallback apenas se nenhuma tiver sido baixada junto ao vídeo
+        if not list(tmp_dir.glob("*.vtt")):
+            print(f"[pipeline] buscando legendas nativas em fallback (best-effort)...")
+            try:
+                ydl_opts_subs = {
+                    'skip_download': True,
+                    'writesubtitles': True,
+                    'writeautomaticsub': True,
+                    'subtitlesformat': 'vtt',
+                    'subtitleslangs': ['pt', 'pt-BR', 'en'],
+                    'ignoreerrors': True,
+                    'socket_timeout': 10,
+                    'outtmpl': str(tmp_dir / "original.%(ext)s"),
+                }
+                with yt_dlp.YoutubeDL(ydl_opts_subs) as ydl:
+                    ydl.extract_info(url, download=True)
+            except Exception as sub_err:
+                print(f"[pipeline] legendas nativas indisponíveis ({sub_err}), usando Whisper")
 
         # Localiza o arquivo de vídeo final mesclado (pode ser .mkv ou .webm se merge falhou)
         mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4")) or list(tmp_dir.glob("*.mkv")) or list(tmp_dir.glob("*.webm"))
