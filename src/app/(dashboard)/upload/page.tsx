@@ -129,8 +129,8 @@ export default function CreateClipsPage() {
         }
       } catch {}
 
-      // Dispara job no backend em segundo plano com template ativo integrado
-      fetch('/api/jobs', {
+      // Dispara job no backend com o template ativo; sem confirmação o projeto ficaria preso em "processing"
+      const jobRes = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,6 +143,12 @@ export default function CreateClipsPage() {
           remove_silence: removeSilence,
         }),
       }).catch(() => null)
+      if (!jobRes || !jobRes.ok) {
+        const detail = jobRes ? await jobRes.json().catch(() => ({})) : {}
+        const msg = detail.error || 'O servidor de processamento não respondeu. Tente novamente em instantes.'
+        await supabase.from('projects').update({ status: 'failed', error_message: msg }).eq('id', project.id)
+        throw new Error(msg)
+      }
 
       // Redireciona imediatamente para a tela do projeto
       router.push(`/project/${project.id}`)

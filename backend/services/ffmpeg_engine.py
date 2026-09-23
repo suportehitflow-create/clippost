@@ -177,7 +177,7 @@ def create_vertical_clip(
     tmp_dir = tempfile.mkdtemp(prefix="clippost_engine_")
 
     try:
-        layout = (brand_kit or {}).get("layout_config", {})
+        layout = (brand_kit or {}).get("layout_config") or {}
 
         # 1. Dimensões do quadrado/retângulo de vídeo do template
         # Default: preenche tela completa (sem brand_kit configurado)
@@ -229,6 +229,20 @@ def create_vertical_clip(
             bg_color = "0x18181b"
         else:
             bg_color = "black"
+
+        # Camada do template (perfil, selo, título-gancho, marca d'água, cantos arredondados)
+        overlay_png = None
+        if layout.get("headerPos") or layout.get("titlePos"):
+            try:
+                from services.template_overlay import render_template_overlay
+                bg_rgb = {"white": (255, 255, 255), "0x18181b": (24, 24, 27)}.get(bg_color, (0, 0, 0))
+                overlay_png = render_template_overlay(
+                    brand_kit or {}, hook_title or "", os.path.join(tmp_dir, "template.png"),
+                    CANVAS_W, CANVAS_H, (box_x, box_y, target_w, target_h), bg_rgb,
+                )
+            except Exception as ov_err:
+                print(f"[ffmpeg_engine] camada do template falhou ({ov_err}), renderizando sem ela")
+                overlay_png = None
 
         # 4. Remoção de silêncio sincronizada (trim+concat): detecta silêncios ANTES de renderizar
         # e usa trim/atrim no filter_complex para cortar vídeo+áudio juntos.
@@ -300,6 +314,11 @@ def create_vertical_clip(
         audio_map = "[aout]"
         last_video = "[base]"
 
+        if overlay_png:
+            input_files += ["-i", overlay_png]
+            filter_parts.append(f"{last_video}[1:v]overlay=0:0[tpl]")
+            last_video = "[tpl]"
+
         # 5. Legendas queimadas
         if subtitle_file and os.path.exists(subtitle_file):
             safe_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
@@ -312,7 +331,7 @@ def create_vertical_clip(
 
         # 6. Watermark: @username no canto inferior esquerdo
         username = (brand_kit or {}).get("username", "")
-        if username:
+        if username and not overlay_png:
             # Garante que começa com @ e escapa caracteres especiais para drawtext
             if not username.startswith("@"):
                 username = "@" + username

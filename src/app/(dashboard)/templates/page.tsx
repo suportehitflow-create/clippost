@@ -3,7 +3,7 @@
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
 import { AspectRatioSelector, AspectFormat } from '@/components/ui/AspectRatioSelector'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Type,
   AlignLeft,
@@ -204,6 +204,10 @@ export default function TemplatesPage() {
   // Feedback e Salvamento
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  // Só salva depois de carregar o template existente; senão os valores padrão sobrescrevem o salvo
+  const hydratedRef = useRef(false)
+  const pendingSaveRef = useRef<string | null>(null)
   const [draggingTarget, setDraggingTarget] = useState<'avatar' | 'header' | 'title' | 'video' | 'subtitle' | null>(null)
   const [isResizingVideo, setIsResizingVideo] = useState(false)
 
@@ -217,150 +221,71 @@ export default function TemplatesPage() {
   const initialElemPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 })
   const totalDragMovement = useRef(0)
 
-  // Carregar template salvo
+  const applyConfig = (c: any, avatar?: string | null) => {
+    if (!c) return
+    if (avatar !== undefined) {
+      setAvatarUrl(avatar && !avatar.startsWith('blob:') && !avatar.includes('photo-1514888286974-6c03e2ca1dba') ? avatar : DEFAULT_BRAND_AVATAR)
+    }
+    if (c.subtitle_preset) setSelectedSubtitle(c.subtitle_preset)
+    if (c.templateBg) setTemplateBg(c.templateBg)
+    if (c.showVerifiedBadge !== undefined) setShowVerifiedBadge(c.showVerifiedBadge)
+    setBrandName(c.brandName && c.brandName !== 'HUMOR DA IGUANA' ? c.brandName : 'Nome da Página')
+    setBrandHandle(c.brandHandle && c.brandHandle !== '@humordaiguana' ? c.brandHandle : '@nomedapagina')
+    if (c.brandAlign) setBrandAlign(c.brandAlign)
+    if (c.brandLayout) setBrandLayout(c.brandLayout)
+    if (c.brandScale) setBrandScale(c.brandScale)
+    if (c.titleText && !c.titleText.includes('arrependimento') && !c.titleText.includes('É assim que')) setTitleText(c.titleText)
+    if (c.fontFamily) setFontFamily(c.fontFamily)
+    if (c.fontSize) setFontSize(c.fontSize)
+    if (c.textAlign) setTextAlign(c.textAlign)
+    if (c.titleColor) setTitleColor(c.titleColor)
+    if (c.titleStroke) setTitleStroke(c.titleStroke)
+    if (c.titleStrokeColor) setTitleStrokeColor(c.titleStrokeColor)
+    if (c.titleCapsLock !== undefined) setTitleCapsLock(c.titleCapsLock)
+    if (c.showTitleEmojis !== undefined) setShowTitleEmojis(c.showTitleEmojis)
+    if (c.videoWidth) setVideoWidth(c.videoWidth)
+    if (c.videoHeight) setVideoHeight(c.videoHeight)
+    if (c.videoRounded !== undefined) setVideoRounded(c.videoRounded)
+    if (c.videoAspect) setVideoAspect(c.videoAspect)
+    if (c.avatarPos) setAvatarPos(c.avatarPos)
+    if (c.headerPos) setHeaderPos(c.headerPos)
+    if (c.titlePos) setTitlePos(c.titlePos)
+    if (c.videoPos) setVideoPos(c.videoPos)
+    if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
+    if (c.showWatermark !== undefined) setShowWatermark(c.showWatermark)
+    if (c.watermarkText) setWatermarkText(c.watermarkText)
+    if (c.watermarkOpacity !== undefined) setWatermarkOpacity(c.watermarkOpacity)
+    if (c.watermarkPosition) setWatermarkPosition(c.watermarkPosition)
+    if (c.watermarkType) setWatermarkType(c.watermarkType)
+    if (c.watermarkImage) setWatermarkImage(c.watermarkImage)
+    if (c.instagramDecal !== undefined) setInstagramDecal(c.instagramDecal)
+  }
+
+  // Carregar template salvo: localStorage primeiro (instantâneo), depois o banco (fonte da verdade)
   useEffect(() => {
     try {
       const saved = localStorage.getItem('clippost_active_template')
       if (saved) {
         const p = JSON.parse(saved)
-        if (p.subtitle_preset) setSelectedSubtitle(p.subtitle_preset)
-        if (p.avatar_url && !p.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(p.avatar_url)
-        else setAvatarUrl(DEFAULT_BRAND_AVATAR)
-        if (p.config) {
-          const c = p.config
-          if (c.templateBg) setTemplateBg(c.templateBg)
-          if (c.showVerifiedBadge !== undefined) setShowVerifiedBadge(c.showVerifiedBadge)
-          if (c.brandName && c.brandName !== 'HUMOR DA IGUANA') setBrandName(c.brandName)
-          else setBrandName('Nome da Página')
-          if (c.brandHandle && c.brandHandle !== '@humordaiguana') setBrandHandle(c.brandHandle)
-          else setBrandHandle('@nomedapagina')
-          if (c.titleText && !c.titleText.includes('arrependimento') && !c.titleText.includes('É assim que')) {
-            setTitleText(c.titleText)
-          } else {
-            setTitleText('ASSIM QUE SEU TITULO APARECERA NO VIDEOS')
-          }
-          if (c.fontFamily) setFontFamily(c.fontFamily)
-          if (c.fontSize) setFontSize(c.fontSize)
-          if (c.brandScale) setBrandScale(c.brandScale)
-          if (c.textAlign) setTextAlign(c.textAlign)
-          if (c.videoWidth) setVideoWidth(c.videoWidth)
-          if (c.videoHeight) setVideoHeight(c.videoHeight)
-          if (c.videoRounded !== undefined) setVideoRounded(c.videoRounded)
-          if (c.avatarPos) setAvatarPos(c.avatarPos)
-          if (c.headerPos) setHeaderPos(c.headerPos)
-          if (c.titlePos) setTitlePos(c.titlePos)
-          if (c.videoPos) setVideoPos(c.videoPos)
-          if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
-          if (c.showWatermark !== undefined) setShowWatermark(c.showWatermark)
-          if (c.watermarkText) setWatermarkText(c.watermarkText)
-          if (c.watermarkOpacity !== undefined) setWatermarkOpacity(c.watermarkOpacity)
-          if (c.watermarkPosition) setWatermarkPosition(c.watermarkPosition)
-          if (c.watermarkType) setWatermarkType(c.watermarkType)
-          if (c.watermarkImage) setWatermarkImage(c.watermarkImage)
-          if (c.showTitleEmojis !== undefined) setShowTitleEmojis(c.showTitleEmojis)
-        }
+        applyConfig({ ...(p.config || {}), subtitle_preset: p.config?.subtitle_preset || p.subtitle_preset }, p.avatar_url)
       }
     } catch {}
 
-    async function fetchRemoteTemplate() {
+    ;(async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
         const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
-        if (bk) {
-          if (bk.avatar_url && !bk.avatar_url.includes('photo-1514888286974-6c03e2ca1dba')) setAvatarUrl(bk.avatar_url)
-          else setAvatarUrl(DEFAULT_BRAND_AVATAR)
-          if (bk.username && bk.username !== '@humordaiguana') setBrandHandle(bk.username)
-          else setBrandHandle('@nomedapagina')
-          if (bk.layout_config) {
-            const cfg = bk.layout_config
-            if (cfg.brandName && cfg.brandName !== 'HUMOR DA IGUANA') setBrandName(cfg.brandName)
-            else setBrandName('Nome da Página')
-            if (cfg.templateBg) setTemplateBg(cfg.templateBg)
-            if (cfg.showVerifiedBadge !== undefined) setShowVerifiedBadge(cfg.showVerifiedBadge)
-            if (cfg.fontFamily) setFontFamily(cfg.fontFamily)
-            if (cfg.fontSize) setFontSize(cfg.fontSize)
-            if (cfg.brandScale) setBrandScale(cfg.brandScale)
-            if (cfg.subtitle_preset) setSelectedSubtitle(cfg.subtitle_preset)
-            if (cfg.videoWidth) setVideoWidth(cfg.videoWidth)
-            if (cfg.videoHeight) setVideoHeight(cfg.videoHeight)
-            if (cfg.videoRounded !== undefined) setVideoRounded(cfg.videoRounded)
-            if (cfg.videoPos) setVideoPos(cfg.videoPos)
-            if (cfg.headerPos) setHeaderPos(cfg.headerPos)
-            if (cfg.titlePos) setTitlePos(cfg.titlePos)
-            if (cfg.subtitlePos) setSubtitlePos(cfg.subtitlePos)
-            if (cfg.brandAlign) setBrandAlign(cfg.brandAlign)
-            if (cfg.brandLayout) setBrandLayout(cfg.brandLayout)
-            if (cfg.titleColor) setTitleColor(cfg.titleColor)
-            if (cfg.titleStroke) setTitleStroke(cfg.titleStroke)
-            if (cfg.titleStrokeColor) setTitleStrokeColor(cfg.titleStrokeColor)
-            if (cfg.titleCapsLock !== undefined) setTitleCapsLock(cfg.titleCapsLock)
-            if (cfg.textAlign) setTextAlign(cfg.textAlign)
-          }
+        if (bk?.layout_config && Object.keys(bk.layout_config).length > 0) {
+          applyConfig({ ...bk.layout_config, brandHandle: bk.layout_config.brandHandle || bk.username }, bk.avatar_url)
         }
-      } catch {}
-    }
-    fetchRemoteTemplate()
+      } catch {} finally {
+        hydratedRef.current = true
+      }
+    })()
   }, [])
 
-  // Auto-Save no localStorage
-  useEffect(() => {
-    const templateData = {
-      layout: 'meme_frame',
-      subtitle_preset: selectedSubtitle,
-      avatar_url: avatarUrl,
-      template_bg: templateBg,
-      config: {
-        templateBg,
-        avatarPos,
-        headerPos,
-        titlePos,
-        videoPos,
-        subtitlePos,
-        videoWidth,
-        videoHeight,
-        brandName,
-        brandHandle,
-        brandAlign,
-        brandLayout,
-        showVerifiedBadge,
-        titleText,
-        fontFamily,
-        fontSize,
-        brandScale,
-        textAlign,
-        titleColor,
-        titleStroke,
-        titleStrokeColor,
-        titleCapsLock,
-        videoRounded,
-        videoScale: videoWidth,
-      }
-    }
-    localStorage.setItem('clippost_active_template', JSON.stringify(templateData))
-    localStorage.setItem('clippost_template_config', JSON.stringify(templateData.config))
-
-    // Sincroniza automaticamente com o Supabase com debounce de 1.5s
-    const timer = setTimeout(async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          await fetch('/api/brand-kit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: user.id,
-              avatar_url: avatarUrl,
-              username: brandHandle,
-              layout_config: templateData.config,
-            }),
-          })
-        }
-      } catch {}
-    }, 1500)
-
-    return () => clearTimeout(timer)
-  }, [
+  const layoutConfig = useMemo(() => ({
     templateBg,
     avatarPos,
     headerPos,
@@ -369,17 +294,101 @@ export default function TemplatesPage() {
     subtitlePos,
     videoWidth,
     videoHeight,
+    videoScale: videoWidth,
+    videoRounded,
+    videoAspect,
     brandName,
     brandHandle,
+    brandAlign,
+    brandLayout,
+    brandScale,
+    showVerifiedBadge,
     titleText,
     fontFamily,
     fontSize,
     textAlign,
-    selectedSubtitle,
-    brandScale,
-    videoRounded,
-    avatarUrl
+    titleColor,
+    titleStroke,
+    titleStrokeColor,
+    titleCapsLock,
+    showTitleEmojis,
+    subtitle_preset: selectedSubtitle,
+    showWatermark,
+    watermarkText,
+    watermarkOpacity,
+    watermarkPosition,
+    watermarkType,
+    watermarkImage,
+    instagramDecal,
+  }), [
+    templateBg, avatarPos, headerPos, titlePos, videoPos, subtitlePos, videoWidth, videoHeight,
+    videoRounded, videoAspect, brandName, brandHandle, brandAlign, brandLayout, brandScale,
+    showVerifiedBadge, titleText, fontFamily, fontSize, textAlign, titleColor, titleStroke,
+    titleStrokeColor, titleCapsLock, showTitleEmojis, selectedSubtitle, showWatermark, watermarkText,
+    watermarkOpacity, watermarkPosition, watermarkType, watermarkImage, instagramDecal,
   ])
+
+  const persistLocal = () => {
+    try {
+      localStorage.setItem('clippost_active_template', JSON.stringify({
+        layout: 'meme_frame',
+        subtitle_preset: selectedSubtitle,
+        avatar_url: avatarUrl,
+        template_bg: templateBg,
+        config: layoutConfig,
+      }))
+      localStorage.setItem('clippost_template_config', JSON.stringify(layoutConfig))
+    } catch {}
+  }
+
+  const buildSaveBody = () => JSON.stringify({
+    // blob: é só a prévia local enquanto o upload do avatar não termina
+    avatar_url: avatarUrl.startsWith('blob:') ? undefined : avatarUrl,
+    username: brandHandle,
+    layout_config: layoutConfig,
+  })
+
+  const sendSave = async (body: string, keepalive = false) => {
+    pendingSaveRef.current = null
+    setSaveStatus('saving')
+    try {
+      const res = await fetch('/api/brand-kit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive,
+      })
+      setSaveStatus(res.ok ? 'saved' : 'error')
+      return res.ok
+    } catch {
+      setSaveStatus('error')
+      return false
+    }
+  }
+
+  // Salvamento automático: qualquer mudança é salva 1,2s depois da última edição
+  const saveKey = JSON.stringify(layoutConfig) + '|' + avatarUrl
+  useEffect(() => {
+    if (!hydratedRef.current) return
+    persistLocal()
+    const body = buildSaveBody()
+    pendingSaveRef.current = body
+    setSaveStatus('saving')
+    const timer = setTimeout(() => { void sendSave(body) }, 1200)
+    return () => clearTimeout(timer)
+  }, [saveKey])
+
+  // Se a pessoa sair da página antes do debounce, envia o que estiver pendente
+  useEffect(() => {
+    const flush = () => {
+      if (pendingSaveRef.current) void sendSave(pendingSaveRef.current, true)
+    }
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [])
 
   // Aplicar Preset de 1-Clique
   const applyPreset = (preset: typeof TEMPLATE_PRESETS[0]) => {
@@ -678,67 +687,12 @@ export default function TemplatesPage() {
 
   const handleSave = async () => {
     setSaving(true)
-    try {
-      const layoutConfig = {
-        brandName,
-        brandHandle,
-        brandAlign,
-        brandLayout,
-        brandScale,
-        showVerifiedBadge,
-        templateBg,
-        titleText,
-        videoScale: videoWidth,
-        subtitle_preset: selectedSubtitle,
-        fontFamily,
-        fontSize,
-        textAlign,
-        titleColor,
-        titleStroke,
-        titleStrokeColor,
-        titleCapsLock,
-        videoWidth,
-        videoHeight,
-        videoRounded,
-        avatarPos,
-        headerPos,
-        titlePos,
-        videoPos,
-        subtitlePos,
-      }
-
-      // Salva localmente primeiro (100% resiliente)
-      localStorage.setItem('clippost_active_template', JSON.stringify({
-        layout: 'meme_frame',
-        subtitle_preset: selectedSubtitle,
-        avatar_url: avatarUrl,
-        template_bg: templateBg,
-        config: layoutConfig,
-      }))
-      localStorage.setItem('clippost_template_config', JSON.stringify(layoutConfig))
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Envia para /api/brand-kit sem erros 400
-        await fetch('/api/brand-kit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: user.id,
-            avatar_url: avatarUrl,
-            username: brandHandle,
-            layout_config: layoutConfig,
-          }),
-        }).catch(() => null)
-      }
-
+    persistLocal()
+    const ok = await sendSave(buildSaveBody())
+    setSaving(false)
+    if (ok) {
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
-    } catch {
-      setSavedSuccess(true)
-      setTimeout(() => setSavedSuccess(false), 2500)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -751,11 +705,21 @@ export default function TemplatesPage() {
     setBrandLayout(layout)
   }
 
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // A foto vai para o Storage: uma URL blob: só existe neste navegador e o servidor não consegue baixá-la
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setAvatarUrl(url)
+    if (!file) return
+    setAvatarUrl(URL.createObjectURL(file))
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const path = `${user.id}/brand/avatar-${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      setAvatarUrl(supabase.storage.from('videos').getPublicUrl(path).data.publicUrl)
+    } catch {
+      setSaveStatus('error')
     }
   }
 
@@ -786,8 +750,14 @@ export default function TemplatesPage() {
               <h1 className="text-xs sm:text-sm font-semibold text-white tracking-tight flex items-center gap-2">
                 <span>Editor de Template • Reels 9:16</span>
               </h1>
-              <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
-                <Check className="w-3 h-3 text-emerald-400" /> Salvo automaticamente
+              <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1" aria-live="polite">
+                {saveStatus === 'saving' ? (
+                  <><RotateCcw className="w-3 h-3 text-indigo-400 animate-spin" /> Salvando…</>
+                ) : saveStatus === 'error' ? (
+                  <><X className="w-3 h-3 text-red-400" /> Não foi possível salvar — tente de novo</>
+                ) : (
+                  <><Check className="w-3 h-3 text-emerald-400" /> Salvo automaticamente</>
+                )}
               </span>
             </div>
           </div>

@@ -5,10 +5,17 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     fonts-dejavu-core \
+    fonts-roboto-unhinted \
+    fonts-montserrat \
     git \
     unzip \
     wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Anton = opção "Anton / Impact" do editor de template (camada do título nos cortes)
+RUN mkdir -p /usr/local/share/fonts/anton \
+    && wget -q https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf -O /usr/local/share/fonts/anton/Anton-Regular.ttf \
+    && fc-cache -f >/dev/null 2>&1 || true
 
 # Deno: o yt-dlp atual precisa de um runtime JavaScript para extrair formatos do
 # YouTube; sem ele o download falha com "nsig extraction failed".
