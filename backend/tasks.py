@@ -362,6 +362,15 @@ _INVIDIOUS_INSTANCES = [
     "https://yt.cdaut.de",
     "https://inv.nadeko.net",
     "https://invidious.nerdvpn.de",
+    "https://iv.ggtyler.dev",
+    "https://invidious.fdn.fr",
+]
+
+_PIPED_API_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://api.piped.yt",
+    "https://pipedapi.adminforge.de",
+    "https://watchapi.whatever.social",
 ]
 
 
@@ -409,6 +418,147 @@ def _download_via_invidious(url: str, tmp_dir: Path) -> tuple[str, dict]:
         raise Exception(f"InvidiousError: arquivo muito pequeno ({size} bytes)")
     print(f"[invidious] download OK — {size // 1024}KB")
     return str(video_path), {}
+
+
+def _download_via_cobalt_public(url: str, tmp_dir: Path) -> tuple[str, dict]:
+    """Fallback via cobalt.tools público (infraestrutura não-Fly.io — contorna bloqueio de IP)."""
+    # cobalt.tools API pública — sem necessidade de instância própria
+    endpoints = [
+        "https://api.cobalt.tools/",
+        "https://cobalt.tools/api/",
+    ]
+    last_err = None
+    for endpoint in endpoints:
+        try:
+            print(f"[cobalt-pub] tentando {endpoint}")
+            resp = httpx.post(
+                endpoint,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "User-Agent": "clippost/1.0",
+                },
+                json={"url": url, "videoQuality": "720", "downloadMode": "auto", "youtubeVideoCodec": "h264"},
+                timeout=30.0,
+            )
+            if resp.status_code in (401, 403, 429):
+                last_err = Exception(f"cobalt.tools recusou ({resp.status_code}): {resp.text[:200]}")
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("status") == "error":
+                last_err = Exception(f"CobaltPublicError: {(data.get('error') or {}).get('code', data)}")
+                continue
+            download_url = data.get("url")
+            if not download_url:
+                last_err = Exception("CobaltPublicError: sem URL de download")
+                continue
+            video_path = tmp_dir / "original_cobalt_pub.mp4"
+            print(f"[cobalt-pub] baixando de {download_url[:80]}...")
+            with httpx.stream("GET", download_url, timeout=300.0, follow_redirects=True) as stream:
+                stream.raise_for_status()
+                with open(video_path, "wb") as f:
+                    for chunk in stream.iter_bytes(1024 * 1024):
+                        f.write(chunk)
+            size = video_path.stat().st_size
+            print(f"[cobalt-pub] download — {size // 1024}KB")
+            if size < 100 * 1024:
+                last_err = Exception(f"CobaltPublicError: arquivo muito pequeno ({size} bytes)")
+                continue
+            print("[cobalt-pub] OK!")
+            return str(video_path), {}
+        except Exception as e:
+            last_err = e
+            print(f"[cobalt-pub] {endpoint} falhou: {e}")
+    raise last_err or Exception("CobaltPublicError: todos os endpoints falharam")
+
+
+def _download_via_piped(url: str, tmp_dir: Path) -> tuple[str, dict]:
+    """Fallback via Piped API — streams proxiados pelo Piped (IP não-Fly.io chega ao CDN do YouTube)."""
+    import re as _re
+    m = _re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+    if not m:
+        raise Exception("PipedError: não foi possível extrair video_id")
+    vid = m.group(1)
+
+    api_data = None
+    used_inst = None
+    for inst in _PIPED_API_INSTANCES:
+        try:
+            r = httpx.get(f"{inst}/streams/{vid}", timeout=15.0, follow_redirects=True)
+            if r.status_code == 200:
+                api_data = r.json()
+                used_inst = inst
+                print(f"[piped] usando instância {inst}")
+                break
+        except Exception as e:
+            print(f"[piped] {inst} falhou: {e}")
+
+    if not api_data:
+        raise Exception("PipedError: nenhuma instância Piped disponível")
+
+    # Piped retorna streams separados (videoOnly=True) e combinados (videoOnly=False)
+    # Prefere combinados (mp4 com áudio), cai para melhor vídeo+áudio separados
+    combined = sorted(
+        [s for s in api_data.get("videoStreams", []) if not s.get("videoOnly", True) and s.get("url")],
+        key=lambda s: int(s.get("quality", "0p").rstrip("p") or 0),
+        reverse=True,
+    )
+    if combined:
+        stream_url = combined[0]["url"]
+        quality = combined[0].get("quality", "?")
+        print(f"[piped] stream combinado {quality}: {stream_url[:80]}...")
+        video_path = tmp_dir / "original_piped.mp4"
+        with httpx.stream("GET", stream_url, timeout=300.0, follow_redirects=True) as resp:
+            resp.raise_for_status()
+            with open(video_path, "wb") as f:
+                for chunk in resp.iter_bytes(1024 * 1024):
+                    f.write(chunk)
+        size = video_path.stat().st_size
+        if size < 100 * 1024:
+            raise Exception(f"PipedError: arquivo muito pequeno ({size} bytes)")
+        print(f"[piped] download OK — {size // 1024}KB")
+        return str(video_path), {}
+
+    # Streams separados: baixa melhor vídeo + melhor áudio e faz merge via ffmpeg
+    video_streams = sorted(
+        [s for s in api_data.get("videoStreams", []) if s.get("url") and "video/mp4" in s.get("mimeType", "")],
+        key=lambda s: int(s.get("quality", "0p").rstrip("p") or 0),
+        reverse=True,
+    )
+    audio_streams = sorted(
+        [s for s in api_data.get("audioStreams", []) if s.get("url")],
+        key=lambda s: s.get("bitrate", 0),
+        reverse=True,
+    )
+    if not video_streams or not audio_streams:
+        raise Exception("PipedError: sem streams utilizáveis")
+
+    vid_url = video_streams[0]["url"]
+    aud_url = audio_streams[0]["url"]
+    quality = video_streams[0].get("quality", "?")
+    print(f"[piped] streams separados {quality} — baixando vídeo+áudio...")
+
+    vid_tmp = tmp_dir / "piped_video.mp4"
+    aud_tmp = tmp_dir / "piped_audio.mp4"
+    for dl_url, dl_path in [(vid_url, vid_tmp), (aud_url, aud_tmp)]:
+        with httpx.stream("GET", dl_url, timeout=300.0, follow_redirects=True) as resp:
+            resp.raise_for_status()
+            with open(dl_path, "wb") as f:
+                for chunk in resp.iter_bytes(1024 * 1024):
+                    f.write(chunk)
+
+    merged_path = tmp_dir / "original_piped.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(vid_tmp), "-i", str(aud_tmp),
+         "-c:v", "copy", "-c:a", "aac", str(merged_path)],
+        capture_output=True, timeout=120,
+    )
+    size = merged_path.stat().st_size
+    if size < 100 * 1024:
+        raise Exception(f"PipedError: merge falhou ou arquivo muito pequeno ({size} bytes)")
+    print(f"[piped] merge OK — {size // 1024}KB")
+    return str(merged_path), {}
 
 
 @celery.task(name="process_youtube_video")
@@ -519,21 +669,47 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
             _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
 
-            # Fallback 1: Cobalt (IP diferente do worker)
-            print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt...")
+            # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
+            print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
             try:
-                video_path, _ = _download_via_cobalt(url, tmp_dir)
-                video_id = "cobalt"
+                video_path, _ = _download_via_cobalt_public(url, tmp_dir)
+                video_id = _vid_id
                 title = _vid_id
                 video_duration = None
                 fallback_ok = True
-                print(f"[pipeline] cobalt OK")
-            except Exception as cobalt_err:
-                print(f"[pipeline] cobalt falhou: {cobalt_err}")
+                print(f"[pipeline] cobalt público OK")
+            except Exception as cobalt_pub_err:
+                print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
 
-            # Fallback 2: Invidious (API pública, IP diferente)
+            # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
             if not fallback_ok:
-                print(f"[pipeline] fallback 2: invidious...")
+                print(f"[pipeline] fallback 2: cobalt privado (fra)...")
+                try:
+                    video_path, _ = _download_via_cobalt(url, tmp_dir)
+                    video_id = _vid_id
+                    title = _vid_id
+                    video_duration = None
+                    fallback_ok = True
+                    print(f"[pipeline] cobalt privado OK")
+                except Exception as cobalt_err:
+                    print(f"[pipeline] cobalt privado falhou: {cobalt_err}")
+
+            # Fallback 3: Piped (streams proxiados, IP não-Fly.io chega ao CDN)
+            if not fallback_ok:
+                print(f"[pipeline] fallback 3: piped...")
+                try:
+                    video_path, _ = _download_via_piped(url, tmp_dir)
+                    video_id = _vid_id
+                    title = _vid_id
+                    video_duration = None
+                    fallback_ok = True
+                    print(f"[pipeline] piped OK")
+                except Exception as piped_err:
+                    print(f"[pipeline] piped falhou: {piped_err}")
+
+            # Fallback 4: Invidious (API pública, IP diferente)
+            if not fallback_ok:
+                print(f"[pipeline] fallback 4: invidious...")
                 try:
                     video_path, _ = _download_via_invidious(url, tmp_dir)
                     video_id = _vid_id
@@ -546,8 +722,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
             if not fallback_ok:
                 raise Exception(
-                    "YouTubeBlockError: yt-dlp, Cobalt e Invidious falharam. "
-                    "Configure cookies do YouTube (YOUTUBE_COOKIES_FILE) para contornar."
+                    "YouTubeBlockError: todos os métodos de download falharam "
+                    "(yt-dlp, cobalt privado, cobalt público, piped, invidious). "
+                    "Verifique os logs para detalhes."
                 )
 
         # Detecta duração via ffprobe se não disponível (download via cobalt)
