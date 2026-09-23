@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
@@ -42,7 +42,7 @@ import {
   Flame,
   AlertCircle
 } from 'lucide-react'
-import { formatDuration } from '@/lib/utils'
+import { formatDuration, downloadVideoFile } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -1020,24 +1020,34 @@ export default function ProjectClient({
     }
   }
 
-  // Baixar todos os cortes em lote
-  const handleDownloadAll = () => {
+  const [downloadingAll, setDownloadingAll] = useState(false)
+  const [downloadingClipId, setDownloadingClipId] = useState<string | null>(null)
+
+  const handleDownloadSingleClip = async (clip: Clip, index: number) => {
+    if (!clip.storage_url) return
+    setDownloadingClipId(clip.id)
+    triggerBulkFeedback(`Baixando corte #${index + 1}...`)
+    const fname = `corte_${index + 1}_${extractCoreSubject(project.title)}.mp4`
+    await downloadVideoFile(clip.storage_url, fname)
+    setDownloadingClipId(null)
+  }
+
+  // Baixar todos os cortes em lote (via Blob real direto no navegador)
+  const handleDownloadAll = async () => {
     const readyClips = clips.filter(c => !!c.storage_url)
     if (readyClips.length === 0) {
-      alert('Os arquivos de vídeo finais em 9:16 estão sendo renderizados pelo backend. Aguarde alguns instantes!')
+      alert("Os arquivos de vídeo finais em 9:16 estão sendo renderizados pelo backend. Aguarde alguns instantes!")
       return
     }
-    readyClips.forEach((clip, i) => {
-      setTimeout(() => {
-        const a = document.createElement('a')
-        a.href = clip.storage_url!
-        a.download = `corte_${i + 1}_${extractCoreSubject(project.title)}.mp4`
-        a.target = '_blank'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-      }, i * 350)
-    })
+    setDownloadingAll(true)
+    triggerBulkFeedback(`Iniciando download de ${readyClips.length} cortes...`)
+    for (let i = 0; i < readyClips.length; i++) {
+      const clip = readyClips[i]
+      const fname = `corte_${i + 1}_${extractCoreSubject(project.title)}.mp4`
+      await downloadVideoFile(clip.storage_url!, fname)
+    }
+    setDownloadingAll(false)
+    triggerBulkFeedback("Todos os cortes foram baixados com sucesso!")
   }
 
       
@@ -1087,7 +1097,7 @@ export default function ProjectClient({
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Baixar Todos ({clips.length})</span>
+            <span>{downloadingAll ? "Baixando..." : `Baixar Todos (${clips.length})`}</span>
           </button>
 
           <Link
@@ -1661,16 +1671,19 @@ export default function ProjectClient({
 
             {/* Botões de Ação Imediata (Limpos e Diretos) */}
             <div className="grid grid-cols-3 gap-2.5 pt-1">
-              <a
-                href={activeClip.storage_url || project.raw_video_url || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                download={!!activeClip.storage_url}
-                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+              <button
+                type="button"
+                onClick={() => handleDownloadSingleClip(activeClip, selectedClipIndex)}
+                disabled={!activeClip.storage_url || downloadingClipId === activeClip.id}
+                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Baixar Vídeo</span>
-              </a>
+                {downloadingClipId === activeClip.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                <span>{downloadingClipId === activeClip.id ? "Baixando..." : "Baixar Vídeo"}</span>
+              </button>
 
               <button
                 type="button"
@@ -2019,17 +2032,22 @@ export default function ProjectClient({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <a
-                        href={c.storage_url || project.raw_video_url || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={!!c.storage_url}
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all"
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDownloadSingleClip(c, i)
+                        }}
+                        disabled={!c.storage_url || downloadingClipId === c.id}
+                        className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all cursor-pointer disabled:opacity-50"
                         title="Baixar este corte"
                       >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
+                        {downloadingClipId === c.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 )

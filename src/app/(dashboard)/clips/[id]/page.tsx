@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft,
+  Loader2,
   Sparkles,
   Check,
   RefreshCw,
@@ -26,7 +27,7 @@ import {
   CheckCircle2,
   Eye
 } from 'lucide-react'
-import { formatDuration } from '@/lib/utils'
+import { formatDuration, downloadVideoFile } from '@/lib/utils'
 import Link from 'next/link'
 import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
@@ -91,6 +92,8 @@ export default function ClipEditorPage() {
   const [showMobileQr, setShowMobileQr] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [isRerendering, setIsRerendering] = useState(false)
   const [error, setError] = useState('')
   const [viralityModalMetrics, setViralityModalMetrics] = useState<ViralityMetrics | null>(null)
   const [smartEmojisEnabled, setSmartEmojisEnabled] = useState(true)
@@ -224,8 +227,56 @@ export default function ClipEditorPage() {
     setEditingWordId(null)
   }
 
+  const handleDownloadVideo = async () => {
+    if (!clip?.storage_url) return
+    setDownloading(true)
+    const fname = `corte_${clip.title ? clip.title.slice(0, 30).replace(/[^a-zA-Z0-9_-]/g, '_') : clipId}.mp4`
+    await downloadVideoFile(clip.storage_url, fname)
+    setDownloading(false)
+  }
+
+  // Polling para detectar quando a re-renderização do backend estiver concluída
+  useEffect(() => {
+    if (!isRerendering || !clipId) return
+
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('clips')
+          .select('*')
+          .eq('id', clipId)
+          .maybeSingle()
+
+        if (data) {
+          if (data.status === 'ready' && data.storage_url) {
+            // Adiciona timestamp para forçar recarregamento do player de vídeo
+            const cacheBusterUrl = data.storage_url.includes('?')
+              ? `${data.storage_url}&t=${Date.now()}`
+              : `${data.storage_url}?t=${Date.now()}`
+            setClip({ ...data, storage_url: cacheBusterUrl })
+            setIsRerendering(false)
+            setSaving(false)
+            setSavedSuccess(true)
+            setTimeout(() => setSavedSuccess(false), 4000)
+            clearInterval(interval)
+          } else if (data.status === 'failed') {
+            setError('Falha ao processar novo vídeo no backend. Tente novamente.')
+            setIsRerendering(false)
+            setSaving(false)
+            clearInterval(interval)
+          }
+        }
+      } catch (e) {
+        console.error('Erro no polling de re-render:', e)
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [isRerendering, clipId, supabase])
+
   const handleSaveAndRerender = async () => {
     setSaving(true)
+    setIsRerendering(true)
     setError('')
     setSavedSuccess(false)
 
@@ -258,6 +309,7 @@ export default function ClipEditorPage() {
       setTimeout(() => setSavedSuccess(false), 3000)
     } catch (err: any) {
       setError('Erro ao salvar alterações: ' + err.message)
+      setIsRerendering(false)
     } finally {
       setSaving(false)
     }
@@ -345,28 +397,33 @@ export default function ClipEditorPage() {
             </button>
           )}
           {clip?.storage_url && (
-            <a
-              href={clip.storage_url}
-              download
-              className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all flex items-center gap-2"
+            <button
+              type="button"
+              onClick={handleDownloadVideo}
+              disabled={downloading}
+              className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <Download className="w-3.5 h-3.5" />
-              Baixar Vídeo
-            </a>
+              {downloading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>{downloading ? 'Baixando...' : 'Baixar Vídeo'}</span>
+            </button>
           )}
           <button
             onClick={handleSaveAndRerender}
-            disabled={saving}
+            disabled={saving || isRerendering}
             className="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            {saving ? (
+            {saving || isRerendering ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : savedSuccess ? (
               <Check className="w-3.5 h-3.5 text-emerald-300" />
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            {saving ? 'Aplicando...' : savedSuccess ? 'Salvo!' : 'Salvar Alterações'}
+            {isRerendering ? 'Renderizando corte...' : saving ? 'Aplicando...' : savedSuccess ? 'Salvo!' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
@@ -379,16 +436,26 @@ export default function ClipEditorPage() {
           <div className="relative w-[310px] h-[550px] bg-black rounded-[40px] p-2.5 shadow-2xl shadow-black ring-1 ring-white/20 border-4 border-zinc-800 flex flex-col overflow-hidden">
             <div className="relative flex-1 w-full rounded-[30px] overflow-hidden bg-black flex items-center justify-center">
               {clip?.storage_url ? (
-                <video
-                  ref={videoRef}
-                  src={clip.storage_url}
-                  onTimeUpdate={handleTimeUpdate}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  loop
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    key={clip.storage_url}
+                    src={clip.storage_url}
+                    onTimeUpdate={handleTimeUpdate}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    loop
+                  />
+                  {isRerendering && (
+                    <div className="absolute inset-0 z-30 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center">
+                      <RefreshCw className="w-8 h-8 text-orange-400 animate-spin mb-3" />
+                      <span className="text-sm font-bold text-white tracking-wide">Re-renderizando Vídeo 9:16</span>
+                      <span className="text-xs text-zinc-400 font-mono mt-1">Aplicando novo estilo e legendas dinâmicas...</span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center p-4 text-center select-none">
                   <div className="w-10 h-10 rounded-2xl bg-indigo-600/25 border border-indigo-500/30 flex items-center justify-center mb-2 animate-pulse">

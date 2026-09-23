@@ -1,5 +1,5 @@
 app = "clippost-cobalt"
-primary_region = "gru"
+primary_region = "fra"
 
 [build]
   image = "ghcr.io/imputnet/cobalt:11"
