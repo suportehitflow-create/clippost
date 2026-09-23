@@ -716,8 +716,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 "end_time": end,
                 "score": clip["ai_score"],
                 "storage_url": clip_url,
-                "subtitle_preset": sub_preset,
-                "status": "ready",
+                                "status": "ready",
             }).execute()
             print(f"[pipeline] clip {i+1} pronto — '{clip['hook_title'][:40]}'")
 
