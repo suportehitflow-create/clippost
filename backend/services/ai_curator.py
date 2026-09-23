@@ -217,7 +217,7 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
             "Modo Automático Narrativo: escolha a duração ideal para cada história "
             "(mínimo 30s, máximo 300s / 5 min). Preserve início, desenvolvimento e conclusão completos."
         )
-        min_duration, max_duration = 25, 300
+        min_duration, max_duration = 30, 300
 
     chapters_ctx = ""
     if chapters:

@@ -57,58 +57,34 @@ _MAX_UPLOAD_MB = 45.0
 
 
 def _recompress_if_needed(file_path: str) -> bytes:
-    """Se o arquivo > 45 MB, re-codifica para caber no limite do Supabase."""
+    “””Garante que o clipe fique estritamente <= 45MB para evitar 413 do Supabase.”””
     import tempfile
-    data = open(file_path, "rb").read()
+    data = open(file_path, “rb”).read()
     size_mb = len(data) / (1024 * 1024)
     if size_mb <= _MAX_UPLOAD_MB:
         return data
 
-    # Timeout escalado pelo tamanho: mín 600s, +12s/MB
-    recompress_timeout = max(600, int(size_mb * 12))
-
-    # 1ª passagem: CRF 36 sem alterar resolução
-    print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — recomprimindo CRF 36 (timeout {recompress_timeout}s)...")
-    out1 = tempfile.mktemp(suffix=".mp4")
+    print(f”[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — comprimindo rapido para 720p...”)
+    out = tempfile.mktemp(suffix=”.mp4”)
     try:
         subprocess.run([
-            "ffmpeg", "-y", "-i", file_path,
-            "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "36",
-            "-acodec", "aac", "-b:a", "64k",
-            "-movflags", "+faststart", out1,
-        ], check=True, capture_output=True, timeout=recompress_timeout)
-        data = open(out1, "rb").read()
-        new_mb = len(data) / (1024 * 1024)
-        print(f"[upload] 1ª passagem: {new_mb:.1f} MB")
-        if new_mb <= _MAX_UPLOAD_MB:
-            return data
-
-        # 2ª passagem: CRF 40 + limitar largura a 720px
-        print(f"[upload] ainda {new_mb:.1f} MB — 2ª passagem CRF 40 + scale 720p...")
-        out2 = tempfile.mktemp(suffix=".mp4")
-        try:
-            subprocess.run([
-                "ffmpeg", "-y", "-i", out1,
-                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "40",
-                "-vf", "scale='min(720,iw)':-2",
-                "-acodec", "aac", "-b:a", "48k",
-                "-movflags", "+faststart", out2,
-            ], check=True, capture_output=True, timeout=300)
-            data2 = open(out2, "rb").read()
-            print(f"[upload] 2ª passagem: {len(data2)/(1024*1024):.1f} MB")
-            return data2
-        except Exception as e2:
-            print(f"[upload] 2ª passagem falhou: {e2} — usando 1ª passagem")
-            return data
-        finally:
-            if os.path.exists(out2):
-                os.unlink(out2)
+            “ffmpeg”, “-y”, “-i”, file_path,
+            “-vf”, “scale=min(720\\,iw):-2”,
+            “-vcodec”, “libx264”, “-preset”, “ultrafast”, “-crf”, “32”,
+            “-maxrate”, “2200k”, “-bufsize”, “4400k”,
+            “-acodec”, “aac”, “-b:a”, “64k”,
+            “-movflags”, “+faststart”, out,
+        ], check=True, capture_output=True, timeout=180)
+        compressed = open(out, “rb”).read()
+        new_mb = len(compressed) / (1024 * 1024)
+        print(f”[upload] comprimido para {new_mb:.1f} MB”)
+        return compressed
     except Exception as e:
-        print(f"[upload] recompressão falhou: {e} — tentando original")
-        return open(file_path, "rb").read()
+        print(f”[upload] compressao falhou: {e} — enviando original”)
+        return data
     finally:
-        if os.path.exists(out1):
-            os.unlink(out1)
+        if os.path.exists(out):
+            os.unlink(out)
 
 
 def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
