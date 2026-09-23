@@ -483,53 +483,66 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _set_step(project_id, "download")
         print(f"[pipeline] baixando vídeo: {url[:80]}")
         info = {}  # fallback se Cobalt for usado no lugar do yt-dlp
+        _ytdlp_blocked = False
         try:
             with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-                info = ydl.extract_info(url, download=True)
-                if not info:
-                    raise Exception("yt-dlp não retornou informações — URL inválida ou vídeo indisponível")
+                info = ydl.extract_info(url, download=True) or {}
                 video_id = info.get('id', 'video')
                 title = info.get('title', 'Sem título')
                 video_duration = info.get('duration')
+            # Se yt-dlp retornou info mas não gerou arquivo → 403 silencioso no stream
+            mp4_early = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
+            if not info.get('id') or not mp4_early:
+                _ytdlp_blocked = True
         except yt_dlp.utils.DownloadError as de:
             err = str(de).lower()
             if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
-                fallback_ok = False
-                _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
-                _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
+                _ytdlp_blocked = True
+            else:
+                raise
+        except Exception as ge:
+            # ignoreerrors=True pode suprimir DownloadError e lançar Exception genérica
+            _ge = str(ge).lower()
+            if any(k in _ge for k in ("sign in", "bot", "403", "429", "não retornou", "url inválida")):
+                _ytdlp_blocked = True
+            else:
+                raise
 
-                # Fallback 1: Cobalt (IP diferente do worker)
-                print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt...")
+        if _ytdlp_blocked:
+            fallback_ok = False
+            _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+            _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
+
+            # Fallback 1: Cobalt (IP diferente do worker)
+            print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt...")
+            try:
+                video_path, _ = _download_via_cobalt(url, tmp_dir)
+                video_id = "cobalt"
+                title = _vid_id
+                video_duration = None
+                fallback_ok = True
+                print(f"[pipeline] cobalt OK")
+            except Exception as cobalt_err:
+                print(f"[pipeline] cobalt falhou: {cobalt_err}")
+
+            # Fallback 2: Invidious (API pública, IP diferente)
+            if not fallback_ok:
+                print(f"[pipeline] fallback 2: invidious...")
                 try:
-                    video_path, _ = _download_via_cobalt(url, tmp_dir)
-                    video_id = "cobalt"
+                    video_path, _ = _download_via_invidious(url, tmp_dir)
+                    video_id = _vid_id
                     title = _vid_id
                     video_duration = None
                     fallback_ok = True
-                    print(f"[pipeline] cobalt OK")
-                except Exception as cobalt_err:
-                    print(f"[pipeline] cobalt falhou: {cobalt_err}")
+                    print(f"[pipeline] invidious OK")
+                except Exception as inv_err:
+                    print(f"[pipeline] invidious falhou: {inv_err}")
 
-                # Fallback 2: Invidious (API pública, IP diferente)
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 2: invidious...")
-                    try:
-                        video_path, _ = _download_via_invidious(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] invidious OK")
-                    except Exception as inv_err:
-                        print(f"[pipeline] invidious falhou: {inv_err}")
-
-                if not fallback_ok:
-                    raise Exception(
-                        "YouTubeBlockError: yt-dlp, Cobalt e Invidious falharam. "
-                        "Configure cookies do YouTube (YOUTUBE_COOKIES_FILE) para contornar."
-                    )
-            else:
-                raise
+            if not fallback_ok:
+                raise Exception(
+                    "YouTubeBlockError: yt-dlp, Cobalt e Invidious falharam. "
+                    "Configure cookies do YouTube (YOUTUBE_COOKIES_FILE) para contornar."
+                )
 
         # Detecta duração via ffprobe se não disponível (download via cobalt)
         if video_duration is None:
