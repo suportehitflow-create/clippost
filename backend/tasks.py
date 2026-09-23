@@ -81,7 +81,7 @@ def _recompress_if_needed(file_path: str) -> bytes:
                     "-maxrate", maxrate, "-bufsize", str(int(maxrate[:-1]) * 2) + "k",
                     "-acodec", "aac", "-b:a", ba,
                     "-movflags", "+faststart", out,
-                ], check=True, capture_output=True, timeout=240)
+                ], check=True, capture_output=True, timeout=480)
                 compressed = open(out, "rb").read()
                 new_mb = len(compressed) / (1024 * 1024)
                 print(f"[upload] recomprimido para {new_mb:.1f} MB (CRF {crf})")
