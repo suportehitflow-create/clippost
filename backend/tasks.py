@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +55,8 @@ except Exception:
 
 
 _MAX_UPLOAD_MB = 45.0
+# Garante que apenas 1 ffmpeg de compressão roda por vez (evita timeout por sobrecarga de CPU paralela)
+_compress_lock = threading.Semaphore(1)
 
 
 def _recompress_if_needed(file_path: str) -> bytes:
@@ -88,14 +91,15 @@ def _recompress_if_needed(file_path: str) -> bytes:
         for vf, crf, maxrate, ba in passes:
             print(f"[upload] {size_mb:.1f} MB > {_MAX_UPLOAD_MB} MB — recomprimindo CRF {crf} scale {vf[:12]}...")
             try:
-                subprocess.run([
-                    "ffmpeg", "-y", "-i", file_path,
-                    "-vf", vf,
-                    "-vcodec", "libx264", "-preset", "ultrafast", "-crf", crf,
-                    "-maxrate", maxrate, "-bufsize", str(int(maxrate[:-1]) * 2) + "k",
-                    "-acodec", "aac", "-b:a", ba,
-                    "-movflags", "+faststart", out,
-                ], check=True, capture_output=True, timeout=480)
+                with _compress_lock:
+                    subprocess.run([
+                        "ffmpeg", "-y", "-i", file_path,
+                        "-vf", vf,
+                        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", crf,
+                        "-maxrate", maxrate, "-bufsize", str(int(maxrate[:-1]) * 2) + "k",
+                        "-acodec", "aac", "-b:a", ba,
+                        "-movflags", "+faststart", out,
+                    ], check=True, capture_output=True, timeout=720)
                 compressed = open(out, "rb").read()
                 new_mb = len(compressed) / (1024 * 1024)
                 print(f"[upload] recomprimido para {new_mb:.1f} MB (CRF {crf})")
