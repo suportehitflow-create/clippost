@@ -32,6 +32,7 @@ from services.cut_rules import snap_to_words
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
 from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
+from services.scene_detector import detect_scenes, scene_timestamps
 
 load_dotenv()
 
@@ -293,6 +294,21 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             supabase.table("projects").update({"status": "processing", "error_message": None}).eq("id", project_id).execute()
         except Exception as e:
             print(f"[tasks] erro ao atualizar status inicial do projeto: {e}")
+    else:
+        # Cria projeto imediatamente para aparecer na UI durante o download
+        try:
+            new_proj = supabase.table("projects").insert({
+                "user_id": user_id,
+                "source_url": url,
+                "platform": "youtube",
+                "title": url.split("v=")[-1].split("&")[0] if "v=" in url else "Processando...",
+                "status": "processing",
+                "source_type": "url",
+            }).execute()
+            project_id = new_proj.data[0]["id"]
+            print(f"[pipeline] projeto criado early: {project_id}")
+        except Exception as early_err:
+            print(f"[pipeline] erro ao criar projeto early: {early_err}")
 
     tmp_dir = None
 
@@ -452,30 +468,124 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 print(f"[tasks] falha ao ler legenda nativa .vtt: {e}")
 
         if not transcript_data or not transcript_data.get("segments"):
-            # Fallback: extração de áudio + Whisper tiny (3x mais rápido que base)
             _set_step(project_id, "transcricao")
-            print(f"[pipeline] sem legendas nativas — extraindo áudio para Whisper...")
+            print(f"[pipeline] sem legendas nativas — extraindo áudio para transcrição...")
+            # Usa 64kbps mono para manter arquivo <25MB (limite Groq Whisper API)
             subprocess.run([
                 "ffmpeg", "-y", "-i", video_path,
-                "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k", "-f", "mp3",
+                "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k", "-f", "mp3",
                 audio_path,
-            ], check=True, capture_output=True, timeout=300)  # 5 min max
+            ], check=True, capture_output=True, timeout=300)
 
-            from faster_whisper import WhisperModel
-            print(f"[pipeline] iniciando transcrição Whisper tiny...")
-            model = WhisperModel("tiny", device="cpu", compute_type="int8")
-            fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
-            fw_segments = list(fw_segments_gen)  # força avaliação completa agora
-            print(f"[pipeline] Whisper concluído — {len(fw_segments)} segmentos transcritos")
+            # Comprime mais se arquivo ainda > 24MB (vídeos muito longos)
+            audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
+            if audio_size_mb > 24:
+                print(f"[pipeline] áudio {audio_size_mb:.1f}MB > 24MB, recomprimindo...")
+                audio_compressed = audio_path.replace(".mp3", "_small.mp3")
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", audio_path,
+                    "-b:a", "32k", "-f", "mp3", audio_compressed,
+                ], check=True, capture_output=True, timeout=120)
+                audio_path = audio_compressed
+                audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
 
-            segments = []
-            words = []
-            for seg in fw_segments:
-                segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
-                if seg.words:
-                    for w in seg.words:
-                        words.append({"start": w.start, "end": w.end, "word": w.word})
-            transcript_data = {"segments": segments, "words": words}
+            groq_key = os.environ.get("GROQ_API_KEY", "")
+            transcript_data = None
+
+            if groq_key and audio_size_mb <= 24.9:
+                print(f"[pipeline] transcrição Groq Whisper ({audio_size_mb:.1f}MB)...")
+                try:
+                    with open(audio_path, "rb") as af:
+                        audio_bytes = af.read()
+                    resp = httpx.post(
+                            "https://api.groq.com/openai/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {groq_key}"},
+                            files=[
+                                ("model", (None, "whisper-large-v3-turbo")),
+                                ("response_format", (None, "verbose_json")),
+                                ("timestamp_granularities[]", (None, "word")),
+                                ("timestamp_granularities[]", (None, "segment")),
+                                ("file", (Path(audio_path).name, audio_bytes, "audio/mpeg")),
+                            ],
+                            timeout=120.0,
+                        )
+                    resp.raise_for_status()
+                    groq_result = resp.json()
+                    segments = [
+                        {"start": s["start"], "end": s["end"], "text": s["text"]}
+                        for s in groq_result.get("segments", [])
+                    ]
+                    words = [
+                        {"start": w["start"], "end": w["end"], "word": w["word"]}
+                        for w in groq_result.get("words", [])
+                    ]
+                    if segments:
+                        transcript_data = {"segments": segments, "words": words}
+                        print(f"[pipeline] Groq Whisper OK — {len(segments)} segmentos")
+                    else:
+                        print(f"[pipeline] Groq retornou 0 segmentos, usando Whisper local")
+                except Exception as groq_err:
+                    print(f"[pipeline] Groq Whisper falhou: {groq_err}, usando Whisper local")
+
+            if not transcript_data or not transcript_data.get("segments"):
+                from faster_whisper import WhisperModel
+                print(f"[pipeline] iniciando Whisper tiny local...")
+                model = WhisperModel("tiny", device="cpu", compute_type="int8")
+                fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+                fw_segments = list(fw_segments_gen)
+                print(f"[pipeline] Whisper concluído — {len(fw_segments)} segmentos transcritos")
+                segments = []
+                words = []
+                for seg in fw_segments:
+                    segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
+                    if seg.words:
+                        for w in seg.words:
+                            words.append({"start": w.start, "end": w.end, "word": w.word})
+                transcript_data = {"segments": segments, "words": words}
+
+            # Fallback 3: autocut (se faster-whisper também falhou ou retornou 0 segmentos)
+            if not transcript_data or not transcript_data.get("segments"):
+                print(f"[pipeline] tentando autocut como fallback de transcrição...")
+                try:
+                    import tempfile, json as _json
+                    from autocut.transcribe import Transcribe
+                    import argparse as _ap
+                    _args = _ap.Namespace(
+                        inputs=[audio_path],
+                        whisper_model="tiny",
+                        lang=None,
+                        prompt="",
+                        output_dir=str(Path(audio_path).parent),
+                        encoding="utf-8",
+                        device="cpu",
+                        whisper_mode="faster",
+                        openai_rpm=3,
+                    )
+                    t = Transcribe(_args)
+                    t.run()
+                    # autocut gera .srt ao lado do arquivo de áudio
+                    srt_path = audio_path.replace(".mp3", ".srt")
+                    if Path(srt_path).exists():
+                        import re as _re
+                        srt_text = Path(srt_path).read_text(encoding="utf-8", errors="ignore")
+                        segs = []
+                        for block in _re.split(r"\n\n+", srt_text.strip()):
+                            lines = block.strip().split("\n")
+                            if len(lines) >= 3:
+                                times = lines[1].replace(",", ".").split(" --> ")
+                                def _tc(s):
+                                    h, m, rest = s.strip().split(":")
+                                    sec, ms = rest.split(".")
+                                    return int(h)*3600 + int(m)*60 + int(sec) + int(ms[:3])/1000
+                                try:
+                                    segs.append({"start": _tc(times[0]), "end": _tc(times[1]), "text": " ".join(lines[2:])})
+                                except Exception:
+                                    pass
+                        if segs:
+                            transcript_data = {"segments": segs, "words": []}
+                            print(f"[pipeline] autocut fallback OK — {len(segs)} segmentos")
+                except Exception as ac_err:
+                    print(f"[pipeline] autocut fallback falhou: {ac_err}")
 
         chapters = info.get("chapters") or []
         transcript_data["chapters"] = chapters
@@ -506,11 +616,17 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         print(f"[pipeline] IA Curator retornou {len(clips_meta)} clipes candidatos")
 
         if not clips_meta:
+            print("[pipeline] AI Curator retornou 0 clipes — tentando PySceneDetect fallback...")
+            clips_meta = detect_scenes(video_path, min_scene_len=30.0, max_clip_len=120.0, max_clips=10)
+            if clips_meta:
+                print(f"[pipeline] PySceneDetect gerou {len(clips_meta)} clipes candidatos")
+
+        if not clips_meta:
             supabase.table("projects").update({
                 "status": "failed",
-                "error_message": "IA Curator não encontrou momentos virais. Verifique se AI_CURATOR_API_KEY está configurada no Fly.io."
+                "error_message": "Nenhum momento viral encontrado (AI Curator + PySceneDetect falharam)."
             }).eq("id", project_id).execute()
-            return {"status": "failed", "reason": "no_clips_from_ai"}
+            return {"status": "failed", "reason": "no_clips_from_ai_or_scenes"}
 
                 # Brand Kit e Template Ativo do Usuário (100% integrado)
         bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()

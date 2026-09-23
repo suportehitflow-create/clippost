@@ -492,11 +492,11 @@ async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
     from tasks import process_youtube_video
     if CELERY_ENABLED:
         try:
-            task = process_youtube_video.apply_async(args=[req.url, req.user_id, req.clip_duration])
+            task = process_youtube_video.apply_async(args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config])
             return {"task_id": task.id, "status": "processing"}
         except Exception as e:
             print(f"[process-url] Celery falhou ({e}), usando BackgroundTasks")
-    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration)
+    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config)
     return {"task_id": "bg_process", "status": "processing"}
 
 

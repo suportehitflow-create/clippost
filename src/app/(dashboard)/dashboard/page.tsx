@@ -65,8 +65,6 @@ export default function CleanDashboard() {
   async function handleDeleteProject(id: string, e: React.MouseEvent) {
     e.stopPropagation()
     e.preventDefault()
-    if (!confirm('Deseja realmente excluir permanentemente este projeto e todos os seus cortes?')) return
-
     setDeletingId(id)
     try {
       // 1. Exclusão segura via API server-side (remove posts agendados, storage e registro no DB)

@@ -28,7 +28,7 @@ def _detect_silences(input_video: str, start: float, duration: float,
             "-ss", str(start), "-t", str(duration), "-i", input_video,
             "-af", f"silencedetect=noise={noise_db}dB:duration={min_dur}",
             "-f", "null", "-"
-        ], capture_output=True, text=True, timeout=30)
+        ], capture_output=True, text=True, timeout=max(60, int(duration * 2)))
         silences: list[tuple[float, float]] = []
         for line in result.stderr.split("\n"):
             if "silence_end" in line and "|" in line:
@@ -321,8 +321,9 @@ def create_vertical_clip(
             ]
         )
 
+        render_timeout = max(600, int(duration * 12))  # 12x realtime + mínimo 10min
         with _FFMPEG_SEMAPHORE:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=480)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=render_timeout)
         if result.returncode != 0:
             print(f"[ffmpeg_engine] filter_complex falhou, tentando fallback simples:\n{result.stderr[-800:]}")
             with _FFMPEG_SEMAPHORE:
@@ -347,6 +348,7 @@ def _edge_fades(out_duration: float) -> list[str]:
 
 def _simple_render(input_video: str, output_video: str, start: float, duration: float):
     """Fallback: crop 9:16 simples sem overlays."""
+    fallback_timeout = max(600, int(duration * 12))
     subprocess.run([
         "ffmpeg", "-y",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
@@ -356,4 +358,4 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
         "-acodec", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         output_video,
-    ], check=True, capture_output=True)
+    ], check=True, capture_output=True, timeout=fallback_timeout)
