@@ -410,6 +410,32 @@ class TestGetViralClips:
             dur = c["end_time"] - c["start_time"]
             assert 20 <= dur <= 45 + 0.1, f"duração={dur:.1f}s fora do range para clip_duration='30'"
 
+    def test_clip_duration_auto_respects_90s_max(self):
+        """No modo automático, o teto rígido é 90s (1 minuto e meio) conforme solicitado pelo usuário."""
+        clips_json = json.dumps([
+            {"start_time": 0.0, "end_time": 180.0, "hook_title": "3 MINUTOS", "ai_score": 0.9},
+            {"start_time": 10.0, "end_time": 120.0, "hook_title": "110 SEGUNDOS", "ai_score": 0.85},
+            {"start_time": 20.0, "end_time": 80.0, "hook_title": "60 SEGUNDOS", "ai_score": 0.8},
+        ])
+        with patch("services.ai_curator._try_providers", return_value=clips_json):
+            result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []}, clip_duration="auto")
+        for c in result:
+            dur = c["end_time"] - c["start_time"]
+            assert dur <= 90.0 + 0.1, f"duração={dur:.1f}s excedeu 90s no modo automático"
+
+    def test_trim_intro_outro_removes_greetings_and_cta(self):
+        """Valida que saudações ('oi galera') e chamadas finais ('deixa o like') são removidas das bordas."""
+        from services.ai_curator import trim_clip_intro_outro
+        segs = [
+            {"start": 0.0, "end": 5.0, "text": "Fala galera, sejam todos bem-vindos ao canal!"},
+            {"start": 5.0, "end": 25.0, "text": "O maior segredo para vencer é a consistência diária."},
+            {"start": 25.0, "end": 45.0, "text": "Quando você entende isso, seus resultados explodem."},
+            {"start": 45.0, "end": 50.0, "text": "Não esquece de deixar o like e se inscrever no canal!"},
+        ]
+        new_start, new_end = trim_clip_intro_outro(0.0, 50.0, segs, min_len=20.0)
+        assert new_start >= 5.0, f"Intro não foi cortada: start={new_start}"
+        assert new_end <= 45.0, f"Outro não foi cortada: end={new_end}"
+
 
 # =============================================================================
 # 5. Plataformas — URLs suportadas e rejeição

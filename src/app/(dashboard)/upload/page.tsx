@@ -282,10 +282,10 @@ export default function CreateClipsPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'auto', label: '⚡ IA Dinâmico', desc: 'Tempo ideal inteligente' },
-                  { id: '30', label: '< 60s', desc: 'Menos de 60s (Reels rápidos)' },
-                  { id: '60', label: '60s', desc: 'Padrão viral completo' },
-                  { id: '90', label: '60s+', desc: 'Mais de 60s (Conteúdo longo)' },
+                  { id: 'auto', label: '⚡ IA Dinâmico', desc: 'Até 1m30s (Ideal Reels/Shorts)' },
+                  { id: '30', label: '< 60s', desc: '20s - 45s (Ultra-rápidos)' },
+                  { id: '60', label: '60s', desc: '35s - 60s (Padrão viral)' },
+                  { id: '90', label: '60s+', desc: 'Até 90s (1 minuto e meio)' },
                 ].map(opt => (
                   <button
                     key={opt.id}

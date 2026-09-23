@@ -964,7 +964,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         if not clips_meta:
             print("[pipeline] AI Curator retornou 0 clipes — tentando PySceneDetect fallback...")
-            clips_meta = detect_scenes(video_path, min_scene_len=30.0, max_clip_len=120.0, max_clips=10)
+            clips_meta = detect_scenes(video_path, min_scene_len=30.0, max_clip_len=90.0, max_clips=10)
             if clips_meta:
                 print(f"[pipeline] PySceneDetect gerou {len(clips_meta)} clipes candidatos")
 

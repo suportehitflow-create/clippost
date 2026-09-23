@@ -243,9 +243,9 @@ except Exception:
 class ProcessRequest(BaseModel):
     url: str
     user_id: str
-    clip_duration: str = "auto"  # "30", "60", "auto"
+    clip_duration: str = "auto"  # "30", "60", "90", "120", "auto"
     project_id: str | None = None
-    remove_silence: bool = True
+    remove_silence: bool = False  # default False para evitar drift acústico de PTS
     template_config: dict | None = None
 
 
@@ -508,7 +508,7 @@ async def list_connected_social(user_id: str):
 
 @app.post("/api/autopilot/watches")
 async def criar_watch(req: WatchRequest):
-    if req.clip_duration not in {"30", "60", "auto"}:
+    if req.clip_duration not in {"30", "60", "90", "120", "auto"}:
         raise HTTPException(status_code=400, detail=f"Duração inválida: {req.clip_duration}")
     try:
         info = resolve_channel(req.canal)
@@ -577,7 +577,7 @@ async def process_bulk(req: BulkProcessRequest, background_tasks: BackgroundTask
         except Exception as e:
             print(f"[bulk] Celery falhou ({e}), usando BackgroundTasks")
     for url in req.urls:
-        background_tasks.add_task(process_youtube_video, url, req.user_id, req.clip_duration, None, True, None)
+        background_tasks.add_task(process_youtube_video, url, req.user_id, req.clip_duration, None, False, None)
     return {"task_id": "bg_bulk", "status": "queued", "count": len(req.urls)}
 
 

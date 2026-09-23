@@ -79,7 +79,7 @@ export default function BulkStudioPage() {
   const [batchItems, setBatchItems] = useState<BatchItem[]>([])
   const [urlInput, setUrlInput] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('hormozi_yellow')
-  const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60'>('auto')
+  const [clipDuration, setClipDuration] = useState<'auto' | '30' | '60' | '90'>('auto')
   const [showMobileQr, setShowMobileQr] = useState(false)
   const [copiedBulkUrl, setCopiedBulkUrl] = useState(false)
   // Opcoes Anti-Algoritmo (Reels / TikTok)
@@ -500,8 +500,8 @@ export default function BulkStudioPage() {
               Tempo aproximado de cada corte viral gerado.
             </p>
 
-            <div className="grid grid-cols-3 gap-2">
-              {(['auto', '30', '60'] as const).map((d) => (
+            <div className="grid grid-cols-4 gap-2">
+              {(['auto', '30', '60', '90'] as const).map((d) => (
                 <button
                   key={d}
                   onClick={() => setClipDuration(d)}

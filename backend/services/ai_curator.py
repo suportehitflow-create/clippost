@@ -198,10 +198,74 @@ def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 2000
 
 # ─── curadoria principal ──────────────────────────────────────────────────────
 
+INTRO_REGEX = re.compile(
+    r"\b("
+    r"(oi|ol[aá]|fala|e\s+a[íi]|salve)\s+(galera|pessoal|gente|turma|amigos|fam[íi]lia|rapaziada)"
+    r"|seja[m]?\s+muito\s+bem[- ]vindo[s]?"
+    r"|seja[m]?\s+bem[- ]vindo[s]?"
+    r"|bem[- ]vindo[s]?\s+a\s+mais\s+um"
+    r"|hoje\s+(eu\s+)?(estou|vou|vamos|n[óo]s)\s+(aqui|mostrar|falar|gravar|apresentar)"
+    r"|neste\s+v[íi]deo|nesse\s+v[íi]deo"
+    r"|antes\s+de\s+(come[çc]ar|iniciar)"
+    r"|j[áa]\s+deixa\s+o\s+like|deixa\s+o\s+like\s+no\s+come[çc]o"
+    r"|roda\s+a\s+vinheta"
+    r")\b",
+    re.IGNORECASE
+)
+
+OUTRO_REGEX = re.compile(
+    r"\b("
+    r"deixa\s+o\s+like|deixe\s+o\s+seu\s+like|deixa\s+seu\s+like|curte\s+o\s+v[íi]deo|curta\s+o\s+v[íi]deo"
+    r"|se\s+inscreve|se\s+inscreva|inscreva-se"
+    r"|ativa\s+o\s+sininho|ative\s+o\s+sininho|notifica[çc][õo]es"
+    r"|deixa\s+(a[íi]\s+)?nos\s+coment[áa]rios|comenta\s+aqui\s+embaixo"
+    r"|compartilha\s+com|compartilhe\s+com"
+    r"|at[ée]\s+o\s+pr[óo]ximo|at[ée]\s+a\s+pr[óo]xima|at[ée]\s+mais|at[ée]\s+semana\s+que\s+vem"
+    r"|valeu\s+falou|valeu\s+fui|tchau\s+tchau|um\s+grande\s+abra[çc]o|um\s+forte\s+abra[çc]o|fui\s+tchau"
+    r"|link\s+na\s+descri[çc][ãa]o|link\s+na\s+bio"
+    r")\b",
+    re.IGNORECASE
+)
+
+
+def trim_clip_intro_outro(start: float, end: float, segments: list[dict], min_len: float = 20.0) -> tuple[float, float]:
+    """
+    Remove saudações iniciais (intro) e pedidos de like/despedidas (outro) das bordas do clipe.
+    """
+    if not segments:
+        return start, end
+
+    clip_segs = [s for s in segments if float(s.get("end", 0)) > start and float(s.get("start", 0)) < end]
+    if not clip_segs:
+        return start, end
+
+    new_start = start
+    new_end = end
+
+    # Checa os 2 primeiros segmentos (janela inicial de até 15s)
+    for s in clip_segs[:2]:
+        s_end = float(s.get("end", 0))
+        text = str(s.get("text", ""))
+        if (s_end - new_start) <= 15.0 and INTRO_REGEX.search(text):
+            if (new_end - s_end) >= min_len:
+                new_start = s_end
+
+    # Checa os 2 últimos segmentos (janela final de até 15s)
+    for s in reversed(clip_segs[-2:]):
+        s_start = float(s.get("start", 0))
+        text = str(s.get("text", ""))
+        if (new_end - s_start) <= 15.0 and OUTRO_REGEX.search(text):
+            if (s_start - new_start) >= min_len:
+                new_end = s_start
+
+    return round(new_start, 2), round(new_end, 2)
+
+
 def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters: list[dict] | None = None) -> list[dict]:
     """
     Retorna lista de cortes virais usando scoring multidimensional.
-    Prompt inspirado no OpenMontage clip-factory/script-director.
+    Exclui introdução ("oi galera", saudações) e encerramento (pedidos de like, despedidas).
+    Garante teto de 90 segundos no modo automático (1 minuto e meio).
     """
     segments = transcript_data.get("segments", [])
     if not segments:
@@ -210,18 +274,27 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     if chapters is None:
         chapters = transcript_data.get("chapters") or []
 
+    # Configuração de limites conforme escolha do usuário
     if clip_duration == "30":
-        duration_desc = "Cortes curtos de 25 a 45 segundos (dinâmicos, direto ao ponto)."
+        duration_desc = "Cortes curtos de 20 a 45 segundos (dinâmicos, rápidos e direto ao ponto)."
         min_duration, max_duration = 20, 45
     elif clip_duration == "60":
-        duration_desc = "Cortes médios de 50 a 90 segundos (ideias desenvolvidas com clareza)."
-        min_duration, max_duration = 40, 90
+        duration_desc = "Cortes padrão de 35 a 60 segundos (tempo ideal para Shorts, TikTok e Reels)."
+        min_duration, max_duration = 35, 60
+    elif clip_duration == "90":
+        duration_desc = "Cortes médios de 50 a 90 segundos (1 minuto e meio máximo)."
+        min_duration, max_duration = 50, 90
+    elif clip_duration == "120":
+        duration_desc = "Cortes longos de 60 a 120 segundos (máximo 2 minutos)."
+        min_duration, max_duration = 60, 120
     else:
+        # Modo Automático padrão solicitado pelo usuário:
+        # Limite máximo de 90 segundos (1 minuto e meio) para reter atenção.
         duration_desc = (
-            "Modo Automático Narrativo: escolha a duração ideal para cada história "
-            "(mínimo 30s, máximo 300s / 5 min). Preserve início, desenvolvimento e conclusão completos."
+            "Modo Automático Viral: escolha a duração ideal para cada momento (mínimo 30s, MÁXIMO RIGOROSO de 90s / 1 minuto e meio). "
+            "Cortes com mais de 90 segundos perdem retenção, portanto NUNCA crie clipes com mais de 90 segundos."
         )
-        min_duration, max_duration = 30, 300
+        min_duration, max_duration = 30, 90
 
     chapters_ctx = ""
     if chapters:
@@ -230,30 +303,40 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     timeline = prepare_full_transcript_timeline(segments)
     video_end = float(segments[-1].get("end", 600)) if segments else 600.0
 
-    prompt = f"""Você é um editor de vídeo especializado em fragmentar vídeos longos em partes coerentes e compreensíveis.
+    prompt = f"""Você é um editor de vídeo sênior especializado em cortes virais (Shorts, Reels, TikTok) a partir de podcasts, entrevistas e vídeos longos.
 
-TAREFA: Segmente o vídeo em TODOS os blocos de conteúdo com sentido próprio. Gere tantos clipes quanto existirem blocos naturais no vídeo — pode ser 3, pode ser 10 ou mais.
+TAREFA:
+Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético ou ensinamentos profundos. Gere entre 3 e 10 cortes que tenham potencial de explodir nas redes sociais.
 
-COMO SEGMENTAR:
-1. Comece do início. Quando o locutor termina um assunto/história, esse é o fim do primeiro clipe.
-2. Quando começa um novo assunto, começa um novo clipe. E assim por diante até o fim do vídeo.
-3. Cada clipe deve ter começo, meio e fim dentro de seu próprio contexto — deve ser compreensível sozinho.
-4. Se no meio de uma história o locutor se desviar para outro assunto e depois voltar, você pode ignorar esse desvio nos timestamps (o clipe cobre a história principal, o desvio pode ficar de fora).
-5. Não pule nenhuma parte — cubra o vídeo inteiro do início ao fim, sem deixar buracos.
+⚠️ REGRAS RIGOROSAS DE EXCLUSÃO (FILTRO OBRIGATÓRIO):
+1. EXCLUA TOTALMENTE A INTRODUÇÃO / ABERTURA:
+   - NUNCA comece um clipe com saudações ("oi galera", "fala pessoal", "e aí galera", "sejam bem-vindos", "olá a todos").
+   - NUNCA inclua vinhetas, enrolações de início de vídeo, apresentações demoradas de convidados ou patrocinadores na abertura.
+   - O clipe DEVE começar direto na fala interessante, no gancho provocativo ou no assunto central daquele momento.
 
-REGRAS:
-- Cada clipe deve fazer sentido para quem assiste sem ter visto o restante do vídeo.
-- Nunca comece um clipe no meio de uma frase ou raciocínio.
-- Para cada clipe, escreva um hook_title em MAIÚSCULAS que seja um gancho viral para redes sociais. Use emoção, suspense, curiosidade ou impacto — como se fosse o título de um Reels ou Short que precisa parar o dedo de quem está rolando o feed. Exemplos bons: "ELE CHOROU AO VIVO QUANDO OUVIU ISSO", "NINGUÉM ESPERAVA ESSA RESPOSTA", "ISSO MUDA TUDO", "A VERDADE QUE NINGUÉM TE CONTA". NUNCA use títulos descritivos ou jornalísticos tipo "FULANO EXPLICA SEU PONTO DE VISTA".
-- O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
+2. EXCLUA TOTALMENTE A FINALIZAÇÃO / ENCERRAMENTO:
+   - NUNCA inclua pedidos de like ("deixa o like", "se inscreva no canal", "ativa as notificações", "deixe nos comentários", "compartilha").
+   - NUNCA inclua despedidas de fim de vídeo ("até a próxima", "valeu fui", "um forte abraço", "fui tchau", "tchau tchau") ou chamadas para outros vídeos.
+   - O clipe DEVE terminar imediatamente após a conclusão da história, reflexão ou punchline, ANTES de qualquer encerramento de canal.
+
+3. FOCO EXCLUSIVO NAS PARTES MAIS INTERESSANTES:
+   - Não tente cobrir o vídeo inteiro. Ignore partes mornas, repetições, bate-papo sem propósito ou enrolação.
+   - Cada clipe selecionado deve ser autossuficiente (começo, meio e conclusão lógica compreensíveis sem precisar ver o resto do vídeo).
+   - NUNCA inicie ou termine cortando uma frase ao meio ou no meio de uma palavra.
+
+4. TÍTULO VIRAL (hook_title):
+   - Em MAIÚSCULAS, até 60 caracteres. Deve gerar curiosidade irresistível, urgência ou impacto emocional para parar a rolagem no feed.
+   - Exemplos: "EU GASTEI 3 MIL REAIS NISSO E ME ARREPENDI", "O SEGREDO DOS BILIONÁRIOS QUE NINGUÉM CONTA", "A VERDADE QUE VAI TE CHOCAR".
+   - NUNCA use títulos descritivos ou neutros tipo "FULANO EXPLICA SEU PONTO DE VISTA".
+   - O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
 
 DURAÇÃO: {duration_desc}
-(Mínimo: {min_duration}s | Máximo: {max_duration}s | Duração do vídeo: {int(video_end)}s)
+(Mínimo: {min_duration}s | Máximo RIGOROSO: {max_duration}s [máx 1min e meio no modo automático] | Duração do vídeo: {int(video_end)}s)
 {chapters_ctx}
 TRANSCRIÇÃO COM TIMESTAMPS:
 {timeline}
 
-RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cubra o vídeo inteiro:
+RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, contendo apenas os melhores cortes:
 [
   {{
     "start_time": <segundo exato de início>,
@@ -323,7 +406,7 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cu
     if not clips:
         print(f"[ai_curator] resposta bruta da IA sem JSON válido (primeiros 300 chars):\n{raw[:300]}")
 
-    # Validação e saneamento
+    # Validação e saneamento (incluindo filtro de intro/outro e limite de 90s)
     validated = []
     for c in clips[:15]:
         try:
@@ -332,6 +415,10 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cu
             if end <= start:
                 end = start + 60
 
+            # 1. Filtro inteligente de intro/outro nas bordas do clipe
+            start, end = trim_clip_intro_outro(start, end, segments, min_len=min_duration)
+
+            # 2. Respeito rigoroso aos limites de duração (máx 90s no modo automático)
             dur = end - start
             if dur > max_duration:
                 end = start + max_duration
