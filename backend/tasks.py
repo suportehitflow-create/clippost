@@ -682,7 +682,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     "end_time": end,
                     "score": clip["ai_score"],
                     "storage_url": None,
-                    "status": "rendering",
+                    "status": "pending",
                 }).execute()
                 clip_db_id = row.data[0]["id"] if row.data else None
             except Exception as pre_err:
@@ -691,7 +691,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             prepared_clips.append({
                 "clip_meta": clip, "start": start, "end": end, "index": i, "db_id": clip_db_id,
             })
-        print(f"[pipeline] {len(prepared_clips)} clips pré-criados no DB como 'rendering'")
+        print(f"[pipeline] {len(prepared_clips)} clips pré-criados no DB como 'pending'")
 
         # Fase B: renderiza cada clip e atualiza para "ready" conforme conclui
         for pc in prepared_clips:
