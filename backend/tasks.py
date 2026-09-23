@@ -321,54 +321,40 @@ def _set_step(pid: str | None, step: str):
 
 
 def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
-    """Fallback via cobalt — usa IP privado de Frankfurt direto para evitar routing gru."""
-    from urllib.parse import urlparse, urlunparse
-    # IP privado da máquina Frankfurt (fra) — bypass do load balancer que pode rotear para gru
-    fra_private = os.environ.get("COBALT_FRA_IP", "fdaa:c0:ead3:a7b:61b:6fc2:dd02:2")
-    cobalt_direct = f"http://[{fra_private}]:9000"
-    cobalt_public = os.environ.get("COBALT_URL", "https://clippost-cobalt.fly.dev")
+    """Fallback via Cobalt Frankfurt (IP europeu, app separado = tunnel URL correto)."""
+    # app separado em Frankfurt: API_URL=https://clippost-cobalt-fra.fly.dev
+    # garante que tanto a chamada API quanto o tunnel download usam Frankfurt
+    cobalt_base = os.environ.get("COBALT_URL", "https://clippost-cobalt-fra.fly.dev")
+    print(f"[cobalt] tentando: {cobalt_base}")
+    resp = httpx.post(
+        f"{cobalt_base}/",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        json={"url": url, "videoQuality": "1080", "youtubeVideoCodec": "h264", "downloadMode": "auto"},
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") == "error":
+        code = (data.get("error") or {}).get("code", "unknown")
+        raise Exception(f"CobaltError: {code}")
 
-    # Tenta Frankfurt direto, depois público como fallback
-    for label, base in [("fra-direct", cobalt_direct), ("public", cobalt_public)]:
-        try:
-            print(f"[cobalt-{label}] tentando: {base}")
-            resp = httpx.post(
-                f"{base}/",
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
-                json={"url": url, "videoQuality": "1080", "youtubeVideoCodec": "h264", "downloadMode": "auto"},
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if data.get("status") == "error":
-                code = (data.get("error") or {}).get("code", "unknown")
-                raise Exception(f"CobaltError: {code}")
+    download_url = data.get("url")
+    if not download_url:
+        raise Exception("CobaltError: sem URL de download na resposta")
 
-            download_url = data.get("url")
-            if not download_url:
-                raise Exception("CobaltError: sem URL de download")
-
-            # Redireciona o tunnel para Frankfurt (mesmo IP que respondeu o API)
-            if label == "fra-direct" and "clippost-cobalt.fly.dev" in download_url:
-                parsed = urlparse(download_url)
-                download_url = urlunparse(parsed._replace(scheme="http", netloc=f"[{fra_private}]:9000"))
-
-            video_path = tmp_dir / f"original_cobalt_{label}.mp4"
-            print(f"[cobalt-{label}] baixando de {download_url[:80]}...")
-            with httpx.stream("GET", download_url, timeout=300.0, follow_redirects=True) as stream:
-                stream.raise_for_status()
-                with open(video_path, "wb") as f:
-                    for chunk in stream.iter_bytes(chunk_size=1024 * 1024):
-                        f.write(chunk)
-            file_size = video_path.stat().st_size
-            print(f"[cobalt-{label}] download — {file_size // 1024}KB")
-            if file_size < 100 * 1024:
-                raise Exception(f"CobaltError: arquivo muito pequeno ({file_size} bytes)")
-            print(f"[cobalt-{label}] OK!")
-            return str(video_path), {}
-        except Exception as e:
-            print(f"[cobalt-{label}] falhou: {e}")
-    raise Exception("CobaltError: todos os endpoints falharam")
+    video_path = tmp_dir / "original_cobalt.mp4"
+    print(f"[cobalt] baixando de {download_url[:80]}...")
+    with httpx.stream("GET", download_url, timeout=300.0, follow_redirects=True) as stream:
+        stream.raise_for_status()
+        with open(video_path, "wb") as f:
+            for chunk in stream.iter_bytes(chunk_size=1024 * 1024):
+                f.write(chunk)
+    file_size = video_path.stat().st_size
+    print(f"[cobalt] download — {file_size // 1024}KB")
+    if file_size < 100 * 1024:
+        raise Exception(f"CobaltError: arquivo muito pequeno ({file_size} bytes), provável YouTube bloqueando")
+    print(f"[cobalt] OK!")
+    return str(video_path), {}
 
 
 _INVIDIOUS_INSTANCES = [
