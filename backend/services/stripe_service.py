@@ -99,8 +99,10 @@ def _upsert_plan(user_id: str, plan: str, customer_id: str, subscription_id: str
 def get_plan_status(user_id: str) -> dict:
     plan = maybe_one(_supabase.table("user_plans").select("*").eq("user_id", user_id))
     if not plan.data:
-        # Criar registro free se não existe
-        _supabase.table("user_plans").insert({"user_id": user_id}).execute()
+        try:
+            _supabase.table("user_plans").insert({"user_id": user_id}).execute()
+        except Exception:
+            pass  # FK violation ou user inexistente — continua como free
         return {"plan": "free", "clips_used": 0, "clips_limit": 3, "period_reset": None}
     d = plan.data
     limit = 999999 if d["plan"] == "pro" else 3
