@@ -166,7 +166,7 @@ def create_vertical_clip(
     speed: float = 1.0,
 ) -> str:
     """
-    Renderiza clipe vertical 9:16 (1080x1920) 100% integrado com o template:
+    Renderiza clipe vertical 9:16 (720x1280 HD padrão) 100% integrado com o template:
     - O vídeo bruto é recortado na proporção e dimensões exatas definidas no template.
     - IA Smart Framing: centraliza no foco/falante (com âncora prioritária no centro).
     - Canvas com cor de fundo do template (dark, white, zinc).
@@ -187,16 +187,20 @@ def create_vertical_clip(
         video_pos_x = float(video_pos.get("x", 50))
         video_pos_y = float(video_pos.get("y", 50))
 
-        target_w = int(round(1080 * (video_w_pct / 100.0)))
-        target_h = int(round(1920 * (video_h_pct / 100.0)))
-        # Garante dimensões pares para codecs x264
-        target_w = max(200, min(1080, target_w - (target_w % 2)))
-        target_h = max(200, min(1920, target_h - (target_h % 2)))
+        # Canvas 9:16 HD vertical (720x1280) - renderização 2.5x mais rápida e leve
+        CANVAS_W = 720
+        CANVAS_H = 1280
 
-        box_x = int(round(1080 * (video_pos_x / 100.0) - (target_w / 2.0)))
-        box_y = int(round(1920 * (video_pos_y / 100.0) - (target_h / 2.0)))
-        box_x = max(0, min(1080 - target_w, box_x))
-        box_y = max(0, min(1920 - target_h, box_y))
+        target_w = int(round(CANVAS_W * (video_w_pct / 100.0)))
+        target_h = int(round(CANVAS_H * (video_h_pct / 100.0)))
+        # Garante dimensões pares para codecs x264
+        target_w = max(200, min(CANVAS_W, target_w - (target_w % 2)))
+        target_h = max(200, min(CANVAS_H, target_h - (target_h % 2)))
+
+        box_x = int(round(CANVAS_W * (video_pos_x / 100.0) - (target_w / 2.0)))
+        box_y = int(round(CANVAS_H * (video_pos_y / 100.0) - (target_h / 2.0)))
+        box_x = max(0, min(CANVAS_W - target_w, box_x))
+        box_y = max(0, min(CANVAS_H - target_h, box_y))
         box_x -= (box_x % 2)
         box_y -= (box_y % 2)
 
@@ -212,9 +216,9 @@ def create_vertical_clip(
             print(f"[ffmpeg_engine] IA Smart Framing: focal={focal_x_pct}%, crop=({crop_w}x{crop_h} at {crop_x},{crop_y}) -> target=({target_w}x{target_h})")
         except Exception as sf_err:
             print(f"[ffmpeg_engine] smart_framing aviso ({sf_err}), usando centralizado padrão")
-            crop_w = int(round(1080 * (target_w / float(target_h))))
-            crop_h = 1080
-            crop_x = max(0, (1920 - crop_w) // 2)
+            crop_w = int(round(CANVAS_W * (target_w / float(target_h))))
+            crop_h = CANVAS_W
+            crop_x = max(0, (CANVAS_H - crop_w) // 2)
             crop_y = 0
 
         # 3. Cor de fundo do Template
@@ -282,7 +286,7 @@ def create_vertical_clip(
             a_src = "[acomb]"
 
         # Canvas de fundo com a duração final (após corte de silêncio)
-        filter_parts.append(f"color=c={bg_color}:s=1080x1920:d={actual_duration}[bg]")
+        filter_parts.append(f"color=c={bg_color}:s={CANVAS_W}x{CANVAS_H}:d={actual_duration}[bg]")
         filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
         filter_parts.append(f"[bg][vbox]overlay={box_x}:{box_y}[base]")
 
@@ -332,7 +336,7 @@ def create_vertical_clip(
                 "-filter_complex", filter_complex,
                 "-map", last_video,
                 "-map", audio_map,
-                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "30", "-maxrate", "3200k", "-bufsize", "6400k",
+                "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28", "-maxrate", "2200k", "-bufsize", "4400k",
                 "-acodec", "aac", "-b:a", "96k",
                 "-movflags", "+faststart",
                 output_video,
@@ -370,9 +374,9 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
     subprocess.run([
         "ffmpeg", "-y",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
-        "-vf", "crop=ih*9/16:ih,scale=1080:1920",
+        "-vf", "crop=ih*9/16:ih,scale=720:1280",
         "-af", ",".join(_edge_fades(duration)),
-        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "30", "-maxrate", "3200k", "-bufsize", "6400k",
+        "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28", "-maxrate", "2200k", "-bufsize", "4400k",
         "-acodec", "aac", "-b:a", "96k",
         "-movflags", "+faststart",
         output_video,

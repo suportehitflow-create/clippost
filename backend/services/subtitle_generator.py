@@ -57,7 +57,7 @@ def _clip_chunks(segments: list[dict], words: list[dict] | None,
 
 def generate_ass(segments: list[dict], output_path: str | None = None,
                  clip_start: float = 0.0, clip_end: float | None = None,
-                 words: list[dict] | None = None, margin_v: int = 180,
+                 words: list[dict] | None = None, margin_v: int = 120,
                  subtitle_preset: str = "hormozi_yellow") -> str:
     """
     Gera arquivo .ass com estilo viral e cores configuradas pelo usuário:
@@ -83,13 +83,13 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
     header = f"""\
 [Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: 720
+PlayResY: 1280
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Viral,Impact,86,{primary_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,0,2,80,80,{margin_v},1
+Style: Viral,Impact,58,{primary_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,0,2,54,54,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

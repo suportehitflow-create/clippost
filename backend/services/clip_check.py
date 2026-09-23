@@ -36,7 +36,10 @@ def validate_clip(path: str, expected_duration: float, tolerance: float = 15.0) 
         issues.append(f"muito curto: {duration:.1f}s")
     if abs(duration - expected_duration) > tolerance:
         issues.append(f"duração {duration:.1f}s, esperada {expected_duration:.1f}s")
-    if video and (video.get("width"), video.get("height")) != (1080, 1920):
-        issues.append(f"não é 9:16: {video.get('width')}x{video.get('height')}")
+    if video:
+        w, h = video.get("width", 0) or 0, video.get("height", 0) or 0
+        # Aceita resoluções 9:16 (720x1280 padrão HD, 1080x1920 Full HD ou tolerância de aspecto)
+        if (w, h) not in ((720, 1280), (1080, 1920)) and (h == 0 or abs((w / h) - (9 / 16)) > 0.05):
+            issues.append(f"não é 9:16: {w}x{h}")
 
     return {"ok": not issues, "issues": issues, "duration": duration}

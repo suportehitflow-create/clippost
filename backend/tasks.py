@@ -448,7 +448,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {
-            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
@@ -782,7 +782,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
-            margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
+            margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
             sub_preset = ((brand_kit or {}).get("layout_config") or {}).get("subtitle_preset") or "hormozi_yellow"
             subtitle_file = generate_ass(
                 segments, str(tmp_dir / f"subtitles_{i}.ass"),
@@ -936,7 +936,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
             print(f"[re-render] baixando vÃ­deo da fonte: {source_url[:80]}...")
             try:
                 ydl_opts = {
-                    "format": "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                    "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
                     "outtmpl": str(tmp_dir / "raw.%(ext)s"),
                     "merge_output_format": "mp4",
                     "quiet": True,
@@ -963,7 +963,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         start_snapped, end_snapped = snap_to_words(start, end, seg_words)
 
         sub_y = subtitle_y if subtitle_y is not None else 80.0
-        margin_v = max(80, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 40))
+        margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
         subtitle_file = generate_ass(
             segments, str(tmp_dir / "sub.ass"),
             clip_start=start_snapped, clip_end=end_snapped, words=seg_words,

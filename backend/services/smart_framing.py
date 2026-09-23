@@ -18,10 +18,10 @@ def get_video_dimensions(video_path: str) -> tuple[int, int]:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         data = json.loads(res.stdout)
         stream = data.get("streams", [{}])[0]
-        return int(stream.get("width", 1920)), int(stream.get("height", 1080))
+        return int(stream.get("width", 1280)), int(stream.get("height", 720))
     except Exception as e:
-        print(f"[smart_framing] ffprobe falhou: {e}, assumindo 1920x1080")
-        return 1920, 1080
+        print(f"[smart_framing] ffprobe falhou: {e}, assumindo 1280x720")
+        return 1280, 720
 
 
 def detect_smart_focus(
