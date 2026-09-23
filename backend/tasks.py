@@ -679,7 +679,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     "end_time": end,
                     "score": clip["ai_score"],
                     "storage_url": None,
-                    "status": "ready",
+                    "status": "rendering",
                 }).execute()
                 clip_db_id = row.data[0]["id"] if row.data else None
             except Exception as pre_err:
