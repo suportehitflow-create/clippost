@@ -230,6 +230,18 @@ def create_vertical_clip(
         else:
             bg_color = "black"
 
+        # Imagem de fundo personalizada do editor (substitui a cor sólida)
+        bg_image_png = None
+        if layout.get("customBgImage"):
+            try:
+                from services.template_overlay import prepare_background
+                bg_image_png = prepare_background(
+                    layout["customBgImage"], os.path.join(tmp_dir, "bg.png"), CANVAS_W, CANVAS_H,
+                )
+            except Exception as bg_err:
+                print(f"[ffmpeg_engine] imagem de fundo falhou ({bg_err}), usando cor sólida")
+                bg_image_png = None
+
         # Camada do template (perfil, selo, título-gancho, marca d'água, cantos arredondados)
         overlay_png = None
         if layout.get("headerPos") or layout.get("titlePos"):
@@ -238,7 +250,7 @@ def create_vertical_clip(
                 bg_rgb = {"white": (255, 255, 255), "0x18181b": (24, 24, 27)}.get(bg_color, (0, 0, 0))
                 overlay_png = render_template_overlay(
                     brand_kit or {}, hook_title or "", os.path.join(tmp_dir, "template.png"),
-                    CANVAS_W, CANVAS_H, (box_x, box_y, target_w, target_h), bg_rgb,
+                    CANVAS_W, CANVAS_H, (box_x, box_y, target_w, target_h), bg_rgb, bg_image_png,
                 )
             except Exception as ov_err:
                 print(f"[ffmpeg_engine] camada do template falhou ({ov_err}), renderizando sem ela")
@@ -300,7 +312,13 @@ def create_vertical_clip(
             a_src = "[acomb]"
 
         # Canvas de fundo com a duração final (após corte de silêncio)
-        filter_parts.append(f"color=c={bg_color}:s={CANVAS_W}x{CANVAS_H}:d={actual_duration}[bg]")
+        next_input = 1
+        if bg_image_png:
+            input_files += ["-loop", "1", "-t", str(actual_duration), "-i", bg_image_png]
+            filter_parts.append(f"[{next_input}:v]format=yuv420p,setsar=1[bg]")
+            next_input += 1
+        else:
+            filter_parts.append(f"color=c={bg_color}:s={CANVAS_W}x{CANVAS_H}:d={actual_duration}[bg]")
         filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
         filter_parts.append(f"[bg][vbox]overlay={box_x}:{box_y}[base]")
 
@@ -316,7 +334,7 @@ def create_vertical_clip(
 
         if overlay_png:
             input_files += ["-i", overlay_png]
-            filter_parts.append(f"{last_video}[1:v]overlay=0:0[tpl]")
+            filter_parts.append(f"{last_video}[{next_input}:v]overlay=0:0[tpl]")
             last_video = "[tpl]"
 
         # 5. Legendas queimadas

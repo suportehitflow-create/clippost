@@ -327,7 +327,8 @@ def _draw_watermark(canvas: Image.Image, layout: dict, brand_kit: dict, s: float
     canvas.alpha_composite(pill, (int(x), int(y)))
 
 
-def _round_video_corners(canvas: Image.Image, box: tuple[int, int, int, int], radius: int, bg_rgb: tuple[int, int, int]):
+def _round_video_corners(canvas: Image.Image, box: tuple[int, int, int, int], radius: int,
+                         bg_rgb: tuple[int, int, int], bg_image: Image.Image | None):
     bx, by, bw, bh = box
     if radius <= 0 or bw <= 0 or bh <= 0:
         return
@@ -335,9 +336,24 @@ def _round_video_corners(canvas: Image.Image, box: tuple[int, int, int, int], ra
     mask = Image.new("L", (bw * k, bh * k), 255)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, bw * k - 1, bh * k - 1], radius=radius * k, fill=0)
     mask = mask.resize((bw, bh), Image.LANCZOS)
-    corners = Image.new("RGBA", (bw, bh), bg_rgb + (255,))
+    if bg_image is not None:
+        corners = bg_image.crop((bx, by, bx + bw, by + bh)).convert("RGBA")
+    else:
+        corners = Image.new("RGBA", (bw, bh), bg_rgb + (255,))
     corners.putalpha(mask)
     canvas.alpha_composite(corners, (bx, by))
+
+
+def prepare_background(url: str, out_path: str, canvas_w: int, canvas_h: int) -> str | None:
+    """Imagem de fundo do template recortada em 'cover' para o canvas (como object-cover no editor)."""
+    img = _load_image(url)
+    if img is None:
+        return None
+    scale = max(canvas_w / img.width, canvas_h / img.height)
+    img = img.resize((max(canvas_w, round(img.width * scale)), max(canvas_h, round(img.height * scale))), Image.LANCZOS)
+    left, top = (img.width - canvas_w) // 2, (img.height - canvas_h) // 2
+    img.crop((left, top, left + canvas_w, top + canvas_h)).convert("RGB").save(out_path, "PNG")
+    return out_path
 
 
 def render_template_overlay(
@@ -348,6 +364,7 @@ def render_template_overlay(
     canvas_h: int,
     video_box: tuple[int, int, int, int],
     bg_rgb: tuple[int, int, int],
+    bg_image_path: str | None = None,
 ) -> str:
     layout = (brand_kit or {}).get("layout_config") or {}
     s = canvas_w / EDITOR_PHONE_W
@@ -355,7 +372,8 @@ def render_template_overlay(
     canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
 
     if layout.get("videoRounded"):
-        _round_video_corners(canvas, video_box, int(round(16 * s)), bg_rgb)
+        bg_image = Image.open(bg_image_path) if bg_image_path else None
+        _round_video_corners(canvas, video_box, int(round(16 * s)), bg_rgb, bg_image)
     _draw_watermark(canvas, layout, brand_kit or {}, s, video_box)
     _draw_header(canvas, layout, brand_kit or {}, s, light)
     _draw_title(canvas, layout, hook_title, s, light)

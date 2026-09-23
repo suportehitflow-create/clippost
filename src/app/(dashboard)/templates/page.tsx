@@ -259,6 +259,7 @@ export default function TemplatesPage() {
     if (c.watermarkType) setWatermarkType(c.watermarkType)
     if (c.watermarkImage) setWatermarkImage(c.watermarkImage)
     if (c.instagramDecal !== undefined) setInstagramDecal(c.instagramDecal)
+    if (c.customBgImage !== undefined) setCustomBgImage(c.customBgImage || null)
   }
 
   // Carregar template salvo: localStorage primeiro (instantâneo), depois o banco (fonte da verdade)
@@ -320,12 +321,14 @@ export default function TemplatesPage() {
     watermarkType,
     watermarkImage,
     instagramDecal,
+    // blob: é só a prévia local durante o upload; o servidor precisa da URL pública
+    customBgImage: customBgImage?.startsWith('blob:') ? undefined : customBgImage,
   }), [
     templateBg, avatarPos, headerPos, titlePos, videoPos, subtitlePos, videoWidth, videoHeight,
     videoRounded, videoAspect, brandName, brandHandle, brandAlign, brandLayout, brandScale,
     showVerifiedBadge, titleText, fontFamily, fontSize, textAlign, titleColor, titleStroke,
     titleStrokeColor, titleCapsLock, showTitleEmojis, selectedSubtitle, showWatermark, watermarkText,
-    watermarkOpacity, watermarkPosition, watermarkType, watermarkImage, instagramDecal,
+    watermarkOpacity, watermarkPosition, watermarkType, watermarkImage, instagramDecal, customBgImage,
   ])
 
   const persistLocal = () => {
@@ -412,16 +415,23 @@ export default function TemplatesPage() {
   }
 
   // Auto-Enquadramento dos Elementos na Safe Zone Reels (1080x1440)
-  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setCustomBgImage(reader.result)
-      }
+    const previous = customBgImage
+    setCustomBgImage(URL.createObjectURL(file))
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('sem sessão')
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+      const path = `${user.id}/brand/background-${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      setCustomBgImage(supabase.storage.from('videos').getPublicUrl(path).data.publicUrl)
+    } catch {
+      setCustomBgImage(previous)
+      setSaveStatus('error')
     }
-    reader.readAsDataURL(file)
   }
 
   const autoAlignSafeZone = () => {

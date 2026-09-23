@@ -178,6 +178,26 @@ def _sync_save_processing_projects():
 import atexit
 atexit.register(_sync_save_processing_projects)
 
+import threading
+import time
+import uuid
+
+# Cortes rodando neste processo; o deploy.ps1 consulta /api/admin/active-jobs e só
+# publica quando está zerado, para um deploy não derrubar o corte de outra pessoa.
+_active_jobs: dict[str, tuple[str, float]] = {}
+_active_jobs_lock = threading.Lock()
+
+
+def _run_tracked(kind: str, fn, *args):
+    key = uuid.uuid4().hex
+    with _active_jobs_lock:
+        _active_jobs[key] = (kind, time.time())
+    try:
+        fn(*args)
+    finally:
+        with _active_jobs_lock:
+            _active_jobs.pop(key, None)
+
 
 @app.on_event("startup")
 async def recover_stuck_projects():
@@ -558,7 +578,7 @@ async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
             return {"task_id": task.id, "status": "processing"}
         except Exception as e:
             print(f"[process-url] Celery falhou ({e}), usando BackgroundTasks")
-    background_tasks.add_task(process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config)
+    background_tasks.add_task(_run_tracked, "process", process_youtube_video, req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config)
     return {"task_id": "bg_process", "status": "processing"}
 
 
@@ -577,7 +597,7 @@ async def process_bulk(req: BulkProcessRequest, background_tasks: BackgroundTask
         except Exception as e:
             print(f"[bulk] Celery falhou ({e}), usando BackgroundTasks")
     for url in req.urls:
-        background_tasks.add_task(process_youtube_video, url, req.user_id, req.clip_duration, None, False, None)
+        background_tasks.add_task(_run_tracked, "bulk", process_youtube_video, url, req.user_id, req.clip_duration, None, False, None)
     return {"task_id": "bg_bulk", "status": "queued", "count": len(req.urls)}
 
 
@@ -616,12 +636,21 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
             print(f"[jobs] Celery falhou ({e}), usando BackgroundTasks")
 
     background_tasks.add_task(
-        process_youtube_video,
+        _run_tracked, "process", process_youtube_video,
         req.url, req.user_id, req.clip_duration,
         req.project_id, req.remove_silence, req.template_config,
     )
     print(f"[jobs] BackgroundTask iniciada para projeto {req.project_id}")
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
+
+
+@app.get("/api/admin/active-jobs")
+async def active_jobs():
+    """Quantos cortes estão rodando agora — usado pelo deploy.ps1 antes de publicar."""
+    now = time.time()
+    with _active_jobs_lock:
+        jobs = [{"kind": kind, "running_for_s": int(now - started)} for kind, started in _active_jobs.values()]
+    return {"active": len(jobs), "jobs": jobs}
 
 
 @app.post("/api/admin/set-youtube-cookies")
@@ -734,7 +763,7 @@ async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: Ba
         except Exception as e:
             print(f"[re-render] Celery falhou ({e}), usando BackgroundTasks")
 
-    background_tasks.add_task(rerender_clip_task, clip_id, req.subtitle_preset, req.subtitle_y, req.words)
+    background_tasks.add_task(_run_tracked, "rerender", rerender_clip_task, clip_id, req.subtitle_preset, req.subtitle_y, req.words)
     return {"status": "rerendering", "clip_id": clip_id}
 
 

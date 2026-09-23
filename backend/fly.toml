@@ -1,5 +1,8 @@
 app = "clippost-backend"
 primary_region = "gru"
+# Num deploy o uvicorn para de aceitar requisições e espera os cortes em andamento
+# terminarem; o padrão (5s) matava o pipeline no meio. 300s é o máximo do Fly.
+kill_timeout = 300
 
 [build]
   dockerfile = "Dockerfile"

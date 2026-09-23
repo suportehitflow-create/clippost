@@ -1,4 +1,4 @@
-﻿"""
+"""
 clipost — Worker Celery (processo completo)
 1. Download (yt-dlp)
 2. Upload vídeo raw → Supabase Storage
@@ -1118,7 +1118,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
     try:
         clip_res = supabase.table("clips").select("*").eq("id", clip_id).maybe_single().execute()
         if not clip_res or not clip_res.data:
-            print(f"[re-render] clip {clip_id} nÃ£o encontrado")
+            print(f"[re-render] clip {clip_id} não encontrado")
             return {"status": "error", "message": "clip not found"}
 
         clip = clip_res.data
@@ -1130,7 +1130,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         proj_res = supabase.table("projects").select("raw_video_url,transcript,source_url").eq("id", project_id).maybe_single().execute()
         if not proj_res or not proj_res.data:
             supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
-            print(f"[re-render] projeto {project_id} nÃ£o encontrado")
+            print(f"[re-render] projeto {project_id} não encontrado")
             return {"status": "error", "message": "project not found"}
 
         raw_video_url = proj_res.data.get("raw_video_url")
@@ -1213,7 +1213,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
 
         if not video_downloaded or not os.path.exists(video_path):
             supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
-            print(f"[re-render] vÃ­deo nÃ£o encontrado para projeto {project_id}")
+            print(f"[re-render] vídeo não encontrado para projeto {project_id}")
             return {"status": "error", "message": "raw video not found"}
 
         # Obtém brand_kit do usuário antes de gerar legendas
@@ -1292,7 +1292,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         )
 
         if not os.path.exists(clip_out):
-            raise RuntimeError("FFmpeg nÃ£o gerou o arquivo de saÃ­da")
+            raise RuntimeError("FFmpeg não gerou o arquivo de saída")
 
         check = validate_clip(clip_out, expected_duration=end_snapped - start_snapped)
         if not check["ok"]:
