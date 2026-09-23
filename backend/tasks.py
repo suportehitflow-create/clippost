@@ -397,9 +397,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             'noplaylist': True,
             'merge_output_format': 'mp4',
             'socket_timeout': 60,
-            'retries': 2,
-            'fragment_retries': 2,
-            'extractor_retries': 2,
+            'retries': 3,
+            'fragment_retries': 3,
+            'extractor_retries': 3,
+            'sleep_interval': 1,
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.135 Mobile Safari/537.36',
                 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
@@ -407,7 +408,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web', 'tv', 'ios', 'android'],
+                    'player_client': ['ios', 'android', 'tv_embedded', 'web'],
                     **({"po_token": [f"web+{po_token}"]} if po_token else {}),
                 },
             },
@@ -427,6 +428,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 1. Download do vídeo
         _set_step(project_id, "download")
         print(f"[pipeline] baixando vídeo: {url[:80]}")
+        info = {}  # fallback se Cobalt for usado no lugar do yt-dlp
         try:
             with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                 info = ydl.extract_info(url, download=True)
