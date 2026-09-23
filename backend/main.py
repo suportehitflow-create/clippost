@@ -49,29 +49,46 @@ _STEP_MESSAGES = {
 
 
 async def _mark_stuck_projects(label: str = "recovery"):
-    """Marca projetos stuck em 'processing' há mais de 10 minutos como failed,
-    usando o step gravado para mostrar onde travou."""
+    """No startup: salva projetos processing que têm clips como done, resto como failed.
+    Na recovery periódica: apenas marca projetos com >180min como failed."""
     try:
         if not supabase:
             return
         from datetime import timedelta
-        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=180)).isoformat()
-        result = supabase.table("projects") \
-            .select("id, error_message") \
-            .eq("status", "processing") \
-            .lt("created_at", cutoff) \
-            .execute()
+        is_startup = label == "startup"
+
+        if is_startup:
+            # No startup (após deploy), todos os projetos processing foram interrompidos
+            result = supabase.table("projects") \
+                .select("id, error_message, clips(id,storage_url)") \
+                .eq("status", "processing") \
+                .execute()
+        else:
+            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=180)).isoformat()
+            result = supabase.table("projects") \
+                .select("id, error_message") \
+                .eq("status", "processing") \
+                .lt("created_at", cutoff) \
+                .execute()
+
         rows = result.data or []
+        done_count = 0
+        failed_count = 0
         for row in rows:
+            if is_startup:
+                clips = row.get("clips") or []
+                ready = [c for c in clips if c.get("storage_url")]
+                if ready:
+                    supabase.table("projects").update({"status": "done", "error_message": None}).eq("id", row["id"]).execute()
+                    done_count += 1
+                    print(f"[{label}] projeto {row['id'][:8]} -> done ({len(ready)} clips)")
+                    continue
             step_key = (row.get("error_message") or "").strip()
-            friendly = _STEP_MESSAGES.get(step_key,
-                "Pipeline interrompido. Clique em Tentar Novamente.")
-            supabase.table("projects").update({
-                "status": "failed",
-                "error_message": friendly,
-            }).eq("id", row["id"]).execute()
+            friendly = _STEP_MESSAGES.get(step_key, "Pipeline interrompido. Clique em Tentar Novamente.")
+            supabase.table("projects").update({"status": "failed", "error_message": friendly}).eq("id", row["id"]).execute()
+            failed_count += 1
         if rows:
-            print(f"[{label}] {len(rows)} projeto(s) travado(s) marcado(s) como failed")
+            print(f"[{label}] {done_count} done + {failed_count} failed de {len(rows)} projetos travados")
     except Exception as e:
         print(f"[{label}] erro ao limpar projetos travados: {e}")
 
