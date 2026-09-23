@@ -382,21 +382,22 @@ class TestGetViralClips:
                 result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert result == []
 
-    def test_anthropic_fallback_called_when_primary_fails(self):
-        with patch("services.ai_curator._call_anthropic") as mock_anthropic:
-            mock_anthropic.return_value = json.dumps([
-                {"start_time": 5.0, "end_time": 60.0, "hook_title": "VIA ANTHROPIC", "ai_score": 0.9},
-                {"start_time": 10.0, "end_time": 70.0, "hook_title": "VIA ANTHROPIC 2", "ai_score": 0.85},
-                {"start_time": 15.0, "end_time": 80.0, "hook_title": "VIA ANTHROPIC 3", "ai_score": 0.80},
+    def test_gemini_is_first_provider(self):
+        with patch("services.ai_curator._call_gemini") as mock_gemini, \
+             patch("services.ai_curator._call_openai_compat") as mock_groq:
+            mock_gemini.return_value = json.dumps([
+                {"start_time": 5.0, "end_time": 60.0, "hook_title": "VIA GEMINI", "ai_score": 0.9},
+                {"start_time": 10.0, "end_time": 70.0, "hook_title": "VIA GEMINI 2", "ai_score": 0.85},
+                {"start_time": 15.0, "end_time": 80.0, "hook_title": "VIA GEMINI 3", "ai_score": 0.80},
             ])
             with patch.dict(os.environ, {
-                "GROQ_API_KEY": "",
+                "GROQ_API_KEY": "gsk-fake",
                 "OPENROUTER_API_KEY": "",
-                "GEMINI_API_KEY": "",
-                "ANTHROPIC_API_KEY": "sk-ant-fake",
+                "GEMINI_API_KEY": "gm-fake",
             }):
                 result = get_viral_clips({"segments": SAMPLE_SEGMENTS, "words": []})
         assert len(result) > 0
+        mock_groq.assert_not_called()
 
     def test_clip_duration_30_respects_limits(self):
         clips_json = json.dumps([

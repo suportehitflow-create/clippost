@@ -5,7 +5,6 @@ Suporte multi-provedor (em ordem de prioridade):
   1. Gemini — gemini-flash-lite-latest (GEMINI_API_KEY)
   2. Groq  — llama-3.3-70b, grátis, ultra-rápido (GROQ_API_KEY)
   3. OpenRouter — modelos grátis (:free) (OPENROUTER_API_KEY)
-  4. Anthropic — claude-opus-5-5 (ANTHROPIC_API_KEY + ANTHROPIC_WORKSPACE_ID)
 
 Lógica de seleção inspirada no OpenMontage clip-factory:
   - Scoring multidimensional: hook, coherence, value, energy, platform_fit
@@ -96,26 +95,6 @@ def _call_gemini(prompt: str) -> str:
     return text
 
 
-def _call_anthropic(prompt: str) -> str:
-    import anthropic
-    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID", "")
-    client = anthropic.Anthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
-        default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else {},
-        timeout=120.0,
-    )
-    # Opus 5.5: thinking sempre ligado; effort padrão é "medium", então fixamos explicitamente
-    msg = client.messages.create(
-        model=os.environ.get("ANTHROPIC_MODEL", "claude-opus-5-5"),
-        max_tokens=16000,
-        messages=[{"role": "user", "content": prompt}],
-        extra_body={"output_config": {"effort": os.environ.get("ANTHROPIC_EFFORT", "medium")}},
-    )
-    if msg.stop_reason == "refusal":
-        raise RuntimeError("anthropic recusou a requisição (refusal)")
-    return "".join(b.text for b in msg.content if b.type == "text").strip()
-
-
 def _try_providers(prompt: str) -> str:
     """Tenta provedores em ordem, com retries e backoff."""
     providers = []
@@ -130,9 +109,6 @@ def _try_providers(prompt: str) -> str:
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
     if openrouter_key:
         providers.append(("openrouter", lambda p: _call_openai_compat(OPENROUTER_BASE, openrouter_key, OPENROUTER_MODEL, p)))
-
-    if os.environ.get("ANTHROPIC_API_KEY", ""):
-        providers.append(("anthropic", _call_anthropic))
 
     if not providers:
         print("[ai_curator] nenhuma chave de IA configurada")
