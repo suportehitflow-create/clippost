@@ -301,6 +301,18 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cu
                         clips = parsed
                 except Exception as e:
                     print(f"[ai_curator] falha ao parsear array externo: {e}")
+            # JSON truncado: fecha o array com ]} para recuperar clips completos
+            if not clips and first_b != -1:
+                truncated = cleaned_raw[first_b:]
+                for suffix in ("]", "}]", "}]}"):
+                    try:
+                        parsed = json.loads(truncated + suffix)
+                        if isinstance(parsed, list) and parsed:
+                            clips = parsed[:-1] if len(parsed) > 1 else parsed
+                            print(f"[ai_curator] JSON truncado recuperado: {len(clips)} clips completos")
+                            break
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"[ai_curator] erro geral de parse: {e}")
 
