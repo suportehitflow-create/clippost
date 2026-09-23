@@ -126,6 +126,25 @@ async def recover_stuck_projects():
     asyncio.create_task(_periodic_recovery_loop())
 
 
+@app.on_event("shutdown")
+async def graceful_shutdown():
+    """Ao desligar (deploy/restart): salva projetos processing com clipes como done."""
+    try:
+        if not supabase:
+            return
+        res = supabase.table("projects").select("id").eq("status", "processing").execute()
+        for row in (res.data or []):
+            pid = row["id"]
+            clips_res = supabase.table("clips").select("id, storage_url").eq("project_id", pid).execute()
+            ready = [c for c in (clips_res.data or []) if c.get("storage_url")]
+            new_status = "done" if ready else "failed"
+            msg = None if ready else "Pipeline interrompido por deploy. Clique em Tentar Novamente."
+            supabase.table("projects").update({"status": new_status, "error_message": msg}).eq("id", pid).execute()
+            print(f"[shutdown] projeto {pid[:8]} → {new_status} ({len(ready)} clips)")
+    except Exception as e:
+        print(f"[shutdown] erro ao salvar estado: {e}")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -572,6 +591,19 @@ async def delete_test_projects(user_id: str, video_id: str):
         supabase.table("projects").delete().eq("id", p["id"]).execute()
         deleted += 1
     return {"deleted": deleted, "video_id": video_id}
+
+
+@app.post("/api/admin/force-done/{project_id}")
+async def force_done_project(project_id: str):
+    """Força projeto para status=done se tiver clipes prontos, ou failed caso contrário."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="supabase indisponível")
+    clips_res = supabase.table("clips").select("id, storage_url").eq("project_id", project_id).execute()
+    clips = clips_res.data or []
+    ready = [c for c in clips if c.get("storage_url")]
+    new_status = "done" if ready else "failed"
+    supabase.table("projects").update({"status": new_status, "error_message": None}).eq("id", project_id).execute()
+    return {"project_id": project_id, "status": new_status, "clips_ready": len(ready)}
 
 
 @app.get("/api/projects/{user_id}")
