@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Curator — Diretor de Criação e Roteirista de Cortes Virais para Reels, TikTok e Shorts.
 
 Suporte multi-provedor (em ordem de prioridade):
@@ -266,18 +266,46 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra. Cu
         print("[ai_curator] nenhum provedor disponível")
         return []
 
-    # Parse do JSON
+    # Parse robusto do JSON com fallback para markdown e colchetes externos
+    clips = []
     try:
-        clips = json.loads(raw)
-    except json.JSONDecodeError:
-        match = re.search(r'\[[\s\S]*?\]', raw)
-        if match:
-            try:
-                clips = json.loads(match.group())
-            except Exception:
-                clips = []
-        else:
-            clips = []
+        cleaned_raw = raw.strip()
+        if '```' in cleaned_raw:
+            m = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', cleaned_raw)
+            if m:
+                cleaned_raw = m.group(1).strip()
+        
+        try:
+            parsed = json.loads(cleaned_raw)
+            if isinstance(parsed, list):
+                clips = parsed
+            elif isinstance(parsed, dict):
+                for k in ("clips", "cortes", "data", "results"):
+                    if isinstance(parsed.get(k), list):
+                        clips = parsed[k]
+                        break
+                if not clips:
+                    for v in parsed.values():
+                        if isinstance(v, list):
+                            clips = v
+                            break
+        except Exception:
+            # Busca do array mais externo [ ... ]
+            first_b = cleaned_raw.find("[")
+            last_b = cleaned_raw.rfind("]")
+            if first_b != -1 and last_b > first_b:
+                cand = cleaned_raw[first_b : last_b + 1]
+                try:
+                    parsed = json.loads(cand)
+                    if isinstance(parsed, list):
+                        clips = parsed
+                except Exception as e:
+                    print(f"[ai_curator] falha ao parsear array externo: {e}")
+    except Exception as e:
+        print(f"[ai_curator] erro geral de parse: {e}")
+
+    if not clips:
+        print(f"[ai_curator] resposta bruta da IA sem JSON válido (primeiros 300 chars):\n{raw[:300]}")
 
     # Validação e saneamento
     validated = []
