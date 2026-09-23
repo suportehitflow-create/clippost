@@ -662,11 +662,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _set_step(project_id, "gerando_clipes")
 
         # Fase A: prepara tempos e pre-insere todos os clips como "rendering"
+        _MAX_CLIP_DURATION = 300.0  # 5 min — clips mais longos causam arquivos >50 MB
         prepared_clips = []
         for i, clip in enumerate(clips_meta):
             start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
             if video_duration:
                 end = min(end, float(video_duration))
+            # Cap: nunca mais que 5 min por clip (evita 100+ MB e recompressão lenta)
+            end = min(end, start + _MAX_CLIP_DURATION)
             if end - start < 1:
                 continue
             try:
