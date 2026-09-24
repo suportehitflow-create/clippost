@@ -56,6 +56,13 @@ const SUBTITLE_OPTIONS = [
   { id: 'dark_box', name: 'Dark Box' },
   { id: 'neon_cyan', name: 'Neon Cyan' },
   { id: 'neon_magenta', name: 'Neon Magenta' },
+  { id: 'karaoke_amarelo', name: 'Karaokê Amarelo' },
+  { id: 'karaoke_roxo', name: 'Karaokê Roxo' },
+  { id: 'palavra_unica', name: 'Palavra Única' },
+  { id: 'revelacao', name: 'Revelação' },
+  { id: 'pop_branco', name: 'Pop Branco' },
+  { id: 'caixa_pop', name: 'Caixa Pop' },
+  { id: 'fade_suave', name: 'Fade Suave' },
 ]
 
 const ACTIVE_BATCH_KEY = 'clippost_bulk_batch'

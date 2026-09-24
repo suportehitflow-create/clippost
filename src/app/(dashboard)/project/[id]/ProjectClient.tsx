@@ -119,6 +119,13 @@ const SUBTITLE_STYLES = [
   { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', border: 'border-zinc-700' },
   { id: 'neon_cyan', name: 'Cyan Pro', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(6,182,212,0.8)', border: 'border-indigo-400/40' },
   { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-purple-500/40' },
+  { id: 'karaoke_amarelo', name: 'Karaokê Amarelo', activeColor: '#facc15', activeBg: 'rgba(0,0,0,0.85)', border: 'border-indigo-500/40' },
+  { id: 'karaoke_roxo', name: 'Karaokê Roxo', activeColor: '#a855f7', activeBg: 'rgba(0,0,0,0.85)', border: 'border-purple-500/40' },
+  { id: 'palavra_unica', name: 'Palavra Única', activeColor: '#facc15', activeBg: 'rgba(0,0,0,0.85)', border: 'border-indigo-500/40' },
+  { id: 'revelacao', name: 'Revelação', activeColor: '#ffffff', activeBg: 'rgba(0,0,0,0.85)', border: 'border-white/40' },
+  { id: 'pop_branco', name: 'Pop Branco', activeColor: '#ffffff', activeBg: 'rgba(0,0,0,0.85)', border: 'border-white/40' },
+  { id: 'caixa_pop', name: 'Caixa Pop', activeColor: '#000000', activeBg: '#facc15', border: 'border-zinc-400/40' },
+  { id: 'fade_suave', name: 'Fade Suave', activeColor: '#f4f4f5', activeBg: 'rgba(0,0,0,0.85)', border: 'border-white/40' },
 ]
 
 // `key` = etapa que o backend grava em projects.error_message ("step:<key>") durante o processamento

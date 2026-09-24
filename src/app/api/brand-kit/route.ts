@@ -3,7 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient as createSessionClient } from '@/lib/supabase/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 // O user_id vem da sessão, nunca do corpo: com a service key, confiar no corpo deixaria
 // qualquer pessoa sobrescrever o template de outro usuário.
@@ -13,10 +13,12 @@ async function sessionUser() {
   return user
 }
 
-function admin() {
-  return createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { persistSession: false },
-  })
+// Sem service key (ex.: localhost) usa a sessão do usuário, que o RLS permite gravar
+async function admin(): Promise<any> {
+  if (SUPABASE_SERVICE_KEY) {
+    return createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
+  }
+  return createSessionClient()
 }
 
 export async function POST(req: NextRequest) {
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { avatar_url, username, layout_config } = body
-    const db = admin()
+    const db = await admin()
 
     const { data: profile } = await db.from('profiles').select('id').eq('id', user.id).maybeSingle()
     if (!profile) {
@@ -69,7 +71,7 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
-    const { data, error } = await admin().from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
+    const { data, error } = await (await admin()).from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }

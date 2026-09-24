@@ -33,6 +33,7 @@ import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 
 type SubtitleStyle = 'hormozi_yellow' | 'hormozi_orange' | 'clean_white' | 'dark_box' | 'neon_cyan' | 'neon_magenta' | 'neon_glow' | 'clean_box' | 'minimal_apple'
+  | 'karaoke_amarelo' | 'karaoke_roxo' | 'palavra_unica' | 'revelacao' | 'pop_branco' | 'caixa_pop' | 'fade_suave'
 
 interface WordItem {
   id: string
@@ -131,7 +132,25 @@ const STYLES_CAROUSEL = [
     border: 'border-transparent drop-shadow-md',
     font: 'font-sans font-medium',
     desc: 'Design limpo sem caixa pesada.'
-  }
+  },
+  ...([
+    ['karaoke_amarelo', 'Karaokê Amarelo', '#FACC15', '#ffffff', 'A palavra falada acende em amarelo.'],
+    ['karaoke_roxo', 'Karaokê Roxo', '#A855F7', '#ffffff', 'A palavra falada acende em roxo.'],
+    ['palavra_unica', 'Palavra Única', '#FACC15', '#facc15', 'Uma palavra por vez, grande, com pop.'],
+    ['revelacao', 'Revelação', '#FFFFFF', '#ffffff', 'As palavras surgem conforme são faladas.'],
+    ['pop_branco', 'Pop Branco', '#FFFFFF', '#ffffff', 'Cada bloco entra com um salto.'],
+    ['caixa_pop', 'Caixa Pop', '#FACC15', '#000000', 'Caixa amarela que salta a cada bloco.'],
+    ['fade_suave', 'Fade Suave', '#F4F4F5', '#f4f4f5', 'Entrada suave e minimalista.'],
+  ] as const).map(([id, name, accentColor, textColor, desc]) => ({
+    id: id as SubtitleStyle,
+    name,
+    accentColor,
+    textColor,
+    bgColor: id === 'caixa_pop' ? '#facc15' : 'rgba(0,0,0,0.85)',
+    border: 'border-indigo-500/40',
+    font: 'font-black uppercase',
+    desc: `${desc} (animada)`,
+  })),
 ]
 
 export default function ClipEditorPage() {

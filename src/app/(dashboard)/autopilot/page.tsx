@@ -105,6 +105,28 @@ export default function AutoPilotPage() {
   const [canal, setCanal] = useState('')
   const [salvandoWatch, setSalvandoWatch] = useState(false)
   const [aviso, setAviso] = useState('')
+  const [intervalMinutes, setIntervalMinutes] = useState(60)
+  const [savingInterval, setSavingInterval] = useState(false)
+
+  async function saveInterval(minutes: number) {
+    const previous = intervalMinutes
+    setIntervalMinutes(minutes)
+    setSavingInterval(true)
+    try {
+      const res = await fetch('/api/autopilot/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval_minutes: minutes }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Não foi possível salvar o intervalo.')
+    } catch (err: any) {
+      setIntervalMinutes(previous)
+      setAviso(`Erro: ${err.message}`)
+      setTimeout(() => setAviso(''), 5000)
+    } finally {
+      setSavingInterval(false)
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getUser()
@@ -115,8 +137,10 @@ export default function AutoPilotPage() {
         }
       })
       .catch(() => {})
-    // Auto-run initial demo search so the UI shows the rich experience immediately
-    handleSearchProfile('@modotorque')
+    fetch('/api/autopilot/settings', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.interval_minutes) setIntervalMinutes(d.interval_minutes) })
+      .catch(() => {})
   }, [])
 
     async function loadWatches(uid: string) {
@@ -633,6 +657,34 @@ export default function AutoPilotPage() {
               </button>
             </form>
             {/* aviso shown via global toast above */}
+
+            <div className="mt-5 pt-5 border-t border-white/[0.06] space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-white">Verificar vídeos novos a cada</span>
+                {savingInterval && <span className="text-[10px] text-zinc-500">Salvando…</span>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { v: 15, l: '15 min' }, { v: 30, l: '30 min' }, { v: 60, l: '1 hora' }, { v: 180, l: '3 horas' },
+                  { v: 360, l: '6 horas' }, { v: 720, l: '12 horas' }, { v: 1440, l: '24 horas' },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    disabled={savingInterval}
+                    onClick={() => saveInterval(opt.v)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border disabled:opacity-60 ${
+                      intervalMinutes === opt.v
+                        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white border-transparent'
+                        : 'bg-white/[0.03] text-zinc-400 border-white/[0.08] hover:text-white hover:bg-white/[0.06]'
+                    }`}
+                  >
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-zinc-500">Vale para todos os seus canais monitorados. Intervalos maiores economizam processamento.</p>
+            </div>
           </div>
 
           <div className="bg-[#121214] border border-white/[0.08] rounded-2xl p-6">

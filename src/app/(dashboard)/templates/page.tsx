@@ -69,6 +69,13 @@ const SUBTITLE_PRESETS: SubtitlePreset[] = [
   { id: 'dark_box', name: 'Dark Box', tag: 'Contraste', badgeColor: '#27272a', textColor: '#f97316', bgColor: '#18181b', borderColor: '#3f3f46', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
   { id: 'neon_cyan', name: 'Neon Cyan', tag: 'Tech', badgeColor: '#06b6d4', textColor: '#22d3ee', glow: '0 0 12px rgba(6,182,212,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
   { id: 'neon_magenta', name: 'Neon Magenta', tag: 'Hype', badgeColor: '#ec4899', textColor: '#f472b6', glow: '0 0 12px rgba(236,72,153,0.8)', sampleText: 'SUA LEGENDA APARECERÁ AQUI' },
+  { id: 'karaoke_amarelo', name: 'Karaokê Amarelo', tag: 'Animada', badgeColor: '#facc15', textColor: '#ffffff', glow: '0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000', sampleText: 'A PALAVRA FALADA ACENDE' },
+  { id: 'karaoke_roxo', name: 'Karaokê Roxo', tag: 'Animada', badgeColor: '#a855f7', textColor: '#ffffff', glow: '0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000', sampleText: 'A PALAVRA FALADA ACENDE' },
+  { id: 'palavra_unica', name: 'Palavra Única', tag: 'Animada', badgeColor: '#facc15', textColor: '#facc15', glow: '0 3px 0 #000, 0 -3px 0 #000, 3px 0 0 #000, -3px 0 0 #000', sampleText: 'UMA' },
+  { id: 'revelacao', name: 'Revelação', tag: 'Animada', badgeColor: '#ffffff', textColor: '#ffffff', glow: '0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000', sampleText: 'SURGE PALAVRA POR PALAVRA' },
+  { id: 'pop_branco', name: 'Pop Branco', tag: 'Animada', badgeColor: '#ffffff', textColor: '#ffffff', glow: '0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000', sampleText: 'ENTRA COM SALTO' },
+  { id: 'caixa_pop', name: 'Caixa Pop', tag: 'Animada', badgeColor: '#facc15', textColor: '#000000', bgColor: '#facc15', sampleText: 'CAIXA QUE SALTA' },
+  { id: 'fade_suave', name: 'Fade Suave', tag: 'Animada', badgeColor: '#f4f4f5', textColor: '#f4f4f5', glow: '0 1px 3px rgba(0,0,0,0.9)', sampleText: 'ENTRADA SUAVE' },
 ]
 
 const FONT_OPTIONS = [

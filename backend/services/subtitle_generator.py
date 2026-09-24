@@ -253,15 +253,167 @@ PRESET_STYLES = {
         "shadow": 2,
         "bold": -1,
     },
+    # ─── Estilos dinâmicos (animados palavra a palavra) ──────────────────────
+    # Karaokê: bloco de 3 palavras em branco, a palavra falada acende em amarelo
+    "karaoke_amarelo": {
+        "font": "DejaVu Sans", "fontsize": 58,
+        "primary": "&H00FFFFFF", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 5, "shadow": 2, "bold": -1,
+        "animation": "karaoke", "highlight": "&H0015CCFA",
+    },
+    # Karaokê roxo (cor da marca)
+    "karaoke_roxo": {
+        "font": "DejaVu Sans", "fontsize": 58,
+        "primary": "&H00FFFFFF", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 5, "shadow": 2, "bold": -1,
+        "animation": "karaoke", "highlight": "&H00F755A8",
+    },
+    # Uma palavra por vez, grande, entrando com pop (estilo MrBeast)
+    "palavra_unica": {
+        "font": "DejaVu Sans", "fontsize": 84,
+        "primary": "&H0015CCFA", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 7, "shadow": 3, "bold": -1,
+        "animation": "word",
+    },
+    # As palavras aparecem conforme são faladas
+    "revelacao": {
+        "font": "DejaVu Sans", "fontsize": 58,
+        "primary": "&H00FFFFFF", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 5, "shadow": 2, "bold": -1,
+        "animation": "reveal",
+    },
+    # Bloco branco com contorno entrando com pop
+    "pop_branco": {
+        "font": "DejaVu Sans", "fontsize": 60,
+        "primary": "&H00FFFFFF", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 6, "shadow": 2, "bold": -1,
+        "animation": "pop",
+    },
+    # Caixa amarela Hormozi com pop
+    "caixa_pop": {
+        "font": "DejaVu Sans", "fontsize": 54,
+        "primary": "&H00000000", "outline_col": "&H0015CCFA", "back_col": "&H0015CCFA",
+        "border_style": 3, "outline": 7, "shadow": 0, "bold": -1,
+        "animation": "pop",
+    },
+    # Minimalista com entrada suave
+    "fade_suave": {
+        "font": "DejaVu Sans", "fontsize": 50,
+        "primary": "&H00F5F4F4", "outline_col": "&H00000000", "back_col": "&H80000000",
+        "border_style": 1, "outline": 3, "shadow": 1, "bold": -1,
+        "animation": "fade",
+    },
 }
 
+# Nomes das famílias instaladas no Dockerfile (fontconfig/libass)
 FONT_MAP = {
-    "anton_impact": "Impact",
-    "instagram_sans": "DejaVu Sans",
-    "sf_pro_rounded": "DejaVu Sans",
-    "sf_pro_bold": "DejaVu Sans",
-    "montserrat": "DejaVu Sans",
+    "anton_impact": "Anton",
+    "instagram_sans": "Roboto",
+    "sf_pro_rounded": "Roboto",
+    "sf_pro_bold": "Roboto",
+    "montserrat": "Montserrat",
 }
+
+
+def _resolve_font(font_family: str | None, default: str) -> str:
+    """Aceita o id do editor ('montserrat') ou a pilha CSS ('Montserrat, sans-serif')."""
+    if not font_family:
+        return default
+    if font_family in FONT_MAP:
+        return FONT_MAP[font_family]
+    fam = font_family.lower()
+    if "anton" in fam or "impact" in fam:
+        return "Anton"
+    if "montserrat" in fam:
+        return "Montserrat"
+    return "Roboto"
+
+
+def _clip_groups(segments: list[dict], words: list[dict] | None, clip_start: float,
+                 clip_end: float | None, max_words: int) -> list[tuple[float, float, list[tuple[float, float, str]]]]:
+    """Blocos de até max_words palavras com o tempo de cada palavra (para animar palavra a palavra)."""
+    end_limit = clip_end if clip_end is not None else float("inf")
+    timed: list[tuple[float, float, str]] = []
+    if words:
+        for w in words:
+            text = str(w.get("word", "")).strip()
+            ws, we = float(w.get("start", 0)), float(w.get("end", 0))
+            if text and we > clip_start and ws < end_limit:
+                timed.append((ws, we, text))
+    else:
+        for seg in segments:
+            s, e = float(seg.get("start", 0)), float(seg.get("end", 0))
+            seg_words = str(seg.get("text", "")).split()
+            if not seg_words or e <= clip_start or s >= end_limit:
+                continue
+            step = (e - s) / len(seg_words)
+            timed += [(s + k * step, s + (k + 1) * step, t) for k, t in enumerate(seg_words)]
+
+    groups = []
+    i = 0
+    while i < len(timed):
+        size = max_words
+        for off in range(min(max_words, len(timed) - i)):
+            if timed[i + off][2].endswith((".", "?", "!", ":")):
+                size = off + 1
+                break
+        chunk = timed[i:i + size]
+        rel = [
+            (max(0.0, round(ws - clip_start, 2)), min(round(end_limit - clip_start, 2), round(we - clip_start, 2)), t)
+            for ws, we, t in chunk
+        ]
+        t0, t1 = rel[0][0], max(rel[-1][1], rel[0][0] + 0.3)
+        if i + size < len(timed):
+            nxt = round(timed[i + size][0] - clip_start, 2)
+            if 0 < nxt - t1 <= 0.35:
+                t1 = nxt
+        if t1 > t0:
+            groups.append((t0, t1, rel))
+        i += size
+    return groups
+
+
+def _escape(text: str) -> str:
+    return text.upper().replace("{", "(").replace("}", ")")
+
+
+_POP = r"{\fscx70\fscy70\t(0,90,\fscx108\fscy108)\t(90,170,\fscx100\fscy100)}"
+
+
+def _animated_events(groups, animation: str, primary: str, highlight: str | None) -> list[tuple[float, float, str]]:
+    events: list[tuple[float, float, str]] = []
+    for t0, t1, ws in groups:
+        texts = [_escape(t) for _, _, t in ws]
+        if animation == "karaoke":
+            hl = highlight or "&H0015CCFA"
+            for k in range(len(ws)):
+                start = t0 if k == 0 else ws[k][0]
+                end = ws[k + 1][0] if k + 1 < len(ws) else t1
+                if end <= start:
+                    continue
+                parts = [
+                    (rf"{{\c{hl}\fscx108\fscy108}}{t}{{\c{primary}\fscx100\fscy100}}" if j == k else t)
+                    for j, t in enumerate(texts)
+                ]
+                events.append((start, end, " ".join(parts)))
+        elif animation == "reveal":
+            # \ko some com texto e contorno até a palavra ser falada (SecondaryColour transparente)
+            # No karaokê do ASS a duração antes de cada sílaba é quanto ela dura; uma sílaba vazia
+            # inicial cobre o intervalo até a primeira palavra ser falada
+            lead = max(0, int(round((ws[0][0] - t0) * 100)))
+            pieces = [rf"{{\ko{lead}}}"] if lead else []
+            for k, txt in enumerate(texts):
+                nxt = ws[k + 1][0] if k + 1 < len(ws) else t1
+                dur = max(1, int(round((nxt - ws[k][0]) * 100)))
+                pieces.append(rf"{{\ko{dur}}}{txt} ")
+            events.append((t0, t1, "".join(pieces).strip()))
+        elif animation in ("pop", "word"):
+            events.append((t0, t1, _POP + " ".join(texts)))
+        elif animation == "fade":
+            events.append((t0, t1, r"{\fad(140,90)}" + " ".join(texts)))
+        else:
+            events.append((t0, t1, " ".join(texts)))
+    return events
 
 
 def generate_ass(segments: list[dict], output_path: str | None = None,
@@ -280,10 +432,8 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
     # Localiza o preset de estilo escolhido no template (com fallback seguro para hormozi_yellow)
     style_cfg = PRESET_STYLES.get(subtitle_preset, PRESET_STYLES["hormozi_yellow"])
 
-    # Fonte configurada no template
-    font_name = style_cfg["font"]
-    if font_family:
-        font_name = FONT_MAP.get(font_family, font_name)
+    font_name = _resolve_font(font_family, style_cfg["font"])
+    animation = style_cfg.get("animation")
 
     # Tamanho da fonte
     f_size = style_cfg["fontsize"]
@@ -300,6 +450,8 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
     outline_val = style_cfg["outline"]
     shadow_val = style_cfg["shadow"]
     bold_val = style_cfg["bold"]
+    # Revelação: a cor "ainda não falada" é transparente
+    secondary_color = "&HFF000000" if animation == "reveal" else "&H000000FF"
 
     # Header oficial ASS no canvas 720x1280
     header = f"""[Script Info]
@@ -310,19 +462,24 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Viral,{font_name},{f_size},{primary_color},&H000000FF,{outline_color},{back_color},{bold_val},0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},2,54,54,{margin_v},1
+Style: Viral,{font_name},{f_size},{primary_color},{secondary_color},{outline_color},{back_color},{bold_val},0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},2,54,54,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     event_lines = []
-    chunks = _clip_chunks(segments, words, clip_start, clip_end)
-    for t_start, t_end, chunk in chunks:
-        clean_text = chunk.upper().strip()
-        escaped = clean_text.replace("{", "\{").replace("}", "\}")
+    if animation:
+        groups = _clip_groups(segments, words, clip_start, clip_end, max_words=1 if animation == "word" else 3)
+        timed_texts = _animated_events(groups, animation, primary_color, style_cfg.get("highlight"))
+    else:
+        timed_texts = [
+            (t0, t1, chunk.upper().strip().replace("{", "(").replace("}", ")"))
+            for t0, t1, chunk in _clip_chunks(segments, words, clip_start, clip_end)
+        ]
+    for t_start, t_end, text in timed_texts:
         event_lines.append(
             f"Dialogue: 0,{_seconds_to_ass_time(t_start)},{_seconds_to_ass_time(t_end)},"
-            f"Viral,,0,0,0,,{escaped}"
+            f"Viral,,0,0,0,,{text}"
         )
 
     Path(output_path).write_text(header + "\n".join(event_lines) + "\n", encoding="utf-8")

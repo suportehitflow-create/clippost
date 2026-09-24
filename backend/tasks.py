@@ -172,12 +172,25 @@ def check_channel_watches():
     O baseline — definido no cadastro ou na primeira leitura que der certo — evita
     clipar o vídeo antigo que está no topo do feed.
     """
+    from services.user_settings import autopilot_interval_minutes
+
     watches = (
         supabase.table("channel_watches").select("*").eq("is_active", True).execute().data or []
     )
     novos = 0
+    verificados = 0
 
     for w in watches:
+        # Cada usuário escolhe de quanto em quanto tempo os canais são verificados (mín. 15 min)
+        if w.get("last_checked_at"):
+            try:
+                last = datetime.fromisoformat(str(w["last_checked_at"]).replace("Z", "+00:00"))
+                elapsed_min = (datetime.now(timezone.utc) - last).total_seconds() / 60
+                if elapsed_min < autopilot_interval_minutes(w["user_id"]):
+                    continue
+            except ValueError:
+                pass
+        verificados += 1
         erro = None
         try:
             resp = httpx.get(
@@ -256,7 +269,7 @@ def check_channel_watches():
             "last_error": erro,
         }).eq("id", w["id"]).execute()
 
-    return {"canais": len(watches), "novos": novos}
+    return {"canais": len(watches), "verificados": verificados, "novos": novos}
 
 
 

@@ -1,6 +1,7 @@
 """
 clipost Backend — FastAPI
 """
+import asyncio
 import os
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -43,6 +44,27 @@ def _setup_youtube_cookies():
         print(f"[startup] cookies do YouTube carregados ({len(b64)} bytes b64) — bot-detection contornado")
     except Exception as e:
         print(f"[startup] falha ao carregar cookies do YouTube: {e}")
+
+
+_COOKIE_PLATFORMS = ("instagram", "facebook", "tiktok")
+
+
+def _setup_platform_cookies():
+    """INSTAGRAM_COOKIES_B64 / FACEBOOK_COOKIES_B64 / TIKTOK_COOKIES_B64 -> arquivo + <P>_COOKIES_FILE.
+    Sem login, Instagram e Facebook só deixam listar poucos vídeos de um perfil."""
+    import base64
+    for platform in _COOKIE_PLATFORMS:
+        b64 = os.environ.get(f"{platform.upper()}_COOKIES_B64")
+        if not b64:
+            continue
+        path = f"/tmp/{platform}_cookies.txt"
+        try:
+            with open(path, "wb") as f:
+                f.write(base64.b64decode(b64))
+            os.environ[f"{platform.upper()}_COOKIES_FILE"] = path
+            print(f"[startup] cookies do {platform} carregados")
+        except Exception as e:
+            print(f"[startup] falha ao carregar cookies do {platform}: {e}")
 
 
 _STEP_MESSAGES = {
@@ -183,7 +205,8 @@ from job_tracker import run_tracked as _run_tracked, snapshot as _active_jobs_sn
 
 async def _in_process_scheduler():
     """Sem worker/beat do Celery no Fly, as tarefas periódicas rodam aqui mesmo:
-    publicação dos posts agendados (60s) e checagem de canais do Autopilot (15 min)."""
+    publicação dos posts agendados (60s) e Autopilot (a cada 5 min olha quais canais
+    já passaram do intervalo escolhido pelo usuário, mínimo 15 min)."""
     import asyncio
     try:
         from tasks import check_channel_watches
@@ -191,7 +214,7 @@ async def _in_process_scheduler():
     except Exception as e:
         print(f"[scheduler] não iniciou: {e}")
         return
-    print("[scheduler] agendador interno ativo (posts 60s, autopilot 15min)")
+    print("[scheduler] agendador interno ativo (posts 60s, autopilot conforme intervalo do usuário)")
     last_autopilot = 0.0
     while True:
         await asyncio.sleep(60)
@@ -200,7 +223,7 @@ async def _in_process_scheduler():
         except Exception as e:
             print(f"[scheduler] posts agendados falharam: {e}")
         now = asyncio.get_event_loop().time()
-        if now - last_autopilot >= 900:
+        if now - last_autopilot >= 300:
             last_autopilot = now
             try:
                 result = await asyncio.to_thread(check_channel_watches)
@@ -214,6 +237,7 @@ async def _in_process_scheduler():
 async def recover_stuck_projects():
     import asyncio
     _setup_youtube_cookies()
+    _setup_platform_cookies()
     await _mark_stuck_projects("startup")
     await _cleanup_old_projects()
     asyncio.create_task(_periodic_recovery_loop())
@@ -582,6 +606,27 @@ async def listar_watches(user_id: str):
     return {"watches": resp.data or []}
 
 
+class AutopilotSettingsRequest(BaseModel):
+    user_id: str
+    interval_minutes: int
+
+
+@app.get("/api/autopilot/settings/{user_id}")
+async def autopilot_settings(user_id: str):
+    from services.user_settings import AUTOPILOT_ALLOWED, autopilot_interval_minutes
+    minutes = await asyncio.to_thread(autopilot_interval_minutes, user_id)
+    return {"interval_minutes": minutes, "allowed": list(AUTOPILOT_ALLOWED)}
+
+
+@app.post("/api/autopilot/settings")
+async def salvar_autopilot_settings(req: AutopilotSettingsRequest):
+    from services.user_settings import AUTOPILOT_ALLOWED, save_settings
+    if req.interval_minutes not in AUTOPILOT_ALLOWED:
+        raise HTTPException(status_code=400, detail="Intervalo inválido (mínimo 15 minutos).")
+    await asyncio.to_thread(save_settings, req.user_id, autopilot_interval_minutes=req.interval_minutes)
+    return {"interval_minutes": req.interval_minutes}
+
+
 @app.delete("/api/autopilot/watches/{watch_id}")
 async def remover_watch(watch_id: str):
     supabase.table("channel_watches").delete().eq("id", watch_id).execute()
@@ -728,6 +773,16 @@ async def set_youtube_cookies(request: Request):
         return {"ok": True, "bytes_written": len(base64.b64decode(cookies_b64)), "path": cookies_path}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"falha ao salvar cookies: {e}")
+
+
+@app.get("/api/admin/cookies-status")
+async def cookies_status():
+    """Quais plataformas têm cookies de login carregados (sem expor o conteúdo)."""
+    status = {}
+    for platform in ("youtube",) + _COOKIE_PLATFORMS:
+        path = os.environ.get(f"{platform.upper()}_COOKIES_FILE") or ""
+        status[platform] = bool(path) and os.path.exists(path) and os.path.getsize(path) > 0
+    return status
 
 
 @app.get("/api/admin/youtube-cookies-status")
