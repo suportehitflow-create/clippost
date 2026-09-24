@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileSwitcher from '@/components/ProfileSwitcher'
+
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -179,7 +181,18 @@ export default function TrendsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-32">
+    <div className="min-h-screen bg-[#0a0a0c]">
+      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10 mb-6">
+        <div className="flex items-center gap-2">
+          <Flame className="w-4 h-4 text-orange-400" />
+          <h1 className="text-sm font-semibold text-white tracking-wide">Radar Viral</h1>
+        </div>
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+        <div className="flex justify-end" />
+      </header>
+      <div className="max-w-7xl mx-auto space-y-8 pb-32 px-4 sm:px-8">
       {/* Header com badge futurista */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
         <div>
@@ -380,6 +393,7 @@ export default function TrendsPage() {
           </div>
         ))}
       </div>
+    </div>
     </div>
   )
 }

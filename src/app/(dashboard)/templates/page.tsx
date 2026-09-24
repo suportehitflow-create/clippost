@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileSwitcher from '@/components/ProfileSwitcher'
+
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
 import { AspectRatioSelector, AspectFormat } from '@/components/ui/AspectRatioSelector'
@@ -780,8 +782,12 @@ export default function TemplatesPage() {
           </div>
         </div>
 
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+
         {/* Ações da Direita */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={handleSave}

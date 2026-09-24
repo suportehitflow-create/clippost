@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileSwitcher from '@/components/ProfileSwitcher'
+
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -270,7 +272,18 @@ function SchedulePageContent() {
     loadData(userId)
   }
   return (
-    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] font-sans">
+      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10 mb-6">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-purple-400" />
+          <h1 className="text-sm font-semibold text-white tracking-wide">Programar Posts</h1>
+        </div>
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+        <div className="flex justify-end" />
+      </header>
+      <div className="p-6 lg:p-10 pt-0">
       
       {/* Top Title & Subtitle (Screenshot 1) */}
       <div className="max-w-7xl mx-auto mb-6">
@@ -661,10 +674,10 @@ function SchedulePageContent() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
-
 export default function SchedulePageV2() {
   return (
     <Suspense

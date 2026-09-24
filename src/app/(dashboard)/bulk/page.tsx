@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileSwitcher from '@/components/ProfileSwitcher'
+
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -231,8 +233,14 @@ export default function BulkEditingPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
-      <header className="h-16 border-b border-white/[0.08] flex items-center px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Edição em Massa</h1>
+      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-semibold text-white tracking-wide">Edição em Massa</h1>
+        </div>
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+        <div className="flex justify-end" />
       </header>
 
       <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">

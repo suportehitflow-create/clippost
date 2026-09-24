@@ -1,5 +1,7 @@
 'use client'
 
+import ProfileSwitcher from '@/components/ProfileSwitcher'
+
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
@@ -163,7 +165,7 @@ export default function CreateClipsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#07070a] text-white">
       {/* Header */}
-      <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
+      <header className="h-16 border-b border-white/[0.06] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
             <Scissors className="w-4 h-4" />
@@ -173,16 +175,22 @@ export default function CreateClipsPage() {
           </h1>
         </div>
 
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+
         {/* Template Ativo Pill */}
-        <Link
-          href="/templates"
-          className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer"
-          title="Ver ou trocar template visual de marca"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="hidden sm:inline text-zinc-400">Template Ativo:</span>
-          <span className="text-white font-bold">Oficial Clipost</span>
-        </Link>
+        <div className="flex justify-end">
+          <Link
+            href="/templates"
+            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer"
+            title="Ver ou trocar template visual de marca"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline text-zinc-400">Template Ativo:</span>
+            <span className="text-white font-bold">Oficial Clipost</span>
+          </Link>
+        </div>
       </header>
 
       <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">
@@ -352,7 +360,7 @@ export default function CreateClipsPage() {
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block">Remover pausas longas e silêncios</span>
-                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo acústico e prende a atenção nos primeiros segundos</span>
+                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo e prende a atenção nos primeiros segundos</span>
                   </div>
                 </div>
                 <LiquidToggle
@@ -372,7 +380,7 @@ export default function CreateClipsPage() {
             </div>
             <div className="space-y-0.5">
               <span className="text-indigo-400 font-bold block">2. Whisper</span>
-              <span>Transcrição Acústica</span>
+              <span>Transcrição IA</span>
             </div>
             <div className="space-y-0.5">
               <span className="text-indigo-400 font-bold block">3. Curador IA</span>

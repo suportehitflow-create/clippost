@@ -95,10 +95,14 @@ export default function CleanDashboard() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
-      <header className="h-16 border-b border-white/[0.08] flex items-center justify-between px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clippost</h1>
-        <div className="flex items-center gap-3">
-          {currentUserId && <ProfileSwitcher userId={currentUserId} />}
+      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-semibold text-white tracking-wide">Painel - Clippost</h1>
+        </div>
+        <div className="flex justify-center">
+          {currentUserId && <ProfileSwitcher userId={currentUserId} align="center" />}
+        </div>
+        <div className="flex items-center justify-end gap-3">
           <Link
             href="/upload"
             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"

@@ -144,7 +144,7 @@ def _try_providers(prompt: str) -> str:
 _call_free_model = _try_providers
 
 
-def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 20000) -> str:
+def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 150000) -> str:
     if not segments:
         return "[]"
 
@@ -164,12 +164,11 @@ def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 2000
     if len(full_text) <= max_chars:
         return full_text
 
-    # Amostragem uniforme — calcula quantas linhas cabem em max_chars
+    # Para vídeos muito longos que passem de 150k caracteres, amostra mantendo blocos contínuos
     avg_chars = max(1, len(full_text) // len(lines))
     target_lines = max(10, max_chars // avg_chars)
     step = max(1, len(lines) // target_lines)
     sampled = "\n".join(lines[::step])
-    # Truncagem de segurança: nunca exceder max_chars (corta na última \n completa)
     if len(sampled) > max_chars:
         cut = sampled.rfind("\n", 0, max_chars)
         sampled = sampled[:cut] if cut > 0 else sampled[:max_chars]
@@ -271,22 +270,37 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
         # Modo Automático padrão solicitado pelo usuário:
         # Limite máximo de 90 segundos (1 minuto e meio) para reter atenção.
         duration_desc = (
-            "Modo Automático Viral: escolha a duração ideal para cada momento (mínimo 30s, MÁXIMO RIGOROSO de 90s / 1 minuto e meio). "
-            "Cortes com mais de 90 segundos perdem retenção, portanto NUNCA crie clipes com mais de 90 segundos."
+            "Modo Automático Viral: escolha a duração ideal para cada momento (mínimo 35s, MÁXIMO RIGOROSO de 90s / 1 minuto e meio). "
+            "Para podcasts e vídeos longos, NÃO limite os clipes a apenas 30 segundos! "
+            "Explore durações ricas entre 45s e 90s para cobrir histórias completas, debates intensos, piadas com conclusão e argumentos de peso. "
+            "NUNCA crie clipes com mais de 90 segundos."
         )
-        min_duration, max_duration = 30, 90
+        min_duration, max_duration = 35, 90
 
     chapters_ctx = ""
     if chapters:
-        chapters_ctx = f"\nCAPÍTULOS DO VÍDEO:\n{json.dumps(chapters[:15], ensure_ascii=False)}\n"
+        chapters_ctx = f"\nCAPÍTULOS DO VÍDEO:\n{json.dumps(chapters[:20], ensure_ascii=False)}\n"
 
     timeline = prepare_full_transcript_timeline(segments)
     video_end = float(segments[-1].get("end", 600)) if segments else 600.0
 
+    # Meta de cortes proporcional ao tamanho real do vídeo (podcasts longos precisam de muitos cortes!)
+    if video_end <= 300:        # até 5 min
+        min_clips_target, max_clips_target = 3, 5
+    elif video_end <= 900:      # 5 a 15 min
+        min_clips_target, max_clips_target = 5, 8
+    elif video_end <= 1800:     # 15 a 30 min
+        min_clips_target, max_clips_target = 8, 12
+    elif video_end <= 3600:     # 30 a 60 min (ex: podcast de 36 min)
+        min_clips_target, max_clips_target = 10, 16
+    else:                       # mais de 1 hora
+        min_clips_target, max_clips_target = 12, 20
+
     prompt = f"""Você é um editor de vídeo sênior especializado em cortes virais (Shorts, Reels, TikTok) a partir de podcasts, entrevistas e vídeos longos.
 
-TAREFA:
-Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético ou ensinamentos profundos. Gere entre 3 e 10 cortes que tenham potencial de explodir nas redes sociais.
+TAREFA OBRIGATÓRIA:
+Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético, humor ou ensinamentos profundos.
+Este vídeo possui {int(video_end // 60)} minutos de duração. Por isso, você DEVE gerar OBRIGATORIAMENTE entre {min_clips_target} e {max_clips_target} cortes virais de alto nível, distribuídos ao longo de todo o vídeo (início, meio e fim)! Não gere menos que {min_clips_target} cortes.
 
 ⚠️ REGRAS RIGOROSAS DE EXCLUSÃO (FILTRO OBRIGATÓRIO):
 1. EXCLUA TOTALMENTE A INTRODUÇÃO / ABERTURA:
@@ -388,7 +402,7 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 
     # Validação e saneamento (incluindo filtro de intro/outro e limite de 90s)
     validated = []
-    for c in clips[:15]:
+    for c in clips[:20]:
         try:
             start = max(0.0, float(c.get("start_time", 0)))
             end = float(c.get("end_time", start + 60))

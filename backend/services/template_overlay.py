@@ -322,7 +322,11 @@ def _draw_watermark(canvas: Image.Image, layout: dict, brand_kit: dict, s: float
         x, y = bx + bw - inset - pw, by + inset
     elif pos == "top_left":
         x, y = bx + inset, by + inset
-    else:
+    elif pos == "bottom_right":
+        x, y = bx + bw - inset - pw, by + bh - inset - ph
+    elif pos == "bottom_left":
+        x, y = bx + inset, by + bh - inset - ph
+    else:  # bottom_center
         x, y = bx + (bw - pw) / 2, by + bh - inset - ph
     canvas.alpha_composite(pill, (int(x), int(y)))
 

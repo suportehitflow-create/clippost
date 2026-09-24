@@ -600,7 +600,8 @@ export default function ClipEditorPage() {
                 </div>
               )}
 
-              {/* Dynamic Caption Overlay com Emojis Inteligentes */}
+              {/* Dynamic Caption Overlay com Emojis Inteligentes — apenas no modo preview/draft para não duplicar legenda queimada no vídeo */}
+              {!clip?.storage_url && (
               <div
                 className="absolute inset-x-3 text-center z-20 pointer-events-none transition-all duration-150"
                 style={{ top: `${subtitleY}%` }}
@@ -630,6 +631,7 @@ export default function ClipEditorPage() {
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Play/Pause Center Button Overlay */}
               <button

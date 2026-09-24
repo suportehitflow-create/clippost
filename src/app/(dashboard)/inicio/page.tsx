@@ -84,7 +84,7 @@ const FEATURES: Feature[] = [
   },
   {
     title: 'Meus Projetos & Vídeos',
-    description: 'Acesse todo o histórico de vídeos processados, transcrições acústicas e cortes renderizados prontos para download.',
+    description: 'Acesse todo o histórico de vídeos processados, transcrições e cortes renderizados prontos para download.',
     href: '/dashboard',
     icon: FolderOpen,
   },
@@ -173,7 +173,7 @@ export default async function InicioPage() {
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-semibold text-indigo-300">
               <Sparkles className="w-3 h-3 text-indigo-400" />
-              <span>Pipeline Acústico Groq Whisper Turbo Ativo</span>
+              <span>Motor de IA de Cortes Ativo</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Painel de Criação Viral

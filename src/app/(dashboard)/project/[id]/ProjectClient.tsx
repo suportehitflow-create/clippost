@@ -48,6 +48,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
+import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { generateMagneticClips, extractCoreSubject, type MagneticClipData } from '@/lib/titles'
 
 
@@ -1114,8 +1115,12 @@ export default function ProjectClient({
           </div>
         </div>
 
+        <div className="flex justify-center">
+          <ProfileSwitcher align="center" />
+        </div>
+
         {/* Ações Rápidas no Topo */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={handleDownloadAll}
@@ -1307,28 +1312,123 @@ export default function ProjectClient({
             <div
               style={{ width: "324px", height: "702px", aspectRatio: "9 / 19.5" }}
               className={`relative rounded-[44px] overflow-hidden select-none transition-colors cursor-pointer ${
-                templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white'
+                activeClip.storage_url ? 'bg-black text-white' : (templateBg === 'white' ? 'bg-white text-zinc-950' : 'bg-black text-white')
               }`}
               onClick={togglePlayback}
               title="Clique para Reproduzir / Pausar"
             >
               {/* 1. STATUS BAR DO IPHONE */}
               <div className="h-9 px-5 pt-2 flex items-center justify-between z-50 pointer-events-none select-none">
-                <span className={`text-[11px] font-bold tracking-tight ${templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>9:41</span>
+                <span className={`text-[11px] font-bold tracking-tight ${!activeClip.storage_url && templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>9:41</span>
 
-                <div className={`flex items-center gap-1.5 ${templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>
+                <div className={`flex items-center gap-1.5 ${!activeClip.storage_url && templateBg === 'white' ? 'text-zinc-900' : 'text-white'}`}>
                   <div className="flex items-end gap-0.5 h-2">
-                    <div className={`w-[2px] h-1 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
-                    <div className={`w-[2px] h-1.5 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
-                    <div className={`w-[2px] h-2 rounded-xs ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-1 rounded-xs ${!activeClip.storage_url && templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-1.5 rounded-xs ${!activeClip.storage_url && templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                    <div className={`w-[2px] h-2 rounded-xs ${!activeClip.storage_url && templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                   </div>
                   <Wifi className="w-3 h-3 stroke-[2.4]" />
-                  <div className={`w-4 h-2 rounded-[3px] border p-0.5 flex items-center ${templateBg === 'white' ? 'border-zinc-900' : 'border-white/80'}`}>
-                    <div className={`w-2.5 h-full rounded-[1px] ${templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
+                  <div className={`w-4 h-2 rounded-[3px] border p-0.5 flex items-center ${!activeClip.storage_url && templateBg === 'white' ? 'border-zinc-900' : 'border-white/80'}`}>
+                    <div className={`w-2.5 h-full rounded-[1px] ${!activeClip.storage_url && templateBg === 'white' ? 'bg-zinc-900' : 'bg-white'}`} />
                   </div>
                 </div>
               </div>
 
+              {activeClip.storage_url ? (
+                /* MODO VÍDEO FINAL RENDERIZADO 9:16:
+                   O vídeo ocupa 100% da tela OLED do iPhone com o template real,
+                   marca d'água oficial e legendas já queimados nativamente pelo FFmpeg.
+                   NENHUM elemento HTML duplicado sobreposto! */
+                <div
+                  className="absolute inset-0 w-full h-full bg-black flex items-center justify-center overflow-hidden"
+                  onMouseEnter={() => setShowVideoControls(true)}
+                  onMouseMove={() => {
+                    setShowVideoControls(true)
+                    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+                    controlsTimeoutRef.current = setTimeout(() => setShowVideoControls(false), 2500)
+                  }}
+                  onMouseLeave={() => setShowVideoControls(false)}
+                >
+                  <video
+                    ref={videoRef}
+                    src={activeClip.storage_url}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    loop
+                    onTimeUpdate={() => {
+                      if (videoRef.current) {
+                        setPlaybackTime(videoRef.current.currentTime)
+                      }
+                    }}
+                  />
+
+                  {/* CONTROLES NATIVOS DO PLAYER */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className={`absolute bottom-3 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col gap-1.5 z-40 transition-opacity duration-200 ${
+                      showVideoControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                    }`}
+                  >
+                    <div
+                      className="w-full h-1.5 bg-white/20 hover:h-2 rounded-full overflow-hidden cursor-pointer relative transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                        const targetTime = pct * clipDuration
+                        setPlaybackTime(targetTime)
+                        if (videoRef.current) {
+                          videoRef.current.currentTime = targetTime
+                        }
+                      }}
+                    >
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (playbackTime / clipDuration) * 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-white text-[11px] font-medium select-none">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          togglePlayback()
+                        }}
+                        className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                      </button>
+
+                      {/* SPEED BADGE NO PLAYER */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const speeds = [1.0, 1.05, 1.15, 1.25, 1.5, 1.8, 2.0]
+                          const curIdx = speeds.indexOf(videoSpeed)
+                          const nextSpeed = speeds[(curIdx + 1) % speeds.length]
+                          setVideoSpeed(nextSpeed)
+                          if (applyToAllClips) {
+                            triggerBulkFeedback(`Velocidade ${nextSpeed}x aplicada a todos os cortes`)
+                          }
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-white/15 hover:bg-white/25 text-[10px] font-mono font-bold text-indigo-300 flex items-center gap-0.5 cursor-pointer transition-colors"
+                        title="Alternar velocidade de reprodução"
+                      >
+                        <Zap className="w-2.5 h-2.5 text-indigo-400" />
+                        <span>{videoSpeed}x</span>
+                      </button>
+                      <span className="font-mono text-[10px] text-zinc-300">
+                        {formatDuration(Math.floor(playbackTime))} / {formatDuration(Math.floor(clipDuration))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* MODO DRAFT / PREVIEW (Antes da renderização finalizar no servidor):
+                   Mostra as camadas HTML em tempo real do layout */
+                <>
               {/* 2. CABEÇALHO DO TEMPLATE: AVATAR + @HANDLE (100% VINCULADO AO TEMPLATE) */}
               <div
                 style={{ top: `${headerPos.y}%` }}
@@ -1590,6 +1690,9 @@ export default function ProjectClient({
                     {speechWords.length > 0 ? speechWords.slice(Math.max(0, activeWordIndex - 1), activeWordIndex + 2).join(' ') : 'SUA LEGENDA APARECERÁ AQUI'}
                   </div>
                 </div>
+              )}
+
+                </>
               )}
 
               {/* BARRA HOME DO IPHONE */}
@@ -1958,27 +2061,10 @@ export default function ProjectClient({
                   ? (clips.length > 0 ? `Alterações aplicadas aos ${clips.length} cortes` : 'Alterações sincronizadas no preset global')
                   : `Modo individual ativo para o corte #${selectedClipIndex + 1}`}
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    const currentCfg = {
-                      videoSpeed,
-                      videoAspect,
-                      activeLayout,
-                      showTitleEmojis,
-                      removeSilence,
-                      activeSubtitleStyle
-                    }
-                    localStorage.setItem('clippost_active_template', JSON.stringify({ config: currentCfg, layout: activeLayout, subtitle_preset: activeSubtitleStyle }))
-                    triggerBulkFeedback('Predefinição salva com sucesso!')
-                  } catch {}
-                }}
-                className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Salvar Predefinição</span>
-              </button>
+              <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-medium shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Salvo automaticamente</span>
+              </span>
             </div>
 
           </div>
