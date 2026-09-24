@@ -117,6 +117,23 @@ def _sec_to_ass(sec: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
+# Mesma limpeza de voz do editor em massa (passa-alta, passa-baixa, compressor, normalização)
+_ENHANCE_AUDIO = "highpass=f=80,lowpass=f=13000,acompressor=threshold=-18dB:ratio=3:attack=5:release=50,dynaudnorm=f=150:g=15"
+
+
+def _download_to(url: str, dest_base: str) -> str:
+    """Baixa um arquivo (ex.: música de fundo do Storage) mantendo a extensão."""
+    import httpx
+    ext = os.path.splitext(url.split("?")[0])[1][:6] or ".mp3"
+    dest = dest_base + ext
+    with httpx.stream("GET", url, timeout=60.0, follow_redirects=True) as resp:
+        resp.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in resp.iter_bytes(1024 * 256):
+                f.write(chunk)
+    return dest
+
+
 def _download_avatar(url: str, dest_dir: str) -> str | None:
     if not url:
         return None
@@ -336,13 +353,22 @@ def create_vertical_clip(
         filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
         filter_parts.append(f"[bg][vbox]overlay={box_x}:{box_y}[base]")
 
-        # Fades de áudio
+        # Áudio: velocidade, limpeza da voz (opcional), fades e música de fundo (opcional)
         speed_adj = speed or 1.0
+        out_duration = actual_duration / speed_adj
+        music_path = None
+        if layout.get("musicUrl"):
+            try:
+                music_path = _download_to(layout["musicUrl"], os.path.join(tmp_dir, "music"))
+            except Exception as mus_err:
+                print(f"[ffmpeg_engine] música de fundo ignorada ({mus_err})")
         audio_filters = []
         if speed_adj != 1.0:
             audio_filters.append(f"atempo={min(2.0, speed_adj)}")
-        audio_filters += _edge_fades(actual_duration / speed_adj)
-        filter_parts.append(f"{a_src}{','.join(audio_filters)}[aout]")
+        if layout.get("enhanceAudio"):
+            audio_filters.append(_ENHANCE_AUDIO)
+        audio_filters += _edge_fades(out_duration)
+        filter_parts.append(f"{a_src}{','.join(audio_filters)}{'[voz]' if music_path else '[aout]'}")
         audio_map = "[aout]"
         last_video = "[base]"
 
@@ -350,6 +376,21 @@ def create_vertical_clip(
             input_files += ["-i", overlay_png]
             filter_parts.append(f"{last_video}[{next_input}:v]overlay=0:0[tpl]")
             last_video = "[tpl]"
+            next_input += 1
+
+        if music_path:
+            try:
+                volume = max(0.0, min(1.0, float(layout.get("musicVolume", 0.25))))
+            except (TypeError, ValueError):
+                volume = 0.25
+            fade = min(1.5, out_duration / 3)
+            input_files += ["-stream_loop", "-1", "-i", music_path]
+            filter_parts.append(
+                f"[{next_input}:a]atrim=0:{out_duration:.3f},asetpts=PTS-STARTPTS,volume={volume:.2f},"
+                f"afade=t=out:st={max(0.0, out_duration - fade):.3f}:d={fade:.3f}[mus]"
+            )
+            filter_parts.append("[voz][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]")
+            next_input += 1
 
         # 5. Legendas queimadas
         if subtitle_file and os.path.exists(subtitle_file):

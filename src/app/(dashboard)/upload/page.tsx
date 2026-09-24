@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles } from 'lucide-react'
+import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles, Music, Mic, X } from 'lucide-react'
 
 function getPlatformInfo(inputUrl: string) {
   if (!inputUrl.trim()) return null
@@ -34,6 +34,10 @@ export default function CreateClipsPage() {
   const [url, setUrl] = useState('')
   const [clipDuration, setClipDuration] = useState<'30' | '60' | '90' | 'auto'>('auto')
   const [removeSilence, setRemoveSilence] = useState(true)
+  const [musicFile, setMusicFile] = useState<File | null>(null)
+  const [musicVolume, setMusicVolume] = useState(25)
+  const [enhanceAudio, setEnhanceAudio] = useState(false)
+  const musicRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -132,6 +136,21 @@ export default function CreateClipsPage() {
           if (savedCfg) activeTemplateConfig = JSON.parse(savedCfg)
         }
       } catch {}
+
+      // Áudio dos cortes: música de fundo (vai para o Storage) e limpeza da voz
+      let audioConfig: Record<string, unknown> = { enhanceAudio }
+      if (musicFile) {
+        const ext = (musicFile.name.split('.').pop() || 'mp3').toLowerCase()
+        const musicPath = `${user.id}/music/${Date.now()}.${ext}`
+        const { error: musErr } = await supabase.storage.from('videos').upload(musicPath, musicFile, { contentType: musicFile.type || 'audio/mpeg' })
+        if (musErr) throw new Error('Falha ao enviar a música: ' + musErr.message)
+        audioConfig = {
+          ...audioConfig,
+          musicUrl: supabase.storage.from('videos').getPublicUrl(musicPath).data.publicUrl,
+          musicVolume: musicVolume / 100,
+        }
+      }
+      activeTemplateConfig = { ...(activeTemplateConfig || {}), ...audioConfig }
 
       // Dispara job no backend com o template ativo; sem confirmação o projeto ficaria preso em "processing"
       const jobRes = await fetch('/api/jobs', {
@@ -369,6 +388,69 @@ export default function CreateClipsPage() {
                   activeColor="indigo"
                 />
               </div>
+            </div>
+
+            {/* Música de fundo */}
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${musicFile ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'}`}>
+                    <Music className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-semibold text-white block">Música de fundo</span>
+                    <span className="text-[11px] text-zinc-400 block truncate">{musicFile ? musicFile.name : 'Opcional — toca baixinho por baixo da fala'}</span>
+                  </div>
+                </div>
+                {musicFile ? (
+                  <button
+                    type="button"
+                    onClick={() => { setMusicFile(null); if (musicRef.current) musicRef.current.value = '' }}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+                    aria-label="Remover música"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => musicRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-white"
+                  >
+                    Escolher
+                  </button>
+                )}
+                <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={e => setMusicFile(e.target.files?.[0] || null)} />
+              </div>
+              {musicFile && (
+                <div className="flex items-center gap-3">
+                  <label htmlFor="music-volume" className="text-[11px] text-zinc-400 w-16">Volume</label>
+                  <input
+                    id="music-volume"
+                    type="range"
+                    min={5}
+                    max={100}
+                    value={musicVolume}
+                    onChange={e => setMusicVolume(Number(e.target.value))}
+                    className="flex-1 accent-indigo-500"
+                  />
+                  <span className="text-[11px] text-zinc-300 font-mono w-9 text-right">{musicVolume}%</span>
+                </div>
+              )}
+            </div>
+
+            {/* Limpeza da voz */}
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${enhanceAudio ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'}`}>
+                  <Mic className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-white block">Melhorar áudio da fala</span>
+                  <span className="text-[11px] text-zinc-400">Tira ruído grave e agudo e equilibra o volume da voz</span>
+                </div>
+              </div>
+              <LiquidToggle checked={enhanceAudio} onChange={setEnhanceAudio} activeColor="indigo" />
             </div>
           </div>
 

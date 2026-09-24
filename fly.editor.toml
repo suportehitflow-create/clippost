@@ -1,0 +1,33 @@
+# Servidor do Editor em Massa. Deploy: fly deploy -c fly.editor.toml
+app = "clippost-editor"
+primary_region = "gru"
+# Espera os vídeos em processamento terminarem antes de reiniciar num deploy (máx. do Fly)
+kill_timeout = 300
+
+[build]
+  dockerfile = "Dockerfile.editor"
+
+[env]
+  SUPABASE_URL = "https://alntulecjshpbrhesaoo.supabase.co"
+  EDITOR_MASSA_CONCURRENCIA = "2"
+  EDITOR_MASSA_PRESET = "veryfast"
+  EDITOR_MASSA_RETENCAO_HORAS = "24"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # A fila e os vídeos prontos ficam na memória/disco da máquina: não pode desligar sozinha
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    path = "/api/editor-massa/saude"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
