@@ -51,6 +51,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 
 export interface SubtitlePreset {
   id: string
@@ -434,9 +435,8 @@ export default function TemplatesPage() {
       if (!user) throw new Error('sem sessão')
       const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
       const path = `${user.id}/brand/background-${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      setCustomBgImage(supabase.storage.from('videos').getPublicUrl(path).data.publicUrl)
+      const uploaded = await uploadFileViaSignedUrl(supabase, 'videos', path, file, { upsert: true, contentType: file.type })
+      setCustomBgImage(uploaded.publicUrl)
     } catch {
       setCustomBgImage(previous)
       setSaveStatus('error')
@@ -734,9 +734,8 @@ export default function TemplatesPage() {
       if (!user) return
       const ext = (file.name.split('.').pop() || 'png').toLowerCase()
       const path = `${user.id}/brand/avatar-${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      setAvatarUrl(supabase.storage.from('videos').getPublicUrl(path).data.publicUrl)
+      const uploaded = await uploadFileViaSignedUrl(supabase, 'videos', path, file, { upsert: true, contentType: file.type })
+      setAvatarUrl(uploaded.publicUrl)
     } catch {
       setSaveStatus('error')
     }

@@ -5,6 +5,7 @@ import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import {
   Layers, UploadCloud, Link2, X, Loader2, CheckCircle2, AlertCircle, Play, Sparkles, Wand2, FileVideo,

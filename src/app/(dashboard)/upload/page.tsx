@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles, Music, Mic, X } from 'lucide-react'
 
 function getPlatformInfo(inputUrl: string) {
@@ -117,10 +118,9 @@ export default function CreateClipsPage() {
       let sourceUrl = url.trim()
       if (activeTab === 'file' && file) {
         const path = `${user.id}/${project.id}/original.${file.name.split('.').pop()}`
-        const { error: upErr } = await supabase.storage.from('videos').upload(path, file)
-        if (upErr) throw new Error('Falha no upload do vídeo: ' + upErr.message)
-        sourceUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
-        await supabase.from('projects').update({ source_url: sourceUrl, storage_path: path }).eq('id', project.id)
+        const uploaded = await uploadFileViaSignedUrl(supabase, 'videos', path, file)
+        sourceUrl = uploaded.publicUrl
+        await supabase.from('projects').update({ source_url: sourceUrl, storage_path: uploaded.path }).eq('id', project.id)
       }
 
       // Recupera o template ativo configurado pelo usuário para aplicar nos cortes
@@ -142,11 +142,10 @@ export default function CreateClipsPage() {
       if (musicFile) {
         const ext = (musicFile.name.split('.').pop() || 'mp3').toLowerCase()
         const musicPath = `${user.id}/music/${Date.now()}.${ext}`
-        const { error: musErr } = await supabase.storage.from('videos').upload(musicPath, musicFile, { contentType: musicFile.type || 'audio/mpeg' })
-        if (musErr) throw new Error('Falha ao enviar a música: ' + musErr.message)
+        const uploadedMusic = await uploadFileViaSignedUrl(supabase, 'videos', musicPath, musicFile, { contentType: musicFile.type || 'audio/mpeg' })
         audioConfig = {
           ...audioConfig,
-          musicUrl: supabase.storage.from('videos').getPublicUrl(musicPath).data.publicUrl,
+          musicUrl: uploadedMusic.publicUrl,
           musicVolume: musicVolume / 100,
         }
       }

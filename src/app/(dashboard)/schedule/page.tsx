@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import {
   Calendar,
   Clock,
@@ -185,10 +186,8 @@ function SchedulePageContent() {
       if (uploadedFile) {
         const ext = uploadedFile.name.split('.').pop()
         const path = `uploads/${userId}-${Date.now()}.${ext}`
-        const { error: upErr } = await supabase.storage.from('videos').upload(path, uploadedFile)
-        if (upErr) throw upErr
-        
-        const pubUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
+        const uploaded = await uploadFileViaSignedUrl(supabase, 'videos', path, uploadedFile)
+        const pubUrl = uploaded.publicUrl
         const { data: projData } = await supabase
           .from('projects')
           .insert({ user_id: userId, title: uploadedFile.name, source_type: 'file', status: 'done' })
