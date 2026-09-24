@@ -17,12 +17,27 @@ const CHAVE_ABA = 'clippost_bulk_aba'
 
 export default function EdicaoEmMassaPage() {
   const [aba, setAba] = useState<Aba>('editor')
+  // O editor precisa do servidor com FFmpeg: no localhost é o próprio `next dev`; em produção,
+  // o endereço vem de NEXT_PUBLIC_EDITOR_MASSA_URL (servidor no Fly)
+  const [editorDisponivel, setEditorDisponivel] = useState(true)
 
   useEffect(() => {
-    try {
-      const salva = localStorage.getItem(CHAVE_ABA)
-      if (salva === 'editor' || salva === 'perfil') setAba(salva)
-    } catch {}
+    let salva: string | null = null
+    try { salva = localStorage.getItem(CHAVE_ABA) } catch {}
+    if (salva === 'editor' || salva === 'perfil') setAba(salva)
+
+    const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    const servidor = process.env.NEXT_PUBLIC_EDITOR_MASSA_URL
+    if (local) return
+    const aplicar = (ok: boolean) => {
+      setEditorDisponivel(ok)
+      if (!ok && salva !== 'editor') setAba('perfil')
+    }
+    if (!servidor) return aplicar(false)
+    // O servidor do editor só conta como no ar se responder à checagem de saúde
+    fetch(`${servidor.replace(/\/$/, '')}/api/editor-massa/saude`, { signal: AbortSignal.timeout(8000) })
+      .then(r => aplicar(r.ok))
+      .catch(() => aplicar(false))
   }, [])
 
   function trocar(nova: Aba) {
@@ -60,7 +75,24 @@ export default function EdicaoEmMassaPage() {
         <span />
       </header>
 
-      {aba === 'editor' ? (
+      {aba === 'editor' && !editorDisponivel ? (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md text-center space-y-3 bg-white/[0.02] border border-white/[0.08] rounded-2xl p-6">
+            <Film className="w-8 h-8 text-indigo-400 mx-auto" />
+            <h2 className="text-sm font-semibold text-white">O editor de vídeos está sendo ativado</h2>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              O servidor que processa os vídeos ainda não foi publicado. Enquanto isso, use a aba “Baixar de um perfil”.
+            </p>
+            <button
+              type="button"
+              onClick={() => trocar('perfil')}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white text-xs font-semibold"
+            >
+              Ir para Baixar de um perfil
+            </button>
+          </div>
+        </div>
+      ) : aba === 'editor' ? (
         <div className="flex-1 min-h-0">
           <EditorMassa />
         </div>

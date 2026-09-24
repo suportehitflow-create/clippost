@@ -9,6 +9,8 @@ kill_timeout = 300
 
 [env]
   SUPABASE_URL = "https://alntulecjshpbrhesaoo.supabase.co"
+  # Chave publicável (a mesma que vai no navegador) — só valida o login do usuário
+  SUPABASE_ANON_KEY = "sb_publishable_bPRyNHzjwbI8TrVdke62LQ_HSY5wu3s"
   EDITOR_MASSA_CONCURRENCIA = "2"
   EDITOR_MASSA_PRESET = "veryfast"
   EDITOR_MASSA_RETENCAO_HORAS = "24"

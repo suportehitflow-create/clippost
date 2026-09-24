@@ -13,6 +13,7 @@ import { Icone } from './icones';
 import Inspetor from './Inspetor';
 import Lateral from './Lateral';
 import { GavetaLog, ModalConcluido, PainelResultados } from './Paineis';
+import ImportarPerfil from './ImportarPerfil';
 import s from './editor-massa.module.css';
 
 type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string } | null;
@@ -60,6 +61,7 @@ export default function EditorMassa() {
   const [status, setStatus] = useState('Pronto');
   const [resultados, setResultados] = useState<ResultadoJob[]>([]);
   const [sobre, setSobre] = useState<Sobreposicao>(null);
+  const [importarAberto, setImportarAberto] = useState(false);
   const [logAberto, setLogAberto] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [gatilhoAnalise, setGatilhoAnalise] = useState(0);
@@ -628,6 +630,9 @@ export default function EditorMassa() {
         </nav>
 
         <div className={s.barraDireita}>
+          <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => setImportarAberto(true)} title="Baixar vídeos de um perfil do Instagram, TikTok, Facebook ou YouTube">
+            <Icone nome="mais" tamanho={14} /> Importar perfil
+          </button>
           <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => setSobre({ tipo: 'resultados' })}>
             <Icone nome="pasta" /> Prontos {prontos > 0 && <span className={s.contador}>{prontos}</span>}
           </button>
@@ -750,6 +755,7 @@ export default function EditorMassa() {
         />
       )}
       {toast && <div className={s.toast}>{toast}</div>}
+      {importarAberto && <ImportarPerfil fechar={() => setImportarAberto(false)} aoArquivos={adicionarVideos} />}
 
       <input
         ref={inputVideos}

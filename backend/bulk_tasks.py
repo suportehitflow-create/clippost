@@ -278,6 +278,17 @@ def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> d
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict) -> dict:
+    """Importação para o Editor em Massa: só baixa o vídeo e deixa no Storage (a edição é no editor)."""
+    tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_import_"))
+    try:
+        video_path, _info = _download(item["url"], tmp_dir)
+        url = _upload_clip_to_storage(f"{user_id}/imports/{batch_id}/{idx + 1}.mp4", _recompress_if_needed(video_path))
+        return {"status": "done", "file_url": url}
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def run_batch(batch_id: str, req: dict):
     user_id = req["user_id"]
     options = req.get("options") or {}
@@ -302,9 +313,18 @@ def run_batch(batch_id: str, req: dict):
             items = copy.deepcopy(_batches[batch_id]["items"])
         _set_batch(batch_id, status="processing")
 
-        brand_kit = _load_brand_kit(user_id, req.get("template_config"))
+        download_only = bool(options.get("download_only"))
+        brand_kit = {} if download_only else _load_brand_kit(user_id, req.get("template_config"))
         for idx, item in enumerate(items):
             if item.get("status") in ("done", "failed"):
+                continue
+            if download_only:
+                _set_item(batch_id, idx, status="processing")
+                try:
+                    _set_item(batch_id, idx, **_download_only_item(user_id, batch_id, idx, item))
+                except Exception as e:
+                    print(f"[bulk] importação {idx} falhou: {e}")
+                    _set_item(batch_id, idx, status="failed", error=str(e)[:300])
                 continue
             try:
                 check_clip_limit(user_id)
