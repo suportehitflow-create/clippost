@@ -206,6 +206,12 @@ def _cookies_args(platform: str) -> list[str]:
     return ["--cookies", path] if path and os.path.exists(path) else []
 
 
+def _proxy_args() -> list[str]:
+    """Proxy residencial opcional (YTDLP_PROXY) para contornar bloqueio de IP de datacenter."""
+    proxy = os.environ.get("YTDLP_PROXY")
+    return ["--proxy", proxy] if proxy else []
+
+
 def normalize_profile_url(raw: str) -> str:
     raw = raw.strip()
     if raw.startswith("http"):
@@ -247,7 +253,7 @@ def _entry_to_video(e: dict) -> dict | None:
 def _enrich(video: dict, cookies: list[str]) -> dict:
     """Metadados completos de um vídeo (a listagem 'flat' às vezes não traz curtidas/views)."""
     try:
-        r = subprocess.run(["yt-dlp", "-j", "--no-playlist", "--no-warnings", *cookies, video["url"]],
+        r = subprocess.run(["yt-dlp", "-j", "--no-playlist", "--no-warnings", *cookies, *_proxy_args(), video["url"]],
                            capture_output=True, text=True, timeout=60)
         if r.returncode == 0:
             full = _entry_to_video(json.loads(r.stdout)) or {}
@@ -321,7 +327,7 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views") ->
 
     scan = limit if (sort_by == "date" and limit) else _MAX_PROFILE_SCAN
     cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
-           "--playlist-end", str(scan), *cookies, url]
+           "--playlist-end", str(scan), *cookies, *_proxy_args(), url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
     videos: list[dict] = []

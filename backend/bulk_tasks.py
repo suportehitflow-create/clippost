@@ -163,6 +163,8 @@ def _download(url: str, tmp_dir: Path) -> tuple[str, dict]:
     cookies = _cookies_args(detect_platform(url))
     if cookies:
         opts["cookiefile"] = cookies[1]
+    if os.environ.get("YTDLP_PROXY"):
+        opts["proxy"] = os.environ["YTDLP_PROXY"]
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True) or {}
     files = sorted(tmp_dir.glob("source.*"), key=lambda p: p.stat().st_size, reverse=True)

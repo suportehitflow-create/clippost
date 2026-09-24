@@ -740,6 +740,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 },
             },
             **({"cookiefile": cookies_file} if cookies_file and os.path.exists(cookies_file) else {}),
+            # Proxy residencial opcional: IPs de datacenter (Fly) são bloqueados pelo YouTube
+            **({"proxy": os.environ["YTDLP_PROXY"]} if os.environ.get("YTDLP_PROXY") else {}),
         }
 
         # Download unificado: baixa o vídeo e legendas simultaneamente no mesmo request
