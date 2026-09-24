@@ -238,6 +238,7 @@ async def recover_stuck_projects():
     import asyncio
     _setup_youtube_cookies()
     _setup_platform_cookies()
+    _restore_cookies_from_storage()
     await _mark_stuck_projects("startup")
     await _cleanup_old_projects()
     asyncio.create_task(_periodic_recovery_loop())
@@ -301,6 +302,27 @@ try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception:
     supabase = None
+
+def _restore_cookies_from_storage():
+    """Restaura cookies salvos no Supabase Storage para /tmp na inicialização do servidor."""
+    try:
+        import os
+        from pathlib import Path
+        if not supabase:
+            return
+        for platform in ("instagram", "youtube", "tiktok", "facebook"):
+            target_path = Path(f"/tmp/{platform}_cookies.txt")
+            try:
+                raw_bytes = supabase.storage.from_("videos").download(f"_config/{platform}_cookies.txt")
+                if raw_bytes and len(raw_bytes) > 10:
+                    target_path.write_bytes(raw_bytes)
+                    os.environ[f"{platform.upper()}_COOKIES_FILE"] = str(target_path)
+                    print(f"[startup] cookies do {platform} restaurados do Supabase Storage ({len(raw_bytes)} bytes)")
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[startup] aviso na restauração de cookies: {e}")
+
 
 
 class ProcessRequest(BaseModel):
@@ -749,6 +771,56 @@ async def active_jobs():
     """Quantos cortes estão rodando agora — usado pelo deploy.ps1 antes de publicar."""
     jobs = _active_jobs_snapshot()
     return {"active": len(jobs), "jobs": jobs}
+
+
+@app.post("/api/admin/set-instagram-cookies")
+async def set_instagram_cookies(request: Request):
+    """Carrega cookies do Instagram via HTTP e persiste no Supabase Storage."""
+    body = await request.json()
+    cookies_raw = body.get("cookies", "") or body.get("cookies_b64", "")
+    if not cookies_raw.strip():
+        raise HTTPException(status_code=400, detail="cookies ou cookies_b64 é obrigatório")
+    try:
+        import base64
+        if body.get("cookies_b64"):
+            raw = base64.b64decode(cookies_raw).decode("utf-8", errors="replace")
+        else:
+            raw = cookies_raw
+        cookies_path = "/tmp/instagram_cookies.txt"
+        with open(cookies_path, "w", encoding="utf-8") as f:
+            f.write(raw)
+        os.environ["INSTAGRAM_COOKIES_FILE"] = cookies_path
+        
+        # Persiste no bucket videos para não perder ao reiniciar a máquina
+        try:
+            if supabase:
+                supabase.storage.from_("videos").upload(
+                    "_config/instagram_cookies.txt",
+                    raw.encode("utf-8"),
+                    file_options={"content-type": "text/plain", "upsert": "true"}
+                )
+                print(f"[admin] cookies do Instagram persistidos no Supabase Storage")
+        except Exception as st_err:
+            print(f"[admin] aviso ao persistir cookies no storage: {st_err}")
+
+        return {"ok": True, "bytes_written": len(raw), "path": cookies_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"falha ao salvar cookies do Instagram: {e}")
+
+
+@app.get("/api/admin/instagram-cookies-status")
+async def instagram_cookies_status():
+    """Verifica se cookies do Instagram estão carregados."""
+    cookies_path = os.environ.get("INSTAGRAM_COOKIES_FILE", "/tmp/instagram_cookies.txt")
+    import pathlib
+    p = pathlib.Path(cookies_path)
+    exists = p.exists()
+    size = p.stat().st_size if exists else 0
+    return {
+        "cookies_file_exists": exists,
+        "cookies_file_size_bytes": size,
+        "cookies_path": cookies_path,
+    }
 
 
 @app.post("/api/admin/set-youtube-cookies")

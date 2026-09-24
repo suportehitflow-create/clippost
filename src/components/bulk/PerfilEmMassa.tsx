@@ -101,6 +101,10 @@ export default function PerfilEmMassa() {
 
   const [source] = useState<Source>('profile')
   const [files, setFiles] = useState<File[]>([])
+  const [showCookieModal, setShowCookieModal] = useState(false)
+  const [cookieInput, setCookieInput] = useState('')
+  const [savingCookies, setSavingCookies] = useState(false)
+  const [cookieMsg, setCookieMsg] = useState('')
   const [profileUrl, setProfileUrl] = useState('')
   const [count, setCount] = useState(10)
   const [sortBy, setSortBy] = useState<SortBy>('views')
@@ -156,6 +160,34 @@ export default function PerfilEmMassa() {
     if (!list) return
     setFiles(prev => [...prev, ...Array.from(list).filter(f => f.type.startsWith('video/'))])
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+
+  async function handleSaveCookies() {
+    if (!cookieInput.trim()) return
+    setSavingCookies(true)
+    setCookieMsg('')
+    try {
+      const res = await fetch('/api/social/instagram-cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookies: cookieInput.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setCookieMsg('Cookies do Instagram salvos com sucesso no servidor! Tente baixar o perfil novamente.')
+        setTimeout(() => {
+          setShowCookieModal(false)
+          setCookieMsg('')
+        }, 2000)
+      } else {
+        setCookieMsg(data.error || 'Falha ao salvar cookies.')
+      }
+    } catch (e: any) {
+      setCookieMsg('Erro de conexão ao salvar cookies.')
+    } finally {
+      setSavingCookies(false)
+    }
   }
 
   async function start() {
@@ -287,7 +319,39 @@ export default function PerfilEmMassa() {
               )}
 
               {batch?.status === 'failed' && batch.error && (
-                <p className="text-xs text-zinc-300 bg-white/[0.03] border border-white/[0.08] rounded-xl p-3 leading-relaxed">{batch.error}</p>
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <strong className="text-white block text-sm font-semibold">O Instagram bloqueia a listagem automática de perfis sem login (Erro 429).</strong>
+                      <p className="text-zinc-300 leading-relaxed text-xs">
+                        Para proteger as contas, o Instagram exige cookies de autenticação para listar páginas inteiras a partir do servidor. Escolha uma das soluções abaixo:
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { localStorage.setItem('clippost_bulk_aba', 'editor') } catch {}
+                        window.location.reload()
+                      }}
+                      className="p-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-left transition-all cursor-pointer"
+                    >
+                      <span className="font-semibold text-white block text-xs">📁 Enviar Arquivos no Editor</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Arraste os vídeos baixados no seu PC para aplicar o template sem nenhum bloqueio.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCookieModal(true)}
+                      className="p-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-left transition-all cursor-pointer"
+                    >
+                      <span className="font-semibold text-indigo-300 block text-xs">🍪 Conectar Cookies do Instagram</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Cole os cookies para liberar o download automático direto do perfil no servidor.</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 font-mono pt-1">Detalhes técnicos: {batch.error}</p>
+                </div>
               )}
             </div>
 
@@ -345,19 +409,31 @@ export default function PerfilEmMassa() {
             {source === 'profile' ? (
               <section className="space-y-5">
                 <div className="space-y-2">
-                  <label htmlFor="bulk-profile" className="text-xs font-medium text-zinc-300">Link do perfil</label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="bulk-profile" className="text-xs font-medium text-zinc-300">
+                      Link do perfil ou Links diretos de Reels/Vídeos
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCookieModal(true)}
+                      className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      🍪 Cookies do Instagram
+                    </button>
+                  </div>
                   <div className="relative">
-                    <Link2 className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
+                    <textarea
                       id="bulk-profile"
-                      type="text"
+                      rows={2}
                       value={profileUrl}
                       onChange={e => setProfileUrl(e.target.value)}
-                      placeholder="instagram.com/perfil, tiktok.com/@perfil, facebook.com/pagina…"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                      placeholder="Cole o link do perfil (ex: instagram.com/perfil) OU múltiplos links de Reels (um por linha)..."
+                      className="w-full p-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                     />
                   </div>
-                  <p className="text-[11px] text-zinc-500">Baixamos os vídeos do perfil e editamos cada um com o seu template.</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Você pode colar o perfil inteiro (TikTok, YouTube, Instagram) ou uma lista de links de Reels individuais.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -509,6 +585,65 @@ export default function PerfilEmMassa() {
           </>
         )}
       </div>
+    
+      {/* MODAL DE COOKIES DO INSTAGRAM */}
+      {showCookieModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121218] border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🍪</span>
+                <h3 className="text-sm font-bold text-white">Conectar Cookies do Instagram</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCookieModal(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.06] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              O Instagram exige login para robôs listarem perfis completos sem o erro 429. Cole o conteúdo do arquivo <code>cookies.txt</code> do seu navegador (exportado via extensão como <em>Get cookies.txt LOCALLY</em>) abaixo:
+            </p>
+
+            <textarea
+              rows={6}
+              value={cookieInput}
+              onChange={e => setCookieInput(e.target.value)}
+              placeholder="# Netscape HTTP Cookie File&#10;.instagram.com	TRUE	/	TRUE	...	sessionid	..."
+              className="w-full p-3 rounded-xl bg-[#09090c] border border-white/[0.1] text-zinc-200 text-[11px] font-mono placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+            />
+
+            {cookieMsg && (
+              <p className={`text-xs p-2.5 rounded-lg ${cookieMsg.includes('sucesso') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {cookieMsg}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCookieModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCookies}
+                disabled={savingCookies || !cookieInput.trim()}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
+              >
+                {savingCookies ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>Salvar Cookies no Servidor</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

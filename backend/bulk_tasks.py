@@ -297,9 +297,28 @@ def run_batch(batch_id: str, req: dict):
             already_listed = bool(_batches.get(batch_id, {}).get("items"))
         if not already_listed:
             if req.get("source") == "profile":
-                listing = list_profile_videos(req.get("profile_url") or "", int(req.get("limit") or 0), req.get("sort_by") or "views")
-                videos = listing["videos"]
-                _set_batch(batch_id, profile_url=listing["profile_url"], platform=listing["platform"])
+                raw_input = (req.get("profile_url") or "").strip()
+                # Suporte a múltiplos links de Reels/Vídeos colados de uma vez (um por linha ou vírgula)
+                direct_links = [l.strip() for l in raw_input.splitlines() if l.strip().startswith("http")]
+                if len(direct_links) > 1 or (len(direct_links) == 1 and any(k in direct_links[0] for k in ("/reel/", "/p/", "/shorts/", "watch?v=", "/video/"))):
+                    videos = [{"url": u, "title": f"Vídeo {i+1}", "platform": detect_platform(u)} for i, u in enumerate(direct_links)]
+                    _set_batch(batch_id, profile_url=raw_input[:100], platform=videos[0]["platform"])
+                else:
+                    try:
+                        listing = list_profile_videos(raw_input, int(req.get("limit") or 0), req.get("sort_by") or "views")
+                        videos = listing["videos"]
+                        _set_batch(batch_id, profile_url=listing["profile_url"], platform=listing["platform"])
+                    except Exception as e:
+                        err_str = str(e)
+                        if "429" in err_str or "exigir login" in err_str or "Too Many Requests" in err_str:
+                            clean_err = (
+                                f"O Instagram bloqueou a listagem automática do perfil {raw_input} (Erro 429: limite de requisições sem login). "
+                                "DICA: Você pode colar os links diretos dos Reels (um por linha) ou usar a aba 'Editor de vídeos' para enviar os arquivos MP4 diretamente sem nenhum bloqueio!"
+                            )
+                        else:
+                            clean_err = err_str
+                        _set_batch(batch_id, status="failed", error=clean_err)
+                        return
             else:
                 videos = req.get("videos") or []
             with _batches_lock:
