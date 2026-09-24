@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Home,
   Scissors,
   Flame,
   PenTool,
@@ -17,6 +18,7 @@ import { useHorizontalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
+  { label: 'Início', href: '/inicio', icon: Home },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
   { label: 'Radar Viral', href: '/trends', icon: Flame },
   { label: 'Roteiros IA', href: '/creator', icon: PenTool },
@@ -51,7 +53,7 @@ export default function Sidebar({ user }: { user: User }) {
     >
       {/* Logo / Home */}
       <Link
-        href="/dashboard"
+        href="/inicio"
         title="Clipost - Início"
         className="w-10 h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer mr-0.5"
       >

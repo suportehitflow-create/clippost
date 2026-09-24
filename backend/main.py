@@ -644,6 +644,41 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}
 
 
+class BulkStartRequest(BaseModel):
+    user_id: str
+    source: str  # "profile" | "files"
+    profile_url: str | None = None
+    limit: int = 0  # 0 = todos os vídeos do perfil
+    sort_by: str = "views"  # views | likes | engagement | date
+    videos: list[dict] = []  # [{url, title}] quando source == "files"
+    template_config: dict | None = None
+    options: dict = {}
+
+
+@app.post("/api/bulk/start")
+async def bulk_start(req: BulkStartRequest, background_tasks: BackgroundTasks):
+    """Edição em massa: aplica o template em cada vídeo inteiro de um perfil ou dos arquivos enviados."""
+    from bulk_tasks import create_batch, run_batch
+    if req.source == "profile" and not (req.profile_url or "").strip():
+        raise HTTPException(status_code=400, detail="Informe o link do perfil.")
+    if req.source == "files" and not req.videos:
+        raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
+    if req.source not in ("profile", "files"):
+        raise HTTPException(status_code=400, detail="Fonte inválida.")
+    batch_id = create_batch(req.user_id, req.source)
+    background_tasks.add_task(_run_tracked, "bulk", run_batch, batch_id, req.model_dump())
+    return {"batch_id": batch_id, "status": "started"}
+
+
+@app.get("/api/bulk/{batch_id}")
+async def bulk_status(batch_id: str, user_id: str):
+    from bulk_tasks import get_batch
+    batch = get_batch(batch_id)
+    if not batch or batch["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Lote não encontrado (o servidor pode ter reiniciado).")
+    return batch
+
+
 @app.get("/api/admin/active-jobs")
 async def active_jobs():
     """Quantos cortes estão rodando agora — usado pelo deploy.ps1 antes de publicar."""

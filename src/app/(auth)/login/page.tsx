@@ -25,7 +25,7 @@ export default function LoginPage() {
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (active && user) {
-        window.location.href = '/dashboard'
+        window.location.href = '/inicio'
       }
     })
     return () => { active = false }
@@ -37,7 +37,7 @@ export default function LoginPage() {
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError(error.message); setLoading(false); return }
-    window.location.href = '/dashboard'
+    window.location.href = '/inicio'
   }
 
   async function handleGoogle() {
@@ -80,7 +80,7 @@ export default function LoginPage() {
         }
       }
 
-      window.location.href = '/dashboard'
+      window.location.href = '/inicio'
     } catch (err: any) {
       console.error('Erro no login de teste:', err)
       setError(err.message || 'Falha ao autenticar conta de teste.')

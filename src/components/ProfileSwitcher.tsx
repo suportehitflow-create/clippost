@@ -22,7 +22,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   youtube_shorts: '▶️',
 }
 
-export default function ProfileSwitcher({ userId: userIdProp }: { userId?: string }) {
+export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }: { userId?: string; align?: 'right' | 'center' }) {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(userIdProp || null)
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
@@ -142,7 +142,9 @@ export default function ProfileSwitcher({ userId: userIdProp }: { userId?: strin
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-60 bg-[#13141a] border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 z-50 overflow-hidden">
+        <div className={`absolute top-full mt-2 w-60 bg-[#13141a] border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 z-50 overflow-hidden ${
+          align === 'center' ? 'left-1/2 -translate-x-1/2' : 'right-0'
+        }`}>
           {accounts.length > 0 && (
             <>
               <div className="px-3 pt-3 pb-1">
@@ -174,16 +176,14 @@ export default function ProfileSwitcher({ userId: userIdProp }: { userId?: strin
               <div className="border-t border-white/[0.06]" />
             </>
           )}
-          <div className="p-2 space-y-0.5">
+          <div className="p-2 space-y-1">
             <button
               onClick={connectAccount}
               disabled={connecting}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white transition-all cursor-pointer disabled:opacity-50"
             >
-              <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-3.5 h-3.5 text-indigo-400" />
-              </div>
-              <span className="text-xs font-semibold text-zinc-300">
+              <Plus className="w-3.5 h-3.5" />
+              <span className="text-xs font-semibold">
                 {connecting ? 'Redirecionando...' : 'Adicionar conta'}
               </span>
             </button>

@@ -589,6 +589,75 @@ def _download_via_piped(url: str, tmp_dir: Path) -> tuple[str, dict]:
     return str(merged_path), {}
 
 
+def transcribe_media(video_path: str, audio_path: str) -> dict:
+    """Transcrição com tempo por palavra: Groq Whisper; se falhar, Whisper tiny local.
+    Retorna {"segments": [...], "words": [...]} (listas vazias se o vídeo não tiver fala)."""
+    # 64kbps mono mantém o arquivo abaixo do limite de 25MB da API do Groq
+    subprocess.run([
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k", "-f", "mp3",
+        audio_path,
+    ], check=True, capture_output=True, timeout=300)
+
+    audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
+    if audio_size_mb > 24:
+        print(f"[transcricao] áudio {audio_size_mb:.1f}MB > 24MB, recomprimindo...")
+        audio_compressed = audio_path.replace(".mp3", "_small.mp3")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", audio_path,
+            "-b:a", "32k", "-f", "mp3", audio_compressed,
+        ], check=True, capture_output=True, timeout=120)
+        audio_path = audio_compressed
+        audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
+
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if groq_key and audio_size_mb <= 24.9:
+        print(f"[transcricao] Groq Whisper ({audio_size_mb:.1f}MB)...")
+        try:
+            with open(audio_path, "rb") as af:
+                audio_bytes = af.read()
+            resp = httpx.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {groq_key}"},
+                files=[
+                    ("model", (None, "whisper-large-v3-turbo")),
+                    ("response_format", (None, "verbose_json")),
+                    ("timestamp_granularities[]", (None, "word")),
+                    ("timestamp_granularities[]", (None, "segment")),
+                    ("file", (Path(audio_path).name, audio_bytes, "audio/mpeg")),
+                ],
+                timeout=120.0,
+            )
+            resp.raise_for_status()
+            groq_result = resp.json()
+            segments = [
+                {"start": s["start"], "end": s["end"], "text": s["text"]}
+                for s in groq_result.get("segments", [])
+            ]
+            words = [
+                {"start": w["start"], "end": w["end"], "word": w["word"]}
+                for w in groq_result.get("words", [])
+            ]
+            if segments:
+                print(f"[transcricao] Groq Whisper OK — {len(segments)} segmentos")
+                return {"segments": segments, "words": words}
+            print("[transcricao] Groq retornou 0 segmentos, usando Whisper local")
+        except Exception as groq_err:
+            print(f"[transcricao] Groq Whisper falhou: {groq_err}, usando Whisper local")
+
+    from faster_whisper import WhisperModel
+    print("[transcricao] iniciando Whisper tiny local...")
+    model = WhisperModel("tiny", device="cpu", compute_type="int8")
+    fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+    segments, words = [], []
+    for seg in fw_segments_gen:
+        segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
+        for w in seg.words or []:
+            words.append({"start": w.start, "end": w.end, "word": w.word})
+    print(f"[transcricao] Whisper concluído — {len(segments)} segmentos")
+    return {"segments": segments, "words": words}
+
+
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = False, template_config: dict | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
@@ -850,82 +919,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 3. Transcrição: Sempre usa Groq Whisper com timestamps acústicos precisos por palavra
         _set_step(project_id, "transcricao")
         print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
-        transcript_data = None
-        if True:
-            print(f"[pipeline] sem legendas nativas — extraindo áudio para transcrição...")
-            # Usa 64kbps mono para manter arquivo <25MB (limite Groq Whisper API)
-            subprocess.run([
-                "ffmpeg", "-y", "-i", video_path,
-                "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k", "-f", "mp3",
-                audio_path,
-            ], check=True, capture_output=True, timeout=300)
-
-            # Comprime mais se arquivo ainda > 24MB (vídeos muito longos)
-            audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
-            if audio_size_mb > 24:
-                print(f"[pipeline] áudio {audio_size_mb:.1f}MB > 24MB, recomprimindo...")
-                audio_compressed = audio_path.replace(".mp3", "_small.mp3")
-                subprocess.run([
-                    "ffmpeg", "-y", "-i", audio_path,
-                    "-b:a", "32k", "-f", "mp3", audio_compressed,
-                ], check=True, capture_output=True, timeout=120)
-                audio_path = audio_compressed
-                audio_size_mb = Path(audio_path).stat().st_size / (1024 * 1024)
-
-            groq_key = os.environ.get("GROQ_API_KEY", "")
-            transcript_data = None
-
-            if groq_key and audio_size_mb <= 24.9:
-                print(f"[pipeline] transcrição Groq Whisper ({audio_size_mb:.1f}MB)...")
-                try:
-                    with open(audio_path, "rb") as af:
-                        audio_bytes = af.read()
-                    resp = httpx.post(
-                            "https://api.groq.com/openai/v1/audio/transcriptions",
-                            headers={"Authorization": f"Bearer {groq_key}"},
-                            files=[
-                                ("model", (None, "whisper-large-v3-turbo")),
-                                ("response_format", (None, "verbose_json")),
-                                ("timestamp_granularities[]", (None, "word")),
-                                ("timestamp_granularities[]", (None, "segment")),
-                                ("file", (Path(audio_path).name, audio_bytes, "audio/mpeg")),
-                            ],
-                            timeout=120.0,
-                        )
-                    resp.raise_for_status()
-                    groq_result = resp.json()
-                    segments = [
-                        {"start": s["start"], "end": s["end"], "text": s["text"]}
-                        for s in groq_result.get("segments", [])
-                    ]
-                    words = [
-                        {"start": w["start"], "end": w["end"], "word": w["word"]}
-                        for w in groq_result.get("words", [])
-                    ]
-                    if segments:
-                        transcript_data = {"segments": segments, "words": words}
-                        print(f"[pipeline] Groq Whisper OK — {len(segments)} segmentos")
-                    else:
-                        print(f"[pipeline] Groq retornou 0 segmentos, usando Whisper local")
-                except Exception as groq_err:
-                    print(f"[pipeline] Groq Whisper falhou: {groq_err}, usando Whisper local")
-
-            if not transcript_data or not transcript_data.get("segments"):
-                from faster_whisper import WhisperModel
-                print(f"[pipeline] iniciando Whisper tiny local...")
-                model = WhisperModel("tiny", device="cpu", compute_type="int8")
-                fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
-                fw_segments = list(fw_segments_gen)
-                print(f"[pipeline] Whisper concluído — {len(fw_segments)} segmentos transcritos")
-                segments = []
-                words = []
-                for seg in fw_segments:
-                    segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
-                    if seg.words:
-                        for w in seg.words:
-                            words.append({"start": w.start, "end": w.end, "word": w.word})
-                transcript_data = {"segments": segments, "words": words}
-
+        transcript_data = transcribe_media(video_path, audio_path)
 
         chapters = info.get("chapters") or []
         transcript_data["chapters"] = chapters
@@ -942,6 +936,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             "title": title,
             "status": "processing",
         }
+        # Arquivo enviado: o nome gravado pela tela vale mais que o "original" que o yt-dlp devolve
+        if project_id and "/storage/v1/object/" in url:
+            project_data.pop("title")
         if project_id:
             supabase.table("projects").update(project_data).eq("id", project_id).execute()
         else:

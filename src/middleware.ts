@@ -28,6 +28,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/signup')
 
   const isProtected = request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/inicio') ||
+    request.nextUrl.pathname.startsWith('/trends') ||
+    request.nextUrl.pathname.startsWith('/creator') ||
+    request.nextUrl.pathname.startsWith('/settings') ||
     request.nextUrl.pathname.startsWith('/upload') ||
     request.nextUrl.pathname.startsWith('/project') ||
     request.nextUrl.pathname.startsWith('/schedule') ||
@@ -42,7 +46,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isAuth) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/inicio', request.url))
   }
 
   return supabaseResponse

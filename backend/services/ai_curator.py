@@ -422,3 +422,21 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
             print(f"[ai_curator] erro ao validar clipe: {parse_err}")
 
     return validated
+
+
+def generate_hook_title(transcript_text: str, original_title: str = "") -> str:
+    """Título-gancho em MAIÚSCULAS para um vídeo curto inteiro (edição em massa)."""
+    fallback = re.sub(r"[#@]\S+", "", original_title or "").strip().upper()[:60]
+    text = (transcript_text or "").strip()[:4000]
+    if not text and not fallback:
+        return ""
+    prompt = f"""Escreva UM título-gancho viral em português para este vídeo curto de Reels/TikTok.
+Regras: MAIÚSCULAS, no máximo 60 caracteres, sem hashtags, sem emojis, sem aspas.
+Provoque curiosidade ou emoção, como quem quer parar o dedo de quem rola o feed.
+Responda apenas com o título.
+
+Legenda original: {original_title[:300]}
+Transcrição: {text or "(sem fala)"}"""
+    raw = _try_providers(prompt)
+    title = re.sub(r"[\"'*#`]", "", (raw or "").strip().splitlines()[0] if raw else "").strip().upper()
+    return title[:60] if title else fallback
