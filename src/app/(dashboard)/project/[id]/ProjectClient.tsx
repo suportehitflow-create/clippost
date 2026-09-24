@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { SweepStepper } from '@/components/ui/SweepStepper'
@@ -1677,20 +1677,29 @@ export default function ProjectClient({
             )}
 
             {/* Botões de Ação Imediata (Limpos e Diretos) */}
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => handleDownloadSingleClip(activeClip, selectedClipIndex)}
                 disabled={!activeClip.storage_url || downloadingClipId === activeClip.id}
-                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                className="py-2.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 {downloadingClipId === activeClip.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Download className="w-3.5 h-3.5" />
                 )}
-                <span>{downloadingClipId === activeClip.id ? "Baixando..." : "Baixar Vídeo"}</span>
+                <span>{downloadingClipId === activeClip.id ? "Baixando..." : "Baixar"}</span>
               </button>
+
+              <Link
+                href={`/clips/${activeClip.id}`}
+                className="py-2.5 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
+                title="Editar legendas, palavras e timing deste clipe"
+              >
+                <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Legendas</span>
+              </Link>
 
               <button
                 type="button"
@@ -1698,15 +1707,15 @@ export default function ProjectClient({
                   title: displayedTitle,
                   url: activeClip.storage_url || project.raw_video_url || (typeof window !== 'undefined' ? window.location.href : '')
                 })}
-                className="py-2.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-2.5 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
                 <span>P/ Celular</span>
               </button>
 
               <Link
-                href="/schedule"
-                className="py-2.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
+                href={`/schedule?clipId=${activeClip.id}`}
+                className="py-2.5 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
               >
                 <Calendar className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Agendar</span>
@@ -2038,13 +2047,26 @@ export default function ProjectClient({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Link
+                        href={`/clips/${c.id}`}
+                        className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all"
+                        title="Editar legendas e palavras deste corte"
+                      >
+                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                      </Link>
+
+                      <Link
+                        href={`/schedule?clipId=${c.id}`}
+                        className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all"
+                        title="Agendar este corte"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                      </Link>
+
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDownloadSingleClip(c, i)
-                        }}
+                        onClick={() => handleDownloadSingleClip(c, i)}
                         disabled={!c.storage_url || downloadingClipId === c.id}
                         className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all cursor-pointer disabled:opacity-50"
                         title="Baixar este corte"

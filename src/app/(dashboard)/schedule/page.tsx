@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Calendar,
@@ -51,8 +52,11 @@ interface ScheduledPost {
   clips?: { title: string; storage_url: string } | null
 }
 
-export default function SchedulePageV2() {
+function SchedulePageContent() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const queryClipId = searchParams.get('clipId')
+
   const [userId, setUserId] = useState<string | null>(null)
   const [clips, setClips] = useState<Clip[]>([])
   const [posts, setPosts] = useState<ScheduledPost[]>([])
@@ -90,9 +94,23 @@ export default function SchedulePageV2() {
         loadData(data.user.id).catch(err => console.warn('loadData error:', err))
       })
       .catch(() => {})
-  }, [])
+  }, [queryClipId])
 
   async function loadData(uid: string) {
+    let targetClip: Clip | null = null
+    if (queryClipId) {
+      try {
+        const { data: cData } = await supabase
+          .from('clips')
+          .select('id, title, hook, storage_url, score')
+          .eq('id', queryClipId)
+          .maybeSingle()
+        if (cData) targetClip = cData as Clip
+      } catch (err) {
+        console.warn('Erro ao buscar clipe especificado:', err)
+      }
+    }
+
     // Load generated clips
     const { data: clipsData } = await supabase
       .from('clips')
@@ -100,10 +118,21 @@ export default function SchedulePageV2() {
       .order('created_at', { ascending: false })
       .limit(10)
 
-    if (clipsData && clipsData.length > 0) {
-      setClips(clipsData as Clip[])
-      setSelectedClipId(clipsData[0].id)
-      setMediaPreviewUrl(clipsData[0].storage_url)
+    let allClips: Clip[] = (clipsData as Clip[]) || []
+    if (targetClip) {
+      if (!allClips.some(c => c.id === targetClip!.id)) {
+        allClips = [targetClip, ...allClips]
+      }
+      setClips(allClips)
+      setSelectedClipId(targetClip.id)
+      setMediaPreviewUrl(targetClip.storage_url)
+      if (targetClip.hook || targetClip.title) {
+        setCaption(`${targetClip.hook || targetClip.title} 🚀\n\nConfira esse corte completo! O que achou? Deixe nos comentários 👇\n\n#reels #shorts #corte #viral`)
+      }
+    } else if (allClips.length > 0) {
+      setClips(allClips)
+      setSelectedClipId(allClips[0].id)
+      setMediaPreviewUrl(allClips[0].storage_url)
     }
 
     // Load scheduled posts directly from Supabase (immune to CORS / 502)
@@ -633,5 +662,19 @@ export default function SchedulePageV2() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function SchedulePageV2() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-500 font-mono text-sm">
+          Carregando agendador...
+        </div>
+      }
+    >
+      <SchedulePageContent />
+    </Suspense>
   )
 }

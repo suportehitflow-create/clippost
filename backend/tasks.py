@@ -1250,9 +1250,9 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         seg_words = words or (transcript_data.get("words") if isinstance(transcript_data, dict) else None) or []
         segments = transcript_data.get("segments", []) if isinstance(transcript_data, dict) else []
 
-        # Sempre transcreve o áudio do clipe com Groq Whisper para garantir 100% de precisão acústica e sincronia
+        # Se palavras personalizadas não foram passadas pelo editor, transcreve com Groq Whisper
         groq_key = os.environ.get("GROQ_API_KEY", "")
-        if groq_key:
+        if groq_key and not words:
             try:
                 print(f"[re-render] Transcrevendo áudio do clipe via Groq Whisper ({start:.1f}s a {end:.1f}s)...")
                 clip_audio_path = str(tmp_dir / "clip_audio.mp3")

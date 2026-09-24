@@ -237,6 +237,7 @@ export default function ClipEditorPage() {
         }
 
         // Buscar projeto pai
+        let loadedProject: any = null
         if (clipData.project_id) {
           try {
             const { data: proj } = await supabase
@@ -244,19 +245,61 @@ export default function ClipEditorPage() {
               .select('*')
               .eq('id', clipData.project_id)
               .maybeSingle()
-            if (proj) setProject(proj)
+            if (proj) {
+              loadedProject = proj
+              setProject(proj)
+            }
           } catch {}
         }
 
-        // Simula ou mapeia palavras do clipe
-        const wordsArr: WordItem[] = [
-          { id: '1', word: 'O', start: (clipData.start_time || 0) + 0.1, end: (clipData.start_time || 0) + 0.4 },
-          { id: '2', word: 'SEGREDO', start: (clipData.start_time || 0) + 0.4, end: (clipData.start_time || 0) + 1.0 },
-          { id: '3', word: 'QUE', start: (clipData.start_time || 0) + 1.0, end: (clipData.start_time || 0) + 1.2 },
-          { id: '4', word: 'TODOS', start: (clipData.start_time || 0) + 1.2, end: (clipData.start_time || 0) + 1.6 },
-          { id: '5', word: 'ESPERAVAM', start: (clipData.start_time || 0) + 1.6, end: (clipData.start_time || 0) + 2.3 }
-        ]
-        setWords(wordsArr)
+        // Carrega palavras reais da transcrição do projeto dentro do intervalo [start_time, end_time]
+        let clipWords: WordItem[] = []
+        const transcript = loadedProject?.transcript
+        if (transcript) {
+          let rawWords: any[] = []
+          if (Array.isArray(transcript.words) && transcript.words.length > 0) {
+            rawWords = transcript.words
+          } else if (Array.isArray(transcript.segments)) {
+            for (const seg of transcript.segments) {
+              if (Array.isArray(seg.words)) {
+                rawWords.push(...seg.words)
+              }
+            }
+          }
+
+          if (rawWords.length > 0) {
+            const cStart = typeof clipData.start_time === 'number' ? clipData.start_time : parseFloat(clipData.start_time) || 0
+            const cEnd = typeof clipData.end_time === 'number' ? clipData.end_time : (cStart + 60)
+            clipWords = rawWords
+              .filter((w: any) => {
+                const s = typeof w.start === 'number' ? w.start : parseFloat(w.start) || 0
+                const e = typeof w.end === 'number' ? w.end : parseFloat(w.end) || s
+                return e >= (cStart - 0.2) && s <= (cEnd + 0.2) && Boolean(String(w.word || '').trim())
+              })
+              .map((w: any, idx: number) => ({
+                id: `w-${idx}-${w.start}`,
+                word: String(w.word || '').trim(),
+                start: typeof w.start === 'number' ? w.start : parseFloat(w.start) || 0,
+                end: typeof w.end === 'number' ? w.end : parseFloat(w.end) || 0,
+              }))
+          }
+        }
+
+        if (clipWords.length > 0) {
+          setWords(clipWords)
+        } else {
+          // Fallback inteligente se não houver transcrição acústica gravada
+          const baseStart = clipData.start_time || 0
+          const fallbackText = clipData.hook || clipData.title || 'Corte viral de alta retenção'
+          const split = fallbackText.split(/\s+/).filter(Boolean)
+          const step = Math.min(0.5, Math.max(0.2, ((clipData.end_time || (baseStart + 15)) - baseStart) / Math.max(split.length, 1)))
+          setWords(split.map((term: string, i: number) => ({
+            id: `fb-${i}`,
+            word: term.toUpperCase(),
+            start: baseStart + (i * step),
+            end: baseStart + ((i + 1) * step)
+          })))
+        }
       }
 
       // Buscar perfil
@@ -369,8 +412,7 @@ export default function ClipEditorPage() {
           subtitle_preset: selectedStyle,
           subtitle_y: subtitleY,
           smart_emojis: smartEmojisEnabled,
-          // pass null so backend uses the project's real transcript words
-          words: null,
+          words: words.length > 0 ? words.map(w => ({ start: w.start, end: w.end, word: w.word })) : null,
         })
       })
       if (!rerenderRes.ok) {
@@ -458,15 +500,15 @@ export default function ClipEditorPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {clip?.storage_url && (
             <button
               type="button"
               onClick={() => setShowMobileQr(true)}
-              className="px-4 py-2 text-xs font-semibold text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-purple-950/40"
+              className="px-3.5 py-2 text-xs font-semibold text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-purple-950/40"
             >
               <Smartphone className="w-3.5 h-3.5" />
-              Celular
+              <span>Celular</span>
             </button>
           )}
           {clip?.storage_url && (
@@ -474,20 +516,27 @@ export default function ClipEditorPage() {
               type="button"
               onClick={handleDownloadVideo}
               disabled={downloading}
-              className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {downloading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <Download className="w-3.5 h-3.5" />
               )}
-              <span>{downloading ? 'Baixando...' : 'Baixar Vídeo'}</span>
+              <span>{downloading ? 'Baixando...' : 'Baixar'}</span>
             </button>
           )}
+          <Link
+            href={`/schedule?clipId=${clipId}`}
+            className="px-3.5 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all flex items-center gap-1.5"
+          >
+            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Agendar</span>
+          </Link>
           <button
             onClick={handleSaveAndRerender}
             disabled={saving || isRerendering}
-            className="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-600 hover:to-purple-600 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-600 hover:to-purple-600 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
             {saving || isRerendering ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -496,7 +545,7 @@ export default function ClipEditorPage() {
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            {isRerendering ? 'Renderizando corte...' : saving ? 'Aplicando...' : savedSuccess ? 'Salvo!' : 'Salvar Alterações'}
+            {isRerendering ? 'Renderizando...' : saving ? 'Aplicando...' : savedSuccess ? 'Salvo!' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
