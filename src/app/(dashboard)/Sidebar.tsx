@@ -49,13 +49,13 @@ export default function Sidebar({ user }: { user: User }) {
       aria-label="Dock"
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
-      className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-row items-center py-2 px-3 rounded-[24px] bg-[#0c0c0f]/85 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] gap-1.5 select-none"
+      className="fixed bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-row items-center py-2 px-3 rounded-[24px] bg-[#0c0c0f]/90 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] gap-1 sm:gap-1.5 select-none max-w-[calc(100vw-1.5rem)] overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Logo / Home */}
       <Link
         href="/inicio"
         title="Clipost - Início"
-        className="w-10 h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer mr-0.5"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shrink-0 mr-0.5"
       >
         <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
           <Scissors className="w-4 h-4 text-white" />
@@ -75,7 +75,7 @@ export default function Sidebar({ user }: { user: User }) {
             key={item.href}
             href={item.href}
             ref={registerItem(index)}
-            className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+            className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
               active
                 ? 'bg-indigo-600/20 text-white shadow-sm ring-1 ring-indigo-500/30'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.05] opacity-70 hover:opacity-100'
@@ -107,13 +107,13 @@ export default function Sidebar({ user }: { user: User }) {
         )
       })}
 
-      <div className="w-px h-6 bg-white/10 mx-0.5" />
+      <div className="w-px h-6 bg-white/10 mx-0.5 shrink-0" />
 
       {/* Ajustes da Conta */}
       <Link
         href="/settings"
         ref={registerItem(NAV_ITEMS.length)}
-        className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+        className={`gdock-item group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
           pathname === '/settings'
             ? 'bg-indigo-600/20 text-white shadow-sm ring-1 ring-indigo-500/30'
             : 'text-zinc-400 hover:text-white hover:bg-white/[0.05] opacity-70 hover:opacity-100'

@@ -295,8 +295,8 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetry }: {
         {errorMessage ? (
           <div className="rounded-xl bg-black/50 border border-white/[0.08] overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Código de erro do servidor</span>
-              <span className="text-[10px] font-mono text-zinc-600" suppressHydrationWarning>{errorTime}</span>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Diagnóstico do Processamento</span>
+              <span className="text-[10px] font-mono text-zinc-500" suppressHydrationWarning>{errorTime}</span>
             </div>
             <pre className="px-3 py-3 text-[11px] font-mono text-zinc-300 break-all whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
               {errorMessage}
@@ -304,7 +304,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetry }: {
           </div>
         ) : (
           <div className="rounded-xl bg-black/40 border border-white/[0.06] px-3 py-2.5">
-            <span className="text-[11px] font-mono text-zinc-600 italic">Nenhum detalhe retornado pelo servidor. Verifique os logs do Fly.io.</span>
+            <span className="text-[11px] font-mono text-zinc-400">O servidor encontrou uma oscilação temporária na conexão. Clique em &ldquo;Tentar novamente&rdquo; para reprocessar o corte.</span>
           </div>
         )}
 

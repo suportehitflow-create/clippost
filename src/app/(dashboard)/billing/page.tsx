@@ -1,8 +1,9 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
+import { Zap, Check, CreditCard, Sparkles, ArrowLeft, ShieldCheck, ArrowRight } from 'lucide-react'
 
 interface PlanStatus {
   plan: 'free' | 'pro'
@@ -94,123 +95,200 @@ export default function BillingPage() {
   const usedPct = status ? Math.min(100, (status.clips_used / Math.max(status.clips_limit, 1)) * 100) : 0
   const resetDate = status?.period_reset ? new Date(status.period_reset).toLocaleDateString('pt-BR') : null
 
-  const card: React.CSSProperties = {
-    background: 'var(--card, #18181b)', border: '1px solid var(--card-border, #27272a)',
-    borderRadius: '0.875rem', padding: '1.5rem',
-  }
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background, #09090b)', color: 'var(--foreground, #fafafa)', fontFamily: 'system-ui, sans-serif' }}>
-      <header style={{ borderBottom: '1px solid var(--card-border, #27272a)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <Link href="/dashboard" style={{ color: 'var(--muted, #71717a)', textDecoration: 'none', fontSize: '0.85rem' }}>← Dashboard</Link>
-        <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>💳 Plano & Cobrança</span>
-      </header>
+    <div className="min-h-screen bg-[#060608] text-[#ededed] font-sans">
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <Link
+            href="/inicio"
+            className="inline-flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Voltar ao Início</span>
+          </Link>
 
-      <main style={{ maxWidth: '640px', margin: '2.5rem auto', padding: '0 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs text-zinc-400 font-mono">Faturamento Seguro Stripe</span>
+          </div>
+        </div>
 
+        {/* Page Title */}
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
+            Plano & Faturamento
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400">
+            Gerencie sua assinatura, limites mensais de cortes e faturas.
+          </p>
+        </div>
+
+        {/* Alerts */}
         {upgraded && (
-          <div style={{ ...card, borderColor: '#166534', background: '#052e16', color: '#4ade80' }}>
-            ✅ Upgrade realizado com sucesso! Bem-vindo ao Pro.
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-3">
+            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+            <span>Upgrade realizado com sucesso! Bem-vindo ao Clippost Pro.</span>
           </div>
         )}
         {canceled && (
-          <div style={{ ...card, borderColor: '#854d0e', background: '#1c1107', color: '#fbbf24' }}>
-            ⚠️ Pagamento cancelado. Você continua no plano gratuito.
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-3">
+            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+            <span>Pagamento cancelado. Nenhuma cobrança foi efetuada.</span>
           </div>
         )}
 
-        {/* Plano atual */}
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <h2 style={{ fontWeight: 700, fontSize: '1.1rem' }}>Plano atual</h2>
-            <span style={{
-              padding: '0.3rem 0.85rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 700,
-              background: isPro ? '#6366f122' : '#3f3f4622',
-              color: isPro ? '#a78bfa' : '#71717a',
-              border: `1px solid ${isPro ? '#6366f155' : '#52525b'}`,
-            }}>
-              {isPro ? '⚡ Pro' : 'Gratuito'}
-            </span>
-          </div>
-
-          {/* Barra de uso */}
-          <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-            <span style={{ color: 'var(--muted, #71717a)' }}>Clipes gerados este mês</span>
-            <span style={{ fontWeight: 600 }}>
-              {status ? `${status.clips_used} / ${isPro ? '∞' : status.clips_limit}` : '—'}
-            </span>
-          </div>
-          {!isPro && (
-            <div style={{ height: '6px', background: '#27272a', borderRadius: '999px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-              <div style={{
-                height: '100%', borderRadius: '999px', transition: 'width 0.4s',
-                width: `${usedPct}%`,
-                background: usedPct >= 100 ? '#ef4444' : usedPct >= 66 ? '#a1a1aa' : '#6366f1',
-              }} />
+        {/* Current Plan Card */}
+        <div className="bg-[#0e0e13]/80 backdrop-blur-xl border border-white/[0.08] rounded-3xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs text-zinc-500 uppercase tracking-wider font-mono">Assinatura Atual</span>
+                <h3 className="text-lg font-bold text-white">
+                  {isPro ? 'Plano Pro Unlimited' : 'Plano Gratuito (Starter)'}
+                </h3>
+              </div>
             </div>
-          )}
-          {resetDate && !isPro && (
-            <p style={{ fontSize: '0.75rem', color: 'var(--muted, #71717a)' }}>Contador reseta em {resetDate}</p>
-          )}
-        </div>
 
-        {/* Cards de plano */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-
-          {/* Free */}
-          <div style={{ ...card, opacity: isPro ? 0.5 : 1 }}>
-            <p style={{ fontWeight: 700, marginBottom: '0.75rem' }}>Gratuito</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>$0<span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--muted)' }}>/mês</span></p>
-            <ul style={{ fontSize: '0.82rem', color: 'var(--muted, #71717a)', lineHeight: 2, listStyle: 'none', padding: 0 }}>
-              <li>✓ 3 clipes por mês</li>
-              <li>✓ Download MP4</li>
-              <li>✓ Qualidade 1080p</li>
-            </ul>
+            <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-semibold border ${
+              isPro
+                ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+            }`}>
+              {isPro ? '⚡ Ativo Ilimitado' : 'Modo Degustação'}
+            </span>
           </div>
 
-          {/* Pro */}
-          <div style={{ ...card, border: '1px solid #6366f166', background: isPro ? '#1a0a2e' : 'var(--card)' }}>
-            <p style={{ fontWeight: 700, marginBottom: '0.75rem', color: '#a78bfa' }}>⚡ Pro</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>$19<span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--muted)' }}>/mês</span></p>
-            <ul style={{ fontSize: '0.82rem', color: 'var(--muted, #71717a)', lineHeight: 2, listStyle: 'none', padding: 0 }}>
-              <li>✓ Clipes ilimitados</li>
-              <li>✓ Brand Kit (logo + @username)</li>
-              <li>✓ Legendas automáticas</li>
-              <li>✓ Agendamento Instagram</li>
-              <li>✓ Suporte prioritário</li>
-            </ul>
+          {/* Usage Meter */}
+          <div className="space-y-2 pt-2 border-t border-white/[0.06]">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-400">Cortes de IA gerados no ciclo</span>
+              <span className="font-semibold text-white font-mono">
+                {status ? `${status.clips_used} / ${isPro ? '∞ Ilimitado' : status.clips_limit}` : '—'}
+              </span>
+            </div>
+
+            {!isPro && (
+              <div className="h-2 rounded-full bg-white/[0.05] overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
+                  style={{ width: `${usedPct}%` }}
+                />
+              </div>
+            )}
+
+            {resetDate && !isPro && (
+              <p className="text-[11px] text-zinc-500">Ciclo reseta em {resetDate}</p>
+            )}
           </div>
         </div>
 
-        {/* CTA */}
-        {!isPro ? (
-          <button
-            onClick={handleUpgrade}
-            disabled={loading}
-            style={{
-              padding: '0.9rem', background: 'linear-gradient(90deg, #4f46e5, #6366f1, #9333ea)', color: '#fff',
-              border: 'none', borderRadius: '0.6rem', fontWeight: 700,
-              fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? 'Redirecionando…' : '⚡ Fazer upgrade para Pro — $19/mês'}
-          </button>
-        ) : (
-          <button
-            onClick={handlePortal}
-            disabled={loading}
-            style={{
-              padding: '0.75rem', background: 'transparent',
-              border: '1px solid var(--card-border, #27272a)',
-              color: 'var(--muted, #71717a)', borderRadius: '0.6rem',
-              fontSize: '0.9rem', cursor: 'pointer',
-            }}
-          >
-            {loading ? 'Abrindo…' : 'Gerenciar assinatura / Cancelar'}
-          </button>
-        )}
-      </main>
+        {/* Plan Tiers Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+          
+          {/* Free Tier */}
+          <div className={`p-6 sm:p-8 rounded-3xl bg-[#0e0e13]/60 border border-white/[0.06] flex flex-col justify-between ${isPro ? 'opacity-50' : 'ring-1 ring-white/10'}`}>
+            <div>
+              <span className="text-xs uppercase tracking-wider font-semibold text-zinc-400">Starter</span>
+              <div className="mt-2 mb-4">
+                <span className="text-3xl font-extrabold text-white">R$ 0</span>
+                <span className="text-xs text-zinc-500 ml-1">/mês</span>
+              </div>
+              <ul className="space-y-3 text-xs text-zinc-300">
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                  <span>3 cortes mensais em 1080p</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                  <span>Transcrição Groq Whisper Turbo</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                  <span>Download em arquivo MP4</span>
+                </li>
+              </ul>
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] text-zinc-500">
+              Plano de entrada para experimentação
+            </div>
+          </div>
+
+          {/* Pro Tier */}
+          <div className={`p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-[#16132b] to-[#0e0e13] border-2 border-indigo-500/40 relative shadow-2xl shadow-indigo-950/40 flex flex-col justify-between ${isPro ? 'ring-2 ring-indigo-500/50' : ''}`}>
+            <div className="absolute top-4 right-4">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/30">
+                Mais Popular
+              </span>
+            </div>
+
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-indigo-400">
+                <Zap className="w-3.5 h-3.5" /> Pro Creator
+              </div>
+              <div className="mt-2 mb-4">
+                <span className="text-3xl font-extrabold text-white">R$ 97</span>
+                <span className="text-xs text-zinc-400 ml-1">/mês</span>
+              </div>
+              <ul className="space-y-3 text-xs text-zinc-200">
+                <li className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span><strong>Cortes Ilimitados</strong> sem fila de espera</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span>Brand Kit completo (Logo, Selo e @handle)</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span>Legendas dinâmicas estilo Hormozi & Karaokê</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span>Publicação Direta & Modo Trial Reels</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-white/[0.06]">
+              {!isPro ? (
+                <button
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-semibold text-xs tracking-wide transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{loading ? 'Redirecionando...' : 'Ativar Acesso Pro'}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handlePortal}
+                  disabled={loading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-zinc-300 font-semibold text-xs transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {loading ? 'Abrindo portal...' : 'Gerenciar Assinatura Stripe'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }
+

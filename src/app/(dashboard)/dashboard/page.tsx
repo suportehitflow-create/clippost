@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, CheckCircle2, Loader2, Video, Trash2, ArrowRight, Play } from 'lucide-react'
+import { Scissors, CheckCircle2, Loader2, Video, Trash2, ArrowRight, Play, Sparkles } from 'lucide-react'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 
 interface Project {
@@ -110,15 +110,35 @@ export default function CleanDashboard() {
 
       <div className="max-w-5xl w-full mx-auto p-6 md:p-10 space-y-8">
         {/* Métricas Diretas e Limpas */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-[#121216]/60 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-sm">
-            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Vídeos Adicionados</span>
-            <p className="text-3xl font-light text-white mt-2 tracking-tight">{projects.length}</p>
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 backdrop-blur-md relative overflow-hidden flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Vídeos Minerados</span>
+              <p className="text-3xl font-black text-white tracking-tight font-mono">{projects.length}</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Video className="w-6 h-6" />
+            </div>
           </div>
 
-          <div className="bg-[#121216]/60 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-sm">
-            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Cortes Prontos (9:16)</span>
-            <p className="text-3xl font-light text-white mt-2 tracking-tight text-indigo-400">{totalClips}</p>
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 backdrop-blur-md relative overflow-hidden flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Cortes Prontos (9:16)</span>
+              <p className="text-3xl font-black text-indigo-400 tracking-tight font-mono">{totalClips}</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Scissors className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 backdrop-blur-md relative overflow-hidden flex items-center justify-between sm:col-span-1 col-span-1">
+            <div className="space-y-1">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Motor de Renderização</span>
+              <p className="text-base font-bold text-white tracking-tight">Groq 60fps</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+              <Sparkles className="w-6 h-6" />
+            </div>
           </div>
         </section>
 
@@ -126,28 +146,28 @@ export default function CleanDashboard() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white tracking-tight">Meus Vídeos e Projetos</h2>
-            <span className="text-xs text-zinc-500 font-mono">{projects.length} projeto{projects.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-zinc-400 font-mono">{projects.length} projeto{projects.length !== 1 ? 's' : ''}</span>
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl">
+            <div className="flex flex-col items-center justify-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-3xl">
               <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-2" />
-              <p className="text-xs text-zinc-400">Carregando seus vídeos...</p>
+              <p className="text-xs text-zinc-400 font-mono">Carregando seus vídeos...</p>
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-2xl space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto text-white">
+            <div className="text-center p-12 bg-white/[0.02] border border-white/[0.08] rounded-3xl space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
                 <Video className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Nenhum projeto ainda</h3>
-                <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+                <h3 className="text-base font-bold text-white">Nenhum projeto ainda</h3>
+                <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto leading-relaxed">
                   Cole o link de um vídeo do YouTube, Instagram ou TikTok para gerar seus primeiros cortes virais no Clipost.
                 </p>
               </div>
               <Link
                 href="/upload"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 cursor-pointer"
               >
                 <Scissors className="w-4 h-4" /> Começar Agora
               </Link>
@@ -157,37 +177,37 @@ export default function CleanDashboard() {
               {projects.map((proj) => (
                 <div
                   key={proj.id}
-                  className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.08] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all group"
+                  className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.08] hover:border-indigo-500/30 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all group shadow-sm"
                 >
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex items-center gap-2.5">
                       <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
                           proj.status === 'done' || proj.status === 'completed'
-                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : proj.status === 'processing'
-                            ? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30 animate-pulse'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                         }`}
                       >
                         {proj.status === 'done' || proj.status === 'completed' ? (
                           <>
-                            <CheckCircle2 className="w-3 h-3" /> Concluído
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Concluído
                           </>
                         ) : proj.status === 'processing' ? (
                           <>
-                            <Loader2 className="w-3 h-3 animate-spin" /> Processando
+                            <Loader2 className="w-3 h-3 animate-spin text-indigo-400" /> Processando Cortes
                           </>
                         ) : (
-                          proj.status
+                          'Falha ao Processar'
                         )}
                       </span>
                       <span className="text-[11px] text-zinc-500 font-mono">
-                        {new Date(proj.created_at).toLocaleDateString('pt-BR')}
+                        {new Date(proj.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
 
-                    <h3 className="text-sm font-semibold text-white truncate" title={proj.title}>
+                    <h3 className="text-sm font-bold text-white truncate group-hover:text-indigo-200 transition-colors" title={proj.title}>
                       {proj.title}
                     </h3>
 
@@ -201,7 +221,7 @@ export default function CleanDashboard() {
                   <div className="flex items-center gap-2 shrink-0">
                     <Link
                       href={`/project/${proj.id}`}
-                      className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-indigo-600 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-2 border border-white/[0.08] hover:border-indigo-500 transition-all cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-indigo-600 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-2 border border-white/[0.08] hover:border-indigo-500 transition-all cursor-pointer shadow-sm"
                     >
                       <Play className="w-3 h-3 fill-current" /> Abrir Cortes
                     </Link>

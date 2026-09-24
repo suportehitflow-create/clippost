@@ -37,13 +37,21 @@ export default function SignupPage() {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: '400px' }}>
-      <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '1rem', padding: '2rem' }}>
-        <h1 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: '0.5rem' }}>Criar conta grátis</h1>
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>Comece a criar clipes virais agora</p>
+    <div className="w-full max-w-[420px]">
+      <div className="bg-[#0e0e13]/80 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-8 shadow-2xl shadow-black/80 relative overflow-hidden">
+        {/* Top ambient highlight */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
 
-        <button onClick={handleGoogle} disabled={googleLoading}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'var(--background)', border: '1px solid var(--card-border)', color: 'var(--foreground)', fontWeight: 600, fontSize: '0.95rem', cursor: googleLoading ? 'not-allowed' : 'pointer', opacity: googleLoading ? 0.7 : 1, marginBottom: '1.25rem' }}>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-white mb-1.5">Criar Conta Grátis</h1>
+          <p className="text-xs text-zinc-400">Comece a minerar clipes virais em minutos</p>
+        </div>
+
+        <button
+          onClick={handleGoogle}
+          disabled={googleLoading}
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm transition-all duration-200 shadow-md shadow-white/5 disabled:opacity-60 cursor-pointer mb-5"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -53,36 +61,62 @@ export default function SignupPage() {
           {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }} />
-          <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>ou</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }} />
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px bg-white/[0.08]" />
+          <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou crie com e-mail</span>
+          <div className="flex-1 h-px bg-white/[0.08]" />
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Nome</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Seu nome"
-              style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none' }} />
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Nome Completo</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+              placeholder="Seu nome"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+            />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>E-mail</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="seu@email.com"
-              style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none' }} />
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">E-mail</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              placeholder="seu@email.com"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+            />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.4rem' }}>Senha</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min. 8 caracteres"
-              style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.95rem', outline: 'none' }} />
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Senha</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              placeholder="Mínimo 8 caracteres"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+            />
           </div>
-          {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
-          <button type="submit" disabled={loading}
-            style={{ padding: '0.875rem', borderRadius: '0.5rem', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: '1rem', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Criando conta...' : 'Criar conta grátis'}
+          {error && (
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-indigo-600/30 disabled:opacity-60 cursor-pointer"
+          >
+            {loading ? 'Criando conta...' : 'Criar Conta Grátis'}
           </button>
         </form>
-        <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
-          Já tem conta? <Link href="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Entrar →</Link>
+
+        <p className="text-center mt-6 text-xs text-zinc-400">
+          Já tem conta? <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">Entrar →</Link>
         </p>
       </div>
     </div>

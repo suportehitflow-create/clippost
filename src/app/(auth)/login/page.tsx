@@ -90,19 +90,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: '420px' }}>
-      <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '1.25rem', padding: '2.25rem', boxShadow: '0 20px 40px -15px rgba(0,0,0,0.5)' }}>
-        
+    <div className="w-full max-w-[420px]">
+      <div className="bg-[#0e0e13]/80 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-8 shadow-2xl shadow-black/80 relative overflow-hidden">
+        {/* Top ambient highlight */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.75rem', borderRadius: '9999px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#818cf8', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Zap size={13} /> Clipost Pro
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-3">
+            <Zap className="w-3.5 h-3.5" /> Clipost Pro
           </div>
-          <h1 style={{ fontWeight: 800, fontSize: '1.65rem', letterSpacing: '-0.025em', color: '#fff', marginBottom: '0.35rem' }}>
+          <h1 className="text-2xl font-bold tracking-tight text-white mb-1.5">
             Entrar na Plataforma
           </h1>
-          <p style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
-            Automação completa para clipadores profissionais
+          <p className="text-xs text-zinc-400">
+            Automação completa para criadores e editores profissionais
           </p>
         </div>
 
@@ -111,24 +113,7 @@ export default function LoginPage() {
           type="button"
           onClick={handleGoogle}
           disabled={googleLoading}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.75rem',
-            padding: '0.85rem 1rem',
-            borderRadius: '0.75rem',
-            background: '#ffffff',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#18181b',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: googleLoading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 4px 15px rgba(255, 255, 255, 0.1)',
-            transition: 'all 0.2s ease',
-            marginBottom: '0.85rem',
-          }}
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-sm transition-all duration-200 shadow-md shadow-white/5 disabled:opacity-60 cursor-pointer mb-3"
         >
           <svg width="18" height="18" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -144,69 +129,52 @@ export default function LoginPage() {
           type="button"
           onClick={handleQuickTestLogin}
           disabled={testLoading}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.6rem',
-            padding: '0.85rem 1rem',
-            borderRadius: '0.75rem',
-            background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #9333ea 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: testLoading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 8px 20px -4px rgba(99, 102, 241, 0.35)',
-            transition: 'all 0.2s ease',
-            marginBottom: '1rem',
-          }}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-indigo-600/30 disabled:opacity-60 cursor-pointer mb-5"
         >
           {testLoading ? (
             'Autenticando via Supabase...'
           ) : (
             <>
               <span>🧪 Entrar com Conta de Teste</span>
-              <ArrowRight size={16} />
+              <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
 
         {/* Divisor */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }} />
-          <span style={{ color: 'var(--muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ou e-mail e senha</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--card-border)' }} />
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px bg-white/[0.08]" />
+          <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou e-mail e senha</span>
+          <div className="flex-1 h-px bg-white/[0.08]" />
         </div>
 
         {/* Formulário Tradicional */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.35rem' }}>E-mail</label>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">E-mail</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               placeholder="seu@email.com"
-              style={{ width: '100%', padding: '0.7rem 0.9rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none' }}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.35rem' }}>Senha</label>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Senha</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
               placeholder="••••••••"
-              style={{ width: '100%', padding: '0.7rem 0.9rem', background: 'var(--background)', border: '1px solid var(--card-border)', borderRadius: '0.5rem', color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none' }}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
             />
           </div>
 
           {error && (
-            <p style={{ color: '#ef4444', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '0.4rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
               {error}
             </p>
           )}
@@ -214,14 +182,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            style={{ padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, transition: 'all 0.2s' }}
+            className="w-full py-3 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white font-semibold text-sm transition-all duration-200 disabled:opacity-60 cursor-pointer"
           >
             {loading ? 'Entrando...' : 'Entrar com Senha'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
-          Não tem conta? <Link href="/signup" style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600 }}>Criar conta grátis →</Link>
+        <p className="text-center mt-6 text-xs text-zinc-400">
+          Não tem conta? <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">Criar conta grátis →</Link>
         </p>
       </div>
     </div>

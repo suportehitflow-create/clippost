@@ -2,6 +2,7 @@
 
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles } from 'lucide-react'
@@ -160,31 +161,53 @@ export default function CreateClipsPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
+    <div className="flex-1 flex flex-col min-h-screen bg-[#07070a] text-white">
       {/* Header */}
-      <header className="h-16 border-b border-white/[0.08] flex items-center px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-sm font-semibold text-white tracking-wide">Criar Novos Cortes - Clipost</h1>
+      <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <Scissors className="w-4 h-4" />
+          </div>
+          <h1 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-semibold">
+            Minerador de Cortes 9:16
+          </h1>
+        </div>
+
+        {/* Template Ativo Pill */}
+        <Link
+          href="/templates"
+          className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer"
+          title="Ver ou trocar template visual de marca"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="hidden sm:inline text-zinc-400">Template Ativo:</span>
+          <span className="text-white font-bold">Oficial Clipost</span>
+        </Link>
       </header>
 
-      <div className="max-w-2xl w-full mx-auto p-6 md:p-10 space-y-8">
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto text-white mb-4">
-            <Scissors className="w-6 h-6" />
+      <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">
+        {/* Intro */}
+        <div className="text-center space-y-2.5 max-w-lg mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Curadoria Automática por IA</span>
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">Criar Cortes 9:16 com IA</h2>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Cole o link do YouTube, Instagram ou TikTok. A IA encontra os momentos mais virais, corta no formato vertical e aplica seu template oficial do Clipost.
+          <h2 className="text-3xl font-black tracking-tight text-white">
+            Criar Novos Cortes Virais
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+            Cole links do YouTube, TikTok, Reels ou faça upload de um arquivo. A IA encontra ganchos de alta retenção, centraliza em 9:16 e gera legendas animadas.
           </p>
         </div>
 
         {/* Alternador Link / Arquivo */}
-        <div className="flex p-1 bg-white/[0.02] border border-white/[0.08] rounded-xl max-w-sm mx-auto gap-1">
+        <div className="flex p-1 bg-white/[0.02] border border-white/[0.08] rounded-2xl max-w-xs mx-auto gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('link')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+            className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
               activeTab === 'link'
-                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
                 : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
             }`}
           >
@@ -194,21 +217,22 @@ export default function CreateClipsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('file')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+            className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
               activeTab === 'file'
-                ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
                 : 'text-zinc-400 hover:text-white border-transparent hover:bg-white/[0.03]'
             }`}
           >
             <UploadCloud className="w-3.5 h-3.5" />
-            <span>Upload de Arquivo</span>
+            <span>Arquivo MP4</span>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Formulário Principal */}
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl">
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
@@ -216,38 +240,38 @@ export default function CreateClipsPage() {
           {activeTab === 'link' ? (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-300">Link do Vídeo</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Link do Vídeo</label>
                 {getPlatformInfo(url) && (
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getPlatformInfo(url)?.color} transition-all`}>
+                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${getPlatformInfo(url)?.color} transition-all`}>
                     ✓ {getPlatformInfo(url)?.name} detectado
                   </span>
                 )}
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                  <Link2 className="w-4 h-4" />
+                  <Link2 className="w-4 h-4 text-indigo-400" />
                 </div>
                 <input
                   type="url"
-                  placeholder="Cole link do YouTube, TikTok, Reels, Twitter/X, Twitch..."
+                  placeholder="https://www.youtube.com/watch?v=... ou link do TikTok / Instagram"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#121216] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-[#6366f1] transition-colors"
+                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-[#0c0c10] border border-white/[0.1] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all font-sans"
                 />
               </div>
 
-              {/* Badges de plataformas suportadas (Reclip / yt-dlp) */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[10px] text-zinc-500">Plataformas suportadas:</span>
+              {/* Badges de plataformas suportadas */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-zinc-500 font-mono">Compatível com:</span>
                 {[
                   { name: 'YouTube', color: 'text-zinc-400 bg-white/[0.04]' },
                   { name: 'TikTok', color: 'text-zinc-400 bg-white/[0.04]' },
-                  { name: 'Instagram', color: 'text-zinc-400 bg-white/[0.04]' },
+                  { name: 'Instagram Reels', color: 'text-zinc-400 bg-white/[0.04]' },
                   { name: 'X / Twitter', color: 'text-zinc-400 bg-white/[0.04]' },
                   { name: 'Twitch', color: 'text-zinc-400 bg-white/[0.04]' },
                 ].map(p => (
-                  <span key={p.name} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.color}`}>
+                  <span key={p.name} className={`text-[10px] px-2 py-0.5 rounded-lg font-medium ${p.color} border border-white/[0.04]`}>
                     {p.name}
                   </span>
                 ))}
@@ -255,16 +279,18 @@ export default function CreateClipsPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-300">Arquivo de Vídeo (MP4, MOV)</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Arquivo de Vídeo (MP4, MOV)</label>
               <div
                 onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-white/[0.12] hover:border-[#6366f1]/50 rounded-2xl p-8 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.03]"
+                className="border-2 border-dashed border-white/[0.12] hover:border-indigo-500/50 rounded-2xl p-8 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.03] space-y-2"
               >
-                <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-white">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mx-auto">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <p className="text-xs font-bold text-white">
                   {file ? file.name : 'Clique para selecionar um vídeo do seu computador'}
                 </p>
-                <p className="text-[11px] text-zinc-500 mt-1">Até 500MB</p>
+                <p className="text-[11px] text-zinc-400 font-mono">Suporta até 500MB em MP4 ou MOV</p>
                 <input
                   ref={fileRef}
                   type="file"
@@ -277,13 +303,13 @@ export default function CreateClipsPage() {
           )}
 
           {/* Configurações de Duração dos Cortes & Áudio */}
-          <div className="space-y-4 pt-4 border-t border-white/[0.08]">
+          <div className="space-y-4 pt-4 border-t border-white/[0.06]">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos Cortes:
                 </label>
-                <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase">
+                <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
                   {clipDuration === 'auto' ? 'IA Automático' : `${clipDuration}s`}
                 </span>
               </div>
@@ -298,16 +324,16 @@ export default function CreateClipsPage() {
                     key={opt.id}
                     type="button"
                     onClick={() => setClipDuration(opt.id as any)}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       clipDuration === opt.id
-                        ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/40 shadow-sm shadow-[#6366f1]/10'
+                        ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/50 shadow-md ring-1 ring-indigo-500/30'
                         : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:text-white hover:bg-white/[0.05]'
                     }`}
                   >
                     <span className={`text-xs font-bold block ${clipDuration === opt.id ? 'text-white' : 'text-zinc-200'}`}>
                       {opt.label}
                     </span>
-                    <span className="text-[10px] text-zinc-500 mt-0.5 block leading-tight">
+                    <span className="text-[10px] text-zinc-500 mt-0.5 block leading-tight font-mono">
                       {opt.desc}
                     </span>
                   </button>
@@ -316,41 +342,62 @@ export default function CreateClipsPage() {
             </div>
 
             {/* Toggle de Silêncio */}
-            <div className="pt-2">
-              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+            <div className="pt-1">
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
                     removeSilence ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
                   }`}>
                     <VolumeX className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-white block">Remover pausas longas e silêncios</span>
-                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo e retenção do corte para prender a atenção</span>
+                    <span className="text-xs font-bold text-white block">Remover pausas longas e silêncios</span>
+                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo acústico e prende a atenção nos primeiros segundos</span>
                   </div>
                 </div>
                 <LiquidToggle
                   checked={removeSilence}
                   onChange={setRemoveSilence}
-                  
-                  activeColor="emerald"
+                  activeColor="indigo"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Pipeline Visual Preview */}
+          <div className="p-4 rounded-2xl bg-[#09090d] border border-white/[0.06] grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px] text-zinc-400 font-mono">
+            <div className="space-y-0.5">
+              <span className="text-indigo-400 font-bold block">1. Ingestão</span>
+              <span>Download & Limpeza</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-indigo-400 font-bold block">2. Whisper</span>
+              <span>Transcrição Acústica</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-indigo-400 font-bold block">3. Curador IA</span>
+              <span>Enquadramento 9:16</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-indigo-400 font-bold block">4. Render</span>
+              <span>60fps com Legendas</span>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Gerando cortes inteligentes com IA...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Iniciando Processamento em 60fps...</span>
               </>
             ) : (
               <>
-                <Scissors className="w-4 h-4" /> Gerar Cortes Virais com Clipost
+                <Scissors className="w-4 h-4" />
+                <span>Gerar Cortes Virais com IA</span>
               </>
             )}
           </button>
