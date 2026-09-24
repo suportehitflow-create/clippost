@@ -6,6 +6,7 @@ Facebook, YouTube). Cada vídeo vira um projeto com um clipe, então aparece nas
 mesmas telas dos cortes. O andamento do lote fica em memória (GET /api/bulk/{id}).
 """
 import copy
+import json
 import os
 import shutil
 import subprocess
@@ -32,31 +33,64 @@ _BATCH_TTL_SECS = 24 * 3600
 _batches: dict[str, dict] = {}
 _batches_lock = threading.Lock()
 
+# Estado do lote também vai para o Storage: um deploy reinicia o servidor e zera a
+# memória, e um lote de perfil inteiro pode levar horas. Na volta, retomamos daqui.
+_STATE_BUCKET = "videos"
+_STATE_PREFIX = "_bulk"
 
-def create_batch(user_id: str, source: str) -> str:
-    batch_id = uuid.uuid4().hex[:12]
+
+def _persist(batch_id: str):
+    with _batches_lock:
+        batch = copy.deepcopy(_batches.get(batch_id))
+    if not batch:
+        return
+    try:
+        supabase.storage.from_(_STATE_BUCKET).upload(
+            f"{_STATE_PREFIX}/{batch_id}.json",
+            json.dumps(batch, ensure_ascii=False).encode("utf-8"),
+            file_options={"content-type": "application/json", "upsert": "true"},
+        )
+    except Exception as e:
+        print(f"[bulk] não salvou o estado do lote {batch_id}: {e}")
+
+
+def _load_persisted(batch_id: str) -> dict | None:
+    try:
+        raw = supabase.storage.from_(_STATE_BUCKET).download(f"{_STATE_PREFIX}/{batch_id}.json")
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def create_batch(user_id: str, req: dict) -> str:
+    batch_id = uuid.uuid4().hex  # 32 hex: o caminho no Storage não é adivinhável
     now = time.time()
     with _batches_lock:
         for bid in [b for b, v in _batches.items() if now - v["created_at"] > _BATCH_TTL_SECS]:
             _batches.pop(bid, None)
         _batches[batch_id] = {
-            "id": batch_id, "user_id": user_id, "source": source,
-            "status": "listing" if source == "profile" else "processing",
-            "error": None, "created_at": now, "items": [],
+            "id": batch_id, "user_id": user_id, "source": req.get("source"),
+            "status": "listing" if req.get("source") == "profile" else "processing",
+            "error": None, "created_at": now, "items": [], "request": req,
         }
+    _persist(batch_id)
     return batch_id
 
 
 def get_batch(batch_id: str) -> dict | None:
     with _batches_lock:
-        batch = _batches.get(batch_id)
-        return copy.deepcopy(batch) if batch else None
+        batch = copy.deepcopy(_batches.get(batch_id))
+    batch = batch or _load_persisted(batch_id)
+    if batch:
+        batch.pop("request", None)
+    return batch
 
 
 def _set_batch(batch_id: str, **fields):
     with _batches_lock:
         if batch_id in _batches:
             _batches[batch_id].update(fields)
+    _persist(batch_id)
 
 
 def _set_item(batch_id: str, idx: int, **fields):
@@ -64,6 +98,36 @@ def _set_item(batch_id: str, idx: int, **fields):
         batch = _batches.get(batch_id)
         if batch and idx < len(batch["items"]):
             batch["items"][idx].update(fields)
+    _persist(batch_id)
+
+
+def resume_pending_batches(enqueue) -> int:
+    """No startup: recoloca na fila os lotes que um reinício interrompeu."""
+    try:
+        entries = supabase.storage.from_(_STATE_BUCKET).list(_STATE_PREFIX, {"limit": 1000})
+    except Exception as e:
+        print(f"[bulk] não listou lotes salvos: {e}")
+        return 0
+    resumed = 0
+    for entry in entries or []:
+        name = entry.get("name") or ""
+        if not name.endswith(".json"):
+            continue
+        batch = _load_persisted(name[:-5])
+        if not batch or batch.get("status") not in ("listing", "processing") or not batch.get("request"):
+            continue
+        if time.time() - float(batch.get("created_at") or 0) > _BATCH_TTL_SECS:
+            continue
+        for item in batch.get("items") or []:
+            if item.get("status") == "processing":
+                item["status"] = "pending"
+        with _batches_lock:
+            _batches[batch["id"]] = batch
+        enqueue("bulk", run_batch, batch["id"], batch["request"])
+        resumed += 1
+    if resumed:
+        print(f"[bulk] {resumed} lote(s) retomado(s) após reinício")
+    return resumed
 
 
 def _load_brand_kit(user_id: str, template_config: dict | None) -> dict:
@@ -215,24 +279,30 @@ def run_batch(batch_id: str, req: dict):
     user_id = req["user_id"]
     options = req.get("options") or {}
     try:
-        if req.get("source") == "profile":
-            listing = list_profile_videos(req.get("profile_url") or "", int(req.get("limit") or 0), req.get("sort_by") or "views")
-            videos = listing["videos"]
-            _set_batch(batch_id, profile_url=listing["profile_url"], platform=listing["platform"])
-        else:
-            videos = req.get("videos") or []
         with _batches_lock:
-            _batches[batch_id]["items"] = [
-                {"url": v["url"], "title": v.get("title") or "", "thumbnail": v.get("thumbnail"),
-                 "view_count": v.get("view_count"), "like_count": v.get("like_count"),
-                 "status": "pending", "project_id": None, "error": None}
-                for v in videos if v.get("url")
-            ]
+            already_listed = bool(_batches.get(batch_id, {}).get("items"))
+        if not already_listed:
+            if req.get("source") == "profile":
+                listing = list_profile_videos(req.get("profile_url") or "", int(req.get("limit") or 0), req.get("sort_by") or "views")
+                videos = listing["videos"]
+                _set_batch(batch_id, profile_url=listing["profile_url"], platform=listing["platform"])
+            else:
+                videos = req.get("videos") or []
+            with _batches_lock:
+                _batches[batch_id]["items"] = [
+                    {"url": v["url"], "title": v.get("title") or "", "thumbnail": v.get("thumbnail"),
+                     "view_count": v.get("view_count"), "like_count": v.get("like_count"),
+                     "status": "pending", "project_id": None, "error": None}
+                    for v in videos if v.get("url")
+                ]
+        with _batches_lock:
             items = copy.deepcopy(_batches[batch_id]["items"])
         _set_batch(batch_id, status="processing")
 
         brand_kit = _load_brand_kit(user_id, req.get("template_config"))
         for idx, item in enumerate(items):
+            if item.get("status") in ("done", "failed"):
+                continue
             try:
                 check_clip_limit(user_id)
             except Exception as limit_err:

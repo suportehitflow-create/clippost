@@ -155,6 +155,15 @@ def process_bulk_videos(urls: list[str], user_id: str, clip_duration: str = "aut
 RSS_NS = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
 
 
+def _dispatch_pipeline(*args):
+    """Celery quando houver worker; senão a fila interna (um corte por vez)."""
+    from job_tracker import CELERY_ENABLED, enqueue
+    if CELERY_ENABLED:
+        process_youtube_video.delay(*args)
+    else:
+        enqueue("autopilot", process_youtube_video, *args)
+
+
 @celery.task(name="check_channel_watches")
 def check_channel_watches():
     """Canal AutoPilot: detecta vídeo novo nos canais monitorados e enfileira o corte.
@@ -234,9 +243,7 @@ def check_channel_watches():
                     "project_id": projeto["id"],
                 }).execute()
 
-                process_youtube_video.delay(
-                    url, w["user_id"], w.get("clip_duration", "auto"), projeto["id"]
-                )
+                _dispatch_pipeline(url, w["user_id"], w.get("clip_duration", "auto"), projeto["id"])
                 novos += 1
                 print(f"[autopilot] {w.get('channel_name') or w['channel_id']}: {title}")
 

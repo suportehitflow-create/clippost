@@ -178,25 +178,36 @@ def _sync_save_processing_projects():
 import atexit
 atexit.register(_sync_save_processing_projects)
 
-import threading
-import time
-import uuid
-
-# Cortes rodando neste processo; o deploy.ps1 consulta /api/admin/active-jobs e só
-# publica quando está zerado, para um deploy não derrubar o corte de outra pessoa.
-_active_jobs: dict[str, tuple[str, float]] = {}
-_active_jobs_lock = threading.Lock()
+from job_tracker import run_tracked as _run_tracked, snapshot as _active_jobs_snapshot
 
 
-def _run_tracked(kind: str, fn, *args):
-    key = uuid.uuid4().hex
-    with _active_jobs_lock:
-        _active_jobs[key] = (kind, time.time())
+async def _in_process_scheduler():
+    """Sem worker/beat do Celery no Fly, as tarefas periódicas rodam aqui mesmo:
+    publicação dos posts agendados (60s) e checagem de canais do Autopilot (15 min)."""
+    import asyncio
     try:
-        fn(*args)
-    finally:
-        with _active_jobs_lock:
-            _active_jobs.pop(key, None)
+        from tasks import check_channel_watches
+        from workers.scheduler_tasks import check_and_publish_scheduled_posts
+    except Exception as e:
+        print(f"[scheduler] não iniciou: {e}")
+        return
+    print("[scheduler] agendador interno ativo (posts 60s, autopilot 15min)")
+    last_autopilot = 0.0
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await asyncio.to_thread(check_and_publish_scheduled_posts)
+        except Exception as e:
+            print(f"[scheduler] posts agendados falharam: {e}")
+        now = asyncio.get_event_loop().time()
+        if now - last_autopilot >= 900:
+            last_autopilot = now
+            try:
+                result = await asyncio.to_thread(check_channel_watches)
+                if result and result.get("novos"):
+                    print(f"[autopilot] {result['novos']} vídeo(s) novo(s) enfileirado(s)")
+            except Exception as e:
+                print(f"[autopilot] checagem falhou: {e}")
 
 
 @app.on_event("startup")
@@ -206,6 +217,14 @@ async def recover_stuck_projects():
     await _mark_stuck_projects("startup")
     await _cleanup_old_projects()
     asyncio.create_task(_periodic_recovery_loop())
+    if os.getenv("CELERY_ENABLED", "false").lower() != "true":
+        asyncio.create_task(_in_process_scheduler())
+    try:
+        from bulk_tasks import resume_pending_batches
+        from job_tracker import enqueue
+        await asyncio.to_thread(resume_pending_batches, enqueue)
+    except Exception as e:
+        print(f"[startup] retomada de lotes falhou: {e}")
 
 
 @app.get("/health")
@@ -665,8 +684,9 @@ async def bulk_start(req: BulkStartRequest, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
     if req.source not in ("profile", "files"):
         raise HTTPException(status_code=400, detail="Fonte inválida.")
-    batch_id = create_batch(req.user_id, req.source)
-    background_tasks.add_task(_run_tracked, "bulk", run_batch, batch_id, req.model_dump())
+    payload = req.model_dump()
+    batch_id = create_batch(req.user_id, payload)
+    background_tasks.add_task(_run_tracked, "bulk", run_batch, batch_id, payload)
     return {"batch_id": batch_id, "status": "started"}
 
 
@@ -682,9 +702,7 @@ async def bulk_status(batch_id: str, user_id: str):
 @app.get("/api/admin/active-jobs")
 async def active_jobs():
     """Quantos cortes estão rodando agora — usado pelo deploy.ps1 antes de publicar."""
-    now = time.time()
-    with _active_jobs_lock:
-        jobs = [{"kind": kind, "running_for_s": int(now - started)} for kind, started in _active_jobs.values()]
+    jobs = _active_jobs_snapshot()
     return {"active": len(jobs), "jobs": jobs}
 
 
