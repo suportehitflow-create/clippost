@@ -3,7 +3,14 @@ import type { CriarJobPayload, JobInfo } from '../types';
 
 // Em produção a tela fica na Vercel e o processamento (FFmpeg) num servidor Node persistente
 // (NEXT_PUBLIC_EDITOR_MASSA_URL). Sem a variável (localhost), usa as rotas do próprio app.
-const ORIGEM = (process.env.NEXT_PUBLIC_EDITOR_MASSA_URL || '').replace(/\/$/, '');
+function sanitizeUrl(u?: string): string {
+  if (!u) return '';
+  return u.replace(/[\uFEFF\u200B-\u200D\s]/g, '').replace(/\/$/, '');
+}
+const isBrowser = typeof window !== 'undefined';
+const isLocal = isBrowser && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const rawOrigem = process.env.NEXT_PUBLIC_EDITOR_MASSA_URL;
+const ORIGEM = sanitizeUrl(rawOrigem) || (isBrowser && !isLocal ? 'https://clippost-editor.fly.dev' : '');
 export const BASE = `${ORIGEM}/api/editor-massa`;
 
 async function token(): Promise<string | null> {

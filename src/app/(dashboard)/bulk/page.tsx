@@ -27,7 +27,8 @@ export default function EdicaoEmMassaPage() {
     if (salva === 'editor' || salva === 'perfil') setAba(salva)
 
     const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-    const servidor = process.env.NEXT_PUBLIC_EDITOR_MASSA_URL
+    const rawServidor = process.env.NEXT_PUBLIC_EDITOR_MASSA_URL || 'https://clippost-editor.fly.dev'
+    const servidor = rawServidor.replace(/[\uFEFF\u200B-\u200D\s]/g, '').replace(/\/$/, '')
     if (local) return
     const aplicar = (ok: boolean) => {
       setEditorDisponivel(ok)
@@ -35,7 +36,7 @@ export default function EdicaoEmMassaPage() {
     }
     if (!servidor) return aplicar(false)
     // O servidor do editor só conta como no ar se responder à checagem de saúde
-    fetch(`${servidor.replace(/\/$/, '')}/api/editor-massa/saude`, { signal: AbortSignal.timeout(8000) })
+    fetch(`${servidor}/api/editor-massa/saude`, { signal: AbortSignal.timeout(8000) })
       .then(r => aplicar(r.ok))
       .catch(() => aplicar(false))
   }, [])

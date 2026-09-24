@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient as createSessionClient } from '@/lib/supabase/server'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co').replace(/[\uFEFF\u200B-\u200D]/g, '').trim()
+const SUPABASE_SERVICE_KEY = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsbnR1bGVjanNocGJyaGVzYW9vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzIzNjg0MywiZXhwIjoyMTAyODEyODQzfQ.n96uoY_3gxr6-8WV-KOAA6lJ4pjRSSa3dNpmHorguOM'
+).replace(/[\uFEFF\u200B-\u200D]/g, '').trim()
 
-// O user_id vem da sessão, nunca do corpo: com a service key, confiar no corpo deixaria
-// qualquer pessoa sobrescrever o template de outro usuário.
 async function sessionUser() {
   const supabase = await createSessionClient()
   const { data: { user } } = await supabase.auth.getUser()
   return user
 }
 
-// Sem service key (ex.: localhost) usa a sessão do usuário, que o RLS permite gravar
-async function admin(): Promise<any> {
+function admin() {
   if (SUPABASE_SERVICE_KEY) {
     return createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
   }
-  return createSessionClient()
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { avatar_url, username, layout_config } = body
-    const db = await admin()
+    const db = admin() || (await createSessionClient())
 
     const { data: profile } = await db.from('profiles').select('id').eq('id', user.id).maybeSingle()
     if (!profile) {
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
     const patch: Record<string, unknown> = {
       username: username || '@nomedapagina',
       layout_config: layout_config || {},
-      updated_at: new Date().toISOString(),
     }
     if (avatar_url !== undefined) patch.avatar_url = avatar_url || null
 
@@ -71,7 +70,8 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
-    const { data, error } = await (await admin()).from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
+    const db = admin() || (await createSessionClient())
+    const { data, error } = await db.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
