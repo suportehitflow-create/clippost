@@ -753,112 +753,136 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         # 1. Download do vídeo
         _set_step(project_id, "download")
-        print(f"[pipeline] baixando vídeo: {url[:80]}")
         info = {}  # fallback se Cobalt for usado no lugar do yt-dlp
-        _ytdlp_blocked = False
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-                info = ydl.extract_info(url, download=True) or {}
-                video_id = info.get('id', 'video')
-                title = info.get('title', 'Sem título')
-                video_duration = info.get('duration')
-            # Se yt-dlp retornou info mas não gerou arquivo → 403 silencioso no stream
-            mp4_early = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
-            if not info.get('id') or not mp4_early:
-                _ytdlp_blocked = True
-        except yt_dlp.utils.DownloadError as de:
-            err = str(de).lower()
-            if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
-                _ytdlp_blocked = True
-            else:
-                raise
-        except Exception as ge:
-            # ignoreerrors=True pode suprimir DownloadError e lançar Exception genérica
-            _ge = str(ge).lower()
-            if any(k in _ge for k in ("sign in", "bot", "403", "429", "não retornou", "url inválida")):
-                _ytdlp_blocked = True
-            else:
-                raise
+        video_id = "video"
+        title = "Sem título"
+        video_duration = None
+        _direct_downloaded = False
 
-        if _ytdlp_blocked:
-            fallback_ok = False
-            _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
-            _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
-
-            # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
-            print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
+        # Download direto ultrarrápido para arquivos já hospedados (ex: upload manual via Supabase Storage)
+        if "supabase.co/storage" in url or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
+            print(f"[pipeline] arquivo já hospedado — baixando diretamente: {url[:80]}...")
             try:
-                _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
-                with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
-                    _f18_info = ydl.extract_info(url, download=True) or {}
-                _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
-                if _f18_info.get("id") and _f18_files:
-                    video_path = str(_f18_files[0])
-                    video_id = _f18_info.get("id", _vid_id)
-                    title = _f18_info.get("title", _vid_id)
-                    video_duration = _f18_info.get("duration")
-                    fallback_ok = True
-                    print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
-            except Exception as f18_err:
-                print(f"[pipeline] format 18 falhou: {f18_err}")
+                with httpx.Client(timeout=180, follow_redirects=True) as client:
+                    with client.stream("GET", url) as resp:
+                        resp.raise_for_status()
+                        with open(video_path, "wb") as f:
+                            for chunk in resp.iter_bytes(65536):
+                                f.write(chunk)
+                if os.path.exists(video_path) and os.path.getsize(video_path) > 1000:
+                    _direct_downloaded = True
+                    video_id = project_id or "direct_upload"
+                    title = "Upload de Vídeo"
+                    print(f"[pipeline] download direto Supabase OK ({os.path.getsize(video_path) // 1024} KB)")
+            except Exception as dl_direct_err:
+                print(f"[pipeline] download direto falhou ({dl_direct_err}), tentando yt-dlp...")
 
-            # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
-            print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
+        if not _direct_downloaded:
+            print(f"[pipeline] baixando vídeo via extratores: {url[:80]}")
+            _ytdlp_blocked = False
             try:
-                video_path, _ = _download_via_cobalt_public(url, tmp_dir)
-                video_id = _vid_id
-                title = _vid_id
-                video_duration = None
-                fallback_ok = True
-                print(f"[pipeline] cobalt público OK")
-            except Exception as cobalt_pub_err:
-                print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
+                with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+                    info = ydl.extract_info(url, download=True) or {}
+                    video_id = info.get('id', 'video')
+                    title = info.get('title', 'Sem título')
+                    video_duration = info.get('duration')
+                # Se yt-dlp retornou info mas não gerou arquivo → 403 silencioso no stream
+                mp4_early = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
+                if not info.get('id') or not mp4_early:
+                    _ytdlp_blocked = True
+            except yt_dlp.utils.DownloadError as de:
+                err = str(de).lower()
+                if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
+                    _ytdlp_blocked = True
+                else:
+                    raise
+            except Exception as ge:
+                # ignoreerrors=True pode suprimir DownloadError e lançar Exception genérica
+                _ge = str(ge).lower()
+                if any(k in _ge for k in ("sign in", "bot", "403", "429", "não retornou", "url inválida")):
+                    _ytdlp_blocked = True
+                else:
+                    raise
 
-            # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
-            if not fallback_ok:
-                print(f"[pipeline] fallback 2: cobalt privado (fra)...")
+            if _ytdlp_blocked:
+                fallback_ok = False
+                _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+                _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
+
+                # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
+                print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
                 try:
-                    video_path, _ = _download_via_cobalt(url, tmp_dir)
+                    _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
+                    with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
+                        _f18_info = ydl.extract_info(url, download=True) or {}
+                    _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
+                    if _f18_info.get("id") and _f18_files:
+                        video_path = str(_f18_files[0])
+                        video_id = _f18_info.get("id", _vid_id)
+                        title = _f18_info.get("title", _vid_id)
+                        video_duration = _f18_info.get("duration")
+                        fallback_ok = True
+                        print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
+                except Exception as f18_err:
+                    print(f"[pipeline] format 18 falhou: {f18_err}")
+
+                # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
+                print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
+                try:
+                    video_path, _ = _download_via_cobalt_public(url, tmp_dir)
                     video_id = _vid_id
                     title = _vid_id
                     video_duration = None
                     fallback_ok = True
-                    print(f"[pipeline] cobalt privado OK")
-                except Exception as cobalt_err:
-                    print(f"[pipeline] cobalt privado falhou: {cobalt_err}")
+                    print(f"[pipeline] cobalt público OK")
+                except Exception as cobalt_pub_err:
+                    print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
 
-            # Fallback 3: Piped (streams proxiados, IP não-Fly.io chega ao CDN)
-            if not fallback_ok:
-                print(f"[pipeline] fallback 3: piped...")
-                try:
-                    video_path, _ = _download_via_piped(url, tmp_dir)
-                    video_id = _vid_id
-                    title = _vid_id
-                    video_duration = None
-                    fallback_ok = True
-                    print(f"[pipeline] piped OK")
-                except Exception as piped_err:
-                    print(f"[pipeline] piped falhou: {piped_err}")
+                # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 2: cobalt privado (fra)...")
+                    try:
+                        video_path, _ = _download_via_cobalt(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] cobalt privado OK")
+                    except Exception as cobalt_err:
+                        print(f"[pipeline] cobalt privado falhou: {cobalt_err}")
 
-            # Fallback 4: Invidious (API pública, IP diferente)
-            if not fallback_ok:
-                print(f"[pipeline] fallback 4: invidious...")
-                try:
-                    video_path, _ = _download_via_invidious(url, tmp_dir)
-                    video_id = _vid_id
-                    title = _vid_id
-                    video_duration = None
-                    fallback_ok = True
-                    print(f"[pipeline] invidious OK")
-                except Exception as inv_err:
-                    print(f"[pipeline] invidious falhou: {inv_err}")
+                # Fallback 3: Piped (streams proxiados, IP não-Fly.io chega ao CDN)
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 3: piped...")
+                    try:
+                        video_path, _ = _download_via_piped(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] piped OK")
+                    except Exception as piped_err:
+                        print(f"[pipeline] piped falhou: {piped_err}")
 
-            if not fallback_ok:
-                raise Exception(
-                    "YouTubeBlockError: todos os métodos de download falharam "
-                    "(yt-dlp, cobalt privado, cobalt público, piped, invidious). "
-                    "Verifique os logs para detalhes."
-                )
+                # Fallback 4: Invidious (API pública, IP diferente)
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 4: invidious...")
+                    try:
+                        video_path, _ = _download_via_invidious(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] invidious OK")
+                    except Exception as inv_err:
+                        print(f"[pipeline] invidious falhou: {inv_err}")
+
+                if not fallback_ok:
+                    raise Exception(
+                        "YouTubeBlockError: todos os métodos de download falharam "
+                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious). "
+                        "Verifique os logs para detalhes."
+                    )
 
         # Detecta duração via ffprobe se não disponível (download via cobalt)
         if video_duration is None:
