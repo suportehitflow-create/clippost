@@ -1,7 +1,8 @@
 ﻿# Deploy do backend sem derrubar cortes em andamento.
 # Espera /api/admin/active-jobs zerar e só então roda `fly deploy`.
 # Uso:  powershell -ExecutionPolicy Bypass -File backend\deploy.ps1 [-MaxWaitMinutes 30]
-param([int]$MaxWaitMinutes = 30)
+# -NoDepot usa o builder remoto do próprio Fly quando o Depot não responde (timeout em api.depot.dev)
+param([int]$MaxWaitMinutes = 30, [switch]$NoDepot)
 
 $ErrorActionPreference = "Stop"
 $fly = (Get-Command flyctl -ErrorAction SilentlyContinue).Source
@@ -31,7 +32,9 @@ while ($true) {
 
 Push-Location $PSScriptRoot
 try {
-    & $fly deploy --strategy immediate --wait-timeout 10m
+    $extra = @()
+    if ($NoDepot) { $extra += "--depot=false" }
+    & $fly deploy --strategy immediate --wait-timeout 10m @extra
     if ($LASTEXITCODE -ne 0) { throw "fly deploy falhou (código $LASTEXITCODE)" }
 } finally {
     Pop-Location

@@ -121,12 +121,16 @@ const SUBTITLE_STYLES = [
   { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-pink-500/40' },
 ]
 
+// `key` = etapa que o backend grava em projects.error_message ("step:<key>") durante o processamento
 const PIPELINE_STEPS = [
-  { label: 'Baixando vídeo', detail: 'yt-dlp + Deno runtime', thresholdSecs: 0 },
-  { label: 'Transcrevendo áudio', detail: 'Turbo VTT ou Whisper', thresholdSecs: 40 },
-  { label: 'IA identificando momentos virais', detail: 'Claude analisando o conteúdo', thresholdSecs: 90 },
-  { label: 'Criando cortes 9:16', detail: 'FFmpeg renderizando com legenda', thresholdSecs: 160 },
+  { key: 'download', label: 'Baixando vídeo', detail: 'yt-dlp + Deno runtime', thresholdSecs: 0 },
+  { key: 'transcricao', label: 'Transcrevendo áudio', detail: 'Groq Whisper com tempo por palavra', thresholdSecs: 40 },
+  { key: 'ia_curator', label: 'IA identificando momentos virais', detail: 'Gemini analisando o conteúdo', thresholdSecs: 90 },
+  { key: 'gerando_clipes', label: 'Criando cortes 9:16', detail: 'FFmpeg aplicando seu template', thresholdSecs: 160 },
 ]
+
+// Sem notícia do backend por esse tempo, o pipeline provavelmente morreu
+const PIPELINE_TIMEOUT_SECS = 20 * 60
 
 const ERROR_CATEGORIES: Array<{
   match: (e: string) => boolean
@@ -205,18 +209,17 @@ const ERROR_CATEGORIES: Array<{
     label: 'Vídeo muito longo',
     color: 'orange',
     icon: '⏱️',
-    hint: 'O vídeo ultrapassa o limite de 30 minutos. Envie um trecho menor ou escolha um vídeo mais curto.',
+    hint: 'O vídeo ultrapassa o limite de 90 minutos. Envie um trecho menor ou escolha um vídeo mais curto.',
     canRetry: false,
   },
 ]
 
-function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
+function FailedPanel({ projectId, sourceUrl, errorMessage, onRetry }: {
   projectId: string
   sourceUrl: string | null
   errorMessage?: string | null
-  onRetrying: () => void
+  onRetry: () => Promise<void>
 }) {
-  const supabase = createClient()
   const [retrying, setRetrying] = useState(false)
   const [copied, setCopied] = useState(false)
   const [errorTime, setErrorTime] = useState('')
@@ -236,22 +239,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
   async function handleRetry() {
     if (!sourceUrl) return
     setRetrying(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'processing', error_message: null }),
-      }).catch(() => null)
-      await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: sourceUrl, project_id: projectId, user_id: user?.id }),
-      })
-      onRetrying()
-    } catch {
-      // silently fail — status will stay failed
-    }
+    await onRetry()
     setRetrying(false)
   }
 
@@ -341,9 +329,14 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetrying }: {
   )
 }
 
-function PipelineProgress({ elapsedSecs, clipsReady }: { elapsedSecs: number; clipsReady: number }) {
+function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSecs: number; clipsReady: number; backendStep?: string | null }) {
+  const realIdx = backendStep?.startsWith('step:')
+    ? PIPELINE_STEPS.findIndex(s => s.key === backendStep.slice(5))
+    : -1
   const activeIdx = clipsReady > 0
     ? PIPELINE_STEPS.length - 1
+    : realIdx >= 0
+    ? realIdx
     : (() => {
         let idx = 0
         for (let i = PIPELINE_STEPS.length - 1; i >= 0; i--) {
@@ -454,18 +447,18 @@ export default function ProjectClient({
   const supabase = createClient()
   const router = useRouter()
   const [isDeletingProject, setIsDeletingProject] = useState(false)
-  const [elapsedSecs, setElapsedSecs] = useState(() => {
-    const start = new Date(project.created_at).getTime()
-    return Math.max(0, Math.floor((Date.now() - start) / 1000))
-  })
+  // Zera ao reprocessar; senão um projeto antigo abriria direto na tela de "demorou demais"
+  const [processingSince, setProcessingSince] = useState(() => new Date(project.created_at).getTime())
+  const [elapsedSecs, setElapsedSecs] = useState(() => Math.max(0, Math.floor((Date.now() - processingSince) / 1000)))
+  // Incrementar reinicia o polling, que para sozinho quando o projeto termina ou falha
+  const [pollKey, setPollKey] = useState(0)
 
   useEffect(() => {
-    const start = new Date(project.created_at).getTime()
-    const t = setInterval(() => {
-      setElapsedSecs(Math.max(0, Math.floor((Date.now() - start) / 1000)))
-    }, 1000)
+    const tick = () => setElapsedSecs(Math.max(0, Math.floor((Date.now() - processingSince) / 1000)))
+    tick()
+    const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [project.created_at])
+  }, [processingSince])
 
   const [clips, setClips] = useState<Clip[]>(initialClips)
   const [status, setStatus] = useState(project.status)
@@ -840,7 +833,37 @@ export default function ProjectClient({
       active = false
       if (timer) clearTimeout(timer)
     }
-  }, [project.id])
+  }, [project.id, pollKey])
+
+  async function reprocessProject() {
+    const { data: { user } } = await supabase.auth.getUser()
+    setProcessingSince(Date.now())
+    setStatus('processing')
+    setErrorMessage(null)
+    await fetch(`/api/projects/${project.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'processing', error_message: null }),
+    }).catch(() => null)
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: project.source_url, project_id: project.id, user_id: user?.id }),
+    }).catch(() => null)
+    if (!res || !res.ok) {
+      const detail = res ? await res.json().catch(() => ({})) : {}
+      const msg = detail.error || 'O servidor de processamento não respondeu. Tente novamente em instantes.'
+      await fetch(`/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'failed', error_message: msg }),
+      }).catch(() => null)
+      setStatus('failed')
+      setErrorMessage(msg)
+      return
+    }
+    setPollKey(k => k + 1)
+  }
 
   const readyClips = clips.filter(c => c.status === 'ready' || c.storage_url)
   // activeClip sempre aponta para um clip pronto; se o índice selecionado for "rendering", usa o primeiro pronto
@@ -1186,9 +1209,9 @@ export default function ProjectClient({
       {/* 3. TELA DE ESPERA: processando sem nenhum corte PRONTO ainda */}
       {status === 'processing' && !clips.some(c => c.status === 'ready' || c.storage_url) && (
         <div className="flex-1 flex flex-col items-center justify-center py-20 px-4">
-          {elapsedSecs < 480 ? (
+          {elapsedSecs < PIPELINE_TIMEOUT_SECS ? (
             <>
-              <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} />
+              <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.length} backendStep={errorMessage} />
               <p className="mt-5 text-xs text-zinc-500 text-center max-w-sm">
                 O estúdio abrirá automaticamente quando o primeiro corte ficar pronto.
               </p>
@@ -1202,22 +1225,12 @@ export default function ProjectClient({
               <div>
                 <h3 className="text-sm font-semibold text-white">Pipeline demorou demais</h3>
                 <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                  O processamento não foi concluído em 8 minutos — pode ter sido interrompido pelo servidor. Tente novamente.
+                  O processamento não foi concluído em {PIPELINE_TIMEOUT_SECS / 60} minutos — pode ter sido interrompido pelo servidor. Tente novamente.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    await fetch(`/api/projects/${project.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ status: 'failed', error_message: 'Timeout: pipeline não concluído em 8 minutos.' }),
-                    })
-                    setStatus('failed')
-                    setErrorMessage('Timeout: pipeline não concluído em 8 minutos.')
-                  } catch { setStatus('failed') }
-                }}
+                onClick={() => { void reprocessProject() }}
                 className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer"
               >
                 Tentar Novamente
@@ -1229,7 +1242,7 @@ export default function ProjectClient({
 
       {/* BANNER DE PROGRESSO: processando com ao menos 1 corte pronto */}
       {status === 'processing' && clips.some(c => c.status === 'ready' || c.storage_url) && (
-        <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.filter(c => c.status === 'ready' || c.storage_url).length} />
+        <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={clips.filter(c => c.status === 'ready' || c.storage_url).length} backendStep={errorMessage} />
       )}
 
       {/* PAINEL DE ERRO COM CAUSA E BOTÃO DE RETENTAR */}
@@ -1238,7 +1251,7 @@ export default function ProjectClient({
           projectId={project.id}
           sourceUrl={project.source_url}
           errorMessage={errorMessage}
-          onRetrying={() => { setStatus('processing'); setErrorMessage(null) }}
+          onRetry={reprocessProject}
         />
       )}
 
@@ -1256,20 +1269,7 @@ export default function ProjectClient({
           </p>
           <div className="flex gap-3">
             <button
-              onClick={async () => {
-                const { data: { user } } = await supabase.auth.getUser()
-                setStatus('processing')
-                await fetch(`/api/projects/${project.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ status: 'processing', error_message: null }),
-                })
-                await fetch('/api/jobs', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url: project.source_url, project_id: project.id, user_id: user?.id }),
-                })
-              }}
+              onClick={() => { void reprocessProject() }}
               className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-400 rounded-xl transition-all cursor-pointer"
             >
               Reprocessar Vídeo
