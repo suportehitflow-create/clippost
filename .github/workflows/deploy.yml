@@ -40,9 +40,20 @@ jobs:
 
   deploy-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+
+      # Um deploy reinicia a única máquina do backend: espera os cortes em andamento terminarem
+      - name: Esperar cortes em andamento
+        run: |
+          for i in $(seq 1 90); do
+            ATIVOS=$(curl -s --max-time 15 https://clippost-backend.fly.dev/api/admin/active-jobs | jq -r '.active // 0' 2>/dev/null || echo 0)
+            if [ "${ATIVOS:-0}" = "0" ]; then echo "Nenhum corte em andamento"; exit 0; fi
+            echo "$ATIVOS corte(s) em andamento, aguardando 20s..."
+            sleep 20
+          done
+          echo "Ainda há cortes rodando após 30 min; publicando mesmo assim (kill_timeout dá mais 5 min)"
 
       - name: Deploy Backend (Fly.io)
         env:
@@ -59,6 +70,52 @@ jobs:
           FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
           echo "Fly.io health: $FLY_STATUS"
           [ "$FLY_STATUS" = "200" ] && echo "Backend OK" || echo "Backend not responding yet"
+
+  # Servidor do Editor em Massa (Next + FFmpeg). Só publica quando o código dele muda,
+  # porque o deploy interrompe a fila de vídeos em processamento.
+  deploy-editor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar flyctl
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          echo "$HOME/.fly/bin" >> "$GITHUB_PATH"
+
+      - name: Precisa publicar?
+        id: mudou
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if ! flyctl status -a clippost-editor >/dev/null 2>&1; then
+            echo "App ainda não existe no Fly: criando"
+            flyctl apps create clippost-editor --org personal
+            echo "publicar=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "publicar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          BASE="${{ github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then echo "publicar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^(src/lib/editor-massa/|src/app/api/editor-massa/|Dockerfile\.editor|fly\.editor\.toml|package(-lock)?\.json|next\.config\.ts)'; then
+            echo "publicar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nada do editor mudou"; echo "publicar=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy Editor em Massa (Fly.io)
+        if: steps.mudou.outputs.publicar == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only -c fly.editor.toml
+
+      - name: Verificar saúde
+        if: steps.mudou.outputs.publicar == 'true'
+        run: |
+          sleep 20
+          curl -sf --max-time 20 https://clippost-editor.fly.dev/api/editor-massa/saude && echo " Editor OK" || echo "Editor ainda não respondeu"
 
   deploy-cobalt:
     runs-on: ubuntu-latest
