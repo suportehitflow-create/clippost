@@ -25,6 +25,7 @@ from services.ffmpeg_engine import create_vertical_clip
 from services.stripe_service import check_clip_limit, increment_clips_used
 from services.subtitle_generator import generate_ass
 from services.template_detector import crop_to_region, detect_video_region
+from services.db_utils import maybe_one
 from tasks import _recompress_if_needed, _upload_clip_to_storage, supabase, transcribe_media
 
 _MAX_VIDEO_SECS = 10 * 60
@@ -131,7 +132,7 @@ def resume_pending_batches(enqueue) -> int:
 
 
 def _load_brand_kit(user_id: str, template_config: dict | None) -> dict:
-    resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+    resp = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", user_id))
     brand_kit = (resp.data if resp and resp.data else {}) or {}
     if template_config:
         brand_kit["layout_config"] = {**(brand_kit.get("layout_config") or {}), **template_config}

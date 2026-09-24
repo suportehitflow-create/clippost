@@ -13,6 +13,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from services.upload_post import publish_video, UploadPostError
 from services.social_publisher import publish_reel, publish_facebook_page, InstagramPublishError
+from services.db_utils import maybe_one
 
 load_dotenv()
 
@@ -45,7 +46,7 @@ def _get_meta_token(user_id: str, platform: str, social_account_id: str | None) 
             q = q.eq("id", social_account_id)
         else:
             q = q.eq("user_id", user_id).eq("platform", platform).eq("is_active", True)
-        res = q.maybe_single().execute()
+        res = maybe_one(q)
         return res.data
     except Exception:
         return None
@@ -72,7 +73,7 @@ def check_and_publish_scheduled_posts():
     published = failed = 0
     for post in due.data:
         platform = post["platform"]
-        clip = supabase.table("clips").select("storage_url, title").eq("id", post["clip_id"]).maybe_single().execute()
+        clip = maybe_one(supabase.table("clips").select("storage_url, title").eq("id", post["clip_id"]))
         clip_data = (clip.data if clip else None) or {}
         video_url = clip_data.get("storage_url")
         caption = post.get("caption") or clip_data.get("title") or ""

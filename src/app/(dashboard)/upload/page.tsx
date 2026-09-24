@@ -113,6 +113,7 @@ export default function CreateClipsPage() {
         const { error: upErr } = await supabase.storage.from('videos').upload(path, file)
         if (upErr) throw new Error('Falha no upload do vídeo: ' + upErr.message)
         sourceUrl = supabase.storage.from('videos').getPublicUrl(path).data.publicUrl
+        await supabase.from('projects').update({ source_url: sourceUrl, storage_path: path }).eq('id', project.id)
       }
 
       // Recupera o template ativo configurado pelo usuário para aplicar nos cortes

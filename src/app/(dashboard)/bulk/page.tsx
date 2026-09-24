@@ -86,6 +86,8 @@ function readActiveTemplate() {
       const parsed = JSON.parse(saved)
       return parsed.config || parsed
     }
+    const savedCfg = localStorage.getItem('clippost_template_config')
+    if (savedCfg) return JSON.parse(savedCfg)
   } catch {}
   return null
 }

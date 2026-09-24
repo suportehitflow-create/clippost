@@ -35,6 +35,7 @@ from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
 from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
 from services.scene_detector import detect_scenes
+from services.db_utils import maybe_one
 
 load_dotenv()
 
@@ -995,7 +996,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             return {"status": "failed", "reason": "no_clips_from_ai_or_scenes"}
 
                 # Brand Kit e Template Ativo do Usuário (100% integrado)
-        bk_resp = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+        bk_resp = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", user_id))
         brand_kit = bk_resp.data if bk_resp and bk_resp.data else {}
         if template_config:
             existing_cfg = brand_kit.get("layout_config") or {}
@@ -1080,14 +1081,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         # Auto-publish: se o perfil tiver auto_publish ativado, agenda os clipes no perfil ativo
         try:
-            profile_res = supabase.table("profiles").select("auto_publish, active_social_account_id").eq("id", user_id).maybe_single().execute()
+            profile_res = maybe_one(supabase.table("profiles").select("auto_publish, active_social_account_id").eq("id", user_id))
             if profile_res and profile_res.data and profile_res.data.get("auto_publish"):
                 active_acc_id = profile_res.data.get("active_social_account_id")
                 acc_res = None
                 if active_acc_id:
-                    acc_res = supabase.table("social_accounts").select("id, platform").eq("id", active_acc_id).maybe_single().execute()
+                    acc_res = maybe_one(supabase.table("social_accounts").select("id, platform").eq("id", active_acc_id))
                 if not acc_res or not acc_res.data:
-                    acc_res = supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
+                    acc_res = maybe_one(supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).eq("is_active", True))
                 if acc_res and acc_res.data:
                     clips_res = supabase.table("clips").select("id, title").eq("project_id", project_id).eq("status", "ready").execute()
                     for c in (clips_res.data or []):
@@ -1135,7 +1136,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
     """Re-renderiza um clipe existente com novo preset de legenda via FFmpeg."""
     tmp_dir = None
     try:
-        clip_res = supabase.table("clips").select("*").eq("id", clip_id).maybe_single().execute()
+        clip_res = maybe_one(supabase.table("clips").select("*").eq("id", clip_id))
         if not clip_res or not clip_res.data:
             print(f"[re-render] clip {clip_id} não encontrado")
             return {"status": "error", "message": "clip not found"}
@@ -1146,7 +1147,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
         start = float(clip.get("start_time", 0))
         end = float(clip.get("end_time", start + 60))
 
-        proj_res = supabase.table("projects").select("raw_video_url,transcript,source_url").eq("id", project_id).maybe_single().execute()
+        proj_res = maybe_one(supabase.table("projects").select("raw_video_url,transcript,source_url").eq("id", project_id))
         if not proj_res or not proj_res.data:
             supabase.table("clips").update({"status": "failed"}).eq("id", clip_id).execute()
             print(f"[re-render] projeto {project_id} não encontrado")
@@ -1236,7 +1237,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
             return {"status": "error", "message": "raw video not found"}
 
         # Obtém brand_kit do usuário antes de gerar legendas
-        brand_kit_res = supabase.table("brand_kits").select("*").eq("user_id", user_id).maybe_single().execute()
+        brand_kit_res = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", user_id))
         brand_kit = (brand_kit_res.data if brand_kit_res else None) or {}
         layout_cfg = (brand_kit or {}).get("layout_config") or {}
 

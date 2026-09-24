@@ -437,7 +437,7 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
 
     # Tamanho da fonte
     f_size = style_cfg["fontsize"]
-    if font_size and isinstance(font_size, (int, float)) and font_size >= 24:
+    if font_size and isinstance(font_size, (int, float)) and font_size > 0:
         if font_size <= 24:
             f_size = int(round(font_size * 3.8))
         else:

@@ -981,77 +981,53 @@ async def scrape_profile_reels(req: ProfileScrapeRequest):
     Mineracao de reels/videos de perfis publicos (Instagram, TikTok, YouTube).
     Permite filtrar por mais visualizados, mais curtidos e ordenar em lote.
     """
-    import subprocess
-    import json
+    from services.downloader import list_profile_videos
+    sort_map = {
+        "most_viewed": "views",
+        "most_liked": "likes",
+        "engagement": "engagement",
+        "recent": "date",
+    }
+    sort_by = sort_map.get(req.sort_by, "views")
 
-    handle = req.profile.strip().lstrip("@")
-    if "/" in handle:
-        parts = [p for p in handle.split("/") if p]
-        handle = parts[-1] if parts else handle
-
-    clean_handle = handle.replace("https://", "").replace("http://", "").replace("www.instagram.com/", "").replace("instagram.com/", "").split("?")[0].strip("/")
-
-    items = []
     try:
-        url = f"https://www.instagram.com/{clean_handle}/reels/"
-        cmd = [
-            "yt-dlp",
-            "--dump-json",
-            "--flat-playlist",
-            "--playlist-end", str(min(req.limit or 50, 60)),
-            "--no-warnings",
-            "--quiet",
-            url
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
-        if proc.returncode == 0 and proc.stdout.strip():
-            for line in proc.stdout.strip().split("\n"):
-                if line:
-                    try:
-                        data = json.loads(line)
-                        items.append({
-                            "id": data.get("id") or str(len(items) + 1),
-                            "title": data.get("title") or f"Reel de @{clean_handle}",
-                            "url": data.get("url") or data.get("webpage_url") or f"https://www.instagram.com/reel/{data.get('id')}/",
-                            "thumbnail": data.get("thumbnail") or (data.get("thumbnails", [{}])[-1].get("url") if data.get("thumbnails") else None),
-                            "views": data.get("view_count") or 0,
-                            "likes": data.get("like_count") or 0,
-                            "duration": data.get("duration") or 30,
-                            "type": "reel"
-                        })
-                    except Exception:
-                        continue
-    except Exception as e:
-        print(f"Scrape attempt error: {e}")
+        data = await asyncio.to_thread(list_profile_videos, req.profile, req.limit or 50, sort_by)
+        videos = data.get("videos") or []
+        items = []
+        for i, v in enumerate(videos):
+            items.append({
+                "id": str(i + 1),
+                "title": v.get("title") or f"Vídeo {i + 1}",
+                "url": v["url"],
+                "thumbnail": v.get("thumbnail"),
+                "views": v.get("view_count") or 0,
+                "likes": v.get("like_count") or 0,
+                "duration": v.get("duration") or 30,
+                "type": "reel",
+            })
 
-    if not items:
+        clean_handle = req.profile.strip().lstrip("@").split("/")[-1]
+        total_views = sum(it.get("views", 0) for it in items)
+        total_likes = sum(it.get("likes", 0) for it in items)
+
+        return {
+            "profile": {
+                "handle": clean_handle,
+                "name": clean_handle.replace(".", " ").replace("_", " ").upper(),
+                "followers": 0,
+                "views_total": str(total_views),
+                "likes_total": str(total_likes),
+                "posts_count": len(items),
+                "platform": data.get("platform", "instagram"),
+            },
+            "items": items,
+        }
+    except Exception as e:
+        print(f"[sources/profile] erro ao listar perfil {req.profile}: {e}")
         raise HTTPException(
             status_code=404,
-            detail=f"Não foi possível listar vídeos do perfil @{clean_handle}. "
-                   "O Instagram bloqueia scraping automatizado. "
-                   "Tente colar a URL diretamente de um Reel específico."
+            detail=f"Não foi possível listar vídeos do perfil: {e}",
         )
-
-    if req.sort_by == "most_viewed":
-        items.sort(key=lambda x: x.get("views", 0), reverse=True)
-    elif req.sort_by == "most_liked":
-        items.sort(key=lambda x: x.get("likes", 0), reverse=True)
-
-    total_views = sum(it.get("views", 0) for it in items)
-    total_likes = sum(it.get("likes", 0) for it in items)
-
-    return {
-        "profile": {
-            "handle": clean_handle,
-            "name": clean_handle.replace(".", " ").replace("_", " ").upper(),
-            "followers": 38400,
-            "views_total": str(total_views),
-            "likes_total": str(total_likes),
-            "posts_count": len(items),
-            "avatar_url": f"https://api.dicebear.com/7.x/bottts/svg?seed={clean_handle}",
-        },
-        "items": items,
-    }
 
 # ==========================================
 # Rotas: Radar de Tendências & Creator Studio

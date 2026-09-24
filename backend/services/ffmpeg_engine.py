@@ -216,10 +216,24 @@ def create_vertical_clip(
             print(f"[ffmpeg_engine] IA Smart Framing: focal={focal_x_pct}%, crop=({crop_w}x{crop_h} at {crop_x},{crop_y}) -> target=({target_w}x{target_h})")
         except Exception as sf_err:
             print(f"[ffmpeg_engine] smart_framing aviso ({sf_err}), usando centralizado padrão")
-            crop_w = int(round(CANVAS_W * (target_w / float(target_h))))
-            crop_h = CANVAS_W
-            crop_x = max(0, (CANVAS_H - crop_w) // 2)
-            crop_y = 0
+            try:
+                from services.smart_framing import get_video_dimensions
+                in_w, in_h = get_video_dimensions(input_video)
+            except Exception:
+                in_w, in_h = 1280, 720
+            box_aspect = max(0.2, float(target_w / float(target_h)))
+            if in_w / max(1, in_h) >= box_aspect:
+                crop_h = in_h
+                crop_w = min(in_w, int(round(in_h * box_aspect)))
+                crop_w -= (crop_w % 2)
+                crop_x = max(0, (in_w - crop_w) // 2)
+                crop_y = 0
+            else:
+                crop_w = in_w
+                crop_h = min(in_h, int(round(in_w / box_aspect)))
+                crop_h -= (crop_h % 2)
+                crop_x = 0
+                crop_y = max(0, (in_h - crop_h) // 2)
 
         # 3. Cor de fundo do Template
         template_bg = layout.get("templateBg", "dark")
