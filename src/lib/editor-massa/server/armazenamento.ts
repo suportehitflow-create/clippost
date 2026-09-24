@@ -69,7 +69,7 @@ export async function limparAntigos(horas = Number(process.env.EDITOR_MASSA_RETE
   for (const pasta of [PASTA_UPLOADS, PASTA_JOBS]) {
     let itens: string[] = [];
     try {
-      itens = await fs.readdir(pasta);
+      itens = await fs.readdir(/*turbopackIgnore: true*/ pasta);
     } catch {
       continue;
     }
