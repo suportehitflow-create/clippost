@@ -437,6 +437,6 @@ Responda apenas com o título.
 
 Legenda original: {original_title[:300]}
 Transcrição: {text or "(sem fala)"}"""
-    raw = _try_providers(prompt)
-    title = re.sub(r"[\"'*#`]", "", (raw or "").strip().splitlines()[0] if raw else "").strip().upper()
+    lines = (_try_providers(prompt) or "").strip().splitlines()
+    title = re.sub(r"[\"'*#`]", "", lines[0]).strip().upper() if lines else ""
     return title[:60] if title else fallback
