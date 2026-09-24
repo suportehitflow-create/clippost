@@ -766,7 +766,7 @@ export default function TemplatesPage() {
                 ) : saveStatus === 'error' ? (
                   <><X className="w-3 h-3 text-red-400" /> Não foi possível salvar — tente de novo</>
                 ) : (
-                  <><Check className="w-3 h-3 text-emerald-400" /> Salvo automaticamente</>
+                  <><Check className="w-3 h-3 text-indigo-400" /> Salvo automaticamente</>
                 )}
               </span>
             </div>
@@ -784,7 +784,7 @@ export default function TemplatesPage() {
             {saving ? (
               <RotateCcw className="w-3.5 h-3.5 animate-spin" />
             ) : savedSuccess ? (
-              <Check className="w-3.5 h-3.5 text-emerald-300" />
+              <Check className="w-3.5 h-3.5 text-indigo-300" />
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
@@ -1166,7 +1166,7 @@ export default function TemplatesPage() {
                       onClick={() => setShowTitleEmojis(true)}
                       className={`py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         showTitleEmojis
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-orange-500/30 font-bold'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/30 font-bold'
                           : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
@@ -1574,8 +1574,8 @@ export default function TemplatesPage() {
               
               {/* LINHA GUIA MAGNÉTICA HORIZONTAL (CENTRO X: 50%) */}
               {snapActiveX && (
-                <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-50 pointer-events-none flex items-center justify-center">
-                  <span className="bg-cyan-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-12">
+                <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1.5px] bg-indigo-400 shadow-[0_0_8px_rgba(34,211,238,0.9)] z-50 pointer-events-none flex items-center justify-center">
+                  <span className="bg-indigo-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow absolute top-12">
                     Centro X 50%
                   </span>
                 </div>
@@ -1751,7 +1751,7 @@ export default function TemplatesPage() {
                 >
                   <div className="w-full h-full bg-gradient-to-br from-[#0c0a1a] via-[#161233] to-[#251b4d] flex flex-col items-center justify-center relative overflow-hidden select-none">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.25),transparent_70%)]" />
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl shadow-indigo-500/40 ring-1 ring-white/20 mb-2 z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/40 ring-1 ring-white/20 mb-2 z-10">
                       <Play className="w-6 h-6 text-white fill-white ml-0.5" />
                     </div>
                     <span className="text-[11px] font-bold text-zinc-200 tracking-wider uppercase z-10 drop-shadow">Prévia do Vídeo</span>

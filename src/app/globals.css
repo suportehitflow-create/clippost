@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
-/* theme: orange v2 */
+/* Paleta única: cinza (zinc) + degradê índigo→roxo; vermelho só para erro */
 :root {
   --background: #060608;
   --foreground: #f0f0ff;
   --card: rgba(255,255,255,0.04);
   --card-border: rgba(255,255,255,0.08);
   --card-blur: blur(20px);
-  --muted: #6b7280;
-  --accent: #ea580c;
-  --accent-hover: #c2410c;
-  --accent-glow: rgba(234, 88, 12, 0.25);
-  --success: #10b981;
-  --warning: #f59e0b;
+  --muted: #71717a;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-gradient: linear-gradient(90deg, #4f46e5, #6366f1, #9333ea);
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --success: #818cf8;
+  --warning: #a1a1aa;
   --danger: #ef4444;
 }
 
@@ -41,9 +42,9 @@ h1, h2, h3 {
 }
 
 .glass-accent {
-  background: rgba(234,88,12,0.12);
+  background: rgba(99,102,241,0.12);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(234,88,12,0.25);
+  border: 1px solid rgba(99,102,241,0.25);
 }
 
 ::selection { background: var(--accent-glow); }

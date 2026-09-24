@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
@@ -184,12 +184,12 @@ export default function TrendsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-              <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
+            <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border border-zinc-500/30 text-zinc-300 font-mono text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+              <Flame className="w-3 h-3 text-zinc-400 fill-zinc-400" />
               Radar Viral 24/7 Ativo
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
               Stealth Scraper Conectado
             </span>
           </div>
@@ -223,7 +223,7 @@ export default function TrendsPage() {
       {/* Metrics Highlights Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 rounded-2xl bg-[#121216] border border-white/[0.06] flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-zinc-500/10 border border-zinc-500/20 flex items-center justify-center text-zinc-400">
             <Flame className="w-5 h-5" />
           </div>
           <div>
@@ -243,7 +243,7 @@ export default function TrendsPage() {
         </div>
 
         <div className="p-4 rounded-2xl bg-[#121216] border border-white/[0.06] flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
@@ -317,8 +317,8 @@ export default function TrendsPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
                 {/* Score Pill */}
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold flex items-center gap-1 shadow-lg">
-                  <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md border border-zinc-500/40 text-zinc-300 font-mono text-[10px] font-bold flex items-center gap-1 shadow-lg">
+                  <Flame className="w-3 h-3 text-zinc-400 fill-zinc-400" />
                   <span>{item.virality_score}% Viral</span>
                 </div>
 

@@ -125,9 +125,9 @@ export default function BillingPage() {
             <h2 style={{ fontWeight: 700, fontSize: '1.1rem' }}>Plano atual</h2>
             <span style={{
               padding: '0.3rem 0.85rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 700,
-              background: isPro ? '#ea580c22' : '#3f3f4622',
+              background: isPro ? '#6366f122' : '#3f3f4622',
               color: isPro ? '#a78bfa' : '#71717a',
-              border: `1px solid ${isPro ? '#ea580c44' : '#52525b'}`,
+              border: `1px solid ${isPro ? '#6366f155' : '#52525b'}`,
             }}>
               {isPro ? '⚡ Pro' : 'Gratuito'}
             </span>
@@ -145,7 +145,7 @@ export default function BillingPage() {
               <div style={{
                 height: '100%', borderRadius: '999px', transition: 'width 0.4s',
                 width: `${usedPct}%`,
-                background: usedPct >= 100 ? '#ef4444' : usedPct >= 66 ? '#f59e0b' : '#ea580c',
+                background: usedPct >= 100 ? '#ef4444' : usedPct >= 66 ? '#a1a1aa' : '#6366f1',
               }} />
             </div>
           )}
@@ -169,7 +169,7 @@ export default function BillingPage() {
           </div>
 
           {/* Pro */}
-          <div style={{ ...card, border: '1px solid #ea580c66', background: isPro ? '#1a0a2e' : 'var(--card)' }}>
+          <div style={{ ...card, border: '1px solid #6366f166', background: isPro ? '#1a0a2e' : 'var(--card)' }}>
             <p style={{ fontWeight: 700, marginBottom: '0.75rem', color: '#a78bfa' }}>⚡ Pro</p>
             <p style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>$19<span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--muted)' }}>/mês</span></p>
             <ul style={{ fontSize: '0.82rem', color: 'var(--muted, #71717a)', lineHeight: 2, listStyle: 'none', padding: 0 }}>
@@ -188,7 +188,7 @@ export default function BillingPage() {
             onClick={handleUpgrade}
             disabled={loading}
             style={{
-              padding: '0.9rem', background: '#ea580c', color: '#fff',
+              padding: '0.9rem', background: 'linear-gradient(90deg, #4f46e5, #6366f1, #9333ea)', color: '#fff',
               border: 'none', borderRadius: '0.6rem', fontWeight: 700,
               fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.7 : 1,

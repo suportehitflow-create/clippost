@@ -64,7 +64,7 @@ export function LiquidToggle({
         className={`relative w-[42px] h-[22px] rounded-full p-0 cursor-pointer border transition-colors duration-250 outline-none overflow-visible shrink-0 ${
           checked
             ? activeColor === 'emerald'
-              ? 'bg-emerald-500 border-emerald-400/80 shadow-[0_0_10px_rgba(16,185,129,0.35)]'
+              ? 'bg-indigo-500 border-indigo-400/80 shadow-[0_0_10px_rgba(99,102,241,0.35)]'
               : 'bg-indigo-600 border-indigo-400/80 shadow-[0_0_10px_rgba(99,102,241,0.35)]'
             : 'bg-zinc-800 border-white/10 hover:border-white/20 hover:bg-zinc-700/80'
         }`}

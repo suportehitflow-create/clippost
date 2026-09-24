@@ -184,7 +184,7 @@ export default function SettingsPage() {
           </p>
         </div>
         {savedNotice && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold animate-in fade-in">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold animate-in fade-in">
             <Check className="w-3.5 h-3.5" />
             <span>Salvo</span>
           </div>
@@ -229,8 +229,8 @@ export default function SettingsPage() {
         <section id="social" className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6 space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
-                <LinkIcon className="w-4 h-4 text-pink-400" />
+              <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                <LinkIcon className="w-4 h-4 text-purple-400" />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white">Contas Conectadas</h2>
@@ -241,7 +241,7 @@ export default function SettingsPage() {
 
           {/* Feedback de conexão Meta */}
           {metaConnected && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs">
               <CheckCircle2 className="w-4 h-4" />
               <span>Instagram e Facebook conectados com sucesso!</span>
             </div>
@@ -291,7 +291,7 @@ export default function SettingsPage() {
             <button
               onClick={connectViaMeta}
               disabled={connectingMeta}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-pink-500/30 hover:bg-pink-500/[0.03] transition-all cursor-pointer text-left disabled:opacity-50"
+              className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-purple-500/30 hover:bg-purple-500/[0.03] transition-all cursor-pointer text-left disabled:opacity-50"
             >
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
                 <span>📸</span>
@@ -360,7 +360,7 @@ export default function SettingsPage() {
         {/* SEÇÃO: AUTO-POST */}
         <section className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6 space-y-5">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <div className="w-8 h-8 rounded-xl bg-zinc-500/10 border border-zinc-500/20 flex items-center justify-center text-zinc-400">
               <Zap className="w-4 h-4" />
             </div>
             <div>
@@ -380,9 +380,9 @@ export default function SettingsPage() {
             <LiquidToggle checked={autoPublish} onChange={toggleAutoPublish} activeColor="indigo" />
           </div>
           {!autoPublish && (
-            <div className="p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/20 text-amber-300/80 text-[11px] leading-relaxed">
-              <strong className="text-amber-300">Auto-post desativado.</strong> Após gerar os cortes, vá para
-              a tela de Agendamentos e clique em <strong className="text-amber-300">"Agendar todos"</strong> para publicar em lote.
+            <div className="p-3 rounded-xl bg-zinc-500/[0.06] border border-zinc-500/20 text-zinc-300/80 text-[11px] leading-relaxed">
+              <strong className="text-zinc-300">Auto-post desativado.</strong> Após gerar os cortes, vá para
+              a tela de Agendamentos e clique em <strong className="text-zinc-300">"Agendar todos"</strong> para publicar em lote.
             </div>
           )}
         </section>

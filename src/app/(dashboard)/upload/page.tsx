@@ -10,21 +10,21 @@ function getPlatformInfo(inputUrl: string) {
   if (!inputUrl.trim()) return null
   const u = inputUrl.toLowerCase()
   if (u.includes('youtube.com') || u.includes('youtu.be')) {
-    return { name: 'YouTube', color: 'bg-red-500/10 text-red-400 border-red-500/20' }
+    return { name: 'YouTube', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
   }
   if (u.includes('tiktok.com')) {
-    return { name: 'TikTok', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' }
+    return { name: 'TikTok', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
   }
   if (u.includes('instagram.com')) {
-    return { name: 'Instagram Reels', color: 'bg-pink-500/10 text-pink-400 border-pink-500/20' }
+    return { name: 'Instagram Reels', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
   }
   if (u.includes('twitter.com') || u.includes('x.com')) {
-    return { name: 'X / Twitter', color: 'bg-zinc-400/10 text-zinc-300 border-zinc-500/20' }
+    return { name: 'X / Twitter', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
   }
   if (u.includes('twitch.tv')) {
-    return { name: 'Twitch', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' }
+    return { name: 'Twitch', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
   }
-  return { name: 'Vídeo Web (yt-dlp)', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' }
+  return { name: 'Vídeo Web (yt-dlp)', color: 'bg-white/[0.04] text-zinc-300 border-white/[0.1]' }
 }
 
 export default function CreateClipsPage() {
@@ -240,11 +240,11 @@ export default function CreateClipsPage() {
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 <span className="text-[10px] text-zinc-500">Plataformas suportadas:</span>
                 {[
-                  { name: 'YouTube', color: 'text-red-400 bg-red-500/10' },
-                  { name: 'TikTok', color: 'text-cyan-400 bg-cyan-500/10' },
-                  { name: 'Instagram', color: 'text-pink-400 bg-pink-500/10' },
-                  { name: 'X / Twitter', color: 'text-zinc-300 bg-zinc-500/10' },
-                  { name: 'Twitch', color: 'text-indigo-400 bg-indigo-500/10' },
+                  { name: 'YouTube', color: 'text-zinc-400 bg-white/[0.04]' },
+                  { name: 'TikTok', color: 'text-zinc-400 bg-white/[0.04]' },
+                  { name: 'Instagram', color: 'text-zinc-400 bg-white/[0.04]' },
+                  { name: 'X / Twitter', color: 'text-zinc-400 bg-white/[0.04]' },
+                  { name: 'Twitch', color: 'text-zinc-400 bg-white/[0.04]' },
                 ].map(p => (
                   <span key={p.name} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.color}`}>
                     {p.name}
@@ -319,7 +319,7 @@ export default function CreateClipsPage() {
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                    removeSilence ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-500'
+                    removeSilence ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
                   }`}>
                     <VolumeX className="w-4 h-4" />
                   </div>

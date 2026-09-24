@@ -404,7 +404,7 @@ export default function SchedulePageV2() {
               ))}
             </div>
 
-            <span className="text-[10px] text-amber-400/90 flex items-center gap-1 font-mono">
+            <span className="text-[10px] text-zinc-400/90 flex items-center gap-1 font-mono">
               ⚠️ Limite: 10 Reels de teste por dia por perfil conectado (Apenas Instagram).
             </span>
           </div>
@@ -436,7 +436,7 @@ export default function SchedulePageV2() {
               <span className="text-[10px] text-purple-400 font-mono mt-2">
                 📍 Máximo de 150 mídias por agendamento. Para mais, faça outro lote.
               </span>
-              <span className="text-[10px] text-amber-400 font-mono mt-1">
+              <span className="text-[10px] text-zinc-400 font-mono mt-1">
                 ⚠️ Somente vídeos 1080x1920 (9:16 vertical) são aceitos — padrão Instagram Reels
               </span>
             </label>
@@ -536,7 +536,7 @@ export default function SchedulePageV2() {
               </div>
             )}
             {successMsg && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs">
                 {successMsg}
               </div>
             )}
@@ -556,7 +556,7 @@ export default function SchedulePageV2() {
                 type="button"
                 onClick={() => handleScheduleSubmit(true)}
                 disabled={saving}
-                className="w-full py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 ⚡ Publicar Agora
               </button>

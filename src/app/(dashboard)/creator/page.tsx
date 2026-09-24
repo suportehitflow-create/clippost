@@ -209,7 +209,7 @@ export default function CreatorPage() {
             onClick={handleCopy}
             className="px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Roteiro Copiado!' : 'Copiar Roteiro'}</span>
           </button>
           <button
@@ -346,7 +346,7 @@ export default function CreatorPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                <div className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono font-bold">
                   {script.estimated_retention_score}% Retenção Prevista
                 </div>
                 <div className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-xs font-mono">
@@ -358,8 +358,8 @@ export default function CreatorPage() {
             {/* Hook Box de Alta Atenção */}
             <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-black border border-indigo-500/30 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-bold flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 fill-zinc-400 text-zinc-400" />
                   Gancho Crítico de 3 Segundos (00:00 - 00:03)
                 </span>
                 <span className="text-[10px] text-zinc-400">Taxa de Parada &gt; 80%</span>

@@ -95,7 +95,7 @@ export default function LoginPage() {
         
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.75rem', borderRadius: '9999px', background: 'rgba(249, 115, 22, 0.1)', border: '1px solid rgba(249, 115, 22, 0.2)', color: '#f97316', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.75rem', borderRadius: '9999px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#818cf8', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <Zap size={13} /> Clipost Pro
           </div>
           <h1 style={{ fontWeight: 800, fontSize: '1.65rem', letterSpacing: '-0.025em', color: '#fff', marginBottom: '0.35rem' }}>
@@ -152,13 +152,13 @@ export default function LoginPage() {
             gap: '0.6rem',
             padding: '0.85rem 1rem',
             borderRadius: '0.75rem',
-            background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+            background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #9333ea 100%)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             color: '#fff',
             fontWeight: 700,
             fontSize: '0.95rem',
             cursor: testLoading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 8px 20px -4px rgba(234, 88, 12, 0.35)',
+            boxShadow: '0 8px 20px -4px rgba(99, 102, 241, 0.35)',
             transition: 'all 0.2s ease',
             marginBottom: '1rem',
           }}
@@ -221,7 +221,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
-          Não tem conta? <Link href="/signup" style={{ color: '#f97316', textDecoration: 'none', fontWeight: 600 }}>Criar conta grátis →</Link>
+          Não tem conta? <Link href="/signup" style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600 }}>Criar conta grátis →</Link>
         </p>
       </div>
     </div>

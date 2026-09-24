@@ -112,13 +112,13 @@ interface WordTiming {
 
 // Presets de legenda limpos no padrão Apple
 const SUBTITLE_STYLES = [
-  { id: 'hormozi_orange', name: 'Hormozi Laranja', activeColor: '#ffffff', activeBg: '#ea580c', border: 'border-orange-500/40' },
-  { id: 'hormozi_yellow', name: 'Hormozi Amarelo', activeColor: '#000000', activeBg: '#facc15', border: 'border-yellow-400/40' },
+  { id: 'hormozi_orange', name: 'Hormozi Laranja', activeColor: '#ffffff', activeBg: '#ea580c', border: 'border-indigo-500/40' },
+  { id: 'hormozi_yellow', name: 'Hormozi Amarelo', activeColor: '#000000', activeBg: '#facc15', border: 'border-zinc-400/40' },
   { id: 'clean_white', name: 'Clean White', activeColor: '#000000', activeBg: '#ffffff', border: 'border-white/40' },
   { id: 'clean_white_box', name: 'Clean White Box', activeColor: '#000000', activeBg: '#ffffff', border: 'border-white/40' },
   { id: 'dark_box', name: 'Dark Box', activeColor: '#f97316', activeBg: '#18181b', border: 'border-zinc-700' },
-  { id: 'neon_cyan', name: 'Cyan Pro', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(6,182,212,0.8)', border: 'border-cyan-400/40' },
-  { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-pink-500/40' },
+  { id: 'neon_cyan', name: 'Cyan Pro', activeColor: '#22d3ee', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(6,182,212,0.8)', border: 'border-indigo-400/40' },
+  { id: 'neon_magenta', name: 'Magenta Pro', activeColor: '#f472b6', activeBg: 'rgba(0,0,0,0.85)', glow: '0 0 12px rgba(236,72,153,0.8)', border: 'border-purple-500/40' },
 ]
 
 // `key` = etapa que o backend grava em projects.error_message ("step:<key>") durante o processamento
@@ -251,11 +251,11 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetry }: {
   }
 
   const colorMap: Record<string, string> = {
-    amber:  'bg-amber-500/10 border-amber-500/25 text-amber-300',
-    orange: 'bg-orange-500/10 border-orange-500/25 text-orange-300',
+    amber:  'bg-zinc-500/10 border-zinc-500/25 text-zinc-300',
+    orange: 'bg-indigo-500/10 border-indigo-500/25 text-indigo-300',
     red:    'bg-red-500/10 border-red-500/25 text-red-300',
     purple: 'bg-purple-500/10 border-purple-500/25 text-purple-300',
-    blue:   'bg-blue-500/10 border-blue-500/25 text-blue-300',
+    blue:   'bg-indigo-500/10 border-indigo-500/25 text-indigo-300',
     zinc:   'bg-zinc-500/10 border-zinc-500/25 text-zinc-300',
   }
   const colorClass = colorMap[category.color] || colorMap.red
@@ -279,7 +279,7 @@ function FailedPanel({ projectId, sourceUrl, errorMessage, onRetry }: {
             className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.10] text-zinc-400 hover:text-white text-[11px] font-medium transition-all cursor-pointer border border-white/[0.08]"
             title="Copiar erro para diagnóstico"
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-indigo-400" /> : <Copy className="w-3 h-3" />}
             {copied ? 'Copiado!' : 'Copiar erro'}
           </button>
         </div>
@@ -360,7 +360,7 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-white">Processando com IA</span>
                 {clipsReady > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
                     {clipsReady} {clipsReady === 1 ? 'corte pronto' : 'cortes prontos'}
                   </span>
                 )}
@@ -398,7 +398,7 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
                 key={i}
                 className={`flex flex-col gap-1.5 p-3 rounded-xl border transition-all ${
                   isDone
-                    ? 'bg-emerald-500/8 border-emerald-500/20'
+                    ? 'bg-indigo-500/8 border-indigo-500/20'
                     : isActive
                     ? 'bg-indigo-500/10 border-indigo-500/30'
                     : 'bg-white/[0.02] border-white/[0.05]'
@@ -406,10 +406,10 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
               >
                 <div className="flex items-center gap-1.5">
                   <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                    isDone ? 'bg-emerald-500/20' : isActive ? 'bg-indigo-500/20' : 'bg-white/[0.06]'
+                    isDone ? 'bg-indigo-500/20' : isActive ? 'bg-indigo-500/20' : 'bg-white/[0.06]'
                   }`}>
                     {isDone ? (
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <CheckCircle2 className="w-3 h-3 text-indigo-400" />
                     ) : isActive ? (
                       <Loader2 className="w-3 h-3 text-indigo-400 animate-spin" />
                     ) : (
@@ -417,7 +417,7 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
                     )}
                   </div>
                   <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    isDone ? 'text-emerald-400' : isActive ? 'text-indigo-300' : 'text-zinc-600'
+                    isDone ? 'text-indigo-400' : isActive ? 'text-indigo-300' : 'text-zinc-600'
                   }`}>
                     {isDone ? 'Concluído' : isActive ? 'Em andamento' : 'Aguardando'}
                   </span>
@@ -1092,7 +1092,7 @@ export default function ProjectClient({
               {project.title}
             </h1>
             {status === 'processing' ? (
-              <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 whitespace-nowrap flex items-center gap-1">
+              <span className="text-[10px] font-medium text-zinc-400 bg-zinc-500/10 px-2.5 py-0.5 rounded-full border border-zinc-500/20 whitespace-nowrap flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" /> Processando
               </span>
             ) : status === 'failed' ? (
@@ -1100,7 +1100,7 @@ export default function ProjectClient({
                 <X className="w-3 h-3" /> Falhou
               </span>
             ) : (
-              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1">
+              <span className="text-[10px] font-medium text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20 whitespace-nowrap flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> {clips.length} cortes prontos
               </span>
             )}
@@ -1187,7 +1187,7 @@ export default function ProjectClient({
                   <span className="font-semibold">#{idx + 1}</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
                     scorePercent >= 90
-                      ? 'bg-emerald-500/15 text-emerald-400'
+                      ? 'bg-indigo-500/15 text-indigo-400'
                       : 'bg-indigo-500/15 text-indigo-400'
                   }`}>
                     {scorePercent}%
@@ -1219,8 +1219,8 @@ export default function ProjectClient({
           ) : (
             /* Timeout de 8 min: pipeline travado — oferece retry automático */
             <div className="max-w-md w-full bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6 space-y-4 text-center">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
-                <AlertCircle className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-zinc-500/10 border border-zinc-500/20 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-5 h-5 text-zinc-400" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">Pipeline demorou demais</h3>
@@ -1270,7 +1270,7 @@ export default function ProjectClient({
           <div className="flex gap-3">
             <button
               onClick={() => { void reprocessProject() }}
-              className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-400 rounded-xl transition-all cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-400 rounded-xl transition-all cursor-pointer"
             >
               Reprocessar Vídeo
             </button>
@@ -1614,7 +1614,7 @@ export default function ProjectClient({
               <button
                 type="button"
                 onClick={() => setViralityModalMetrics(activeVirality)}
-                className="px-2.5 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                className="px-2.5 py-1 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
                 title="Clique para ver a análise de retenção e motivo"
               >
                 <Flame className="w-3.5 h-3.5" />
@@ -1662,7 +1662,7 @@ export default function ProjectClient({
                       className="w-full text-left p-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-all cursor-pointer flex items-center justify-between gap-2"
                     >
                       <span className="truncate">{sug.title}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono shrink-0">98% CTR</span>
+                      <span className="text-[10px] text-indigo-400 font-mono shrink-0">98% CTR</span>
                     </button>
                   ))}
                 </div>
@@ -1709,7 +1709,7 @@ export default function ProjectClient({
             {clips.length > 1 && (
               <div className="pt-1.5">
                 {scheduleAllMsg && (
-                  <div className={scheduleAllMsg.startsWith('Erro') ? 'p-2 rounded-lg text-xs text-center bg-red-500/10 text-red-400' : 'p-2 rounded-lg text-xs text-center bg-emerald-500/10 text-emerald-400'}>
+                  <div className={scheduleAllMsg.startsWith('Erro') ? 'p-2 rounded-lg text-xs text-center bg-red-500/10 text-red-400' : 'p-2 rounded-lg text-xs text-center bg-indigo-500/10 text-indigo-400'}>
                     {scheduleAllMsg}
                   </div>
                 )}
@@ -2023,7 +2023,7 @@ export default function ProjectClient({
                           <span>{formatDuration(Math.floor(duration))}</span>
                           <span>•</span>
                           <span className={`${
-                            scoreP >= 90 ? 'text-emerald-400' : 'text-indigo-400'
+                            scoreP >= 90 ? 'text-indigo-400' : 'text-indigo-400'
                           }`}>
                             {scoreP}% Viral
                           </span>
@@ -2067,7 +2067,7 @@ export default function ProjectClient({
           <div className="bg-[#121216] border border-white/10 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-emerald-400" />
+                <Flame className="w-4 h-4 text-indigo-400" />
                 <h3 className="text-sm font-bold text-white">Diagnóstico de Viralidade IA</h3>
               </div>
               <button
@@ -2082,7 +2082,7 @@ export default function ProjectClient({
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                 <span className="text-zinc-300">Nota Geral:</span>
-                <span className="text-sm font-bold text-emerald-400">{viralityModalMetrics.score}/100</span>
+                <span className="text-sm font-bold text-indigo-400">{viralityModalMetrics.score}/100</span>
               </div>
 
               <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-1">
@@ -2181,7 +2181,7 @@ export default function ProjectClient({
                 }}
                 className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/[0.08]"
               >
-                {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedUrl ? <Check className="w-3.5 h-3.5 text-indigo-400" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedUrl ? 'Link Copiado!' : 'Copiar Link Direto'}</span>
               </button>
             </div>
