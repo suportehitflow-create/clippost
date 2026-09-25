@@ -56,12 +56,16 @@ export default function Sidebar({ user }: { user: User }) {
       {/* Logo / Home */}
       <Link
         href="/inicio"
-        title="Clipost - Início"
-        className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shrink-0 mr-0.5"
+        className="group relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shrink-0 mr-0.5"
+        aria-label="Clipost Studio"
       >
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20 group-hover:scale-105 transition-transform">
           <Scissors className="w-4 h-4 text-white" />
         </div>
+        <span className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-[#121218] text-white font-medium text-[11px] tracking-wide shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
+          Clipost Studio
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-[#121218] border-r border-b border-white/15" />
+        </span>
       </Link>
 
       <div className="w-px h-6 bg-white/10 mx-0.5" />
@@ -101,9 +105,10 @@ export default function Sidebar({ user }: { user: User }) {
               />
             </span>
 
-            {/* Bencho Floating Tip (.gdock-tip acima do ícone) */}
-            <span className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-[#18181b] text-white font-mono text-[9px] uppercase tracking-wider shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
+            {/* Bencho Floating Tip (.gdock-tip acima do ícone) rigorosamente centralizado */}
+            <span className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-[#121218] text-white font-medium text-[11px] tracking-wide shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
               {item.label}
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-[#121218] border-r border-b border-white/15" />
             </span>
           </Link>
         )
@@ -135,8 +140,9 @@ export default function Sidebar({ user }: { user: User }) {
             }`}
           />
         </span>
-        <span className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-[#18181b] text-white font-mono text-[9px] uppercase tracking-wider shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
+        <span className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-[#121218] text-white font-medium text-[11px] tracking-wide shadow-2xl border border-white/15 opacity-0 pointer-events-none group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0 z-50 whitespace-nowrap">
           Ajustes
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-[#121218] border-r border-b border-white/15" />
         </span>
       </Link>
     </nav>

@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
-import { Scissors, Link2, Clock, VolumeX, Check, Loader2, UploadCloud, AlertCircle, Sparkles, Music, Mic, X } from 'lucide-react'
+import { Scissors, Link2, Clock, Check, Loader2, UploadCloud, AlertCircle, Sparkles, X } from 'lucide-react'
 
 function getPlatformInfo(inputUrl: string) {
   if (!inputUrl.trim()) return null
@@ -138,18 +138,7 @@ export default function CreateClipsPage() {
       } catch {}
 
       // Áudio dos cortes: música de fundo (vai para o Storage) e limpeza da voz
-      let audioConfig: Record<string, unknown> = { enhanceAudio }
-      if (musicFile) {
-        const ext = (musicFile.name.split('.').pop() || 'mp3').toLowerCase()
-        const musicPath = `${user.id}/music/${Date.now()}.${ext}`
-        const uploadedMusic = await uploadFileViaSignedUrl(supabase, 'videos', musicPath, musicFile, { contentType: musicFile.type || 'audio/mpeg' })
-        audioConfig = {
-          ...audioConfig,
-          musicUrl: uploadedMusic.publicUrl,
-          musicVolume: musicVolume / 100,
-        }
-      }
-      activeTemplateConfig = { ...(activeTemplateConfig || {}), ...audioConfig }
+      
 
       // Dispara job no backend com o template ativo; sem confirmação o projeto ficaria preso em "processing"
       const jobRes = await fetch('/api/jobs', {
@@ -162,7 +151,7 @@ export default function CreateClipsPage() {
           project_id: project.id,
           template_preset: 'meme_frame',
           template_config: activeTemplateConfig,
-          remove_silence: removeSilence,
+          remove_silence: false,
         }),
       }).catch(() => null)
       if (!jobRes || !jobRes.ok) {
@@ -216,13 +205,13 @@ export default function CreateClipsPage() {
         <div className="text-center space-y-2.5 max-w-lg mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Curadoria Automática por IA</span>
+            <span>Ferramenta #1 • Vídeo Longo para Vídeos Curtos</span>
           </div>
           <h2 className="text-3xl font-black tracking-tight text-white">
-            Criar Novos Cortes Virais
+            Criar cortes a partir de vídeos longos
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-            Cole links do YouTube, TikTok, Reels ou faça upload de um arquivo. A IA encontra ganchos de alta retenção, centraliza em 9:16 e gera legendas animadas.
+            Focado no YouTube e arquivos longos de vídeo. A IA encontra os momentos virais de maior retenção, recorta no formato 9:16 e gera os clipes prontos.
           </p>
         </div>
 
@@ -279,7 +268,7 @@ export default function CreateClipsPage() {
                 </div>
                 <input
                   type="url"
-                  placeholder="https://www.youtube.com/watch?v=... ou link do TikTok / Instagram"
+                  placeholder="Cole o link do vídeo do YouTube (ex: https://www.youtube.com/watch?v=...)"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
@@ -287,22 +276,7 @@ export default function CreateClipsPage() {
                 />
               </div>
 
-              {/* Badges de plataformas suportadas */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] text-zinc-500 font-mono">Compatível com:</span>
-                {[
-                  { name: 'YouTube', color: 'text-zinc-400 bg-white/[0.04]' },
-                  { name: 'TikTok', color: 'text-zinc-400 bg-white/[0.04]' },
-                  { name: 'Instagram Reels', color: 'text-zinc-400 bg-white/[0.04]' },
-                  { name: 'X / Twitter', color: 'text-zinc-400 bg-white/[0.04]' },
-                  { name: 'Twitch', color: 'text-zinc-400 bg-white/[0.04]' },
-                ].map(p => (
-                  <span key={p.name} className={`text-[10px] px-2 py-0.5 rounded-lg font-medium ${p.color} border border-white/[0.04]`}>
-                    {p.name}
-                  </span>
-                ))}
               </div>
-            </div>
           ) : (
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Arquivo de Vídeo (MP4, MOV)</label>
@@ -339,12 +313,11 @@ export default function CreateClipsPage() {
                   {clipDuration === 'auto' ? 'IA Automático' : `${clipDuration}s`}
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {[
                   { id: 'auto', label: '⚡ IA Dinâmico', desc: 'Até 1m30s (Ideal Reels/Shorts)' },
-                  { id: '30', label: '< 60s', desc: '20s - 45s (Ultra-rápidos)' },
-                  { id: '60', label: '60s', desc: '35s - 60s (Padrão viral)' },
-                  { id: '90', label: '60s+', desc: 'Até 90s (1 minuto e meio)' },
+                  { id: '30', label: '< 60s', desc: '20s - 50s (Ultra-rápidos)' },
+                  { id: '90', label: '> 60s', desc: '60s - 90s (Padrão e mais longos)' },
                 ].map(opt => (
                   <button
                     key={opt.id}
@@ -365,91 +338,6 @@ export default function CreateClipsPage() {
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Toggle de Silêncio */}
-            <div className="pt-1">
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-                    removeSilence ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'
-                  }`}>
-                    <VolumeX className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">Remover pausas longas e silêncios</span>
-                    <span className="text-[11px] text-zinc-400">Aumenta o ritmo e prende a atenção nos primeiros segundos</span>
-                  </div>
-                </div>
-                <LiquidToggle
-                  checked={removeSilence}
-                  onChange={setRemoveSilence}
-                  activeColor="indigo"
-                />
-              </div>
-            </div>
-
-            {/* Música de fundo */}
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${musicFile ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'}`}>
-                    <Music className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white block">Música de fundo</span>
-                    <span className="text-[11px] text-zinc-400 block truncate">{musicFile ? musicFile.name : 'Opcional — toca baixinho por baixo da fala'}</span>
-                  </div>
-                </div>
-                {musicFile ? (
-                  <button
-                    type="button"
-                    onClick={() => { setMusicFile(null); if (musicRef.current) musicRef.current.value = '' }}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06]"
-                    aria-label="Remover música"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => musicRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-white"
-                  >
-                    Escolher
-                  </button>
-                )}
-                <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={e => setMusicFile(e.target.files?.[0] || null)} />
-              </div>
-              {musicFile && (
-                <div className="flex items-center gap-3">
-                  <label htmlFor="music-volume" className="text-[11px] text-zinc-400 w-16">Volume</label>
-                  <input
-                    id="music-volume"
-                    type="range"
-                    min={5}
-                    max={100}
-                    value={musicVolume}
-                    onChange={e => setMusicVolume(Number(e.target.value))}
-                    className="flex-1 accent-indigo-500"
-                  />
-                  <span className="text-[11px] text-zinc-300 font-mono w-9 text-right">{musicVolume}%</span>
-                </div>
-              )}
-            </div>
-
-            {/* Limpeza da voz */}
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${enhanceAudio ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-zinc-500'}`}>
-                  <Mic className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-white block">Melhorar áudio da fala</span>
-                  <span className="text-[11px] text-zinc-400">Tira ruído grave e agudo e equilibra o volume da voz</span>
-                </div>
-              </div>
-              <LiquidToggle checked={enhanceAudio} onChange={setEnhanceAudio} activeColor="indigo" />
             </div>
           </div>
 

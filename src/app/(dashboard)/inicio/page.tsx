@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 
 interface Feature {
+  number: string
   title: string
   description: string
   href: string
@@ -32,61 +33,77 @@ interface Feature {
 
 const FEATURES: Feature[] = [
   {
-    title: 'Criar Novos Cortes 9:16',
-    description: 'Cole o link do YouTube, Reels ou TikTok. A IA detecta os pontos de retenção máxima e corta no formato vertical com legendas virais.',
+    number: '01',
+    title: 'Criar cortes a partir de vídeos longos',
+    description: 'Transforme vídeos longos do YouTube ou arquivos MP4 em clipes curtos verticais 9:16 com os melhores momentos e legendas virais automáticas.',
     href: '/upload',
     icon: Scissors,
-    badge: 'Mais Usado',
+    badge: 'Ferramenta #1',
     badgeColor: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
     wide: true,
   },
   {
+    number: '02',
     title: 'Edição em Massa & Perfis',
-    description: 'Aplique seu template oficial em dezenas de vídeos ou raspe um perfil inteiro de uma vez só.',
+    description: 'Editor visual em grade com recorte 9:16, templates de marca e servidor FFmpeg dedicado para processar dezenas de vídeos.',
     href: '/bulk',
     icon: Layers,
-    badge: 'Escala',
+    badge: 'Ferramenta #2',
     badgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   },
   {
+    number: '03',
     title: 'Radar de Viralidade',
     description: 'Monitore vídeos que estão explodindo em engajamento nas últimas 24h para minerar antes da concorrência.',
     href: '/trends',
     icon: Flame,
-    badge: 'Tempo Real',
+    badge: 'Ferramenta #3',
     badgeColor: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
   },
   {
+    number: '04',
     title: 'Estúdio de Roteiros IA',
     description: 'Gere roteiros persuasivos e ganchos magnéticos estruturados com técnicas de retenção e storytelling.',
     href: '/creator',
     icon: PenTool,
+    badge: 'Ferramenta #4',
+    badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   },
   {
+    number: '05',
     title: 'Identidade Visual & Templates',
     description: 'Configure layout, cores, fontes Apple/Instagram e posições de títulos e legendas para os seus cortes.',
     href: '/templates',
     icon: Sparkles,
+    badge: 'Ferramenta #5',
+    badgeColor: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
   },
   {
+    number: '06',
     title: 'Autopilot 24/7',
     description: 'Monitore canais do YouTube e perfis para minerar, cortar e preparar clipes sozinho a cada novo upload.',
     href: '/autopilot',
     icon: Zap,
-    badge: 'Automático',
+    badge: 'Ferramenta #6',
     badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   },
   {
+    number: '07',
     title: 'Calendário & Publicações',
     description: 'Agende publicações programadas com legendas prontas e hashtags direto para Instagram, TikTok e Shorts.',
     href: '/schedule',
     icon: Calendar,
+    badge: 'Ferramenta #7',
+    badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   },
   {
+    number: '08',
     title: 'Meus Projetos & Vídeos',
     description: 'Acesse todo o histórico de vídeos processados, transcrições e cortes renderizados prontos para download.',
     href: '/dashboard',
     icon: FolderOpen,
+    badge: 'Histórico',
+    badgeColor: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
   },
 ]
 
@@ -100,8 +117,13 @@ function FeatureCard({ feature }: { feature: Feature }) {
       }`}
     >
       <div className="flex items-start justify-between">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20 group-hover:scale-105 transition-transform">
-          <Icon className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20 group-hover:scale-105 transition-transform">
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-sm font-mono font-bold text-zinc-500 group-hover:text-indigo-400 transition-colors">
+            #{feature.number}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           {feature.badge && (
