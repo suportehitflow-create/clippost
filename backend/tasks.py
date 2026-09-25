@@ -179,10 +179,17 @@ def _agendar_autopilot(project_id: str, user_id: str) -> bool:
     if not watch_id or not (get_settings(user_id).get("autopilot_autopost") or {}).get(watch_id):
         return False
 
-    contas = (
-        supabase.table("social_accounts").select("id, platform")
-        .eq("user_id", user_id).eq("is_active", True).execute().data or []
-    )
+    # Conta ativa do perfil (profiles.active_social_account_id); sem ela, todas as conectadas.
+    # (social_accounts não tem coluna is_active no banco de produção)
+    contas = []
+    perfil = maybe_one(supabase.table("profiles").select("active_social_account_id").eq("id", user_id))
+    ativa = (perfil.data or {}).get("active_social_account_id") if perfil else None
+    if ativa:
+        contas = supabase.table("social_accounts").select("id, platform").eq("id", ativa).execute().data or []
+    if not contas:
+        contas = supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).execute().data or []
+    # scheduled_posts aceita youtube_shorts (não "youtube")
+    contas = [{**c, "platform": "youtube_shorts" if c["platform"] == "youtube" else c["platform"]} for c in contas]
     if not contas:
         print(f"[autopilot] postar automaticamente ligado, mas o usuário não tem conta conectada")
         return False
@@ -1238,7 +1245,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 if active_acc_id:
                     acc_res = maybe_one(supabase.table("social_accounts").select("id, platform").eq("id", active_acc_id))
                 if not acc_res or not acc_res.data:
-                    acc_res = maybe_one(supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).eq("is_active", True))
+                    # social_accounts não tem is_active em produção: usa a primeira conta do usuário
+                    acc_res = maybe_one(supabase.table("social_accounts").select("id, platform").eq("user_id", user_id).limit(1))
                 if acc_res and acc_res.data:
                     clips_res = supabase.table("clips").select("id, title").eq("project_id", project_id).eq("status", "ready").execute()
                     for c in (clips_res.data or []):

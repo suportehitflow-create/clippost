@@ -45,7 +45,8 @@ def _get_meta_token(user_id: str, platform: str, social_account_id: str | None) 
         if social_account_id:
             q = q.eq("id", social_account_id)
         else:
-            q = q.eq("user_id", user_id).eq("platform", platform).eq("is_active", True)
+            # sem conta específica: a primeira conta daquela plataforma (não existe is_active no banco)
+            q = q.eq("user_id", user_id).eq("platform", platform).limit(1)
         res = maybe_one(q)
         return res.data
     except Exception:
@@ -53,7 +54,18 @@ def _get_meta_token(user_id: str, platform: str, social_account_id: str | None) 
 
 
 def _finish(post_id: str, status: str, detail: str) -> None:
-    supabase.table("scheduled_posts").update({"status": status}).eq("id", post_id).execute()
+    campos = {"status": status}
+    # motivo da falha / data de publicação aparecem no Calendário & Publicações
+    if status == "failed":
+        campos["error_message"] = (detail or "")[:900]
+    elif status == "published":
+        campos["published_at"] = datetime.now(timezone.utc).isoformat()
+        campos["error_message"] = None
+    try:
+        supabase.table("scheduled_posts").update(campos).eq("id", post_id).execute()
+    except Exception:
+        # banco sem as colunas extras: grava ao menos o status
+        supabase.table("scheduled_posts").update({"status": status}).eq("id", post_id).execute()
     print(f"[scheduler] post {post_id} -> {status}: {detail}")
 
 

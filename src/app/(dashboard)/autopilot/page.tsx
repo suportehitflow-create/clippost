@@ -144,7 +144,7 @@ export default function AutopilotPage() {
       setUserId(uid)
       const [rec, acc] = await Promise.all([
         supabase.from('autopilot_processed').select('project_id, watch_id, created_at, projects(id, title, status)').eq('user_id', uid).order('created_at', { ascending: false }).limit(12),
-        supabase.from('social_accounts').select('platform').eq('user_id', uid).eq('is_active', true),
+        supabase.from('social_accounts').select('platform').eq('user_id', uid),
       ])
       setRecentes(((rec.data as any[]) ?? []) as Recente[])
       setContas((acc.data as any[]) ?? [])
