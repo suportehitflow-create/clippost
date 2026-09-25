@@ -1,8 +1,8 @@
 name: Capas do painel
 
 # Gera as capas dos cards do Início com o Gemini DENTRO da máquina do backend (onde está a
-# GEMINI_API_KEY) e sobe no Storage público. Roda depois de cada deploy (só gera as que faltam)
-# ou manualmente com "forcar" para refazer todas.
+# GEMINI_API_KEY) e sobe no Storage público. Só manual (repositório público: logs são públicos;
+# o script nunca imprime a chave, mas não precisa rodar a cada deploy).
 on:
   workflow_dispatch:
     inputs:
@@ -10,16 +10,12 @@ on:
         description: "Refazer todas as capas"
         type: boolean
         default: false
-  workflow_run:
-    workflows: ["Deploy to Production"]
-    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   capas:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

@@ -35,13 +35,22 @@ MODELO_GEMINI = "gemini-2.5-flash-image"
 MODELO_IMAGEN = "imagen-4.0-fast-generate-001"
 
 
+def _erro(e: Exception) -> str:
+    """Mensagem de erro SEM a URL (as URLs de API nunca podem aparecer em log público)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"HTTP {e.response.status_code}"
+    return type(e).__name__
+
+
 def gerar(chave: str, prompt: str) -> bytes:
     base = "https://generativelanguage.googleapis.com/v1beta/models"
+    # A chave vai no cabeçalho, nunca na URL (a URL aparece em mensagens de erro)
+    cab = {"x-goog-api-key": chave}
     # 1) Gemini (Nano Banana)
     try:
         r = httpx.post(
             f"{base}/{MODELO_GEMINI}:generateContent",
-            params={"key": chave},
+            headers=cab,
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": "16:9"}},
@@ -55,11 +64,11 @@ def gerar(chave: str, prompt: str) -> bytes:
                 return base64.b64decode(dado["data"])
         raise RuntimeError("resposta sem imagem")
     except Exception as e:
-        print(f"  Gemini falhou ({str(e)[:160]}), tentando Imagen...")
+        print(f"  Gemini falhou ({_erro(e)}), tentando Imagen...")
     # 2) Imagen
     r = httpx.post(
         f"{base}/{MODELO_IMAGEN}:predict",
-        params={"key": chave},
+        headers=cab,
         json={"instances": [{"prompt": prompt}], "parameters": {"sampleCount": 1, "aspectRatio": "16:9"}},
         timeout=120,
     )
@@ -90,7 +99,7 @@ def main() -> int:
             print(f"  ok ({len(png) // 1024} KB)")
         except Exception as e:
             falhas += 1
-            print(f"  FALHOU: {str(e)[:200]}")
+            print(f"  FALHOU: {_erro(e)}")
     return 1 if falhas == len(CAPAS) else 0
 
 
