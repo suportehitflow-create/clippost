@@ -165,6 +165,49 @@ def _dispatch_pipeline(*args):
         enqueue("autopilot", process_youtube_video, *args)
 
 
+AUTOPILOT_INTERVALO_POSTS_H = 3  # um corte publicado a cada 3h para não inundar o perfil
+
+
+def _agendar_autopilot(project_id: str, user_id: str) -> bool:
+    """Se o projeto veio do Autopilot e o monitoramento tem 'Postar automaticamente' ligado,
+    agenda os cortes prontos (melhor nota primeiro) nas contas conectadas. True se agendou."""
+    from datetime import timedelta
+    from services.user_settings import get_settings
+
+    origem = maybe_one(supabase.table("autopilot_processed").select("watch_id").eq("project_id", project_id))
+    watch_id = (origem.data or {}).get("watch_id") if origem else None
+    if not watch_id or not (get_settings(user_id).get("autopilot_autopost") or {}).get(watch_id):
+        return False
+
+    contas = (
+        supabase.table("social_accounts").select("id, platform")
+        .eq("user_id", user_id).eq("is_active", True).execute().data or []
+    )
+    if not contas:
+        print(f"[autopilot] postar automaticamente ligado, mas o usuário não tem conta conectada")
+        return False
+    cortes = (
+        supabase.table("clips").select("id, title, hook, score")
+        .eq("project_id", project_id).eq("status", "ready").execute().data or []
+    )
+    cortes.sort(key=lambda c: c.get("score") or 0, reverse=True)
+    inicio = datetime.now(timezone.utc)
+    for i, c in enumerate(cortes):
+        quando = (inicio + timedelta(hours=AUTOPILOT_INTERVALO_POSTS_H * i)).isoformat()
+        for conta in contas:
+            supabase.table("scheduled_posts").insert({
+                "user_id": user_id,
+                "clip_id": c["id"],
+                "platform": conta["platform"],
+                "social_account_id": conta["id"],
+                "caption": c.get("hook") or c.get("title") or "",
+                "scheduled_at": quando,
+                "status": "scheduled",
+            }).execute()
+    print(f"[autopilot] {len(cortes)} corte(s) agendados em {len(contas)} conta(s) (1 a cada {AUTOPILOT_INTERVALO_POSTS_H}h)")
+    return bool(cortes)
+
+
 @celery.task(name="check_channel_watches")
 def check_channel_watches():
     """Canal AutoPilot: detecta vídeo novo nos canais monitorados e enfileira o corte.
@@ -194,35 +237,51 @@ def check_channel_watches():
         verificados += 1
         erro = None
         try:
-            resp = httpx.get(
-                "https://www.youtube.com/feeds/videos.xml",
-                params={"channel_id": w["channel_id"]},
-                timeout=20,
-                follow_redirects=True,
-            )
-            resp.raise_for_status()
+            # Vídeos do mais novo para o mais antigo: (id estável, título, link, plataforma)
+            prefixo = str(w["channel_id"]).split(":", 1)[0] if ":" in str(w["channel_id"]) else ""
+            plataforma = {"ig": "instagram", "tt": "tiktok", "fb": "facebook"}.get(prefixo, "youtube")
+            nome_canal = w.get("channel_name") or ""
+            if plataforma == "youtube":
+                resp = httpx.get(
+                    "https://www.youtube.com/feeds/videos.xml",
+                    params={"channel_id": w["channel_id"]},
+                    timeout=20,
+                    follow_redirects=True,
+                )
+                resp.raise_for_status()
+                raiz = ET.fromstring(resp.text)
+                nome_canal = nome_canal or raiz.findtext("atom:title", default="", namespaces=RSS_NS)
+                itens = [
+                    (e.find("yt:videoId", RSS_NS).text, e.find("atom:title", RSS_NS).text,
+                     f"https://www.youtube.com/watch?v={e.find('yt:videoId', RSS_NS).text}")
+                    for e in raiz.findall("atom:entry", RSS_NS)
+                ]
+            else:
+                # Instagram / TikTok / Facebook: listagem do perfil (Instagram precisa dos cookies no servidor)
+                from services.downloader import latest_profile_videos
+                recentes = latest_profile_videos(w.get("channel_handle") or "", 6)
+                itens = [(f"{prefixo}:{v['key']}", (v.get("title") or nome_canal or "Vídeo")[:200], v["url"]) for v in recentes]
 
-            raiz = ET.fromstring(resp.text)
-            entradas = raiz.findall("atom:entry", RSS_NS)
+            # Baseline guardado sem o prefixo nos perfis (é o 'key' do vídeo)
+            baseline = w.get("baseline_video_id")
+            if baseline and plataforma != "youtube" and not str(baseline).startswith(f"{prefixo}:"):
+                baseline = f"{prefixo}:{baseline}"
 
-            # Canal cadastrado enquanto o feed estava fora: marca o vídeo atual
-            # como referência e não clipa nada neste ciclo, senão o vídeo antigo
-            # do topo do feed viraria corte.
-            if not w.get("baseline_video_id"):
-                if entradas:
+            # Cadastrado enquanto a fonte estava fora: marca o vídeo atual como referência
+            # e não clipa nada neste ciclo, senão o vídeo antigo do topo viraria corte.
+            if not baseline:
+                if itens:
                     supabase.table("channel_watches").update({
-                        "baseline_video_id": entradas[0].findtext("yt:videoId", namespaces=RSS_NS),
-                        "channel_name": w.get("channel_name") or raiz.findtext(
-                            "atom:title", default="", namespaces=RSS_NS),
+                        "baseline_video_id": itens[0][0].split(":", 1)[-1] if plataforma != "youtube" else itens[0][0],
+                        "channel_name": nome_canal,
                     }).eq("id", w["id"]).execute()
                     print(f"[autopilot] baseline definido para {w['channel_id']}")
                 # Lista vazia em vez de continue: assim o laço abaixo não roda e
                 # o last_checked_at no fim do bloco ainda é atualizado.
-                entradas = []
+                itens = []
 
-            for entry in entradas[:5]:
-                video_id = entry.find("yt:videoId", RSS_NS).text
-                title = entry.find("atom:title", RSS_NS).text
+            for video_id, title, url in itens[:5]:
+                w = {**w, "baseline_video_id": baseline}
 
                 # O feed vem do mais novo para o mais antigo: ao alcançar o baseline,
                 # tudo daí para baixo já existia quando o canal foi cadastrado.
@@ -238,13 +297,12 @@ def check_channel_watches():
                 if ja_processado:
                     continue
 
-                url = f"https://www.youtube.com/watch?v={video_id}"
                 projeto = supabase.table("projects").insert({
                     "user_id": w["user_id"],
                     "title": title,
                     "source_type": "url",
                     "source_url": url,
-                    "platform": "youtube",
+                    "platform": plataforma,
                     "status": "pending",
                 }).execute().data[0]
 
@@ -711,11 +769,15 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         video_path = str(tmp_dir / "original.mp4")
         audio_path = str(tmp_dir / "audio.mp3")
 
-        # Cookies do YouTube (opcional — reduz muito a detecção de bot)
+        # Cookies de login da plataforma do link (YouTube reduz bot-detection; Instagram/TikTok/
+        # Facebook exigem login para vários vídeos — ex.: Autopilot monitorando perfis)
         _fallback_cookies = "/tmp/yt_cookies.txt"
         cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE") or (
             _fallback_cookies if os.path.exists(_fallback_cookies) else None
         )
+        for _plat, _dominio in (("instagram", "instagram.com"), ("tiktok", "tiktok.com"), ("facebook", "facebook.com")):
+            if _dominio in url and os.environ.get(f"{_plat.upper()}_COOKIES_FILE"):
+                cookies_file = os.environ[f"{_plat.upper()}_COOKIES_FILE"]
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {
@@ -1160,10 +1222,17 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as inc_err:
             print(f"[pipeline] increment_clips_used falhou (não crítico): {inc_err}")
 
+        # Autopilot com "Postar automaticamente" ligado naquele canal/perfil
+        ja_agendou = False
+        try:
+            ja_agendou = _agendar_autopilot(project_id, user_id)
+        except Exception as ap_err:
+            print(f"[autopilot] agendamento automático falhou (não crítico): {ap_err}")
+
         # Auto-publish: se o perfil tiver auto_publish ativado, agenda os clipes no perfil ativo
         try:
             profile_res = maybe_one(supabase.table("profiles").select("auto_publish, active_social_account_id").eq("id", user_id))
-            if profile_res and profile_res.data and profile_res.data.get("auto_publish"):
+            if not ja_agendou and profile_res and profile_res.data and profile_res.data.get("auto_publish"):
                 active_acc_id = profile_res.data.get("active_social_account_id")
                 acc_res = None
                 if active_acc_id:

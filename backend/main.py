@@ -313,7 +313,8 @@ def _restore_cookies_from_storage():
         for platform in ("instagram", "youtube", "tiktok", "facebook"):
             target_path = Path(f"/tmp/{platform}_cookies.txt")
             try:
-                raw_bytes = supabase.storage.from_("videos").download(f"_config/{platform}_cookies.txt")
+                # bucket privado (o "videos" é público — cookies nunca ficam lá)
+                raw_bytes = supabase.storage.from_("config-privado").download(f"{platform}_cookies.txt")
                 if raw_bytes and len(raw_bytes) > 10:
                     target_path.write_bytes(raw_bytes)
                     os.environ[f"{platform.upper()}_COOKIES_FILE"] = str(target_path)
@@ -355,8 +356,15 @@ class ConnectRequest(BaseModel):
 
 class WatchRequest(BaseModel):
     user_id: str
-    canal: str  # @handle, URL do canal ou ID UC...
+    canal: str  # YouTube: @handle, URL do canal ou ID UC... | Instagram/TikTok/Facebook: link do perfil
     clip_duration: str = "auto"
+    auto_post: bool = False  # publicar sozinho os cortes de cada vídeo novo
+
+
+class WatchUpdateRequest(BaseModel):
+    user_id: str
+    auto_post: bool | None = None
+    is_active: bool | None = None
 
 
 SCHEDULE_PLATFORMS = {"tiktok", "instagram", "youtube_shorts", "facebook"}
@@ -591,14 +599,54 @@ async def list_connected_social(user_id: str):
     return {"configured": True, "accounts": accounts}
 
 
+_PREFIXO_PERFIL = {"instagram": "ig", "tiktok": "tt", "facebook": "fb"}
+
+
+def _autopost_map(user_id: str) -> dict:
+    from services.user_settings import get_settings
+    return dict(get_settings(user_id).get("autopilot_autopost") or {})
+
+
+def _salvar_autopost(user_id: str, watch_id: str, valor: bool) -> None:
+    from services.user_settings import save_settings
+    mapa = _autopost_map(user_id)
+    mapa[watch_id] = bool(valor)
+    save_settings(user_id, autopilot_autopost=mapa)
+
+
 @app.post("/api/autopilot/watches")
 async def criar_watch(req: WatchRequest):
     if req.clip_duration not in {"30", "60", "90", "120", "auto"}:
         raise HTTPException(status_code=400, detail=f"Duração inválida: {req.clip_duration}")
+
+    # Instagram / TikTok / Facebook: monitora o perfil pela listagem de vídeos (precisa dos
+    # cookies da plataforma no servidor para o Instagram); YouTube continua pelo RSS do canal
+    from services.downloader import profile_key, latest_profile_videos
     try:
-        info = resolve_channel(req.canal)
-    except CanalNaoEncontrado as e:
+        perfil = profile_key(req.canal)
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if perfil:
+        plataforma, nome, url_perfil = perfil
+        try:
+            recentes = await asyncio.to_thread(latest_profile_videos, url_perfil, 3)
+        except Exception as e:
+            dica = " Conecte os cookies do Instagram em Edição em Massa → Baixar de um perfil." if plataforma == "instagram" else ""
+            raise HTTPException(status_code=400, detail=f"Não consegui ler os vídeos desse perfil agora.{dica} ({str(e)[:160]})")
+        info = {
+            "channel_id": f"{_PREFIXO_PERFIL[plataforma]}:{nome.lower()}",
+            "channel_name": f"@{nome}",
+            "baseline_video_id": recentes[0]["key"] if recentes else None,
+            "ultimo_video": ({"titulo": recentes[0].get("title") or "", "url": recentes[0]["url"]} if recentes else None),
+            "handle": url_perfil,
+        }
+    else:
+        try:
+            info = resolve_channel(req.canal)
+        except CanalNaoEncontrado as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        info["handle"] = req.canal.strip()
 
     ja_existe = (
         supabase.table("channel_watches").select("id")
@@ -606,16 +654,19 @@ async def criar_watch(req: WatchRequest):
         .execute().data
     )
     if ja_existe:
-        raise HTTPException(status_code=409, detail="Esse canal já está sendo monitorado.")
+        raise HTTPException(status_code=409, detail="Esse perfil/canal já está sendo monitorado.")
 
     row = supabase.table("channel_watches").insert({
         "user_id": req.user_id,
         "channel_id": info["channel_id"],
-        "channel_handle": req.canal.strip(),
+        "channel_handle": info["handle"],
         "channel_name": info["channel_name"],
         "baseline_video_id": info["baseline_video_id"],
         "clip_duration": req.clip_duration,
     }).execute().data[0]
+    if req.auto_post:
+        await asyncio.to_thread(_salvar_autopost, req.user_id, row["id"], True)
+    row["auto_post"] = bool(req.auto_post)
     return {"watch": row, "ultimo_video": info["ultimo_video"]}
 
 
@@ -625,7 +676,22 @@ async def listar_watches(user_id: str):
         supabase.table("channel_watches").select("*")
         .eq("user_id", user_id).order("created_at", desc=True).execute()
     )
-    return {"watches": resp.data or []}
+    autopost = await asyncio.to_thread(_autopost_map, user_id)
+    watches = [{**w, "auto_post": bool(autopost.get(w["id"]))} for w in (resp.data or [])]
+    return {"watches": watches}
+
+
+@app.patch("/api/autopilot/watches/{watch_id}")
+async def atualizar_watch(watch_id: str, req: WatchUpdateRequest):
+    """Liga/desliga o monitoramento e o 'Postar automaticamente' de um canal/perfil."""
+    dono = maybe_one(supabase.table("channel_watches").select("id").eq("id", watch_id).eq("user_id", req.user_id))
+    if not dono or not dono.data:
+        raise HTTPException(status_code=404, detail="Monitoramento não encontrado.")
+    if req.is_active is not None:
+        supabase.table("channel_watches").update({"is_active": req.is_active}).eq("id", watch_id).execute()
+    if req.auto_post is not None:
+        await asyncio.to_thread(_salvar_autopost, req.user_id, watch_id, req.auto_post)
+    return {"ok": True}
 
 
 class AutopilotSettingsRequest(BaseModel):
@@ -773,9 +839,44 @@ async def active_jobs():
     return {"active": len(jobs), "jobs": jobs}
 
 
+_BUCKET_PRIVADO = "config-privado"
+
+
+def _storage_privado():
+    """Bucket PRIVADO para segredos (cookies de login). O bucket "videos" é público: nunca usar para isso."""
+    if supabase is None:
+        return None
+    try:
+        nomes = {b.name for b in supabase.storage.list_buckets()}
+        if _BUCKET_PRIVADO not in nomes:
+            supabase.storage.create_bucket(_BUCKET_PRIVADO, options={"public": False})
+    except Exception as e:
+        print(f"[storage] bucket privado indisponível: {e}")
+    return supabase.storage.from_(_BUCKET_PRIVADO)
+
+
+async def _exigir_login(request: Request) -> str:
+    """Valida o token de login (Bearer) no Supabase; com ADMIN_EMAILS definido, só esses e-mails passam."""
+    token = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    if not token or supabase is None:
+        raise HTTPException(status_code=401, detail="Faça login.")
+    try:
+        resp = await asyncio.to_thread(lambda: supabase.auth.get_user(token))
+        user = resp.user
+    except Exception:
+        user = None
+    if not user:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+    admins = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+    if admins and (user.email or "").lower() not in admins:
+        raise HTTPException(status_code=403, detail="Só o administrador pode alterar os cookies do servidor.")
+    return user.id
+
+
 @app.post("/api/admin/set-instagram-cookies")
 async def set_instagram_cookies(request: Request):
-    """Carrega cookies do Instagram via HTTP e persiste no Supabase Storage."""
+    """Carrega cookies do Instagram via HTTP e persiste no Storage PRIVADO. Exige login."""
+    await _exigir_login(request)
     body = await request.json()
     cookies_raw = body.get("cookies", "") or body.get("cookies_b64", "")
     if not cookies_raw.strip():
@@ -791,15 +892,16 @@ async def set_instagram_cookies(request: Request):
             f.write(raw)
         os.environ["INSTAGRAM_COOKIES_FILE"] = cookies_path
         
-        # Persiste no bucket videos para não perder ao reiniciar a máquina
+        # Persiste no bucket PRIVADO para não perder ao reiniciar a máquina
         try:
-            if supabase:
-                supabase.storage.from_("videos").upload(
-                    "_config/instagram_cookies.txt",
+            privado = _storage_privado()
+            if privado:
+                privado.upload(
+                    "instagram_cookies.txt",
                     raw.encode("utf-8"),
                     file_options={"content-type": "text/plain", "upsert": "true"}
                 )
-                print(f"[admin] cookies do Instagram persistidos no Supabase Storage")
+                print(f"[admin] cookies do Instagram persistidos no Storage privado")
         except Exception as st_err:
             print(f"[admin] aviso ao persistir cookies no storage: {st_err}")
 

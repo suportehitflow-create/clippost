@@ -315,6 +315,37 @@ def _sort_key(sort_by: str):
     return key
 
 
+def video_key(url: str) -> str:
+    """Id estável de um vídeo a partir do link (shortcode do Instagram, id do TikTok...)."""
+    for padrao in (r"/(?:reel|reels|p|tv)/([A-Za-z0-9_-]+)", r"/video/(\d+)", r"[?&]v=([A-Za-z0-9_-]{6,})",
+                   r"/shorts/([A-Za-z0-9_-]+)", r"/videos/(\d+)", r"[?&]v=(\d+)"):
+        m = re.search(padrao, url)
+        if m:
+            return m.group(1)
+    return url.rstrip("/").rsplit("/", 1)[-1][:120]
+
+
+def profile_key(raw: str) -> tuple[str, str, str] | None:
+    """(plataforma, nome do perfil, url do perfil) para Instagram/TikTok/Facebook; None para YouTube
+    (um "@canal" solto continua sendo YouTube, como sempre foi no Autopilot)."""
+    if not re.search(r"(instagram\.com|tiktok\.com|facebook\.com|fb\.com)", raw, re.I):
+        return None
+    url = normalize_profile_url(raw)
+    platform = detect_platform(url)
+    if platform not in ("instagram", "tiktok", "facebook"):
+        return None
+    m = re.search(r"(?:instagram\.com|tiktok\.com|facebook\.com)/(@?[^/?#]+)", url)
+    if not m or m.group(1).lower() in ("reel", "reels", "p", "explore", "watch", "video"):
+        raise ValueError("Cole o link do PERFIL (ex.: instagram.com/nomedoperfil), não de um vídeo.")
+    return platform, m.group(1).lstrip("@"), url
+
+
+def latest_profile_videos(url: str, limit: int = 6) -> list[dict]:
+    """Vídeos mais recentes de um perfil (do mais novo para o mais antigo), com 'key' estável."""
+    videos = list_profile_videos(url, limit=limit, sort_by="date")["videos"]
+    return [{**v, "key": video_key(v["url"])} for v in videos]
+
+
 def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views") -> dict:
     """
     Vídeos de um perfil/página (TikTok, Instagram, Facebook, YouTube) ordenados.

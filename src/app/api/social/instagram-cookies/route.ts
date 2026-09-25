@@ -19,12 +19,15 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // o backend valida o login de novo: repassa o token da sessão
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return NextResponse.json({ error: 'Sessão expirada, entre de novo' }, { status: 401 })
 
   try {
     const body = await req.json()
     const res = await fetch(`${BACKEND}/api/admin/set-instagram-cookies`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     })
