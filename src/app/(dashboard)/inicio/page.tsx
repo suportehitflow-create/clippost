@@ -17,6 +17,7 @@ import {
   Search,
   Activity,
   Music2,
+  Quote,
   ArrowUpRight,
   Video,
   Clock,
@@ -56,8 +57,9 @@ const FEATURES: Feature[] = [
   { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246' },
   { capa: 'calendario', title: 'Calendário & Publicações', description: 'Programe as postagens no Instagram, TikTok e YouTube e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
+  { capa: 'frases', title: 'Vídeos com frases', description: 'Fotos, frases e música viram vídeos 9:16 em série — prontos na Biblioteca e já agendados.', href: '/frases', icon: Quote, cor: '168,85,247', badge: 'Novo' },
   { capa: 'musicas', title: 'Músicas', description: 'Sua biblioteca de faixas salva na conta, pronta para o Editor em Massa e os vídeos com frases.', href: '/musicas', icon: Music2, cor: '219,39,119' },
-  { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, Raio-X de perfil, YouTube → texto, melhores horários, contador, quebra de linha e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', wide: true },
+  { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, Raio-X de perfil, YouTube → texto, melhores horários, contador, quebra de linha e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', inteiro: true },
 ]
 
 const CAPAS_URL = `${(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co').replace(/[﻿​-‍\s]/g, '').replace(/\/$/, '')}/storage/v1/object/public/videos/site/capas`

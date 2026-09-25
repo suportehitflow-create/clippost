@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import ProfileSwitcher from '@/components/ProfileSwitcher'
+import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal } from '@/components/pagina/Base'
 import { useExtensaoClipost, ModalExtensao } from '@/components/bulk/ExtensaoInstagram'
 import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import {
-  Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink,
+  Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink, AtSign, ArrowDownWideNarrow,
 } from 'lucide-react'
 
 // Explorador de perfis: busca os posts de um perfil (Instagram, TikTok, YouTube), mostra em grade com
@@ -217,51 +217,45 @@ export default function ExplorarPage() {
   const instagram = /instagram\.com/i.test(perfil) || (!!perfil && !/[./]/.test(perfil.replace(/^@/, '')))
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c] text-white">
-      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-2"><Search className="w-4 h-4 text-sky-300" /><h1 className="text-sm font-semibold tracking-wide">Explorar perfis</h1></div>
-        <div className="flex justify-center"><ProfileSwitcher align="center" /></div>
-        <span />
-      </header>
+    <Pagina icone={Search} titulo="Explorar perfis" largura="max-w-6xl">
+        <Intro selo="Busca por @" titulo="Baixe e reposte de qualquer perfil"
+          descricao="Reels, posts e carrosséis do Instagram — e vídeos do TikTok e YouTube. Marque os que quiser e baixe, salve na Biblioteca ou edite com o seu template." />
 
-      <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-5">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold tracking-tight">Busque, baixe e reposte de qualquer perfil</h2>
-          <p className="text-sm text-zinc-400">Reels, posts e carrosséis do Instagram — e vídeos do TikTok e YouTube. Baixe, salve na Biblioteca ou edite com o seu template.</p>
-        </div>
-
-        {/* busca */}
-        <section className="flex flex-col lg:flex-row gap-2">
-          <input id="explorar-perfil" value={perfil} onChange={e => setPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && !buscando && buscar()}
-            placeholder="@perfil, instagram.com/perfil, tiktok.com/@perfil, youtube.com/@canal"
-            className="flex-1 px-4 py-3 rounded-2xl bg-black/40 border border-white/[0.1] text-sm placeholder-zinc-600 outline-none focus:border-indigo-500" />
-          <div className="flex gap-2">
-            <select id="explorar-limite" value={limite} onChange={e => setLimite(Number(e.target.value))} className="px-3 py-3 rounded-2xl bg-black/40 border border-white/[0.1] text-sm" aria-label="Quantidade">
-              {QUANTIDADES.map(q => <option key={q} value={q}>{q.toLocaleString('pt-BR')}</option>)}
-            </select>
-            <select id="explorar-ordem" value={ordem} onChange={e => setOrdem(e.target.value)} className="px-3 py-3 rounded-2xl bg-black/40 border border-white/[0.1] text-sm" aria-label="Ordem">
-              {ORDENS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-            </select>
-            <select id="explorar-periodo" value={periodo} onChange={e => setPeriodo(Number(e.target.value))} className="px-3 py-3 rounded-2xl bg-black/40 border border-white/[0.1] text-sm" aria-label="Período">
-              {PERIODOS.map(p => <option key={p.v} value={p.v}>{p.l}</option>)}
-            </select>
-            <button type="button" onClick={buscar} disabled={buscando || !perfil.trim()}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-sm font-semibold flex items-center gap-2 disabled:opacity-50">
-              {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Buscar
-            </button>
+        {/* busca: um cartão, como no Criar cortes */}
+        <Cartao className="max-w-3xl w-full mx-auto">
+          <div className="space-y-2.5">
+            <Rotulo>Perfil</Rotulo>
+            <Campo icone={AtSign} id="explorar-perfil" value={perfil} onChange={e => setPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && !buscando && buscar()}
+              placeholder="@perfil, tiktok.com/@perfil ou youtube.com/@canal" />
+            {instagram && !res && (
+              <p className="text-[11px] text-zinc-500">
+                {oficial?.configurado
+                  ? <span className="text-emerald-300">Instagram pela API oficial da Meta — sem bloqueio.</span>
+                  : <>Instagram bloqueando? <button type="button" onClick={() => setModalOficial(true)} className="underline text-zinc-300">conecte a API oficial</button> ou <button type="button" onClick={() => setModalExtensao(true)} className="underline text-zinc-300">use a extensão{instalada ? ' ✓' : ''}</button>.</>}
+              </p>
+            )}
           </div>
-        </section>
 
-        {/* Instagram: de onde vem */}
-        {instagram && !res && (
-          <p className="text-[11px] text-zinc-500">
-            Instagram:{' '}
-            {oficial?.configurado
-              ? <span className="text-emerald-300">API oficial conectada — busca direto, sem bloqueio (perfis profissionais).</span>
-              : <><button type="button" onClick={() => setModalOficial(true)} className="underline text-zinc-300">conecte a API oficial</button> para buscar direto no site, </>}
-            {!oficial?.configurado && <>ou <button type="button" onClick={() => setModalExtensao(true)} className="underline text-zinc-300">use a extensão{instalada ? ' (instalada ✓)' : ''}</button>.</>}
-          </p>
-        )}
+          <div className="space-y-4 pt-4 border-t border-white/[0.06]">
+            <div className="space-y-2">
+              <Rotulo direita={
+                <select id="explorar-limite" value={limite} onChange={e => setLimite(Number(e.target.value))} aria-label="Quantidade"
+                  className="text-[11px] font-mono font-bold text-indigo-300 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 outline-none">
+                  {QUANTIDADES.map(q => <option key={q} value={q}>{q.toLocaleString('pt-BR')} posts</option>)}
+                </select>
+              }><ArrowDownWideNarrow className="w-3.5 h-3.5 text-indigo-400" /> Ordem</Rotulo>
+              <Opcoes valor={ordem} mudar={setOrdem} opcoes={ORDENS.map(o => ({ id: o.v, label: o.l }))} />
+            </div>
+            <div className="space-y-2">
+              <Rotulo><CalendarIcon className="w-3.5 h-3.5 text-indigo-400" /> Período</Rotulo>
+              <Opcoes<number> colunas={4} valor={periodo} mudar={setPeriodo} opcoes={PERIODOS.map(p => ({ id: p.v, label: p.l }))} />
+            </div>
+          </div>
+
+          <BotaoPrincipal icone={Search} onClick={buscar} disabled={!perfil.trim()} carregando={buscando} textoCarregando="Lendo os posts do perfil…">
+            Buscar posts
+          </BotaoPrincipal>
+        </Cartao>
 
         {buscando && (
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.08] px-4 py-3 text-xs text-zinc-400 flex items-center gap-2">
@@ -393,14 +387,13 @@ export default function ExplorarPage() {
 
         {!res && !buscando && !erro && (
           <div className="rounded-3xl border border-dashed border-white/[0.1] p-10 text-center text-sm text-zinc-500 space-y-1">
-            <p>Digite um @ e clique em Buscar.</p>
+            <p>Digite um @ e clique em Buscar posts.</p>
             <p className="text-[11px]">Depois é só marcar os posts e escolher: baixar, salvar na <Link href="/dashboard" className="underline">Biblioteca</Link>, editar com o seu template ou abrir no Editor.</p>
           </div>
         )}
-      </div>
 
       {modalOficial && <ModalInstagramOficial status={oficial} fechar={() => setModalOficial(false)} aoSalvar={recarregar} />}
       {modalExtensao && <ModalExtensao instalada={instalada} fechar={() => setModalExtensao(false)} />}
-    </div>
+    </Pagina>
   )
 }

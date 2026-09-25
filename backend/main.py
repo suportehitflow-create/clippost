@@ -1240,6 +1240,30 @@ async def ferramenta_raio_x(request: Request):
         raise HTTPException(status_code=502, detail="Não consegui analisar esse perfil agora.")
 
 
+@app.post("/api/frases/gerar")
+async def frases_gerar(request: Request):
+    """Vídeos com frases: fotos × frases × música → MP4 9:16 prontos na Biblioteca.
+    Corpo: { fotos: [url], frases: [str], modo: pares|todas, musica_url?, musica_inicio?, variar_trecho?,
+             duracao?, arroba?, estilo: {fonte, tamanho, cor, contorno, cor_contorno, posicao, escurecer, maiusculas} }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    if not [f for f in body.get("frases") or [] if str(f).strip()]:
+        raise HTTPException(status_code=400, detail="Escreva pelo menos uma frase.")
+    from services import frases
+    job_id = frases.iniciar(user.id, body, supabase)
+    return {"job_id": job_id}
+
+
+@app.get("/api/frases/{job_id}")
+async def frases_status(job_id: str, request: Request):
+    user = await _usuario_logado(request)
+    from services import frases
+    st = frases.status(job_id, user.id)
+    if st is None:
+        raise HTTPException(status_code=404, detail="Geração não encontrada (o servidor pode ter reiniciado).")
+    return st
+
+
 @app.post("/api/tools/raio-x-pagina")
 async def ferramenta_raio_x_pagina(request: Request):
     """Painel da página (estilo Insights): KPIs, melhor horário, formato campeão, séries por dia,

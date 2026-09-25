@@ -31,6 +31,7 @@ CAPAS = {
     "biblioteca": "neatly stacked translucent glass folders filled with vertical video thumbnails, soft reflections",
     "explorar": "a glass magnifying glass hovering over a floating grid of vertical social video thumbnails with small heart and eye icons",
     "raiox": "a translucent glass smartphone showing glowing bar charts, a rising line graph and a small heatmap grid, x-ray scan light passing through it",
+    "frases": "a vertical glass phone frame showing a bold glowing quotation mark over a soft blurred sunset photo, floating music notes",
     "musicas": "a glossy glass vinyl record and floating translucent music notes with a soft pink sound wave, headphones resting beside it",
     "ferramentas":"a tidy row of small precise glass tools (a hashtag symbol, a clock, a magnifying glass over a bar chart, a text cursor) floating on a dark workbench",
 }

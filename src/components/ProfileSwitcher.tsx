@@ -99,6 +99,8 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
     const newActive = { ...account, is_active: true }
     setActive(newActive)
     try { localStorage.setItem('clippost_active_account', JSON.stringify(newActive)) } catch {}
+    // páginas que dependem da conta (Raio-X, Agendar…) escutam e recarregam
+    window.dispatchEvent(new CustomEvent('clipost:conta-ativa', { detail: newActive }))
     setOpen(false)
   }
 

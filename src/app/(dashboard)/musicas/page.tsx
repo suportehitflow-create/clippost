@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import ProfileSwitcher from '@/components/ProfileSwitcher'
+import { Pagina, Intro } from '@/components/pagina/Base'
 import { apagarMusicaNuvem, enviarMusicaNuvem, listarMusicas, TIPOS_AUDIO, type MusicaNuvem } from '@/lib/musicas'
 import { Music2, Upload, Loader2, Play, Pause, Trash2, AlertCircle } from 'lucide-react'
 
@@ -61,23 +61,13 @@ export default function MusicasPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c] text-white">
-      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-2"><Music2 className="w-4 h-4 text-pink-300" /><h1 className="text-sm font-semibold tracking-wide">Músicas</h1></div>
-        <div className="flex justify-center"><ProfileSwitcher align="center" /></div>
-        <span />
-      </header>
-
-      <div className="max-w-3xl w-full mx-auto px-4 sm:px-8 py-6 space-y-5">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold tracking-tight">Suas músicas, sempre à mão</h2>
-          <p className="text-sm text-zinc-400">Envie uma vez e use em qualquer vídeo: aparecem no Editor em Massa (“Minhas músicas”) e nos Vídeos com frases, em qualquer computador.</p>
-        </div>
-
+    <Pagina icone={Music2} titulo="Músicas">
+        <Intro selo="Biblioteca da conta" titulo="Suas músicas, sempre à mão"
+          descricao="Envie uma vez e use em qualquer vídeo: aparecem no Editor em Massa e nos Vídeos com frases, em qualquer computador." />
         <button type="button" onClick={() => input.current?.click()}
           onDragOver={e => { e.preventDefault(); setArrastando(true) }} onDragLeave={() => setArrastando(false)}
           onDrop={e => { e.preventDefault(); setArrastando(false); enviar(Array.from(e.dataTransfer.files)) }}
-          className={`w-full rounded-3xl border-2 border-dashed p-8 flex flex-col items-center gap-2 transition-colors ${arrastando ? 'border-pink-400 bg-pink-500/10' : 'border-white/[0.12] bg-white/[0.02] hover:bg-white/[0.04]'}`}>
+          className={`w-full rounded-3xl border-2 border-dashed p-10 flex flex-col items-center gap-2 transition-colors ${arrastando ? 'border-pink-400 bg-pink-500/10' : 'border-white/[0.12] bg-white/[0.02] hover:bg-white/[0.04]'}`}>
           {enviando ? <Loader2 className="w-6 h-6 animate-spin text-pink-300" /> : <Upload className="w-6 h-6 text-pink-300" />}
           <span className="text-sm font-semibold">{enviando ? `Enviando ${enviando} música(s)…` : 'Arraste as músicas aqui ou clique para escolher'}</span>
           <span className="text-[11px] text-zinc-500">MP3, M4A, WAV, AAC ou OGG</span>
@@ -102,7 +92,6 @@ export default function MusicasPage() {
             </div>
           ))}
         </section>
-      </div>
-    </div>
+    </Pagina>
   )
 }

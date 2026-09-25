@@ -80,3 +80,22 @@ export async function gerarLegendasIA(p: { clipId?: string; titulo?: string; pla
 
 export const juntarLegenda = (o: { legenda: string; hashtags: string[] }, plataforma: string) =>
   plataforma === 'youtube_shorts' ? o.legenda : `${o.legenda}\n\n${o.hashtags.join(' ')}`.trim()
+
+/** Plataforma gravada em scheduled_posts (YouTube publica como Shorts) */
+export const plataformaPost = (p: string) => (p === 'youtube' ? 'youtube_shorts' : p)
+
+/** Horários da grade dia-da-semana × horário a partir da data de início (hora local), só no futuro */
+export function calcularHorarios(dias: number[], horarios: string[], inicio: string, quantidade: number): Date[] {
+  const [y, m, d] = inicio.split('-').map(Number)
+  const hs = [...horarios].map(t => t.split(':').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const saida: Date[] = []
+  for (let k = 0; saida.length < quantidade && k < 3650; k++) {
+    const dia = new Date(y, m - 1, d + k)
+    if (!dias.includes(dia.getDay())) continue
+    for (const [h, mi] of hs) {
+      const t = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h, mi)
+      if (t.getTime() > Date.now() && saida.length < quantidade) saida.push(t)
+    }
+  }
+  return saida
+}
