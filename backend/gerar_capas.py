@@ -30,6 +30,7 @@ CAPAS = {
     "calendario": "a floating glass calendar with a few glowing checkmarked days and small vertical video thumbnails scheduled on it",
     "biblioteca": "neatly stacked translucent glass folders filled with vertical video thumbnails, soft reflections",
     "explorar": "a glass magnifying glass hovering over a floating grid of vertical social video thumbnails with small heart and eye icons",
+    "raiox": "a translucent glass smartphone showing glowing bar charts, a rising line graph and a small heatmap grid, x-ray scan light passing through it",
     "ferramentas":"a tidy row of small precise glass tools (a hashtag symbol, a clock, a magnifying glass over a bar chart, a text cursor) floating on a dark workbench",
 }
 

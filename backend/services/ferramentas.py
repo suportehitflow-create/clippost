@@ -136,6 +136,107 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     }
 
 
+def _snapshot_seguidores(sb, user_id: str | None, usuario: str, seguidores: int | None) -> list[dict]:
+    """Guarda 1 contagem de seguidores por dia (bucket privado) e devolve o histórico — vira o gráfico."""
+    import json
+    from datetime import date
+    if sb is None or not user_id or not usuario:
+        return []
+    try:
+        caminho = f"raiox/{user_id}/{usuario.lower()}.json"
+        try:
+            hist = json.loads(sb.download(caminho))
+        except Exception:
+            hist = []
+        if seguidores is not None:
+            hoje = date.today().isoformat()
+            hist = [h for h in hist if h.get("data") != hoje] + [{"data": hoje, "n": int(seguidores)}]
+            hist = sorted(hist, key=lambda h: h["data"])[-400:]
+            sb.upload(caminho, json.dumps(hist).encode(), {"content-type": "application/json", "upsert": "true"})
+        return hist
+    except Exception as e:
+        print(f"[raio-x-pagina] histórico de seguidores: {type(e).__name__}")
+        return []
+
+
+def raio_x_pagina(perfil: str, dias: int = 30, user_id: str | None = None, armazem=None) -> dict:
+    """Painel da página: totais do período, melhor horário, formato campeão, séries por dia,
+    mapa dia×hora (horário de Brasília), top posts e evolução de seguidores."""
+    from collections import defaultdict
+    from datetime import timedelta
+
+    dias = dias if dias in (7, 30, 90, 180) else 30
+    dados = explorar_perfil(perfil, limite=150, ordem="recentes", periodo_dias=dias, user_id=user_id)
+    itens = dados["itens"]
+    seguidores = dados["perfil"].get("seguidores")
+    tem_views = any(i.get("views") for i in itens)
+    sp = timezone(timedelta(hours=-3))  # Brasília (sem horário de verão desde 2019)
+
+    def eng(i: dict) -> float:
+        inter = (i.get("likes") or 0) + (i.get("comentarios") or 0)
+        base = i.get("views") if tem_views else seguidores
+        if base:
+            return inter / base
+        return 0.0 if tem_views else float(inter)
+
+    likes = sum(i.get("likes") or 0 for i in itens)
+    coms = sum(i.get("comentarios") or 0 for i in itens)
+    views = sum(i.get("views") or 0 for i in itens) if tem_views else None
+    engajamento = ((likes + coms) / views * 100) if views else ((likes + coms) / (seguidores * max(1, len(itens))) * 100 if seguidores else None)
+
+    # mapa dia da semana × hora (0 = domingo), engajamento médio
+    soma = defaultdict(float)
+    cont = defaultdict(int)
+    por_dia = defaultdict(lambda: {"likes": 0, "comentarios": 0, "views": 0, "posts": 0})
+    for i in itens:
+        if not i.get("timestamp"):
+            continue
+        dt = datetime.fromtimestamp(i["timestamp"], tz=timezone.utc).astimezone(sp)
+        slot = ((dt.weekday() + 1) % 7, dt.hour)
+        soma[slot] += eng(i)
+        cont[slot] += 1
+        d = por_dia[dt.date().isoformat()]
+        d["likes"] += i.get("likes") or 0
+        d["comentarios"] += i.get("comentarios") or 0
+        d["views"] += i.get("views") or 0
+        d["posts"] += 1
+    mapa = [[round(soma[(d, h)] / cont[(d, h)], 5) if cont[(d, h)] else None for h in range(24)] for d in range(7)]
+
+    media_geral = (sum(soma.values()) / sum(cont.values())) if cont else 0
+    melhor = max(cont, key=lambda s: soma[s] / cont[s], default=None)
+    nomes_dia = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
+    melhor_horario = None
+    if melhor and media_geral:
+        media_slot = soma[melhor] / cont[melhor]
+        melhor_horario = {"dia": nomes_dia[melhor[0]], "hora": melhor[1],
+                          "ganho_pct": round((media_slot / media_geral - 1) * 100, 1), "posts": cont[melhor]}
+
+    # formato campeão: maior média de views (ou curtidas) por post
+    por_tipo = defaultdict(list)
+    for i in itens:
+        por_tipo[i["tipo"]].append((i.get("views") if tem_views else i.get("likes")) or 0)
+    formato = None
+    if por_tipo:
+        tipo, vals = max(por_tipo.items(), key=lambda kv: sum(kv[1]) / len(kv[1]))
+        formato = {"tipo": tipo, "media": round(sum(vals) / len(vals)), "metrica": "views" if tem_views else "curtidas"}
+
+    top = sorted(itens, key=lambda i: (i.get("views") if tem_views else i.get("likes")) or 0, reverse=True)[:6]
+    return {
+        "perfil": dados["perfil"],
+        "plataforma": dados["plataforma"],
+        "fonte": dados["fonte"],
+        "dias": dias,
+        "totais": {"views": views, "posts": len(itens), "engajamento": round(engajamento, 2) if engajamento is not None else None,
+                   "likes": likes, "comentarios": coms, "compartilhamentos": None},
+        "melhor_horario": melhor_horario,
+        "formato_campeao": formato,
+        "por_dia": [{"data": k, **v} for k, v in sorted(por_dia.items())],
+        "mapa": mapa,
+        "top_posts": [{**t, "engajamento": round(eng(t) * 100, 2) if (tem_views or seguidores) else None} for t in top],
+        "seguidores": _snapshot_seguidores(armazem, user_id, dados["perfil"].get("usuario") or "", seguidores),
+    }
+
+
 def _nota(engajamento: float, por_semana: float, consistencia: float) -> tuple[str, int]:
     """0-100: engajamento pesa 50, frequência 25, consistência das views 25."""
     p_eng = min(50, engajamento / 0.08 * 50)          # 8% de engajamento = nota cheia

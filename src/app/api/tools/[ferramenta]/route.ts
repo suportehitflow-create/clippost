@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
-const PERMITIDAS = new Set(['youtube-texto', 'raio-x', 'explorar', 'baixar-link'])
+const PERMITIDAS = new Set(['youtube-texto', 'raio-x', 'explorar', 'baixar-link', 'raio-x-pagina'])
 
 // Ferramentas rápidas (YouTube → texto, Raio-X do perfil): repassa para o backend com o login do usuário
 export async function POST(req: NextRequest, { params }: { params: Promise<{ ferramenta: string }> }) {

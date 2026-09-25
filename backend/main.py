@@ -1240,6 +1240,29 @@ async def ferramenta_raio_x(request: Request):
         raise HTTPException(status_code=502, detail="Não consegui analisar esse perfil agora.")
 
 
+@app.post("/api/tools/raio-x-pagina")
+async def ferramenta_raio_x_pagina(request: Request):
+    """Painel da página (estilo Insights): KPIs, melhor horário, formato campeão, séries por dia,
+    mapa dia×hora, top posts e evolução de seguidores. Corpo: { perfil, dias: 7|30|90|180 }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    perfil = str(body.get("perfil") or "").strip()
+    if not perfil:
+        raise HTTPException(status_code=400, detail="Escolha uma conta ou digite o @.")
+    try:
+        dias = int(body.get("dias") or 30)
+    except (TypeError, ValueError):
+        dias = 30
+    from services.ferramentas import raio_x_pagina
+    try:
+        return await asyncio.to_thread(raio_x_pagina, perfil, dias, user.id, _storage_privado())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)[:200])
+    except Exception as e:
+        print(f"[raio-x-pagina] falhou: {type(e).__name__}: {str(e)[:160]}")
+        raise HTTPException(status_code=502, detail="Não consegui ler essa página agora. Tente de novo em instantes.")
+
+
 @app.post("/api/captions/generate")
 async def gerar_legenda_post(request: Request):
     """3 opções de legenda + hashtags para um corte (usa o título e o que é falado nele).
