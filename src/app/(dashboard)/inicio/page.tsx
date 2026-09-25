@@ -22,136 +22,74 @@ import {
 } from 'lucide-react'
 
 interface Feature {
-  number: string
+  /** id da capa gerada com o Gemini (backend/gerar_capas.py → videos/site/capas/<capa>.png) */
+  capa: string
   title: string
   description: string
   href: string
   icon: LucideIcon
+  /** degradê de fundo (aparece sozinho enquanto a capa não existe) */
+  cor: string
   badge?: string
-  badgeColor?: string
   wide?: boolean
 }
 
+// Ordem = ranking das ferramentas (o número do card é a posição)
 const FEATURES: Feature[] = [
-  {
-    number: '01',
-    title: 'Criar cortes de vídeos longos',
-    description: 'Cole o link de um vídeo longo do YouTube e gere dezenas de cortes verticais 9:16 prontos com enquadramento inteligente e legendas dinâmicas.',
-    href: '/upload',
-    icon: Scissors,
-    wide: true,
-  },
-  {
-    number: '02',
-    title: 'Cortes Ao Vivo (Twitch & YouTube)',
-    description: 'Acompanhe lives e clipe retroativamente até 2 minutos para trás em 1 clique, já com seu template e legendas dinâmicas aplicados.',
-    href: '/live',
-    icon: Radio,
-    badge: 'Ao Vivo',
-    badgeColor: 'bg-red-500/15 text-red-400 border-red-500/30',
-  },
-  {
-    number: '03',
-    title: 'Edição em Massa & Perfis',
-    description: 'Editor visual em grade com recorte 9:16, templates de marca e servidor FFmpeg dedicado para processar dezenas de vídeos.',
-    href: '/bulk',
-    icon: Layers,
-    badge: 'Ferramenta #2',
-    badgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  },
-  {
-    number: '04',
-    title: 'Radar de Viralidade',
-    description: 'Monitore vídeos que estão explodindo em engajamento nas últimas 24h para minerar antes da concorrência.',
-    href: '/trends',
-    icon: Flame,
-    badge: 'Ferramenta #3',
-    badgeColor: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  },
-  {
-    number: '05',
-    title: 'Estúdio de Roteiros IA',
-    description: 'Gere roteiros persuasivos e ganchos magnéticos estruturados com técnicas de retenção e storytelling.',
-    href: '/creator',
-    icon: PenTool,
-    badge: 'Ferramenta #4',
-    badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  },
-  {
-    number: '06',
-    title: 'Identidade Visual & Templates',
-    description: 'Configure layout, cores, fontes Apple/Instagram e posições de títulos e legendas para os seus cortes.',
-    href: '/templates',
-    icon: Sparkles,
-    badge: 'Ferramenta #5',
-    badgeColor: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
-  },
-  {
-    number: '07',
-    title: 'Autopilot 24/7',
-    description: 'Monitore canais do YouTube e perfis para minerar, cortar e preparar clipes sozinho a cada novo upload.',
-    href: '/autopilot',
-    icon: Zap,
-    badge: 'Ferramenta #6',
-    badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  },
-  {
-    number: '08',
-    title: 'Calendário & Publicações',
-    description: 'Agende publicações programadas com legendas prontas e hashtags direto para Instagram, TikTok e Shorts.',
-    href: '/schedule',
-    icon: Calendar,
-    badge: 'Ferramenta #7',
-    badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  },
-  {
-    number: '09',
-    title: 'Meus Projetos & Vídeos',
-    description: 'Acesse todo o histórico de vídeos processados, transcrições e cortes renderizados prontos para download.',
-    href: '/dashboard',
-    icon: FolderOpen,
-    badge: 'Histórico',
-    badgeColor: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
-  },
+  { capa: 'cortes', title: 'Criar cortes', description: 'Cole um vídeo longo e receba os melhores momentos em 9:16, com legenda e o seu template.', href: '/upload', icon: Scissors, cor: '99,102,241', wide: true },
+  { capa: 'massa', title: 'Edição em Massa', description: 'Dezenas de vídeos no seu template de uma vez: texto, música, legendas e efeitos.', href: '/bulk', icon: Layers, cor: '147,51,234' },
+  { capa: 'autopilot', title: 'Autopilot', description: 'Monitora YouTube, Instagram e TikTok e deixa os cortes de cada vídeo novo prontos sozinho.', href: '/autopilot', icon: Zap, cor: '16,185,129', badge: '24/7', wide: true },
+  { capa: 'templates', title: 'Identidade Visual', description: 'Seu template: perfil, fontes, cores, marca d’água e posição do vídeo e das legendas.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
+  { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
+  { capa: 'radar', title: 'Radar de Viralidade', description: 'Os vídeos que estão explodindo nas últimas 24h, antes da concorrência.', href: '/trends', icon: Flame, cor: '249,115,22' },
+  { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246' },
+  { capa: 'calendario', title: 'Calendário & Publicações', description: 'Programe as postagens no Instagram, TikTok e YouTube e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11', wide: true },
+  { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
 ]
 
-function FeatureCard({ feature }: { feature: Feature }) {
+const CAPAS_URL = `${(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co').replace(/[﻿​-‍\s]/g, '').replace(/\/$/, '')}/storage/v1/object/public/videos/site/capas`
+
+function FeatureCard({ feature, posicao }: { feature: Feature; posicao: number }) {
   const Icon = feature.icon
   return (
     <Link
       href={feature.href}
-      className={`group relative flex flex-col justify-between gap-5 p-6 rounded-3xl bg-white/[0.02] border border-white/[0.07] hover:border-indigo-500/40 hover:bg-white/[0.04] transition-all shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:shadow-indigo-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+      className={`group relative flex flex-col overflow-hidden rounded-[28px] bg-[#0d0d12] border border-white/[0.07] hover:border-white/[0.18] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
         feature.wide ? 'sm:col-span-2' : ''
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20 group-hover:scale-105 transition-transform">
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-sm font-mono font-bold text-zinc-500 group-hover:text-indigo-400 transition-colors">
-            #{feature.number}
+      {/* capa (Gemini) sobre o degradê da ferramenta */}
+      <div
+        className="relative h-40 sm:h-44 w-full bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.03]"
+        style={{
+          backgroundImage: `url(${CAPAS_URL}/${feature.capa}.png), radial-gradient(120% 90% at 30% 20%, rgba(${feature.cor},0.55), rgba(${feature.cor},0.08) 55%, transparent 80%), linear-gradient(135deg, #15151d, #0b0b10)`,
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/30 to-transparent" />
+        <span className="absolute top-3.5 left-4 text-[11px] font-semibold tabular-nums text-white/70 tracking-wide">
+          {String(posicao).padStart(2, '0')}
+        </span>
+        {feature.badge && (
+          <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white">
+            {feature.badge}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {feature.badge && (
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${feature.badgeColor}`}>
-              {feature.badge}
-            </span>
-          )}
-          <div className="w-7 h-7 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-500 group-hover:text-white group-hover:bg-white/[0.08] transition-all">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </div>
-        </div>
+        )}
       </div>
 
-      <div className="space-y-1.5">
-        <h3 className="text-base font-bold text-white tracking-tight group-hover:text-indigo-200 transition-colors">
-          {feature.title}
-        </h3>
-        <p className="text-xs text-zinc-400 leading-relaxed font-normal">
-          {feature.description}
-        </p>
+      <div className="relative flex items-end justify-between gap-4 px-5 pb-5 -mt-7">
+        <div className="min-w-0 space-y-1.5">
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center ring-1 ring-white/20 shadow-lg"
+            style={{ background: `linear-gradient(135deg, rgba(${feature.cor},1), rgba(${feature.cor},0.55))` }}
+          >
+            <Icon className="w-[18px] h-[18px] text-white" />
+          </div>
+          <h3 className="pt-1.5 text-[17px] font-semibold text-white tracking-tight">{feature.title}</h3>
+          <p className="text-[13px] text-zinc-400 leading-snug max-w-md">{feature.description}</p>
+        </div>
+        <span className="shrink-0 w-8 h-8 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-400 group-hover:bg-white group-hover:text-zinc-900 transition-colors">
+          <ArrowUpRight className="w-4 h-4" />
+        </span>
       </div>
     </Link>
   )
@@ -283,7 +221,7 @@ export default async function InicioPage() {
 
         {/* Feature Grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map(f => <FeatureCard key={f.href} feature={f} />)}
+          {FEATURES.map((f, i) => <FeatureCard key={f.href} feature={f} posicao={i + 1} />)}
         </section>
 
         {/* Bottom Banner */}

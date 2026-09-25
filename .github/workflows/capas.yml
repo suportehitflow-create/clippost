@@ -1,0 +1,33 @@
+name: Capas do painel
+
+# Gera as capas dos cards do Início com o Gemini DENTRO da máquina do backend (onde está a
+# GEMINI_API_KEY) e sobe no Storage público. Roda depois de cada deploy (só gera as que faltam)
+# ou manualmente com "forcar" para refazer todas.
+on:
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Refazer todas as capas"
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: ["Deploy to Production"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  capas:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Gerar capas no backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FORCAR: ${{ inputs.forcar && '--forcar' || '' }}
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export PATH="$HOME/.fly/bin:$PATH"
+          flyctl ssh console -a clippost-backend -C "sh -c 'cd /app && python gerar_capas.py $FORCAR'"
