@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
+import PainelResultados from '@/components/dashboard/PainelResultados'
 import {
   Scissors,
   Flame,
@@ -22,6 +23,7 @@ import {
   TrendingUp,
   Radio,
   CheckCircle2,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -48,6 +50,7 @@ const FEATURES: Feature[] = [
   { capa: 'templates', title: 'Identidade Visual', description: 'Seu template: perfil, fontes, cores, marca d’água e posição do vídeo e das legendas.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
   { capa: 'explorar', title: 'Explorar perfis', description: 'Digite um @ e veja reels, posts e carrosséis com views e curtidas. Baixe, salve ou edite com o seu template.', href: '/explorar', icon: Search, cor: '14,165,233', badge: 'Novo' },
   { capa: 'raiox', title: 'Raio-X da página', description: 'Views, engajamento, melhor horário, formato campeão, mapa de calor e top posts da sua conta.', href: '/raio-x-pagina', icon: Activity, cor: '244,63,94', badge: 'Novo' },
+  { capa: 'resultados', title: 'Resultados & Acompanhamento', description: 'Ritmo diário de posts, analytics de visualizações, tempo economizado e métricas.', href: '/resultados', icon: BarChart3, cor: '16,185,129', badge: 'Ao vivo' },
   { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
   { capa: 'radar', title: 'Radar de Viralidade', description: 'Os vídeos que estão explodindo nas últimas 24h, antes da concorrência.', href: '/trends', icon: Flame, cor: '249,115,22' },
   { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246' },
@@ -179,6 +182,9 @@ export default async function InicioPage() {
             </div>
           </div>
         </div>
+
+        {/* Painel de Resultados & Ritmo de Publicação (Visão Geral Minimalista) */}
+        <PainelResultados compacto={true} nomeUsuario={user.user_metadata?.full_name || 'André'} />
 
         {/* Live Processing Card (Quando há cortes sendo gerados) */}
         {processingProjects && processingProjects.length > 0 && (
