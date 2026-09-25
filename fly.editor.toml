@@ -2,7 +2,7 @@
 app = "clippost-editor"
 primary_region = "gru"
 # Espera os vídeos em processamento terminarem antes de reiniciar num deploy (máx. do Fly)
-kill_timeout = 300
+kill_timeout = 30
 
 [build]
   dockerfile = "Dockerfile.editor"

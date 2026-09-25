@@ -19,9 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production \
+    HOSTNAME="0.0.0.0" \
+    PORT=8080 \
     FFMPEG_PATH=/usr/bin/ffmpeg \
     FFPROBE_PATH=/usr/bin/ffprobe \
     EDITOR_MASSA_DIR=/tmp/editor-massa
 COPY --from=build /app ./
 EXPOSE 8080
-CMD ["npx", "next", "start", "-p", "8080"]
+CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "8080"]
