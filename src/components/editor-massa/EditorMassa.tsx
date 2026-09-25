@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import * as api from '@/lib/editor-massa/client/api';
 import { abrirVideo, capturarQuadro, carregarImagem, detectarNoNavegador, duracaoAudio, lerMeta } from '@/lib/editor-massa/client/midia';
 import { gerarOverlayPng, temOverlay } from '@/lib/editor-massa/client/render';
@@ -65,7 +65,14 @@ function carregarConfig(): ConfigGlobal {
 /** Carrega uma fonte (nome simples ou pilha CSS do template) antes de desenhar no canvas */
 const carregarFonte = (f: string) => document.fonts?.load(`bold 40px ${f.includes(',') ? f : `"${f}"`}`).catch(() => null);
 
-export default function EditorMassa() {
+/** Projeto do Criar Cortes aberto no estúdio (os cortes prontos viram um lote) */
+export interface ProjetoEstudio {
+  id: string;
+  titulo: string;
+  clips: { id: string; url: string; titulo: string }[];
+}
+
+export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?: ProjetoEstudio; titulo?: string; acoesExtras?: ReactNode } = {}) {
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
   const [abas, setAbas] = useState<Aba[]>(() => [novaAba(1)]);
   const [abaAtivaId, setAbaAtivaId] = useState('');
@@ -285,9 +292,10 @@ export default function EditorMassa() {
   }, [abas, abaAtiva, gatilhoAnalise, analisar]);
 
   const adicionarVideos = useCallback(
-    (arquivos: File[]) => {
-      const novos: VideoCliente[] = arquivos.map((arquivo) => ({
-        ...novoVideo({ id: novoId(), nome: arquivo.name, largura: 0, altura: 0, duracao: 0 }),
+    (arquivos: File[], opcoes?: { abaId?: string; extras?: (Partial<ConfigVideo> & { id?: string })[]; silencioso?: boolean }) => {
+      const novos: VideoCliente[] = arquivos.map((arquivo, i) => ({
+        ...novoVideo({ id: opcoes?.extras?.[i]?.id ?? novoId(), nome: arquivo.name, largura: 0, altura: 0, duracao: 0 }),
+        ...(opcoes?.extras?.[i] ?? {}),
         arquivo,
         url: URL.createObjectURL(arquivo),
         upload: 0,
@@ -300,17 +308,56 @@ export default function EditorMassa() {
         progressoJob: 0,
         saidaJob: null,
       }));
-      const alvo = abaAtiva.id;
+      const alvo = opcoes?.abaId ?? abaAtiva.id;
       setAbas((as) => as.map((a) => (a.id === alvo ? { ...a, videos: [...a.videos, ...novos] } : a)));
       novos.forEach((v) => {
         salvarArquivo(v.id, v.arquivo);
         enviarVideo(v).catch(() => {});
       });
-      avisar(`${novos.length} vídeo(s) adicionados`);
+      if (!opcoes?.silencioso) avisar(`${novos.length} vídeo(s) adicionados`);
       if (!ativoId && novos[0]) setAtivoId(novos[0].id);
     },
     [abaAtiva.id, enviarVideo, avisar, ativoId],
   );
+
+  // ---------- projeto do Criar Cortes: todos os cortes prontos entram num lote próprio ----------
+  const [restaurado, setRestaurado] = useState(false);
+  const clipsEmImportacao = useRef(new Set<string>());
+  useEffect(() => {
+    if (!projeto || !restaurado) return;
+    const abaId = 'projeto-' + projeto.id;
+    if (!abasRef.current.some((a) => a.id === abaId)) {
+      // o lote do projeto substitui o lote vazio inicial
+      setAbas((as) => [...as.filter((a) => a.videos.length || a.processando), { ...novaAba(1), id: abaId, nome: projeto.titulo.slice(0, 40) || 'Projeto' }]);
+      setGlobal((g) => ({ ...g, textoAtivo: true, deteccao: { ...g.deteccao, modo: 'auto' } }));
+    }
+    setAbaAtivaId(abaId);
+
+    const existentes = new Set(abasRef.current.flatMap((a) => a.videos.map((v) => v.id)));
+    projeto.clips.forEach((c, i) => {
+      const id = 'clip-' + c.id;
+      if (existentes.has(id) || clipsEmImportacao.current.has(id)) return;
+      clipsEmImportacao.current.add(id);
+      fetch(c.url)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.blob();
+        })
+        .then((blob) => {
+          const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
+          adicionarVideos([new File([blob], nome, { type: blob.type || 'video/mp4' })], {
+            abaId,
+            silencioso: true,
+            extras: [{ id, texto: c.titulo, marcaEmbutida: true }],
+          });
+        })
+        .catch((e) => {
+          clipsEmImportacao.current.delete(id);
+          escreverLog(`[ERRO] Não foi possível abrir o corte "${c.titulo}": ${e?.message ?? e}`);
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projeto?.id, projeto?.clips.length, restaurado]);
 
   const removerVideos = useCallback(
     (ids: string[]) => {
@@ -494,9 +541,15 @@ export default function EditorMassa() {
         if (!e) return;
         const temVideos = e.abas.some((a) => a.videos.length);
         if (temVideos || e.musicas.length) {
-          setAbas(e.abas.length ? e.abas : [novaAba(1)]);
-          setAbaAtivaId(e.abas.find((a) => a.id === e.abaAtivaId)?.id ?? e.abas[0]?.id ?? '');
-          setAtivoId(e.abas.find((a) => a.id === e.abaAtivaId)?.videos[0]?.id ?? null);
+          // Na Edição em Massa (sem projeto) nunca abre no lote de um projeto do Criar Cortes:
+          // esses lotes só aparecem na página do próprio projeto
+          const deProjeto = (id: string) => id.startsWith('projeto-');
+          let lista = e.abas.length ? e.abas : [novaAba(1)];
+          if (!projeto && lista.every((a) => deProjeto(a.id))) lista = [...lista, novaAba(1)];
+          const preferida = lista.find((a) => a.id === e.abaAtivaId && (projeto || !deProjeto(a.id))) ?? lista.find((a) => projeto || !deProjeto(a.id)) ?? lista[0];
+          setAbas(lista);
+          setAbaAtivaId(preferida.id);
+          setAtivoId(preferida.videos[0]?.id ?? null);
           setMusicas(e.musicas);
           e.abas.forEach((a) => a.videos.forEach((v) => enviarVideo(v).catch(() => {})));
           e.musicas.forEach((m) => enviarMusica(m));
@@ -506,6 +559,7 @@ export default function EditorMassa() {
       })
       .finally(() => {
         restaurou.current = true;
+        setRestaurado(true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -720,51 +774,14 @@ export default function EditorMassa() {
           <span className={s.logoMarca}>
             <Icone nome="sparkles" tamanho={15} />
           </span>
-          Editor em Massa
+          {titulo ?? 'Estúdio'}
         </div>
-        <nav className={s.lotes}>
-          {abas.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={`${s.lote} ${a.id === abaAtiva.id ? s.loteAtivo : ''}`}
-              onClick={() => {
-                setAbaAtivaId(a.id);
-                setSelecionados(new Set());
-                setAtivoId(a.videos[0]?.id ?? null);
-              }}
-              onDoubleClick={() => renomearLote(a.id)}
-              title="Duplo clique para renomear"
-            >
-              {a.processando && <span className={s.pontoAtivo} />}
-              {a.nome}
-              <span className={s.loteNum}>{a.videos.length}</span>
-              {abas.length > 1 && (
-                <span
-                  className={s.loteFechar}
-                  role="button"
-                  title="Fechar lote"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fecharLote(a.id);
-                  }}
-                >
-                  <Icone nome="x" tamanho={11} />
-                </span>
-              )}
-            </button>
-          ))}
-          <button type="button" className={`${s.lote}`} onClick={criarLote} title="Novo lote de vídeos (processa separado)">
-            <Icone nome="mais" tamanho={14} />
-          </button>
-        </nav>
+        
 
         <div className={s.barraDireita}>
-          <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => setImportarAberto(true)} title="Baixar vídeos de um perfil do Instagram, TikTok, Facebook ou YouTube">
-            <Icone nome="mais" tamanho={14} /> Importar perfil
-          </button>
-          <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => setSobre({ tipo: 'resultados' })}>
-            <Icone nome="pasta" /> Prontos {prontos > 0 && <span className={s.contador}>{prontos}</span>}
+          {acoesExtras}
+          <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => inputVideos.current?.click()} title="Fazer upload de vídeos do seu computador">
+            <Icone nome="upload" tamanho={14} /> Fazer upload de vídeos
           </button>
           {abaAtiva.processando ? (
             <div className={s.processando}>

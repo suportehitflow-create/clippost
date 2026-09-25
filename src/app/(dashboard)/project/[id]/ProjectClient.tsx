@@ -50,6 +50,13 @@ import { calculateViralityMetrics, type ViralityMetrics } from '@/lib/virality'
 import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { generateMagneticClips, extractCoreSubject, type MagneticClipData } from '@/lib/titles'
+import dynamic from 'next/dynamic'
+
+// O estúdio usa canvas, <video> e IndexedDB: só no navegador
+const EstudioEditor = dynamic(() => import('@/components/editor-massa/EditorMassa'), {
+  ssr: false,
+  loading: () => <div className="flex-1 flex items-center justify-center text-xs text-zinc-500">Abrindo o estúdio…</div>,
+})
 
 
 // Renderizador Oficial de Emojis Nativos Apple iOS
@@ -353,11 +360,26 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
         return idx
       })()
 
-  const elapsed = `${Math.floor(elapsedSecs / 60)}m ${(elapsedSecs % 60).toString().padStart(2, '0')}s`
+  // Calcula porcentagem suave de 0% a 100%
+  const progressPercent = (() => {
+    if (clipsReady > 0) {
+      return Math.min(99, 85 + clipsReady * 3)
+    }
+    const stepBases = [15, 42, 68, 88]
+    const base = stepBases[activeIdx] || 15
+    const stepDur = [40, 50, 70, 70][activeIdx] || 60
+    const prevThreshold = PIPELINE_STEPS[activeIdx]?.thresholdSecs || 0
+    const timeInStep = Math.max(0, elapsedSecs - prevThreshold)
+    const stepFrac = Math.min(0.9, timeInStep / stepDur)
+    const nextBase = stepBases[Math.min(activeIdx + 1, stepBases.length - 1)] || 96
+    const range = nextBase - base
+    const val = Math.min(96, Math.round(base + range * stepFrac))
+    return Math.max(8, val)
+  })()
 
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
-      <div className="bg-[#0d0d14] border border-indigo-500/25 rounded-2xl p-5 space-y-4">
+      <div className="bg-[#0d0d14] border border-indigo-500/25 rounded-2xl p-5 space-y-4 shadow-xl shadow-indigo-950/20">
         {/* cabeçalho */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -375,22 +397,22 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
               </div>
               <p className="text-[11px] text-zinc-400 mt-0.5">
                 {clipsReady === 0
-                  ? 'Configure o template abaixo enquanto os cortes são gerados'
-                  : `Corte #${clipsReady} pronto! Gerando mais em segundo plano...`}
+                  ? 'Identificando ganchos virais e aplicando seu template...'
+                  : ('Corte #' + clipsReady + ' pronto! Gerando mais em segundo plano...')}
               </p>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-wider block">Tempo</span>
-            <span className="text-sm font-bold text-white font-mono">{elapsed}</span>
+            <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-wider block">Progresso</span>
+            <span className="text-sm font-bold text-indigo-400 font-mono">{progressPercent}%</span>
           </div>
         </div>
 
         {/* barra de progresso geral */}
-        <div className="w-full bg-white/[0.06] h-1.5 rounded-full overflow-hidden">
+        <div className="w-full bg-white/[0.06] h-2 rounded-full overflow-hidden">
           <div
-            className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
-            style={{ width: `${clipsReady > 0 ? 90 : Math.min(85, (activeIdx / (PIPELINE_STEPS.length - 1)) * 80 + 5)}%` }}
+            className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-purple-500 rounded-full transition-all duration-700"
+            style={{ width: (progressPercent + '%') }}
           />
         </div>
 
@@ -399,23 +421,22 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
           {PIPELINE_STEPS.map((step, i) => {
             const isDone = i < activeIdx || (i === activeIdx && clipsReady > 0 && i === PIPELINE_STEPS.length - 1)
             const isActive = i === activeIdx && !(clipsReady > 0 && i === PIPELINE_STEPS.length - 1)
-            const isPending = i > activeIdx
 
             return (
               <div
                 key={i}
-                className={`flex flex-col gap-1.5 p-3 rounded-xl border transition-all ${
+                className={'flex flex-col gap-1.5 p-3 rounded-xl border transition-all ' + (
                   isDone
                     ? 'bg-indigo-500/8 border-indigo-500/20'
                     : isActive
                     ? 'bg-indigo-500/10 border-indigo-500/30'
                     : 'bg-white/[0.02] border-white/[0.05]'
-                }`}
+                )}
               >
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                  <div className={'w-4 h-4 rounded-full flex items-center justify-center shrink-0 ' + (
                     isDone ? 'bg-indigo-500/20' : isActive ? 'bg-indigo-500/20' : 'bg-white/[0.06]'
-                  }`}>
+                  )}>
                     {isDone ? (
                       <CheckCircle2 className="w-3 h-3 text-indigo-400" />
                     ) : isActive ? (
@@ -424,18 +445,17 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
                       <span className="text-[9px] font-mono text-zinc-500">{i + 1}</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                  <span className={'text-[10px] font-semibold uppercase tracking-wider ' + (
                     isDone ? 'text-indigo-400' : isActive ? 'text-indigo-300' : 'text-zinc-600'
-                  }`}>
+                  )}>
                     {isDone ? 'Concluído' : isActive ? 'Em andamento' : 'Aguardando'}
                   </span>
                 </div>
-                <span className={`text-xs font-semibold leading-tight ${
+                <span className={'text-xs font-semibold leading-tight ' + (
                   isDone ? 'text-zinc-200' : isActive ? 'text-white' : 'text-zinc-500'
-                }`}>
+                )}>
                   {step.label}
                 </span>
-                <span className="text-[10px] text-zinc-600 font-mono leading-tight">{step.detail}</span>
               </div>
             )
           })}
@@ -1051,6 +1071,7 @@ export default function ProjectClient({
     }
   }
 
+  const [exportQuality, setExportQuality] = useState<"1080p" | "720p">("1080p")
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [downloadingClipId, setDownloadingClipId] = useState<string | null>(null)
 
@@ -1058,7 +1079,7 @@ export default function ProjectClient({
     if (!clip.storage_url) return
     setDownloadingClipId(clip.id)
     triggerBulkFeedback(`Baixando corte #${index + 1}...`)
-    const fname = `corte_${index + 1}_${extractCoreSubject(project.title)}.mp4`
+    const fname = `corte_${index + 1}_${extractCoreSubject(project.title)}_${exportQuality}.mp4`
     await downloadVideoFile(clip.storage_url, fname)
     setDownloadingClipId(null)
   }
@@ -1074,11 +1095,74 @@ export default function ProjectClient({
     triggerBulkFeedback(`Iniciando download de ${readyClips.length} cortes...`)
     for (let i = 0; i < readyClips.length; i++) {
       const clip = readyClips[i]
-      const fname = `corte_${i + 1}_${extractCoreSubject(project.title)}.mp4`
+      const fname = `corte_${i + 1}_${extractCoreSubject(project.title)}_${exportQuality}.mp4`
       await downloadVideoFile(clip.storage_url!, fname)
     }
     setDownloadingAll(false)
     triggerBulkFeedback("Todos os cortes foram baixados com sucesso!")
+  }
+
+  // ESTÚDIO PADRÃO: com cortes prontos, o projeto abre no mesmo editor da Edição em Massa
+  // (todos os cortes num lote, com o seu template, textos, música, efeitos e exportação)
+  const cortesProntos = clips.filter(c => !!c.storage_url)
+  const projetoEstudio = useMemo(
+    () => ({
+      id: project.id,
+      titulo: project.title || 'Projeto',
+      clips: cortesProntos.map(c => ({ id: c.id, url: c.storage_url!, titulo: c.hook || c.title || '' })),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [project.id, project.title, cortesProntos.map(c => c.id + (c.storage_url ?? '')).join('|')],
+  )
+  if (status !== 'failed' && cortesProntos.length > 0) {
+    const processandoAinda = status === 'processing'
+    return (
+      <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
+        <EstudioEditor
+          projeto={projetoEstudio}
+          titulo={project.title?.slice(0, 42) || 'Projeto'}
+          acoesExtras={
+            <>
+              <Link href="/dashboard" className="px-2.5 h-[34px] rounded-[10px] text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center gap-1.5" title="Voltar para a biblioteca">
+                <ArrowLeft className="w-3.5 h-3.5" /> Biblioteca
+              </Link>
+              {processandoAinda && (
+                <span className="px-2.5 h-[34px] rounded-[10px] text-[11px] text-zinc-300 bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Gerando cortes · {cortesProntos.length} prontos
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleDownloadAll}
+                disabled={downloadingAll}
+                className="px-3 h-[34px] rounded-[10px] text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
+                title="Baixar os cortes como foram gerados, sem editar"
+              >
+                <Download className="w-3.5 h-3.5" /> {downloadingAll ? 'Baixando…' : `Originais (${cortesProntos.length})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleScheduleAllProject() }}
+                disabled={schedulingAllProject}
+                className="px-3 h-[34px] rounded-[10px] text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
+                title="Coloca todos os cortes na fila de agendamento"
+              >
+                <Calendar className="w-3.5 h-3.5" /> {schedulingAllProject ? 'Agendando…' : scheduleAllMsg || 'Agendar todos'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteThisProject}
+                disabled={isDeletingProject}
+                className="w-[34px] h-[34px] rounded-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center disabled:opacity-50"
+                title="Excluir projeto"
+              >
+                {isDeletingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              </button>
+            </>
+          }
+        />
+      </div>
+    )
   }
 
       
@@ -1115,48 +1199,76 @@ export default function ProjectClient({
           </div>
         </div>
 
-        <div className="flex justify-center">
-          <ProfileSwitcher align="center" />
-        </div>
+        {status !== "processing" ? (
+          <>
+            <div className="flex justify-center">
+              <ProfileSwitcher align="center" />
+            </div>
 
-        {/* Ações Rápidas no Topo */}
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleDownloadAll}
-            disabled={clips.length === 0}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-sm ${
-              clips.length === 0
-                ? 'opacity-40 cursor-not-allowed pointer-events-none'
-                : 'cursor-pointer'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{downloadingAll ? "Baixando..." : `Baixar Todos (${clips.length})`}</span>
-          </button>
+            {/* Ações Rápidas no Topo */}
+            <div className="flex items-center justify-end gap-2">
+              <div className="hidden sm:inline-flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5 text-[10px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setExportQuality("1080p")}
+                  className={`px-1.5 py-0.5 rounded transition-all ${
+                    exportQuality === "1080p" ? "bg-indigo-600 text-white font-semibold" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  1080p
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportQuality("720p")}
+                  className={`px-1.5 py-0.5 rounded transition-all ${
+                    exportQuality === "720p" ? "bg-indigo-600 text-white font-semibold" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  720p
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadAll}
+                disabled={clips.length === 0}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 shadow-sm ${
+                  clips.length === 0
+                    ? 'opacity-40 cursor-not-allowed pointer-events-none'
+                    : 'cursor-pointer'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{downloadingAll ? "Baixando..." : `Baixar Todos (${clips.length})`}</span>
+              </button>
 
-          <Link
-            href="/templates"
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition-all border border-white/[0.08] hidden md:flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Templates</span>
-          </Link>
+              <Link
+                href="/templates"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white transition-all border border-white/[0.08] hidden md:flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Templates</span>
+              </Link>
 
-          <button
-            type="button"
-            onClick={handleDeleteThisProject}
-            disabled={isDeletingProject}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20 cursor-pointer disabled:opacity-50"
-            title="Excluir projeto"
-          >
-            {isDeletingProject ? (
-              <Loader2 className="w-4 h-4 animate-spin text-red-400" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={handleDeleteThisProject}
+                disabled={isDeletingProject}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20 cursor-pointer disabled:opacity-50"
+                title="Excluir projeto"
+              >
+                {isDeletingProject ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
+            <span>Gerando cortes com IA...</span>
+          </div>
+        )}
       </header>
 
       {/* 2. SELETOR RÁPIDO HORIZONTAL DE CORTES (SEGMENTED APPLE) */}
@@ -1778,6 +1890,31 @@ export default function ProjectClient({
                 </div>
               </div>
             )}
+
+            {/* Seletor de Resolução / Qualidade de Exportação */}
+            <div className="flex items-center justify-between px-1 pt-1 pb-0.5">
+              <span className="text-[11px] font-medium text-zinc-400">Qualidade de exportação:</span>
+              <div className="inline-flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5 text-[11px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setExportQuality("1080p")}
+                  className={`px-2 py-0.5 rounded-md transition-all ${
+                    exportQuality === "1080p" ? "bg-indigo-600 text-white font-semibold shadow-xs" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  1080p (Full HD)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportQuality("720p")}
+                  className={`px-2 py-0.5 rounded-md transition-all ${
+                    exportQuality === "720p" ? "bg-indigo-600 text-white font-semibold shadow-xs" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  720p (HD)
+                </button>
+              </div>
+            </div>
 
             {/* Botões de Ação Imediata (Limpos e Diretos) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">

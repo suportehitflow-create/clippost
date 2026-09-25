@@ -35,6 +35,8 @@ export interface EstiloTexto {
   maiusculas?: boolean;
   /** Peso da fonte quando negrito (700 padrão; o título do template usa 900) */
   peso?: number;
+  /** Tira os emojis do texto (opção "Emojis no título" do estúdio antigo desligada) */
+  semEmojis?: boolean;
 }
 
 /** Marca d'água do template Clipost: pílula dentro do vídeo */
@@ -92,6 +94,8 @@ export interface ConfigGlobal {
     velocidade105: boolean;
     velocidadePersonalizada: boolean;
     velocidade: number; // 0.5 - 2.0
+    /** Tira as pausas sem fala (função do estúdio antigo) */
+    removerSilencio?: boolean;
   };
   // 💧 Marca
   marcaAtiva: boolean;
@@ -136,6 +140,8 @@ export interface ConfigVideo {
   marcasExtras: MarcaDagua[]; // "Marca d'água individual" (máx. 3 no total)
   corte: { inicio: number; fim: number } | null;
   musica: { musicaId: string; inicio: number } | null;
+  /** Corte vindo do Criar Cortes: o vídeo já tem a marca d'água do template dentro (não desenha de novo) */
+  marcaEmbutida?: boolean;
 }
 
 export interface VideoJob extends ConfigVideo {

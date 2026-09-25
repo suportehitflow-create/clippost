@@ -84,6 +84,7 @@ export default function Lateral(p: PropsLateral) {
   const volOriginal = g.musica.mutarOriginal ? 0 : g.musica.volumeVideo;
   const velocidade = g.efeitos.velocidadePersonalizada ? 'custom' : g.efeitos.velocidade105 ? '105' : '1';
   const efeitosAtivos = [
+    g.efeitos.removerSilencio && 'Sem silêncios',
     g.efeitos.espelhar && 'Espelhado',
     g.efeitos.cortarInicioFim && 'Corta 0,5s',
     g.efeitos.ajusteAutomatico && 'Cor auto',
@@ -230,6 +231,7 @@ export default function Lateral(p: PropsLateral) {
         <span className={s.dica}>Ou digite direto no campo abaixo de cada vídeo.</span>
 
         <span className={s.dica}>Fonte, cor, contorno e maiúsculas vêm do seu template (botão "Editar template").</span>
+        <Opcao rotulo="Emojis no texto" valor={!et.semEmojis} mudar={(v) => mudarTexto({ semEmojis: !v })} />
         <Slider rotulo="Tamanho" min={12} max={160} valor={et.tamanho} formatar={(v) => `${v}px`} mudar={(v) => ajustarTexto({ tamanho: v })} />
 
         <div className={s.subtitulo}>Posição da caixa (%)</div>
@@ -328,6 +330,12 @@ export default function Lateral(p: PropsLateral) {
         resumo={efeitosAtivos.length ? efeitosAtivos.join(' · ') : 'Nenhum'}
         aberta={abertas.has('efeitos')}
       >
+        <Opcao
+          rotulo="Remover silêncios"
+          descricao="Corta as pausas sem fala (o vídeo fica mais dinâmico)"
+          valor={!!g.efeitos.removerSilencio}
+          mudar={(v) => mudar('efeitos', { ...g.efeitos, removerSilencio: v })}
+        />
         <Opcao rotulo="Espelhar vídeo" valor={g.efeitos.espelhar} mudar={(v) => mudar('efeitos', { ...g.efeitos, espelhar: v })} />
         <Opcao
           rotulo="Cortar início e fim"

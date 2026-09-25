@@ -8,6 +8,8 @@ import { registrarVideoProcessado } from './autorizacao';
 import { detectarArea } from './deteccao';
 import { executar, FFMPEG, sondar } from './ffmpeg';
 import { montarComando } from './filtro';
+import { trechosComFala, type Segmento } from './silencio';
+import { trechoVideo } from '../layout';
 
 // Fila em memória do processo Node. Roda N vídeos ao mesmo tempo (EDITOR_MASSA_CONCURRENCIA).
 // Para escalar em vários servidores, troque por BullMQ/Redis mantendo a mesma interface.
@@ -204,6 +206,13 @@ async function processarItem(job: Job, indice: number) {
     const antiDup = global.antiDup ? gerarAntiDup(`${job.info.id}:${v.id}`, global.antiDupNivel) : null;
     const saida = path.join(pasta, `${indice + 1}.mp4`);
 
+    // Remover silêncios: detecta as pausas no trecho usado antes de montar o comando
+    let manter: Segmento[] | null = null;
+    if (global.efeitos.removerSilencio && info.temAudio) {
+      const t = trechoVideo(global, video);
+      manter = await trechosComFala(arquivo, t.inicio, t.duracao).catch(() => null);
+    }
+
     item.status = 'processando';
     for (const seguro of [false, true]) {
       const cmd = montarComando({
@@ -217,6 +226,7 @@ async function processarItem(job: Job, indice: number) {
         antiDup,
         saida,
         seguro,
+        manter,
       });
       log(job, `[FFMPEG] ${seguro ? '[RETRY] ' : ''}Processando ${v.nome}: ${cmd.resumo}`);
       const timeoutMs = Math.max(120_000, cmd.duracaoSaida * 20_000);

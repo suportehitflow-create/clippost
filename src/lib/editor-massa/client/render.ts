@@ -82,7 +82,9 @@ function escalaBase(canvas: Canvas, alvo: Canvas) {
 
 function desenharTexto(ctx: CanvasRenderingContext2D, textoBruto: string, e: EstiloTexto, canvas: Canvas, alvo: Canvas) {
   if (!textoBruto.trim()) return;
-  const texto = e.maiusculas ? textoBruto.toLocaleUpperCase('pt-BR') : textoBruto;
+  let texto = e.maiusculas ? textoBruto.toLocaleUpperCase('pt-BR') : textoBruto;
+  if (e.semEmojis) texto = texto.replace(/\p{Extended_Pictographic}(️|‍\p{Extended_Pictographic})*/gu, '').replace(/[ \t]{2,}/g, ' ').trim();
+  if (!texto) return;
   const px = e.tamanho * escalaBase(canvas, alvo);
   const k = alvo.w / canvas.w;
   const caixa = {
@@ -167,7 +169,7 @@ export function temOverlay(global: ConfigGlobal, v: ConfigVideo) {
   return (
     (global.textoAtivo && !!v.texto.trim()) ||
     marcasDoVideo(global, v).length > 0 ||
-    !!global.marcaTemplate ||
+    (!!global.marcaTemplate && !v.marcaEmbutida) ||
     (global.cantos > 0 && !global.moldura.ativo)
   );
 }
@@ -274,7 +276,7 @@ export function desenharOverlay(
 ) {
   const k = alvo.w / L.canvas.w;
   if (global.cantos > 0 && !global.moldura.ativo) desenharCantos(ctx, L.destino, global.cantos, k, alvo, fundo, '#000');
-  if (global.marcaTemplate) desenharMarcaTemplate(ctx, global.marcaTemplate, L.destino, k);
+  if (global.marcaTemplate && !v.marcaEmbutida) desenharMarcaTemplate(ctx, global.marcaTemplate, L.destino, k);
   if (global.textoAtivo) desenharTexto(ctx, v.texto, global.estiloTexto, L.canvas, alvo);
   marcasDoVideo(global, v).forEach((m) => desenharMarca(ctx, m, L.canvas, alvo));
 }

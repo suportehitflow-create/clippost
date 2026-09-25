@@ -2,6 +2,7 @@ import { calcularLayout, trechoVideo, velocidadeEfeitos, type Canvas } from '../
 import type { ConfigGlobal, ConfigVideo } from '../types';
 import type { ParametrosAntiDup } from './antidup';
 import type { InfoMidia } from './ffmpeg';
+import { expressaoTrechos, type Segmento } from './silencio';
 
 // Monta o comando FFmpeg de um vídeo. Estrutura portada do log [FFMPEG-FILTER] do original:
 //   entrada 0 = template em loop, 1 = vídeo, 2 = PNG de texto/marca, 3 = música
@@ -20,6 +21,8 @@ export interface EntradaFiltro {
   saida: string;
   /** modo seguro = nova tentativa sem filtros "opcionais" (igual ao [RETRY] do original) */
   seguro?: boolean;
+  /** Remover silêncios: trechos com fala (segundos relativos ao início do trecho) */
+  manter?: Segmento[] | null;
 }
 
 const hex = (cor: string) => '0x' + cor.replace('#', '').slice(0, 6).padEnd(6, '0').toUpperCase();
@@ -46,8 +49,12 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   const L = calcularLayout(g, { ...v, largura: info.largura, altura: info.altura, duracao: info.duracao }, e.template?.tamanho ?? null);
   const trecho = trechoVideo(g, { ...v, duracao: info.duracao });
   const vel = velocidadeEfeitos(g) * (ad ? ad.atempo : 1);
-  const duracaoSaida = trecho.duracao / vel;
+  // No modo seguro (retry) não corta silêncio: é o filtro mais sensível
+  const manter = !e.seguro && e.manter?.length ? e.manter : null;
+  const duracaoUtil = manter ? manter.reduce((t, s) => t + s.fim - s.ini, 0) : trecho.duracao;
+  const duracaoSaida = duracaoUtil / vel;
   const fps = ad ? ad.fps : Math.min(60, Math.max(15, Math.round(info.fps || 30)));
+  const fpsOrigem = Math.min(60, Math.max(10, Math.round(info.fps || 30)));
   const crf = ad ? ad.crf : 20;
 
   const args: string[] = ['-y', '-hide_banner', '-nostdin'];
@@ -81,7 +88,10 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   // ---------- vídeo ----------
   const o = L.origem;
   const d = L.destino;
-  const cadeiaVid = ['setpts=PTS-STARTPTS', `crop=${o.w}:${o.h}:${o.x}:${o.y}`];
+  const cadeiaVid = ['setpts=PTS-STARTPTS'];
+  // tira as pausas: fica só o que tem fala e os quadros são renumerados em sequência
+  if (manter) cadeiaVid.push(`fps=${fpsOrigem}`, `select=${expressaoTrechos(manter)}`, 'setpts=N/FRAME_RATE/TB');
+  cadeiaVid.push(`crop=${o.w}:${o.h}:${o.x}:${o.y}`);
   if (L.espelhar) cadeiaVid.push('hflip');
   cadeiaVid.push(`scale=${d.w}:${d.h}:flags=bicubic`);
   if (g.efeitos.ajusteAutomatico && !e.seguro) cadeiaVid.push('eq=contrast=1.06:saturation=1.12:brightness=0.01:gamma=1.02');
@@ -126,7 +136,7 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   const usarOriginal = info.temAudio && !v.mudo && volVideo > 0.001;
   let mapaAudio: string | null = null;
   if (usarOriginal) {
-    const a = ['asetpts=PTS-STARTPTS', ...cadeiaAtempo(vel)];
+    const a = ['asetpts=PTS-STARTPTS', ...(manter ? [`aselect=${expressaoTrechos(manter)}`, 'asetpts=N/SR/TB'] : []), ...cadeiaAtempo(vel)];
     if (g.melhorarAudio && !e.seguro) {
       a.push(
         'highpass=f=80',
@@ -171,6 +181,7 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   const resumo =
     `crop=${o.x},${o.y},${o.w},${o.h} → ${d.w}x${d.h}@${d.x},${d.y} saída=${L.saida.w}x${L.saida.h}` +
     ` vel=${n(vel, 3)} dur=${n(duracaoSaida, 2)}s` +
+    (manter ? ` [SILÊNCIO] ${manter.length} trechos, ${n(trecho.duracao - duracaoUtil, 1)}s de pausa removidos` : '') +
     (ad ? ` [ANTI-DUP] zoom=${ad.zoom} atempo=${ad.atempo} crf=${ad.crf} fps=${ad.fps}` : '');
   return { args, duracaoSaida, resumo };
 }

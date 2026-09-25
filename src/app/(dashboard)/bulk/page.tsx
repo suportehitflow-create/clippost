@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Film, Link2 } from 'lucide-react'
-import ProfileSwitcher from '@/components/ProfileSwitcher'
 import PerfilEmMassa from '@/components/bulk/PerfilEmMassa'
 
 // O editor usa canvas, <video> e localStorage: só no navegador
@@ -50,7 +49,7 @@ export default function EdicaoEmMassaPage() {
     // Tela cheia: o dock do site flutua por cima (o -mb-24 anula o espaço que o layout reserva para ele,
     // senão sobra uma faixa preta embaixo do editor)
     <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
-      <header className="h-14 shrink-0 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6 bg-[#0c0c0f]/80 backdrop-blur-md">
+      <header className="h-14 shrink-0 border-b border-white/[0.08] flex items-center gap-3 px-4 sm:px-6 bg-[#0c0c0f]/80 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-sm font-semibold text-white tracking-wide whitespace-nowrap">Edição em Massa</h1>
           <div className="flex p-1 bg-white/[0.02] border border-white/[0.08] rounded-xl gap-1" role="tablist" aria-label="Modo">
@@ -73,8 +72,6 @@ export default function EdicaoEmMassaPage() {
             ))}
           </div>
         </div>
-        <ProfileSwitcher align="center" />
-        <span />
       </header>
 
       {aba === 'editor' && !editorDisponivel ? (
