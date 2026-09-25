@@ -36,6 +36,8 @@ export interface PropsLateral {
   videoAtivo?: VideoCliente | null;
   atualizarAtivo?: (fn: (v: ConfigVideo) => Partial<ConfigVideo>) => void;
   atualizarTodos?: (fn: (v: ConfigVideo) => Partial<ConfigVideo>) => void;
+  aoProcessar?: () => void;
+  processando?: boolean;
 }
 
 type IdSecao = 'template' | 'ajustes' | 'limpeza' | 'texto' | 'legendas' | 'musica' | 'efeitos' | 'exportar';
@@ -72,7 +74,7 @@ function Secao(p: {
 
 export default function Lateral(p: PropsLateral) {
   const g = p.global;
-  const [abertas, setAbertas] = useState<Set<IdSecao>>(() => new Set<IdSecao>(['template', 'legendas']));
+  const [abertas, setAbertas] = useState<Set<IdSecao>>(() => new Set<IdSecao>());
   const [massa, setMassa] = useState('');
   const [tocando, setTocando] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -218,29 +220,14 @@ export default function Lateral(p: PropsLateral) {
       {/* Alça para redimensionar arrastando para a direita */}
       <div className={s.alcaResize} onPointerDown={iniciarResize} title="Arraste para ajustar a largura da barra lateral" />
 
-      {/* Cabeçalho Apple HIG com botão recolher bem visível */}
-      <div className={s.lateralTopoBarra}>
-        <div className={s.lateralTopoTitulo}>
-          <Icone nome="ferramentas" tamanho={14} />
-          <span>Configurações</span>
-        </div>
-        <button
-          type="button"
-          className={s.btnRecolherTopo}
-          onClick={() => setRecolhido(true)}
-          title="Recolher barra lateral"
-        >
-          <Icone nome="chevron" tamanho={12} style={{ transform: 'rotate(90deg)' }} />
-          <span>Recolher</span>
-        </button>
-      </div>
+      
 
       {/* ---------------- 1. TEMPLATE E LAYOUT (SÓ COR DO FUNDO + ENCAIXE + SEM BORDAS + TOPO) ---------------- */}
       <Secao
         {...comum}
         id="template"
         icone="layout"
-        titulo="Template e layout"
+        titulo="Template"
         resumo={p.carregandoTemplate ? 'Carregando…' : corFundoAtual === 'white' ? 'Fundo Branco' : corFundoAtual === 'gray' ? 'Fundo Cinza' : 'Fundo Preto'}
         aberta={abertas.has('template')}
       >
@@ -267,22 +254,19 @@ export default function Lateral(p: PropsLateral) {
             </button>
             <button
               type="button"
-              className={`${s.btnCor} ${ehGray ? s.btnCorAtiva : ''}`}
-              onClick={() => p.mudarTemplate?.({ templateBg: 'gray' })}
-              title="Fundo Cinza"
-            >
-              <span className={s.amostraCor} style={{ background: '#18181b' }} />
-              Cinza
-            </button>
-            <button
-              type="button"
               className={`${s.btnCor} ${ehCustom ? s.btnCorAtiva : ''}`}
               onClick={() => inputCorRef.current?.click()}
               title="Cor Personalizada (clique para escolher qualquer cor)"
               style={{ position: 'relative' }}
             >
-              <span className={s.amostraCor} style={{ background: corHexAtual }} />
-              <span>{ehCustom ? corHexAtual.toUpperCase() : 'Outra'}</span>
+              <span
+                className={s.amostraCor}
+                style={{
+                  background: ehCustom ? corHexAtual : 'conic-gradient(from 180deg at 50% 50%, #f43f5e 0deg, #ec4899 45deg, #a855f7 90deg, #6366f1 135deg, #3b82f6 180deg, #10b981 225deg, #eab308 270deg, #f97316 315deg, #f43f5e 360deg)',
+                  boxShadow: ehCustom ? '0 0 0 2px #fff' : 'none'
+                }}
+              />
+              <span>{ehCustom ? corHexAtual.toUpperCase() : 'Outro'}</span>
               <input
                 ref={inputCorRef}
                 type="color"
@@ -300,7 +284,7 @@ export default function Lateral(p: PropsLateral) {
             valor={g.encaixe}
             mudar={(v) => mudar('encaixe', v)}
             opcoes={[
-              { valor: 'template', rotulo: 'Fixo no template', titulo: 'O vídeo ocupa o quadro fixo do seu template' },
+              { valor: 'template', rotulo: 'Fixo', titulo: 'O vídeo ocupa o quadro fixo do seu template' },
               { valor: 'video', rotulo: 'Solto', titulo: 'O vídeo fica solto, permitindo ajuste de tamanho e posição' },
             ]}
           />
@@ -308,7 +292,7 @@ export default function Lateral(p: PropsLateral) {
 
         {/* Espaço no topo: desloca o vídeo verticalmente sem alterar a escala */}
         <Slider
-          rotulo="Espaço no topo"
+          rotulo="Altura do vídeo"
           min={-Math.round(canvasH * 0.25)}
           max={Math.round(canvasH * 0.35)}
           valor={g.espacoTopo}
@@ -382,37 +366,89 @@ export default function Lateral(p: PropsLateral) {
         id="legendas"
         icone="texto"
         titulo="Legenda"
-        resumo={leg.ativo ? (PRESETS_LEGENDA.find((x) => x.id === leg.preset)?.nome ?? 'Ativa') : 'Desligada'}
-        ligado={leg.ativo}
-        mudarLigado={ligar('legendas', () => mudar('legendas', { ...leg, ativo: !leg.ativo }))}
+        resumo={leg.ativo ? (leg.fonte ? `${leg.fonte} · ${leg.corTexto || '#FFF'}` : 'Ativada') : 'Desligada'}
         aberta={abertas.has('legendas')}
       >
-        <span className={s.dica}>
-          Legendas animadas sincronizadas com a fala de cada corte, estilo Shorts e Reels virais.
-        </span>
-        <Campo rotulo="Estilo da legenda">
-          <select
-            id="legenda-preset"
-            className={s.select}
-            value={leg.preset}
-            onChange={(e) => mudar('legendas', { ...leg, preset: e.target.value })}
-          >
-            {PRESETS_LEGENDA.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.nome}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        <Slider
-          rotulo="Altura na tela"
-          min={20}
-          max={92}
-          valor={leg.posicaoY}
-          formatar={(v) => `${v}%`}
-          padrao={75}
-          mudar={(v) => mudar('legendas', { ...leg, posicaoY: v })}
+        <Opcao
+          rotulo="Legenda ativada"
+          descricao="Legendas animadas sincronizadas com a fala de cada corte"
+          valor={leg.ativo}
+          mudar={(v) => mudar('legendas', { ...leg, ativo: v })}
         />
+
+        {leg.ativo && (
+          <>
+            <Campo rotulo="Fonte da legenda">
+              <select
+                id="legenda-fonte"
+                className={s.select}
+                value={leg.fonte || 'Montserrat'}
+                onChange={(e) => mudar('legendas', { ...leg, fonte: e.target.value })}
+              >
+                {['Montserrat', 'Anton', 'Roboto', 'DejaVu Sans', 'Inter', 'Impact', 'Arial', 'Bebas Neue', 'Poppins'].map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+
+            <Campo rotulo="Cor da legenda">
+              <div className={s.gradeCores}>
+                {[
+                  { nome: 'Branco', hex: '#FFFFFF' },
+                  { nome: 'Amarelo', hex: '#FACC15' },
+                  { nome: 'Ciano', hex: '#22D3EE' },
+                  { nome: 'Rosa', hex: '#F472B6' },
+                  { nome: 'Verde', hex: '#22C55E' },
+                  { nome: 'Laranja', hex: '#FB923C' },
+                ].map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    className={`${s.btnCor} ${(leg.corTexto || '#FFFFFF').toUpperCase() === c.hex ? s.btnCorAtiva : ''}`}
+                    onClick={() => mudar('legendas', { ...leg, corTexto: c.hex })}
+                    title={c.nome}
+                  >
+                    <span className={s.amostraCor} style={{ background: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #444' : 'none' }} />
+                    {c.nome}
+                  </button>
+                ))}
+              </div>
+            </Campo>
+
+            <Opcao
+              rotulo="Borda destacada (contorno)"
+              descricao="Borda preta em volta das palavras para facilitar leitura"
+              valor={leg.borda ?? true}
+              mudar={(v) => mudar('legendas', { ...leg, borda: v })}
+            />
+
+            <Opcao
+              rotulo="Sombra projetada"
+              descricao="Sombra escura suave atrás da legenda"
+              valor={leg.sombra ?? true}
+              mudar={(v) => mudar('legendas', { ...leg, sombra: v })}
+            />
+
+            <Opcao
+              rotulo="Caixa de fundo"
+              descricao="Pílula ou caixa de fundo atrás da legenda"
+              valor={leg.fundo ?? false}
+              mudar={(v) => mudar('legendas', { ...leg, fundo: v })}
+            />
+
+            <Slider
+              rotulo="Altura na tela"
+              min={20}
+              max={92}
+              valor={leg.posicaoY}
+              formatar={(v) => `${v}%`}
+              padrao={75}
+              mudar={(v) => mudar('legendas', { ...leg, posicaoY: v })}
+            />
+          </>
+        )}
       </Secao>
 
       {/* ---------------- 4. REMOVER TEMPLATE ANTIGO (SÓ MOSTRA SE NÃO FOR YOUTUBE) ---------------- */}
@@ -457,9 +493,7 @@ export default function Lateral(p: PropsLateral) {
         id="texto"
         icone="texto"
         titulo="Texto"
-        resumo={g.textoAtivo ? `Estilo do template · ${et.tamanho}px` : 'Desligado'}
-        ligado={g.textoAtivo}
-        mudarLigado={ligar('texto', () => mudar('textoAtivo', !g.textoAtivo))}
+        resumo={`Estilo do template · ${et.tamanho}px`}
         aberta={abertas.has('texto')}
       >
         <Campo rotulo="Textos em massa">
@@ -507,7 +541,7 @@ export default function Lateral(p: PropsLateral) {
         {...comum}
         id="musica"
         icone="musica"
-        titulo="Música e áudio"
+        titulo="Áudio e música"
         resumo={[musicaSel ? musicaSel.nome : 'Sem música', `áudio original ${volOriginal}%`].join(' · ')}
         aberta={abertas.has('musica')}
       >
@@ -635,6 +669,31 @@ export default function Lateral(p: PropsLateral) {
           mudar={(v) => mudar('antiDup', v)}
         />
         <Opcao rotulo="Melhorar áudio" descricao="Remove ruído e normaliza o volume" valor={g.melhorarAudio} mudar={(v) => mudar('melhorarAudio', v)} />
+
+        <button
+          type="button"
+          className={`${s.btn} ${s.btnPrimario}`}
+          style={{
+            width: '100%',
+            marginTop: 14,
+            padding: '12px 16px',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+            boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+            cursor: 'pointer',
+          }}
+          onClick={p.aoProcessar}
+          disabled={!p.totalVideos || p.processando}
+        >
+          <Icone nome={p.processando ? 'refresh' : 'play'} tamanho={15} />
+          <span>{p.processando ? 'Processando vídeos…' : p.totalVideos > 0 ? `Exportar todos os vídeos (${p.totalVideos})` : 'Exportar todos os vídeos'}</span>
+        </button>
       </Secao>
 
       {/* ---------------- BARRA INFERIOR: APLICAR A TODOS (TOGGLE PADRÃO DO SITE) ---------------- */}

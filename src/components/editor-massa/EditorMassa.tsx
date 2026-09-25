@@ -79,11 +79,13 @@ export interface ProjetoEstudio {
 export default function EditorMassa({
   projeto,
   titulo,
+  abasModo,
   acoesExtras,
   onAgendar,
 }: {
   projeto?: ProjetoEstudio;
   titulo?: string;
+  abasModo?: ReactNode;
   acoesExtras?: ReactNode;
   onAgendar?: () => void;
 } = {}) {
@@ -853,17 +855,28 @@ export default function EditorMassa({
         href={`https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&${FONTES_GOOGLE.map((f) => `family=${f.replace(/ /g, '+')}:ital,wght@0,400;0,700;1,400;1,700`).join('&')}&display=swap`}
       />
 
-      {/* ================= barra superior ================= */}
+      {/* ================= barra superior unificada ================= */}
       <header className={s.barra}>
-        <div className={s.logo} title={titulo}>
-          <span className={s.logoMarca}>
-            <Icone nome="sparkles" tamanho={15} />
-          </span>
-          <span style={{ maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
-            {titulo ?? 'Estúdio'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <button
+            type="button"
+            className={`${s.btn} ${s.btnFantasma} ${s.btnIcone}`}
+            onClick={() => setLateralRecolhida((r) => !r)}
+            title={lateralRecolhida ? 'Mostrar configurações (expandir)' : 'Ocultar configurações (recolher)'}
+            style={{ width: 32, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <Icone nome="chevron" tamanho={13} style={{ transform: lateralRecolhida ? 'rotate(-90deg)' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
+          </button>
+          <div className={s.logo} title={titulo}>
+            <span className={s.logoMarca}>
+              <Icone nome="sparkles" tamanho={14} />
+            </span>
+            <span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+              {titulo ?? 'Estúdio'}
+            </span>
+          </div>
+          {abasModo}
         </div>
-        
 
         <div className={s.barraDireita}>
           {acoesExtras}
@@ -893,15 +906,6 @@ export default function EditorMassa({
                   <Icone nome="calendario" tamanho={14} /> Seguir para agendamento
                 </button>
               )}
-              <button
-                type="button"
-                className={`${s.btn} ${projeto && onAgendar ? s.btnFantasma : s.btnPrimario}`}
-                onClick={processar}
-                disabled={!total}
-                style={{ minWidth: 150 }}
-              >
-                <Icone nome="play" tamanho={14} /> {total ? `Processar ${total} vídeo${total > 1 ? 's' : ''}` : 'Processar'}
-              </button>
             </>
           )}
         </div>
@@ -928,6 +932,8 @@ export default function EditorMassa({
         )}
 
         <Lateral
+          aoProcessar={processar}
+          processando={abaAtiva.processando}
           global={global}
           mudarGlobal={setGlobal}
           template={template}

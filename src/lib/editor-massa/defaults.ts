@@ -130,7 +130,7 @@ export function configGlobalPadrao(): ConfigGlobal {
     cantos: 0,
     marcaTemplate: null,
     textoAjustado: false,
-    legendas: { ativo: false, preset: 'hormozi_yellow', posicaoY: 75 },
+    legendas: { ativo: false, preset: 'hormozi_yellow', posicaoY: 75, fonte: 'Montserrat', corTexto: '#FFFFFF', borda: true, sombra: true, fundo: false },
   };
 }
 

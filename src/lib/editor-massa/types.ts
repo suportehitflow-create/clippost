@@ -116,7 +116,7 @@ export interface ConfigGlobal {
   /** O usuário mexeu no tamanho/posição do texto: o template não sobrescreve mais */
   textoAjustado: boolean;
   /** Legendas automáticas (transcrição no backend, queimadas no FFmpeg) */
-  legendas?: { ativo: boolean; preset: string; posicaoY: number };
+  legendas?: { ativo: boolean; preset: string; posicaoY: number; fonte?: string; corTexto?: string; borda?: boolean; sombra?: boolean; fundo?: boolean };
 }
 
 export interface ConfigVideo {

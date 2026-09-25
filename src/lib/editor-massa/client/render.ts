@@ -3,12 +3,13 @@ import type { ConfigGlobal, ConfigVideo, EstiloTexto, MarcaDagua, MarcaTemplate,
 import { MAX_MARCAS, PRESETS_LEGENDA } from '../defaults';
 
 /** Amostra da legenda no preview, no estilo do preset e na altura escolhida */
-function desenharAmostraLegenda(ctx: CanvasRenderingContext2D, preset: string, posicaoY: number, alvo: Canvas) {
+function desenharAmostraLegenda(ctx: CanvasRenderingContext2D, preset: string, posicaoY: number, alvo: Canvas, cfg?: { fonte?: string; corTexto?: string; borda?: boolean; sombra?: boolean; fundo?: boolean }) {
   const p = PRESETS_LEGENDA.find((x) => x.id === preset) ?? PRESETS_LEGENDA[0];
   const px = alvo.w * (p.umaPalavra ? 0.085 : 0.052);
   const palavras = p.umaPalavra ? ['LEGENDA'] : ['SUA', 'LEGENDA', 'AQUI'];
+  const fonteFam = cfg?.fonte ? `"${cfg.fonte}", ` : '';
   ctx.save();
-  ctx.font = `900 ${px.toFixed(1)}px Roboto, "Segoe UI", Arial, sans-serif`;
+  ctx.font = `900 ${px.toFixed(1)}px ${fonteFam}Roboto, "Segoe UI", Arial, sans-serif`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const espaco = ctx.measureText(' ').width;
@@ -16,20 +17,32 @@ function desenharAmostraLegenda(ctx: CanvasRenderingContext2D, preset: string, p
   const total = larguras.reduce((a, b) => a + b, 0) + espaco * (palavras.length - 1);
   const y = (posicaoY / 100) * alvo.h;
   let x = (alvo.w - total) / 2;
-  if (p.caixa) {
+  const temFundo = cfg?.fundo ?? !!p.caixa;
+  if (temFundo) {
     const pad = px * 0.35;
     caixaArredondada(ctx, x - pad, y - px * 0.7, total + pad * 2, px * 1.4, px * 0.18);
-    ctx.fillStyle = p.caixa;
+    ctx.fillStyle = p.caixa || 'rgba(0,0,0,0.85)';
     ctx.fill();
   }
+  const corTexto = cfg?.corTexto || p.texto;
+  const temBorda = cfg?.borda ?? (!p.caixa || !!p.destaque);
+  const temSombra = cfg?.sombra ?? true;
+
+  if (temSombra) {
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = px * 0.25;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+  }
+
   palavras.forEach((w, i) => {
-    if (!p.caixa) {
+    if (temBorda) {
       ctx.lineJoin = 'round';
       ctx.lineWidth = px * 0.16;
-      ctx.strokeStyle = '#000';
+      ctx.strokeStyle = '#000000';
       ctx.strokeText(w, x, y);
     }
-    ctx.fillStyle = p.destaque && i === 1 ? p.destaque : p.texto;
+    ctx.fillStyle = p.destaque && i === 1 ? p.destaque : corTexto;
     ctx.fillText(w, x, y);
     x += larguras[i] + espaco;
   });
@@ -361,7 +374,7 @@ export function desenharComposicao(
   }
   desenharOverlay(ctx, global, v, L, alvo, global.moldura.ativo ? null : template);
   // Só no preview: amostra da legenda automática (a de verdade é gerada no servidor)
-  if (global.legendas?.ativo && !v.marcaEmbutida) desenharAmostraLegenda(ctx, global.legendas.preset, global.legendas.posicaoY, alvo);
+  if (global.legendas?.ativo && !v.marcaEmbutida) desenharAmostraLegenda(ctx, global.legendas.preset, global.legendas.posicaoY, alvo, global.legendas);
   ctx.restore();
   return L;
 }
