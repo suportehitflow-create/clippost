@@ -92,6 +92,7 @@ export default function EditorMassa({
   const [emMassa, setEmMassa] = useState(true);
   const [larguraLateral, setLarguraLateral] = useState(330);
   const [lateralRecolhida, setLateralRecolhida] = useState(false);
+  const [ferramentaAtiva, setFerramentaAtiva] = useState<string | null>(null);
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
   const [abas, setAbas] = useState<Aba[]>(() => [novaAba(1)]);
   const [abaAtivaId, setAbaAtivaId] = useState('');
@@ -861,11 +862,20 @@ export default function EditorMassa({
           <button
             type="button"
             className={`${s.btn} ${s.btnFantasma} ${s.btnIcone}`}
-            onClick={() => setLateralRecolhida((r) => !r)}
-            title={lateralRecolhida ? 'Mostrar configurações (expandir)' : 'Ocultar configurações (recolher)'}
+            onClick={() => {
+              if (lateralRecolhida) {
+                setLateralRecolhida(false);
+                setFerramentaAtiva('template');
+              } else if (ferramentaAtiva) {
+                setFerramentaAtiva(null);
+              } else {
+                setFerramentaAtiva('template');
+              }
+            }}
+            title={ferramentaAtiva ? 'Ocultar painel de configurações' : 'Mostrar painel de configurações'}
             style={{ width: 32, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <Icone nome="chevron" tamanho={13} style={{ transform: lateralRecolhida ? 'rotate(-90deg)' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
+            <Icone nome="chevron" tamanho={13} style={{ transform: ferramentaAtiva ? 'rotate(90deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease' }} />
           </button>
           <div className={s.logo} title={titulo}>
             <span className={s.logoMarca}>
@@ -915,8 +925,8 @@ export default function EditorMassa({
       <div
         className={s.corpo}
         style={{
-          gridTemplateColumns: `${lateralRecolhida ? '0px' : `${larguraLateral}px`} minmax(0, 1fr) 390px`,
-          transition: 'grid-template-columns 0.15s ease',
+          gridTemplateColumns: `${lateralRecolhida ? '0px' : (ferramentaAtiva ? '388px' : '68px')} minmax(0, 1fr) 390px`,
+          transition: 'grid-template-columns 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {lateralRecolhida && (
@@ -934,6 +944,8 @@ export default function EditorMassa({
         <Lateral
           aoProcessar={processar}
           processando={abaAtiva.processando}
+          ferramentaAtiva={ferramentaAtiva}
+          setFerramentaAtiva={setFerramentaAtiva}
           global={global}
           mudarGlobal={setGlobal}
           template={template}
