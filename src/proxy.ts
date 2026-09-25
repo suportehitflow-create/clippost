@@ -39,6 +39,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/bulk') ||
     request.nextUrl.pathname.startsWith('/autopilot') ||
     request.nextUrl.pathname.startsWith('/templates') ||
+    request.nextUrl.pathname.startsWith('/ferramentas') ||
     request.nextUrl.pathname.startsWith('/clips')
 
   if (!user && isProtected) {

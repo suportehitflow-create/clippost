@@ -12,6 +12,7 @@ import {
   Calendar,
   Settings,
   FolderOpen,
+  Wrench,
   ArrowUpRight,
   Video,
   Clock,
@@ -32,6 +33,8 @@ interface Feature {
   cor: string
   badge?: string
   wide?: boolean
+  /** ocupa a linha inteira da grade */
+  inteiro?: boolean
 }
 
 // Ordem = ranking das ferramentas (o número do card é a posição)
@@ -45,6 +48,7 @@ const FEATURES: Feature[] = [
   { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246' },
   { capa: 'calendario', title: 'Calendário & Publicações', description: 'Programe as postagens no Instagram, TikTok e YouTube e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11', wide: true },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
+  { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, Raio-X de perfil, YouTube → texto, melhores horários, contador, quebra de linha e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', inteiro: true },
 ]
 
 const CAPAS_URL = `${(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co').replace(/[﻿​-‍\s]/g, '').replace(/\/$/, '')}/storage/v1/object/public/videos/site/capas`
@@ -55,7 +59,7 @@ function FeatureCard({ feature, posicao }: { feature: Feature; posicao: number }
     <Link
       href={feature.href}
       className={`group relative flex flex-col overflow-hidden rounded-[28px] bg-[#0d0d12] border border-white/[0.07] hover:border-white/[0.18] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-        feature.wide ? 'sm:col-span-2' : ''
+        feature.inteiro ? 'sm:col-span-2 lg:col-span-3' : feature.wide ? 'sm:col-span-2' : ''
       }`}
     >
       {/* capa (Gemini) sobre o degradê da ferramenta */}

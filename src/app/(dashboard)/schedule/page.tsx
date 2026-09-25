@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
+import EditorLegenda from '@/components/ferramentas/EditorLegenda'
+import { FUSOS, gerarLegendasIA, horarioLocal, juntarLegenda, LIMITE_DIARIO, MELHORES_HORARIOS, NOME_REDE } from '@/lib/publicacao'
 import {
   Calendar, ChevronLeft, ChevronRight, Plus, Loader2, X, Send, Trash2, Clock, CheckCircle2, AlertCircle, Layers, Activity, Film, ExternalLink, Sparkles,
 } from 'lucide-react'
@@ -37,47 +39,7 @@ const STATUS: Record<Status, { nome: string; cor: string; fundo: string }> = {
   published: { nome: 'Publicado', cor: '#10b981', fundo: 'rgba(16,185,129,0.14)' },
   failed: { nome: 'Falhou', cor: '#ef4444', fundo: 'rgba(239,68,68,0.14)' },
 }
-const PLAT: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', youtube_shorts: 'YouTube', youtube: 'YouTube', twitter: 'X' }
-
-// Limite de caracteres da legenda (YouTube: é o título do Short) e onde o Instagram corta com "...mais"
-const LIMITE_LEGENDA: Record<string, number> = { instagram: 2200, facebook: 2200, tiktok: 2200, youtube_shorts: 100 }
-const CORTE_MAIS_IG = 125
-
-// Horários de pico gerais por rede (horário do público). São referências de mercado, não dados da sua conta.
-const MELHORES_HORARIOS: Record<string, string[]> = {
-  instagram: ['11:00', '13:00', '19:00', '21:00'],
-  tiktok: ['12:00', '15:00', '19:00', '22:00'],
-  youtube_shorts: ['12:00', '17:00', '20:00'],
-  facebook: ['09:00', '13:00', '18:00'],
-}
-const FUSOS = [
-  { id: 'America/Sao_Paulo', nome: 'Brasil (Brasília)' },
-  { id: 'Europe/Lisbon', nome: 'Portugal' },
-  { id: 'America/New_York', nome: 'EUA (Nova York)' },
-  { id: 'local', nome: 'Meu fuso' },
-]
-
-// Limite diário de publicações pela API de cada rede (por conta)
-const LIMITE_DIARIO: Record<string, { n: number; fonte: string }> = {
-  instagram: { n: 100, fonte: 'a Meta aceita até 100 posts por conta a cada 24h pela API' },
-  tiktok: { n: 15, fonte: 'a API do TikTok aceita cerca de 15 vídeos por dia por conta' },
-  youtube_shorts: { n: 6, fonte: 'a cota padrão da API do YouTube dá para cerca de 6 envios por dia' },
-}
-
-/** Diferença (min) entre o fuso do público e o do navegador, para converter "18:00 no Brasil" em hora local */
-function diferencaFuso(fuso: string): number {
-  if (fuso === 'local') return 0
-  const agora = new Date()
-  const noFuso = new Date(agora.toLocaleString('en-US', { timeZone: fuso }))
-  const local = new Date(agora.toLocaleString('en-US'))
-  return Math.round((noFuso.getTime() - local.getTime()) / 60000)
-}
-
-function horarioLocal(hhmm: string, fuso: string) {
-  const [h, m] = hhmm.split(':').map(Number)
-  const total = (((h * 60 + m - diferencaFuso(fuso)) % 1440) + 1440) % 1440
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
+const PLAT = NOME_REDE
 
 const mesmoDia = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 const hm = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -789,106 +751,6 @@ function NovoPost({ dia, cortes, contas, fechar, agendar }: {
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-/** Pede ao backend 3 legendas com hashtags para um corte */
-async function gerarLegendasIA(p: { clipId?: string; titulo?: string; plataforma: string; tom: string }) {
-  const r = await fetch('/api/captions/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clip_id: p.clipId, titulo: p.titulo, plataforma: p.plataforma, tom: p.tom }),
-  })
-  const d = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(d.detail || 'Não foi possível gerar a legenda.')
-  return (d.opcoes ?? []) as { legenda: string; hashtags: string[] }[]
-}
-
-const juntarLegenda = (o: { legenda: string; hashtags: string[] }, plataforma: string) =>
-  plataforma === 'youtube_shorts' ? o.legenda : `${o.legenda}\n\n${o.hashtags.join(' ')}`.trim()
-
-/** Legenda com contador por rede, prévia do "...mais" do Instagram e geração com IA */
-function EditorLegenda({ id, valor, mudar, plataformas, clipId, titulo, linhas = 5 }: {
-  id: string
-  valor: string
-  mudar: (v: string) => void
-  plataformas: string[]
-  clipId?: string
-  titulo?: string
-  linhas?: number
-}) {
-  const [tom, setTom] = useState('viral')
-  const [gerando, setGerando] = useState(false)
-  const [opcoes, setOpcoes] = useState<{ legenda: string; hashtags: string[] }[]>([])
-  const [erro, setErro] = useState('')
-  const redes = [...new Set(plataformas.length ? plataformas : ['instagram'])]
-  const principal = redes.includes('instagram') ? 'instagram' : redes[0]
-
-  async function gerar() {
-    setGerando(true)
-    setErro('')
-    try {
-      setOpcoes(await gerarLegendasIA({ clipId, titulo, plataforma: principal, tom }))
-    } catch (e: any) {
-      setErro(e.message)
-    } finally {
-      setGerando(false)
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-zinc-500">Legenda</span>
-        <div className="flex items-center gap-1.5">
-          <select id={`${id}-tom`} value={tom} onChange={e => setTom(e.target.value)} className="px-2 py-1 rounded-lg bg-black/40 border border-white/[0.1] text-[11px]" aria-label="Tom da legenda">
-            <option value="viral">Viral</option>
-            <option value="engracado">Engraçado</option>
-            <option value="informativo">Informativo</option>
-            <option value="polemico">Polêmico</option>
-          </select>
-          <button type="button" onClick={gerar} disabled={gerando || (!clipId && !titulo && !valor)}
-            className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-[11px] font-semibold text-indigo-200 flex items-center gap-1 disabled:opacity-50">
-            {gerando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Gerar com IA
-          </button>
-        </div>
-      </div>
-      <textarea id={id} value={valor} onChange={e => mudar(e.target.value)} rows={linhas} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
-      {erro && <p className="text-[11px] text-red-300">{erro}</p>}
-      {opcoes.length > 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[11px] text-zinc-500">Escolha uma opção (dá para editar depois):</span>
-          {opcoes.map((o, i) => (
-            <button key={i} type="button" onClick={() => { mudar(juntarLegenda(o, principal)); setOpcoes([]) }}
-              className="w-full text-left p-2.5 rounded-xl bg-black/30 border border-white/[0.08] hover:border-indigo-400/60">
-              <p className="text-xs text-zinc-200 whitespace-pre-line line-clamp-4">{o.legenda}</p>
-              {principal !== 'youtube_shorts' && <p className="text-[10px] text-indigo-300/80 mt-1 line-clamp-1">{o.hashtags.join(' ')}</p>}
-            </button>
-          ))}
-        </div>
-      )}
-      {/* contador por rede */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {redes.map(r => {
-          const lim = LIMITE_LEGENDA[r] ?? 2200
-          const passou = valor.length > lim
-          return (
-            <span key={r} className={`text-[10px] tabular-nums ${passou ? 'text-red-300' : 'text-zinc-500'}`}>
-              {PLAT[r] ?? r}: {valor.length}/{lim}{r === 'youtube_shorts' && passou ? ' (vira título: corta aqui)' : ''}
-            </span>
-          )
-        })}
-      </div>
-      {/* prévia do Instagram: o que aparece antes do "...mais" */}
-      {redes.includes('instagram') && valor.trim() && (
-        <div className="rounded-xl bg-black/30 border border-white/[0.06] p-2.5">
-          <span className="text-[10px] text-zinc-500 block mb-1">Prévia no Instagram</span>
-          <p className="text-xs text-zinc-200 whitespace-pre-line">
-            {valor.length > CORTE_MAIS_IG ? <>{valor.slice(0, CORTE_MAIS_IG).trimEnd()}<span className="text-zinc-500">... mais</span></> : valor}
-          </p>
-        </div>
-      )}
     </div>
   )
 }
