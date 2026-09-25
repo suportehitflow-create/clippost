@@ -119,7 +119,9 @@ export default function Inspetor({ video: v, editando, global, template, musicas
     if (!c || !v) return;
     const L = calcularLayout(global, v, tpl);
     const aspecto = original ? v.largura / v.altura || 1 : L.canvas.w / L.canvas.h;
-    const w = Math.max(60, Math.min(tamPalco.w - 24, (tamPalco.h - 24) * aspecto));
+    // no modo resultado a tela fica dentro da moldura do celular (borda de 10px + folga)
+    const folga = original ? 24 : 48;
+    const w = Math.max(60, Math.min(tamPalco.w - folga, (tamPalco.h - folga) * aspecto));
     const h = w / aspecto;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
@@ -128,6 +130,7 @@ export default function Inspetor({ video: v, editando, global, template, musicas
       c.style.width = `${w}px`;
       c.style.height = `${h}px`;
     }
+    c.style.borderRadius = original ? '4px' : `${Math.round(w * 0.12)}px`;
     const ctx = c.getContext('2d')!;
     const el = videoRef.current;
     const fonte =
@@ -318,7 +321,10 @@ export default function Inspetor({ video: v, editando, global, template, musicas
       </div>
 
       <div className={s.palco} ref={palcoRef} onPointerDown={apertar} onPointerMove={mover} onPointerUp={() => (arrasto.current = null)}>
-        <canvas ref={canvasRef} style={{ cursor: original ? 'default' : 'grab' }} />
+        <div className={original ? s.telaSolta : s.celular}>
+          {!original && <span className={s.celularIlha} aria-hidden />}
+          <canvas ref={canvasRef} style={{ cursor: original ? 'default' : 'grab' }} />
+        </div>
         <video
           ref={videoRef}
           src={v.tocavel ? v.url : undefined}

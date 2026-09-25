@@ -14,6 +14,8 @@ export interface VideoCliente extends ConfigVideo {
   statusJob: StatusItem | null;
   progressoJob: number;
   saidaJob: string | null;
+  /** Veio do armazenamento do navegador (a detecção já feita é mantida) */
+  restaurado?: boolean;
 }
 
 export interface Aba {

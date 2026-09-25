@@ -1,5 +1,5 @@
 // Teste rápido da detecção de texto sobre o vídeo: npx tsx scripts/editor-massa/teste-texto.mts
-import { detectarAreaVideo } from '../../src/lib/editor-massa/deteccao-core.ts';
+import { detectarAreaVideo } from '../../src/lib/editor-massa/deteccao-core';
 
 const w = 160;
 const h = 284;

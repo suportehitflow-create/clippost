@@ -47,8 +47,9 @@ export default function EdicaoEmMassaPage() {
   }
 
   return (
-    // Altura fixa descontando o dock flutuante, para o rodapé do editor não ficar embaixo dele
-    <div className="flex flex-col h-[calc(100dvh-6rem)] min-h-[620px] bg-[#0a0a0c]">
+    // Tela cheia: o dock do site flutua por cima (o -mb-24 anula o espaço que o layout reserva para ele,
+    // senão sobra uma faixa preta embaixo do editor)
+    <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
       <header className="h-14 shrink-0 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6 bg-[#0c0c0f]/80 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-sm font-semibold text-white tracking-wide whitespace-nowrap">Edição em Massa</h1>

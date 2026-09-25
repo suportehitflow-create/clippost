@@ -20,6 +20,15 @@ import {
 import type { ConfigGlobal, ConfigVideo, VideoJob } from '@/lib/editor-massa/types';
 import { novaAba, novoId, type Aba, type MusicaCliente, type ResultadoJob, type TemplateCliente, type VideoCliente } from './estado';
 import EditarTemplate from './EditarTemplate';
+import {
+  apagarArquivo,
+  carregarEstado,
+  carregarResultados,
+  pedirArmazenamentoPersistente,
+  salvarArquivo,
+  salvarEstado,
+  salvarResultados,
+} from './persistencia';
 import Grade from './Grade';
 import { Icone } from './icones';
 import Inspetor from './Inspetor';
@@ -37,16 +46,17 @@ const emCampoDeTexto = (e: Event) => /INPUT|TEXTAREA|SELECT/.test((e.target as H
 
 /** Só os campos de ConfigVideo (sem File, ImageBitmap etc.) */
 function paraConfig(v: VideoCliente): ConfigVideo {
-  const { arquivo, url, upload, uploadErro, quadro, carregado, tocavel, detectando, statusJob, progressoJob, saidaJob, ...cfg } = v;
-  void arquivo, url, upload, uploadErro, quadro, carregado, tocavel, detectando, statusJob, progressoJob, saidaJob;
+  const { arquivo, url, upload, uploadErro, quadro, carregado, tocavel, detectando, statusJob, progressoJob, saidaJob, restaurado, ...cfg } = v;
+  void arquivo, url, upload, uploadErro, quadro, carregado, tocavel, detectando, statusJob, progressoJob, saidaJob, restaurado;
   return cfg;
 }
 
 function carregarConfig(): ConfigGlobal {
   try {
     const r = completarConfig(JSON.parse(localStorage.getItem(CHAVE_CONFIG) || 'null'));
-    // Agora o fundo é sempre o template Clipost (sem "fundo de cor"/imagem avulsa)
-    return { ...r, moldura: { ...r.moldura, ativo: false }, musica: { ...r.musica, musicaId: null } };
+    // Agora o fundo é sempre o template Clipost (sem "fundo de cor"/imagem avulsa).
+    // A música escolhida volta junto com as músicas salvas no navegador (ver restauração).
+    return { ...r, moldura: { ...r.moldura, ativo: false } };
   } catch {
     return configGlobalPadrao();
   }
@@ -232,7 +242,8 @@ export default function EditorMassa() {
         if (!meta.largura) throw new Error('sem vídeo');
         const quadro = await capturarQuadro(el, Math.min(1, meta.duracao * 0.3), 720);
         atualizarVideo(v.id, { ...meta, quadro, carregado: true, tocavel: true });
-        await detectar(el, { ...v, ...meta });
+        // vídeo que voltou do armazenamento já tem a área detectada (e talvez ajustada à mão)
+        if (!(v.restaurado && v.origemDeteccao)) await detectar(el, { ...v, ...meta });
       } catch {
         // formato que o navegador não abre → o servidor analisa após o upload
         atualizarVideo(v.id, { tocavel: false });
@@ -291,7 +302,10 @@ export default function EditorMassa() {
       }));
       const alvo = abaAtiva.id;
       setAbas((as) => as.map((a) => (a.id === alvo ? { ...a, videos: [...a.videos, ...novos] } : a)));
-      novos.forEach((v) => enviarVideo(v).catch(() => {}));
+      novos.forEach((v) => {
+        salvarArquivo(v.id, v.arquivo);
+        enviarVideo(v).catch(() => {});
+      });
       avisar(`${novos.length} vídeo(s) adicionados`);
       if (!ativoId && novos[0]) setAtivoId(novos[0].id);
     },
@@ -307,6 +321,7 @@ export default function EditorMassa() {
           URL.revokeObjectURL(v.url);
           cancelarUploads.current.get(v.id)?.();
           uploads.current.delete(v.id);
+          apagarArquivo(v.id);
         }),
       );
       setAbas((as) => as.map((a) => ({ ...a, videos: a.videos.filter((v) => !set.has(v.id)) })));
@@ -467,7 +482,49 @@ export default function EditorMassa() {
     setEditarTplAberto(false);
   };
 
+  // ---------- vídeos, músicas e resultados salvos no navegador ----------
+  const restaurou = useRef(false);
+  useEffect(() => {
+    pedirArmazenamentoPersistente();
+    setResultados(carregarResultados());
+    carregarEstado()
+      .then((e) => {
+        const salvas = e?.musicas ?? [];
+        setGlobal((g) => (g.musica.musicaId && !salvas.some((m) => m.id === g.musica.musicaId) ? { ...g, musica: { ...g.musica, musicaId: null } } : g));
+        if (!e) return;
+        const temVideos = e.abas.some((a) => a.videos.length);
+        if (temVideos || e.musicas.length) {
+          setAbas(e.abas.length ? e.abas : [novaAba(1)]);
+          setAbaAtivaId(e.abas.find((a) => a.id === e.abaAtivaId)?.id ?? e.abas[0]?.id ?? '');
+          setAtivoId(e.abas.find((a) => a.id === e.abaAtivaId)?.videos[0]?.id ?? null);
+          setMusicas(e.musicas);
+          e.abas.forEach((a) => a.videos.forEach((v) => enviarVideo(v).catch(() => {})));
+          e.musicas.forEach((m) => enviarMusica(m));
+          const n = e.abas.reduce((t, a) => t + a.videos.length, 0);
+          if (n) avisar(`${n} vídeo(s) da última sessão recuperados`);
+        }
+      })
+      .finally(() => {
+        restaurou.current = true;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!restaurou.current) return;
+    const t = setTimeout(() => salvarEstado(abas, abaAtivaId, musicas), 700);
+    return () => clearTimeout(t);
+  }, [abas, abaAtivaId, musicas]);
+
+  useEffect(() => {
+    if (restaurou.current) salvarResultados(resultados);
+  }, [resultados]);
+
   // ---------- músicas ----------
+  const enviarMusica = (m: MusicaCliente) =>
+    enviar('musica:' + m.id, m.arquivo, (f) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, upload: f } : x))))
+      .then((id) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, arquivoId: id, upload: 1 } : x))))
+      .catch((e) => escreverLog(`[ERRO] Upload da música ${m.nome}: ${e.message}`));
 
   const adicionarMusicas = async (arquivos: File[]) => {
     const novas: MusicaCliente[] = await Promise.all(
@@ -477,11 +534,10 @@ export default function EditorMassa() {
       }),
     );
     setMusicas((m) => [...m, ...novas]);
-    novas.forEach((m) =>
-      enviar('musica:' + m.id, m.arquivo, (f) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, upload: f } : x))))
-        .then((id) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, arquivoId: id, upload: 1 } : x))))
-        .catch((e) => escreverLog(`[ERRO] Upload da música ${m.nome}: ${e.message}`)),
-    );
+    novas.forEach((m) => {
+      salvarArquivo('musica:' + m.id, m.arquivo);
+      enviarMusica(m);
+    });
     // Importou = está ativa (a primeira vira a música de fundo se ainda não tiver uma)
     if (novas[0] && !globalRef.current.musica.musicaId) setGlobal((g) => ({ ...g, musica: { ...g.musica, ativo: true, musicaId: novas[0].id } }));
     avisar(`${novas.length} música(s) importada(s)`);
@@ -610,7 +666,10 @@ export default function EditorMassa() {
     if (!a || abas.length === 1) return;
     if (a.processando) return avisar('Espere o processamento deste lote terminar');
     if (a.videos.length && !window.confirm(`Fechar "${a.nome}" e remover os ${a.videos.length} vídeos dele?`)) return;
-    a.videos.forEach((v) => URL.revokeObjectURL(v.url));
+    a.videos.forEach((v) => {
+      URL.revokeObjectURL(v.url);
+      apagarArquivo(v.id);
+    });
     const resto = abas.filter((x) => x.id !== id);
     setAbas(resto);
     if (abaAtivaId === id) setAbaAtivaId(resto[0].id);
@@ -740,6 +799,7 @@ export default function EditorMassa() {
           musicas={musicas}
           importarMusicas={() => inputMusicas.current?.click()}
           removerMusica={(id) => {
+            apagarArquivo('musica:' + id);
             setMusicas((ms) => ms.filter((m) => m.id !== id));
             setGlobal((g) => (g.musica.musicaId === id ? { ...g, musica: { ...g.musica, musicaId: null } } : g));
           }}

@@ -266,6 +266,8 @@
   background: var(--sup);
   overflow-y: auto;
   min-height: 0;
+  /* o dock do site flutua por cima da parte de baixo da tela */
+  padding-bottom: 72px;
 }
 .secao {
   border-bottom: 1px solid var(--linha);
@@ -608,7 +610,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 16px 96px;
   display: grid;
   gap: 14px;
   align-content: start;
@@ -867,6 +869,7 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  padding-bottom: 72px;
 }
 .inspetorTopo {
   display: flex;
@@ -886,20 +889,67 @@
 }
 .palco {
   position: relative;
-  height: 52vh;
-  min-height: 300px;
+  height: 60vh;
+  min-height: 340px;
   flex: none;
   margin: 12px 14px 0;
   border-radius: 12px;
-  background: repeating-conic-gradient(#141418 0 25%, #101013 0 50%) 0 0 / 18px 18px;
+  background: radial-gradient(circle at 50% 40%, rgba(99, 102, 241, 0.1), transparent 65%), #0d0d10;
   display: grid;
   place-items: center;
   overflow: hidden;
   touch-action: none;
 }
 .palco canvas {
-  border-radius: 4px;
+  display: block;
+}
+.telaSolta canvas {
   box-shadow: 0 6px 28px #000a;
+}
+/* Moldura de iPhone em volta do preview (igual ao editor de Templates) */
+.celular {
+  position: relative;
+  padding: 9px;
+  border-radius: 20%/ 9.5%;
+  background: #050506;
+  border: 1px solid #3f3f46;
+  box-shadow:
+    0 0 0 3px #18181b,
+    0 0 0 4px #52525b,
+    0 24px 60px rgba(0, 0, 0, 0.7);
+}
+.celular canvas {
+  background: #000;
+}
+.celular::before,
+.celular::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: #52525b;
+}
+.celular::before {
+  left: -7px;
+  top: 18%;
+  height: 9%;
+}
+.celular::after {
+  right: -7px;
+  top: 24%;
+  height: 13%;
+}
+.celularIlha {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26%;
+  height: 16px;
+  border-radius: 10px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
 }
 .palcoVazio {
   color: var(--fraco);
