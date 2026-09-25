@@ -103,6 +103,8 @@ export default function PerfilEmMassa() {
   const [source] = useState<Source>('profile')
   const [files, setFiles] = useState<File[]>([])
   const [showCookieModal, setShowCookieModal] = useState(false)
+  const [showExtractorModal, setShowExtractorModal] = useState(false)
+  const [copiedScript, setCopiedScript] = useState(false)
   const [cookieInput, setCookieInput] = useState('')
   const [savingCookies, setSavingCookies] = useState(false)
   const [cookieMsg, setCookieMsg] = useState('')
@@ -330,7 +332,15 @@ export default function PerfilEmMassa() {
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowExtractorModal(true)}
+                      className="p-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-left transition-all cursor-pointer"
+                    >
+                      <span className="font-semibold text-purple-300 block text-xs">⚡ Extrator de Reels (1 Clique)</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Copie todos os links dos Reels diretamente da sua aba do Instagram.</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -340,15 +350,15 @@ export default function PerfilEmMassa() {
                       className="p-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-left transition-all cursor-pointer"
                     >
                       <span className="font-semibold text-white block text-xs">📁 Enviar Arquivos no Editor</span>
-                      <span className="text-[10px] text-zinc-400 block mt-0.5">Arraste os vídeos baixados no seu PC para aplicar o template sem nenhum bloqueio.</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Arraste os vídeos baixados no seu PC para aplicar o template sem bloqueio.</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowCookieModal(true)}
                       className="p-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-left transition-all cursor-pointer"
                     >
-                      <span className="font-semibold text-indigo-300 block text-xs">🍪 Conectar Cookies do Instagram</span>
-                      <span className="text-[10px] text-zinc-400 block mt-0.5">Cole os cookies para liberar o download automático direto do perfil no servidor.</span>
+                      <span className="font-semibold text-indigo-300 block text-xs">🍪 Conectar Cookies</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Libera a listagem automática direta pelo servidor.</span>
                     </button>
                   </div>
                   <p className="text-[11px] text-zinc-400 font-mono pt-1">Detalhes técnicos: {batch.error}</p>
@@ -410,17 +420,27 @@ export default function PerfilEmMassa() {
             {source === 'profile' ? (
               <section className="space-y-5">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <label htmlFor="bulk-profile" className="text-xs font-medium text-zinc-300">
-                      Link do perfil ou Links diretos de Reels/Vídeos
+                      Link do perfil ou Links diretos de Reels/Vídeos (um por linha)
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCookieModal(true)}
-                      className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      🍪 Cookies do Instagram
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowExtractorModal(true)}
+                        className="text-[11px] font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Como copiar 10+ reels do perfil em 1 clique"
+                      >
+                        ⚡ Extrator de Reels
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCookieModal(true)}
+                        className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        🍪 Cookies
+                      </button>
+                    </div>
                   </div>
                   <div className="relative">
                     <textarea

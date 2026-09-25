@@ -205,8 +205,8 @@ def create_vertical_clip(
         video_pos_y = float(video_pos.get("y", 50))
 
         # Canvas 9:16 HD vertical (720x1280) - renderização 2.5x mais rápida e leve
-        CANVAS_W = 720
-        CANVAS_H = 1280
+        CANVAS_W = 1080
+        CANVAS_H = 1920
 
         target_w = int(round(CANVAS_W * (video_w_pct / 100.0)))
         target_h = int(round(CANVAS_H * (video_h_pct / 100.0)))
@@ -466,7 +466,7 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
     subprocess.run([
         "ffmpeg", "-y",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
-        "-vf", "crop=ih*9/16:ih,scale=720:1280",
+        "-vf", "crop=ih*9/16:ih,scale=1080:1920",
         "-af", ",".join(_edge_fades(duration)),
         "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28", "-maxrate", "2200k", "-bufsize", "4400k",
         "-acodec", "aac", "-b:a", "96k",

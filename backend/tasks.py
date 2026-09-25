@@ -719,7 +719,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18',
+            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best/18',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
@@ -905,11 +905,11 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             raise Exception(f"yt-dlp não gerou arquivo de vídeo para '{title}'")
 
         # Rejeita vídeos extremamente longos (evita Whisper demorar horas)
-        MAX_DURATION_SECS = 90 * 60  # 90 minutos
+        MAX_DURATION_SECS = 240 * 60  # 240 minutos (4 horas)
         if video_duration and video_duration > MAX_DURATION_SECS:
             raise Exception(
                 f"DurationError: vídeo longo demais ({int(video_duration // 60)} min). "
-                "Limite máximo: 90 minutos por vídeo."
+                "Limite máximo: 240 minutos (4 horas) por vídeo."
             )
         print(f"[pipeline] vídeo baixado OK — duração: {int((video_duration or 0) // 60)}min {int((video_duration or 0) % 60)}s")
 
@@ -1043,7 +1043,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
-            margin_v = max(50, min(800, int(1280 * (1.0 - (float(sub_y) / 100.0))) - 25))
+            margin_v = max(75, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 35))
             sub_preset = ((brand_kit or {}).get("layout_config") or {}).get("subtitle_preset") or "hormozi_yellow"
             layout_cfg = (brand_kit or {}).get("layout_config") or {}
             sub_font_family = layout_cfg.get("fontFamily")

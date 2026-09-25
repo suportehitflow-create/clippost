@@ -166,12 +166,37 @@ def _download(url: str, tmp_dir: Path) -> tuple[str, dict]:
         opts["cookiefile"] = cookies[1]
     if os.environ.get("YTDLP_PROXY"):
         opts["proxy"] = os.environ["YTDLP_PROXY"]
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True) or {}
+
+    # 1. Tenta yt-dlp
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True) or {}
+        files = sorted(tmp_dir.glob("source.*"), key=lambda p: p.stat().st_size, reverse=True)
+        if files:
+            return str(files[0]), info
+    except Exception as dl_err:
+        print(f"[bulk] yt-dlp falhou ({dl_err}), tentando Cobalt...")
+
+    # 2. Fallback: Cobalt Fly.io
+    try:
+        from tasks import _download_via_cobalt
+        cobalt_path, cobalt_info = _download_via_cobalt(url, tmp_dir)
+        return cobalt_path, cobalt_info
+    except Exception as cob_err:
+        print(f"[bulk] cobalt privado falhou: {cob_err}")
+
+    # 3. Fallback: Cobalt público
+    try:
+        from tasks import _download_via_cobalt_public
+        cobalt_pub_path, cobalt_pub_info = _download_via_cobalt_public(url, tmp_dir)
+        return cobalt_pub_path, cobalt_pub_info
+    except Exception as cob_pub_err:
+        print(f"[bulk] cobalt público falhou: {cob_pub_err}")
+
     files = sorted(tmp_dir.glob("source.*"), key=lambda p: p.stat().st_size, reverse=True)
     if not files:
-        raise RuntimeError("download não gerou arquivo de vídeo")
-    return str(files[0]), info
+        raise RuntimeError("download não gerou arquivo de vídeo (yt-dlp e Cobalt falharam)")
+    return str(files[0]), {}
 
 
 def _probe_duration(path: str) -> float:

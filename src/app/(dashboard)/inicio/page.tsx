@@ -158,11 +158,13 @@ export default async function InicioPage() {
   const [
     { count: projectCount },
     { count: clipCount },
-    { count: scheduledCount }
+    { count: scheduledCount },
+    { data: processingProjects }
   ] = await Promise.all([
     supabase.from('projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('clips').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('scheduled_posts').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'scheduled')
+    supabase.from('scheduled_posts').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'scheduled'),
+    supabase.from('projects').select('id, title, status, created_at, error_message').eq('user_id', user.id).eq('status', 'processing').order('created_at', { ascending: false }).limit(3)
   ])
 
   return (
@@ -221,6 +223,55 @@ export default async function InicioPage() {
             </div>
           </div>
         </div>
+
+        {/* Live Processing Card (Quando há cortes sendo gerados) */}
+        {processingProjects && processingProjects.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                Cortes Gerando em Segundo Plano ({processingProjects.length})
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {processingProjects.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/project/${p.id}`}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-[#0d0d14] border border-indigo-500/30 hover:border-indigo-500/60 shadow-lg shadow-indigo-950/20 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                      <Scissors className="w-5 h-5 text-indigo-400 animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white truncate max-w-sm sm:max-w-md">
+                          {p.title || "Vídeo sem título"}
+                        </span>
+                        <span className="text-[10px] font-semibold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 whitespace-nowrap flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                          Gerando cortes...
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        A IA está analisando ganchos virais e renderizando seus cortes 9:16.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-xs font-semibold text-indigo-400 group-hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                      Acompanhar corte <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Feature Grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

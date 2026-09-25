@@ -255,12 +255,8 @@ export default function CreateClipsPage() {
           {activeTab === 'link' ? (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Link do Vídeo</label>
-                {getPlatformInfo(url) && (
-                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${getPlatformInfo(url)?.color} transition-all`}>
-                    ✓ {getPlatformInfo(url)?.name} detectado
-                  </span>
-                )}
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Link do Vídeo do YouTube</label>
+                
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">

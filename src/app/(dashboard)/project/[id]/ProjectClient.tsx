@@ -138,10 +138,10 @@ const SUBTITLE_STYLES = [
 
 // `key` = etapa que o backend grava em projects.error_message ("step:<key>") durante o processamento
 const PIPELINE_STEPS = [
-  { key: 'download', label: 'Baixando vídeo', detail: 'yt-dlp + Deno runtime', thresholdSecs: 0 },
-  { key: 'transcricao', label: 'Transcrevendo áudio', detail: 'Groq Whisper com tempo por palavra', thresholdSecs: 40 },
-  { key: 'ia_curator', label: 'IA identificando momentos virais', detail: 'Gemini analisando o conteúdo', thresholdSecs: 90 },
-  { key: 'gerando_clipes', label: 'Criando cortes 9:16', detail: 'FFmpeg aplicando seu template', thresholdSecs: 160 },
+  { key: 'download', label: 'Baixando vídeo', thresholdSecs: 0 },
+  { key: 'transcricao', label: 'Transcrevendo áudio', thresholdSecs: 40 },
+  { key: 'ia_curator', label: 'IA identificando momentos virais', thresholdSecs: 90 },
+  { key: 'gerando_clipes', label: 'Criando cortes 9:16', thresholdSecs: 160 },
 ]
 
 // Sem notícia do backend por esse tempo, o pipeline provavelmente morreu
@@ -360,7 +360,7 @@ function PipelineProgress({ elapsedSecs, clipsReady, backendStep }: { elapsedSec
         return idx
       })()
 
-  // Calcula porcentagem suave de 0% a 100%
+  // Porcentagem suave de 0% a 100%
   const progressPercent = (() => {
     if (clipsReady > 0) {
       return Math.min(99, 85 + clipsReady * 3)
