@@ -1,9 +1,8 @@
 'use client';
 
 import { useRef, useState, type ReactNode } from 'react';
-import { FORMATOS_MOLDURA } from '@/lib/editor-massa/defaults';
 import type { ConfigGlobal, Qualidade } from '@/lib/editor-massa/types';
-import { Campo, Cores, Fonte, Opcao, Segmentado, Slider, Toggle } from './campos';
+import { Campo, Opcao, Segmentado, Slider, Toggle } from './campos';
 import type { MusicaCliente, TemplateCliente } from './estado';
 import { Icone, type NomeIcone } from './icones';
 import s from './editor-massa.module.css';
@@ -12,7 +11,10 @@ export interface PropsLateral {
   global: ConfigGlobal;
   mudarGlobal: (fn: (g: ConfigGlobal) => ConfigGlobal) => void;
   template: TemplateCliente | null;
-  escolherTemplate: () => void;
+  /** @ / nome do perfil do template Clipost */
+  perfilTemplate: string;
+  carregandoTemplate: boolean;
+  editarTemplate: () => void;
   musicas: MusicaCliente[];
   importarMusicas: () => void;
   removerMusica: (id: string) => void;
@@ -21,7 +23,7 @@ export interface PropsLateral {
   redetectarTodos: () => void;
 }
 
-type IdSecao = 'template' | 'limpeza' | 'texto' | 'marca' | 'musica' | 'efeitos' | 'exportar';
+type IdSecao = 'template' | 'limpeza' | 'texto' | 'musica' | 'efeitos' | 'exportar';
 
 function Secao(p: {
   id: IdSecao;
@@ -75,9 +77,11 @@ export default function Lateral(p: PropsLateral) {
 
   const et = g.estiloTexto;
   const mudarTexto = (parcial: Partial<typeof et>) => mudar('estiloTexto', { ...et, ...parcial });
-  const canvasW = g.moldura.ativo ? g.moldura.largura : (p.template?.imagem.naturalWidth ?? 1080);
+  // Tamanho/posição mexidos à mão: o template não sobrescreve mais
+  const ajustarTexto = (parcial: Partial<typeof et>) => p.mudarGlobal((x) => ({ ...x, textoAjustado: true, estiloTexto: { ...x.estiloTexto, ...parcial } }));
   const canvasH = g.moldura.ativo ? g.moldura.altura : (p.template?.imagem.naturalHeight ?? 1920);
   const musicaSel = p.musicas.find((m) => m.id === g.musica.musicaId);
+  const volOriginal = g.musica.mutarOriginal ? 0 : g.musica.volumeVideo;
   const velocidade = g.efeitos.velocidadePersonalizada ? 'custom' : g.efeitos.velocidade105 ? '105' : '1';
   const efeitosAtivos = [
     g.efeitos.espelhar && 'Espelhado',
@@ -118,75 +122,47 @@ export default function Lateral(p: PropsLateral) {
         id="template"
         icone="layout"
         titulo="Template e layout"
-        resumo={g.moldura.ativo ? `Cor sólida ${g.moldura.largura}×${g.moldura.altura}` : p.template ? p.template.nome : 'Nenhum template'}
+        resumo={p.carregandoTemplate ? 'Carregando…' : p.perfilTemplate || 'Seu template'}
         aberta={abertas.has('template')}
       >
-        <Segmentado
-          valor={g.moldura.ativo ? 'cor' : 'tpl'}
-          mudar={(v) => mudar('moldura', { ...g.moldura, ativo: v === 'cor' })}
-          opcoes={[
-            { valor: 'tpl', rotulo: 'Imagem de template' },
-            { valor: 'cor', rotulo: 'Fundo de cor' },
-          ]}
+        <div className={s.templateCard} role="button" tabIndex={0} onClick={p.editarTemplate} onKeyDown={(e) => e.key === 'Enter' && p.editarTemplate()}>
+          <span className={s.templateMini} style={p.template ? { backgroundImage: `url(${p.template.url})` } : undefined}>
+            {!p.template && <Icone nome="imagem" />}
+          </span>
+          <span className={s.templateInfo}>
+            <span className={s.templateNome}>{p.carregandoTemplate ? 'Carregando seu template…' : p.perfilTemplate || 'Seu template'}</span>
+            <span className={s.dica}>Fundo, perfil, título e marca d'água do editor de Templates</span>
+          </span>
+        </div>
+        <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={p.editarTemplate} disabled={p.carregandoTemplate}>
+          <Icone nome="layout" tamanho={14} /> Editar template
+        </button>
+
+        <Campo rotulo="Encaixe do vídeo">
+          <Segmentado
+            valor={g.encaixe}
+            mudar={(v) => mudar('encaixe', v)}
+            opcoes={[
+              { valor: 'template', rotulo: 'No quadro do template', titulo: 'O vídeo ocupa o quadro de vídeo do seu template' },
+              { valor: 'video', rotulo: 'Solto', titulo: 'O vídeo fica no formato dele, abaixo do perfil' },
+            ]}
+          />
+        </Campo>
+        <Slider
+          rotulo="Espaço no topo"
+          min={-Math.round(canvasH * 0.2)}
+          max={Math.round(canvasH * 0.3)}
+          valor={g.espacoTopo}
+          formatar={(v) => `${v > 0 ? '+' : ''}${v}px`}
+          padrao={0}
+          mudar={(v) => mudar('espacoTopo', v)}
         />
-        {!g.moldura.ativo ? (
-          <button type="button" className={s.templateCard} onClick={p.escolherTemplate}>
-            <span className={s.templateMini} style={p.template ? { backgroundImage: `url(${p.template.url})` } : undefined}>
-              {!p.template && <Icone nome="imagem" />}
-            </span>
-            <span className={s.templateInfo}>
-              <span className={s.templateNome}>{p.template ? p.template.nome : 'Escolher template'}</span>
-              <span className={s.dica}>
-                {p.template ? `${p.template.imagem.naturalWidth}×${p.template.imagem.naturalHeight} · clique para trocar` : 'PNG ou JPG, ex.: 1080×1920'}
-              </span>
-            </span>
-          </button>
-        ) : (
-          <>
-            <Segmentado
-              valor={FORMATOS_MOLDURA.findIndex((f) => f.largura === g.moldura.largura && f.altura === g.moldura.altura)}
-              mudar={(i) => {
-                const f = FORMATOS_MOLDURA[i];
-                if (f) mudar('moldura', { ...g.moldura, largura: f.largura, altura: f.altura });
-              }}
-              opcoes={FORMATOS_MOLDURA.map((f, i) => ({ valor: i, rotulo: f.nome.split(' ')[0], titulo: f.nome }))}
-            />
-            <Campo rotulo="Cor do fundo">
-              <Cores valor={g.moldura.cor} mudar={(v) => mudar('moldura', { ...g.moldura, cor: v })} />
-            </Campo>
-          </>
-        )}
-        {!g.moldura.ativo && (
-          <>
-            <Slider
-              rotulo="Espaço no topo"
-              min={0}
-              max={Math.round(canvasH * 0.6)}
-              valor={g.pixelsParaDescer}
-              formatar={(v) => `${v}px`}
-              padrao={60}
-              mudar={(v) => mudar('pixelsParaDescer', v)}
-            />
-            <Campo rotulo="Posição do vídeo">
-              <Segmentado
-                valor={g.alinhamentoVertical}
-                mudar={(v) => mudar('alinhamentoVertical', v)}
-                opcoes={[
-                  { valor: 'topo', rotulo: 'No topo' },
-                  { valor: 'centro', rotulo: 'Centralizado' },
-                ]}
-              />
-            </Campo>
-            <Opcao
-              rotulo="Fundo colorido atrás do vídeo"
-              descricao="Cobre o template abaixo do espaço do topo"
-              valor={g.preencherArea}
-              mudar={(v) => mudar('preencherArea', v)}
-            />
-            {g.preencherArea && <Cores valor={g.corBorda} mudar={(v) => mudar('corBorda', v)} />}
-          </>
-        )}
-        <Opcao rotulo="Sem bordas" descricao="Amplia o vídeo para preencher a área" valor={g.semBordas} mudar={(v) => mudar('semBordas', v)} />
+        <Opcao
+          rotulo="Sem bordas"
+          descricao={g.encaixe === 'template' ? 'Preenche o quadro todo, cortando o que sobrar' : 'Vídeo de ponta a ponta na largura'}
+          valor={g.semBordas}
+          mudar={(v) => mudar('semBordas', v)}
+        />
       </Secao>
 
       {/* ---------------- LIMPEZA ---------------- */}
@@ -200,16 +176,24 @@ export default function Lateral(p: PropsLateral) {
       >
         <Segmentado
           valor={g.deteccao.modo}
-          mudar={(v) => mudar('deteccao', { modo: v })}
+          mudar={(v) => mudar('deteccao', { ...g.deteccao, modo: v })}
           opcoes={[
             { valor: 'auto', rotulo: 'Automático' },
             { valor: 'margem', rotulo: 'Margem 5%' },
             { valor: 'nenhuma', rotulo: 'Desligado' },
           ]}
         />
+        {g.deteccao.modo === 'auto' && (
+          <Opcao
+            rotulo="Cortar texto em cima do vídeo"
+            descricao="Se o título antigo estiver escrito sobre o vídeo, corta logo abaixo dele"
+            valor={g.deteccao.cortarTexto}
+            mudar={(v) => mudar('deteccao', { ...g.deteccao, cortarTexto: v })}
+          />
+        )}
         <span className={s.dica}>
           Se o vídeo já vier dentro de outro template, detectamos onde o vídeo está e só essa parte entra no seu template. Use
-          "Ver original" no preview para conferir.
+          "Ver original" no preview para conferir. Mudou a opção? Clique em "Detectar de novo".
         </span>
         <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={p.redetectarTodos} disabled={!p.totalVideos}>
           <Icone nome="refresh" tamanho={14} /> Detectar de novo em todos
@@ -222,7 +206,7 @@ export default function Lateral(p: PropsLateral) {
         id="texto"
         icone="texto"
         titulo="Texto"
-        resumo={g.textoAtivo ? `${et.fonte} · ${et.tamanho}px` : 'Desligado'}
+        resumo={g.textoAtivo ? `Estilo do template · ${et.tamanho}px` : 'Desligado'}
         ligado={g.textoAtivo}
         mudarLigado={ligar('texto', () => mudar('textoAtivo', !g.textoAtivo))}
         aberta={abertas.has('texto')}
@@ -245,89 +229,22 @@ export default function Lateral(p: PropsLateral) {
         </button>
         <span className={s.dica}>Ou digite direto no campo abaixo de cada vídeo.</span>
 
-        <div className={s.subtitulo}>Estilo</div>
-        <Fonte valor={et.fonte} mudar={(v) => mudarTexto({ fonte: v })} />
-        <Slider rotulo="Tamanho" min={12} max={160} valor={et.tamanho} formatar={(v) => `${v}px`} padrao={40} mudar={(v) => mudarTexto({ tamanho: v })} />
-        <Cores valor={et.cor} mudar={(v) => mudarTexto({ cor: v })} />
-        <div className={s.linha}>
-          <div style={{ flex: 1 }}>
-            <Segmentado
-              valor={et.alinhamento}
-              mudar={(v) => mudarTexto({ alinhamento: v })}
-              opcoes={[
-                { valor: 'left', rotulo: <Icone nome="alinharE" tamanho={15} />, titulo: 'Esquerda' },
-                { valor: 'center', rotulo: <Icone nome="alinharC" tamanho={15} />, titulo: 'Centro' },
-                { valor: 'right', rotulo: <Icone nome="alinharD" tamanho={15} />, titulo: 'Direita' },
-              ]}
-            />
-          </div>
-          <div className={s.segmentado}>
-            <button type="button" title="Negrito" className={`${s.seg} ${et.negrito ? s.segAtivo : ''}`} onClick={() => mudarTexto({ negrito: !et.negrito })}>
-              <b>B</b>
-            </button>
-            <button type="button" title="Itálico" className={`${s.seg} ${et.italico ? s.segAtivo : ''}`} onClick={() => mudarTexto({ italico: !et.italico })}>
-              <i style={{ fontFamily: 'Georgia, serif' }}>I</i>
-            </button>
-          </div>
-        </div>
-        <Opcao rotulo="Contorno" valor={et.contorno.ativo} mudar={(v) => mudarTexto({ contorno: { ...et.contorno, ativo: v } })} />
-        {et.contorno.ativo && (
-          <>
-            <Cores valor={et.contorno.cor} mudar={(v) => mudarTexto({ contorno: { ...et.contorno, cor: v } })} />
-            <Slider rotulo="Espessura" min={1} max={12} valor={et.contorno.largura} mudar={(v) => mudarTexto({ contorno: { ...et.contorno, largura: v } })} />
-          </>
-        )}
-        <Opcao rotulo="Sombra" valor={et.sombra.ativo} mudar={(v) => mudarTexto({ sombra: { ...et.sombra, ativo: v } })} />
-        {et.sombra.ativo && (
-          <>
-            <Cores valor={et.sombra.cor} mudar={(v) => mudarTexto({ sombra: { ...et.sombra, cor: v } })} />
-            <div className={s.grade2}>
-              <Slider rotulo="Opacidade" min={0} max={100} valor={et.sombra.opacidade} formatar={(v) => `${v}%`} mudar={(v) => mudarTexto({ sombra: { ...et.sombra, opacidade: v } })} />
-              <Slider rotulo="Distância" min={0} max={30} valor={et.sombra.distancia} mudar={(v) => mudarTexto({ sombra: { ...et.sombra, distancia: v } })} />
-              <Slider rotulo="Desfoque" min={0} max={30} valor={et.sombra.blur} mudar={(v) => mudarTexto({ sombra: { ...et.sombra, blur: v } })} />
-            </div>
-          </>
-        )}
-        <Opcao rotulo="Fundo atrás do texto" valor={et.fundo.ativo} mudar={(v) => mudarTexto({ fundo: { ...et.fundo, ativo: v } })} />
-        {et.fundo.ativo && <Cores valor={et.fundo.cor} mudar={(v) => mudarTexto({ fundo: { ...et.fundo, cor: v } })} />}
+        <span className={s.dica}>Fonte, cor, contorno e maiúsculas vêm do seu template (botão "Editar template").</span>
+        <Slider rotulo="Tamanho" min={12} max={160} valor={et.tamanho} formatar={(v) => `${v}px`} mudar={(v) => ajustarTexto({ tamanho: v })} />
 
         <div className={s.subtitulo}>Posição da caixa (%)</div>
         <div className={s.grade2}>
-          <Slider rotulo="Horizontal" min={0} max={100} valor={et.posicao.x} formatar={(v) => `${v}%`} mudar={(v) => mudarTexto({ posicao: { ...et.posicao, x: v } })} />
-          <Slider rotulo="Vertical" min={0} max={100} valor={et.posicao.y} formatar={(v) => `${v}%`} mudar={(v) => mudarTexto({ posicao: { ...et.posicao, y: v } })} />
-          <Slider rotulo="Largura" min={5} max={100} valor={et.posicao.w} formatar={(v) => `${v}%`} mudar={(v) => mudarTexto({ posicao: { ...et.posicao, w: v } })} />
-          <Slider rotulo="Altura" min={2} max={100} valor={et.posicao.h} formatar={(v) => `${v}%`} mudar={(v) => mudarTexto({ posicao: { ...et.posicao, h: v } })} />
+          <Slider rotulo="Horizontal" min={0} max={100} valor={et.posicao.x} formatar={(v) => `${v}%`} mudar={(v) => ajustarTexto({ posicao: { ...et.posicao, x: v } })} />
+          <Slider rotulo="Vertical" min={0} max={100} valor={et.posicao.y} formatar={(v) => `${v}%`} mudar={(v) => ajustarTexto({ posicao: { ...et.posicao, y: v } })} />
+          <Slider rotulo="Largura" min={5} max={100} valor={et.posicao.w} formatar={(v) => `${v}%`} mudar={(v) => ajustarTexto({ posicao: { ...et.posicao, w: v } })} />
+          <Slider rotulo="Altura" min={2} max={100} valor={et.posicao.h} formatar={(v) => `${v}%`} mudar={(v) => ajustarTexto({ posicao: { ...et.posicao, h: v } })} />
         </div>
         <Slider rotulo="Opacidade" min={0} max={100} valor={et.opacidade} formatar={(v) => `${v}%`} padrao={100} mudar={(v) => mudarTexto({ opacidade: v })} />
-      </Secao>
-
-      {/* ---------------- MARCA D'ÁGUA ---------------- */}
-      <Secao
-        {...comum}
-        id="marca"
-        icone="gota"
-        titulo="Marca d'água"
-        resumo={g.marcaAtiva ? g.marca.texto || 'Digite o texto' : 'Desligada'}
-        ligado={g.marcaAtiva}
-        mudarLigado={ligar('marca', () => mudar('marcaAtiva', !g.marcaAtiva))}
-        aberta={abertas.has('marca')}
-      >
-        <input
-          className={s.input}
-          placeholder="@seuperfil"
-          value={g.marca.texto}
-          onChange={(e) => p.mudarGlobal((x) => ({ ...x, marcaAtiva: true, marca: { ...x.marca, texto: e.target.value } }))}
-        />
-        <Fonte valor={g.marca.fonte} mudar={(v) => mudar('marca', { ...g.marca, fonte: v })} />
-        <Cores valor={g.marca.cor} mudar={(v) => mudar('marca', { ...g.marca, cor: v })} />
-        <div className={s.grade2}>
-          <Slider rotulo="Tamanho" min={10} max={150} valor={g.marca.tamanho} padrao={36} mudar={(v) => mudar('marca', { ...g.marca, tamanho: v })} />
-          <Slider rotulo="Opacidade" min={0} max={100} valor={g.marca.opacidade} formatar={(v) => `${v}%`} padrao={100} mudar={(v) => mudar('marca', { ...g.marca, opacidade: v })} />
-          <Slider rotulo="Horizontal" min={0} max={canvasW} valor={g.marca.posX} formatar={(v) => `${v}px`} mudar={(v) => mudar('marca', { ...g.marca, posX: v })} />
-          <Slider rotulo="Vertical" min={0} max={canvasH} valor={g.marca.posY} formatar={(v) => `${v}px`} mudar={(v) => mudar('marca', { ...g.marca, posY: v })} />
-        </div>
-        <Opcao rotulo="Fundo atrás da marca" valor={g.marca.fundoAtivo} mudar={(v) => mudar('marca', { ...g.marca, fundoAtivo: v })} />
-        {g.marca.fundoAtivo && <Cores valor={g.marca.corFundo} mudar={(v) => mudar('marca', { ...g.marca, corFundo: v })} />}
+        {g.textoAjustado && (
+          <button type="button" className={`${s.btn} ${s.btnFantasma} ${s.btnPequeno}`} onClick={() => mudar('textoAjustado', false)}>
+            <Icone nome="reset" tamanho={13} /> Voltar ao tamanho e posição do template
+          </button>
+        )}
       </Secao>
 
       {/* ---------------- MÚSICA ---------------- */}
@@ -335,10 +252,8 @@ export default function Lateral(p: PropsLateral) {
         {...comum}
         id="musica"
         icone="musica"
-        titulo="Música de fundo"
-        resumo={g.musica.ativo ? (musicaSel?.nome ?? 'Escolha uma música') : 'Desligada'}
-        ligado={g.musica.ativo}
-        mudarLigado={ligar('musica', () => mudar('musica', { ...g.musica, ativo: !g.musica.ativo }))}
+        titulo="Música e áudio"
+        resumo={[musicaSel ? musicaSel.nome : 'Sem música', `áudio original ${volOriginal}%`].join(' · ')}
         aberta={abertas.has('musica')}
       >
         <div className={s.lista}>
@@ -346,7 +261,14 @@ export default function Lateral(p: PropsLateral) {
             <div
               key={m.id}
               className={`${s.musicaItem} ${m.id === g.musica.musicaId ? s.musicaAtiva : ''}`}
-              onClick={() => p.mudarGlobal((x) => ({ ...x, musica: { ...x.musica, ativo: true, musicaId: m.id, inicio: 0 } }))}
+              onClick={() =>
+                // clicar na música ativa tira a música; clicar em outra troca
+                p.mudarGlobal((x) => ({
+                  ...x,
+                  musica: { ...x.musica, ativo: x.musica.musicaId !== m.id, musicaId: x.musica.musicaId === m.id ? null : m.id, inicio: 0 },
+                }))
+              }
+              title={m.id === g.musica.musicaId ? 'Clique para tirar a música' : 'Usar esta música'}
               style={{ cursor: 'pointer' }}
             >
               <Icone nome="musica" tamanho={14} />
@@ -380,20 +302,20 @@ export default function Lateral(p: PropsLateral) {
               formatar={(v) => `${v}s`}
               mudar={(v) => mudar('musica', { ...g.musica, inicio: v })}
             />
-            <div className={s.grade2}>
-              <Slider rotulo="Volume música" min={0} max={200} valor={g.musica.volumeMusica} formatar={(v) => `${v}%`} padrao={30} mudar={(v) => mudar('musica', { ...g.musica, volumeMusica: v })} />
-              <Slider rotulo="Volume vídeo" min={0} max={200} valor={g.musica.volumeVideo} formatar={(v) => `${v}%`} padrao={100} mudar={(v) => mudar('musica', { ...g.musica, volumeVideo: v })} />
-            </div>
+            <Slider rotulo="Volume da música" min={0} max={200} valor={g.musica.volumeMusica} formatar={(v) => `${v}%`} padrao={30} mudar={(v) => mudar('musica', { ...g.musica, volumeMusica: v })} />
             <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={ouvir}>
               <Icone nome={tocando ? 'parar' : 'play'} tamanho={13} /> {tocando ? 'Parar' : 'Ouvir 10s'}
             </button>
           </>
         )}
-        <Opcao
-          rotulo="Tirar o áudio original"
-          descricao="Fica só a música"
-          valor={g.musica.mutarOriginal}
-          mudar={(v) => mudar('musica', { ...g.musica, mutarOriginal: v })}
+        <Slider
+          rotulo="Volume do áudio original"
+          min={0}
+          max={200}
+          valor={volOriginal}
+          formatar={(v) => (v === 0 ? 'Sem áudio' : `${v}%`)}
+          padrao={100}
+          mudar={(v) => mudar('musica', { ...g.musica, mutarOriginal: false, volumeVideo: v })}
         />
       </Secao>
 

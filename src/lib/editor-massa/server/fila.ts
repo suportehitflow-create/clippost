@@ -178,7 +178,7 @@ async function processarItem(job: Job, indice: number) {
     let video = { ...v, largura: info.largura, altura: info.altura, duracao: info.duracao };
     if (!video.areaDetectada) {
       log(job, `[PROC] ${indice + 1}/${total} - Detectando: ${v.nome}`);
-      const det = await detectarArea(arquivo, info, global.deteccao.modo);
+      const det = await detectarArea(arquivo, info, global.deteccao.modo, !!global.deteccao.cortarTexto);
       video = { ...video, areaDetectada: det.area, origemDeteccao: det.origem };
     } else if (v.largura && v.altura && (v.largura !== info.largura || v.altura !== info.altura)) {
       // navegador mediu em outra escala → reescala a área
@@ -194,7 +194,8 @@ async function processarItem(job: Job, indice: number) {
     const templateInfo = templateArq ? await sondar(templateArq) : null;
     const overlay = v.overlayArquivoId ? await caminhoUpload(v.overlayArquivoId) : null;
 
-    const musicaId = v.musica?.musicaId ?? (global.musica.ativo ? global.musica.musicaId : null);
+    // Música escolhida = música ativa (não existe mais o liga/desliga)
+    const musicaId = v.musica?.musicaId ?? global.musica.musicaId ?? null;
     const musicaArqId = musicaId ? job.payload.musicas[musicaId] : null;
     const musica = musicaArqId
       ? { arquivo: await caminhoUpload(musicaArqId), inicio: v.musica?.inicio ?? global.musica.inicio }

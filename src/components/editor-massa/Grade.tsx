@@ -75,13 +75,9 @@ export default function Grade(p: PropsGrade) {
               <span className={`${s.passoNum} ${p.template || p.global.moldura.ativo ? s.passoFeito : ''}`}>
                 {p.template || p.global.moldura.ativo ? <Icone nome="check" tamanho={12} /> : 2}
               </span>
-              {p.template ? (
-                'Template escolhido'
-              ) : (
-                <a href="#" onClick={(e) => (e.preventDefault(), p.escolherTemplate())} style={{ color: 'inherit' }}>
-                  Escolha o template
-                </a>
-              )}
+              <a href="#" onClick={(e) => (e.preventDefault(), p.escolherTemplate())} style={{ color: 'inherit' }}>
+                {p.template ? 'Seu template (editar)' : 'Carregando seu template…'}
+              </a>
             </span>
             <span className={s.passo}>
               <span className={s.passoNum}>3</span> Processe todos de uma vez

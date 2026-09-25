@@ -64,22 +64,42 @@ export function calcularLayout(global: ConfigGlobal, v: ConfigVideo, template: C
   const canvas = tamanhoCanvas(global, template);
   const saida = tamanhoSaida(canvas, global.qualidade);
 
-  const descer = global.moldura.ativo ? 0 : Math.max(0, Math.min(global.pixelsParaDescer, canvas.h - 32));
-  const area: Rect = { x: 0, y: descer, w: canvas.w, h: canvas.h - descer };
-  const alinhamento = global.moldura.ativo ? 'centro' : global.alinhamentoVertical;
   const semBordas = v.semBordas ?? global.semBordas;
-
   const c = areaOrigem(v);
-  const base = semBordas ? Math.max(area.w / c.w, area.h / c.h) : Math.min(area.w / c.w, area.h / c.h);
+  const quadro = !global.moldura.ativo && global.areaTemplate ? quadroTemplate(global.areaTemplate, global.espacoTopo, canvas) : null;
+
+  let area: Rect;
+  let alinhamento: 'topo' | 'centro';
+  let base: number;
+  if (quadro && global.encaixe === 'template') {
+    // Dentro do quadro de vídeo do template (Sem bordas = preenche o quadro cortando o excesso)
+    area = quadro;
+    alinhamento = 'centro';
+    base = semBordas ? Math.max(area.w / c.w, area.h / c.h) : Math.min(area.w / c.w, area.h / c.h);
+  } else if (quadro) {
+    // Solto: no formato do próprio vídeo, começando no topo do quadro (Sem bordas = de ponta a ponta)
+    area = semBordas
+      ? { x: 0, y: quadro.y, w: canvas.w, h: canvas.h - quadro.y }
+      : { x: quadro.x, y: quadro.y, w: quadro.w, h: canvas.h - quadro.y };
+    alinhamento = 'topo';
+    base = Math.min(area.w / c.w, area.h / c.h);
+  } else {
+    const descer = global.moldura.ativo ? 0 : Math.max(0, Math.min(global.pixelsParaDescer, canvas.h - 32));
+    area = { x: 0, y: descer, w: canvas.w, h: canvas.h - descer };
+    alinhamento = global.moldura.ativo ? 'centro' : global.alinhamentoVertical;
+    base = semBordas ? Math.max(area.w / c.w, area.h / c.h) : Math.min(area.w / c.w, area.h / c.h);
+  }
+  const soltoSemBordas = !!quadro && global.encaixe !== 'template';
+  const cortaExcesso = semBordas && !soltoSemBordas;
   const s = base * (Math.max(10, v.posicao.escala) / 100);
   const dw = c.w * s;
   const dh = c.h * s;
   const dx = area.x + (area.w - dw) / 2 + v.posicao.x;
-  const dy = (alinhamento === 'topo' && !semBordas ? area.y : area.y + (area.h - dh) / 2) + v.posicao.y;
+  const dy = (alinhamento === 'topo' && !cortaExcesso ? area.y : area.y + (area.h - dh) / 2) + v.posicao.y;
   const inteiro: Rect = { x: dx, y: dy, w: dw, h: dh };
 
   // Sem Bordas corta o que passa da área; depois aplica VCrop e limita ao canvas
-  let vis = semBordas ? intersecao(inteiro, area) : inteiro;
+  let vis = cortaExcesso ? intersecao(inteiro, area) : inteiro;
   vis = {
     x: vis.x + v.vcrop.esq,
     y: vis.y + v.vcrop.topo,
@@ -105,9 +125,16 @@ export function calcularLayout(global: ConfigGlobal, v: ConfigVideo, template: C
   origem.w = Math.min(origem.w, v.largura - origem.x);
   origem.h = Math.min(origem.h, v.altura - origem.y);
 
-  const preenchimento = global.moldura.ativo || !global.preencherArea ? null : area;
+  const preenchimento = global.moldura.ativo || quadro || !global.preencherArea ? null : area;
 
   return { canvas, saida, area, preenchimento, origem, destino, espelhar };
+}
+
+/** Quadro de vídeo do template, com o "Espaço no topo" aplicado (a base do quadro fica fixa) */
+function quadroTemplate(a: Rect, espacoTopo: number, canvas: Canvas): Rect {
+  const topo = Math.max(0, Math.min(a.y + a.h - 32, a.y + (espacoTopo || 0)));
+  const r = { x: a.x, y: topo, w: a.w, h: a.y + a.h - topo };
+  return intersecao(r, { x: 0, y: 0, w: canvas.w, h: canvas.h });
 }
 
 /** Velocidade final do vídeo (efeitos). O Anti-Dup multiplica por um fator extra no servidor. */

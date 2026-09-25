@@ -19,7 +19,7 @@ async function frameCinza(arquivo: string, t: number, w: number, h: number): Pro
   return new Uint8Array(r.stdout.buffer, r.stdout.byteOffset, w * h);
 }
 
-export async function detectarLocal(arquivo: string, info: InfoMidia) {
+export async function detectarLocal(arquivo: string, info: InfoMidia, cortarTexto = false) {
   const w = LARGURA_AMOSTRA;
   const h = Math.max(8, Math.round((LARGURA_AMOSTRA * info.altura) / info.largura / 2) * 2);
   const tempos = instantesAmostra(info.duracao, 16);
@@ -29,7 +29,7 @@ export async function detectarLocal(arquivo: string, info: InfoMidia) {
     const lote = await Promise.all(tempos.slice(i, i + 4).map((t) => frameCinza(arquivo, t, w, h)));
     lote.forEach((f) => f && frames.push(f));
   }
-  return detectarAreaVideo(frames, w, h);
+  return detectarAreaVideo(frames, w, h, { cortarTexto });
 }
 
 export async function detectarRoboflow(arquivo: string, info: InfoMidia): Promise<Rect | null> {
@@ -78,6 +78,7 @@ export async function detectarArea(
   arquivo: string,
   info: InfoMidia,
   modo: 'auto' | 'margem' | 'nenhuma',
+  cortarTexto = false,
 ): Promise<{ area: Rect; origem: 'local' | 'roboflow' | 'margem' | 'completo' }> {
   if (modo === 'nenhuma') return { area: { x: 0, y: 0, w: info.largura, h: info.altura }, origem: 'completo' };
   if (modo === 'margem') return finalizarArea(null, info.largura, info.altura);
@@ -88,6 +89,6 @@ export async function detectarArea(
     const f = finalizarArea(norm, info.largura, info.altura);
     return { area: f.area, origem: f.origem === 'local' ? 'roboflow' : f.origem };
   }
-  const local = await detectarLocal(arquivo, info).catch(() => null);
+  const local = await detectarLocal(arquivo, info, cortarTexto).catch(() => null);
   return finalizarArea(local, info.largura, info.altura);
 }

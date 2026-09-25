@@ -94,11 +94,11 @@ export const controlarJob = async (id: string, acao: 'pausar' | 'continuar' | 'c
 export const apagarProcessados = async (id: string) =>
   fetch(`${BASE}/jobs/${id}`, { method: 'DELETE', headers: await cabecalhos() }).then((r) => json<{ ok: boolean }>(r));
 
-export const analisarNoServidor = async (arquivoId: string, detectar?: 'auto' | 'margem' | 'nenhuma') =>
+export const analisarNoServidor = async (arquivoId: string, detectar?: 'auto' | 'margem' | 'nenhuma', cortarTexto = false) =>
   fetch(`${BASE}/analisar`, {
     method: 'POST',
     headers: await cabecalhos({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ arquivoId, detectar }),
+    body: JSON.stringify({ arquivoId, detectar, cortarTexto }),
   }).then((r) =>
     json<{ largura: number; altura: number; duracao: number; area: { x: number; y: number; w: number; h: number } | null; origem: string | null }>(r),
   );

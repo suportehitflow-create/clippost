@@ -31,6 +31,19 @@ export interface EstiloTexto {
   fundo: { ativo: boolean; cor: string };
   /** Caixa do texto em % do canvas (X, Y, Larg, Alt) */
   posicao: Rect;
+  /** Texto todo em maiúsculas (vem do template) */
+  maiusculas?: boolean;
+  /** Peso da fonte quando negrito (700 padrão; o título do template usa 900) */
+  peso?: number;
+}
+
+/** Marca d'água do template Clipost: pílula dentro do vídeo */
+export interface MarcaTemplate {
+  texto: string;
+  opacidade: number; // 0-100
+  posicao: 'center' | 'bottom_center' | 'top_right' | 'top_left';
+  /** URL de imagem (marca em imagem) ou null para texto */
+  imagem: string | null;
 }
 
 export interface MarcaDagua {
@@ -84,7 +97,20 @@ export interface ConfigGlobal {
   marcaAtiva: boolean;
   marca: MarcaDagua;
   // Detecção / remoção do template antigo
-  deteccao: { modo: ModoDeteccao };
+  deteccao: { modo: ModoDeteccao; cortarTexto: boolean };
+
+  // Template Clipost (vem do editor de Templates)
+  /** 'template' = vídeo preenche o quadro de vídeo do template; 'video' = solto, no formato do próprio vídeo */
+  encaixe: 'template' | 'video';
+  /** Quadro de vídeo do template, px do canvas. null = sem template Clipost (usa "pixels para descer") */
+  areaTemplate: Rect | null;
+  /** Espaço no topo: desloca o topo do quadro de vídeo (px do canvas) */
+  espacoTopo: number;
+  /** Raio dos cantos arredondados do vídeo (px do canvas, 0 = reto) */
+  cantos: number;
+  marcaTemplate: MarcaTemplate | null;
+  /** O usuário mexeu no tamanho/posição do texto: o template não sobrescreve mais */
+  textoAjustado: boolean;
 }
 
 export interface ConfigVideo {

@@ -17,7 +17,12 @@ export interface ResultadoDeteccao {
   atividade: number;
 }
 
-export function detectarAreaVideo(frames: Uint8Array[], w: number, h: number): ResultadoDeteccao | null {
+export function detectarAreaVideo(
+  frames: Uint8Array[],
+  w: number,
+  h: number,
+  opcoes: { cortarTexto?: boolean } = {},
+): ResultadoDeteccao | null {
   const n = frames.length;
   if (n < 3 || w < 8 || h < 8) return null;
   const total = w * h;
@@ -113,10 +118,65 @@ export function detectarAreaVideo(frames: Uint8Array[], w: number, h: number): R
   if (y1 >= h - 2) y1 = h - 1;
   if (x1 >= w - 2) x1 = w - 1;
 
+  // 6) texto queimado em cima do vídeo: corta abaixo dele e fica com a parte de baixo
+  if (opcoes.cortarTexto) y0 = pularTextoNoTopo(faixa, media, limiar, w, x0, x1, y0, y1);
+
   return {
     rect: { x: x0 / w, y: y0 / h, w: (x1 - x0 + 1) / w, h: (y1 - y0 + 1) / h },
     atividade: ativos / total,
   };
+}
+
+/**
+ * Texto (título do template antigo) escrito POR CIMA do vídeo: as letras ficam paradas e com
+ * bordas nítidas no frame médio, enquanto o vídeo atrás se mexe e fica "borrado" na média.
+ * Procura linhas assim no topo da área e devolve o novo topo, logo abaixo do texto.
+ */
+function pularTextoNoTopo(
+  faixa: Uint8Array,
+  media: Float32Array,
+  limiar: number,
+  w: number,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+): number {
+  const altura = y1 - y0 + 1;
+  const largura = x1 - x0;
+  if (altura < 20 || largura < 20) return y0;
+  const limite = y0 + Math.floor(altura * 0.35);
+  const inicioMax = y0 + Math.floor(altura * 0.12);
+  const tolerancia = Math.max(2, Math.round(altura * 0.025));
+
+  const temTexto = (y: number) => {
+    let c = 0;
+    const o = y * w;
+    for (let x = x0 + 1; x <= x1; x++) {
+      const i = o + x;
+      if (faixa[i] <= limiar && faixa[i - 1] <= limiar && Math.abs(media[i] - media[i - 1]) > 45) c++;
+    }
+    return c / largura > 0.05;
+  };
+
+  let primeira = -1;
+  let ultima = -1;
+  let vazias = 0;
+  for (let y = y0; y <= limite; y++) {
+    if (temTexto(y)) {
+      if (primeira < 0) primeira = y;
+      ultima = y;
+      vazias = 0;
+    } else if (primeira < 0) {
+      if (y > inicioMax) return y0; // o texto tem que começar colado no topo do vídeo
+    } else if (++vazias > tolerancia) {
+      break;
+    }
+  }
+  if (ultima < 0 || ultima - primeira < 2) return y0;
+  const novo = ultima + 1 + Math.max(1, Math.round(altura * 0.015));
+  // Nunca come mais que 35%: se for maior, é cenário parado, não texto
+  return novo - y0 < altura * 0.35 ? novo : y0;
 }
 
 function percentil(hist: Uint32Array, total: number, p: number) {

@@ -106,7 +106,29 @@ export function configGlobalPadrao(): ConfigGlobal {
     },
     marcaAtiva: false,
     marca: marcaPadrao(),
-    deteccao: { modo: 'auto' },
+    deteccao: { modo: 'auto', cortarTexto: true },
+    encaixe: 'template',
+    areaTemplate: null,
+    espacoTopo: 0,
+    cantos: 0,
+    marcaTemplate: null,
+    textoAjustado: false,
+  };
+}
+
+/** Completa uma config salva (localStorage) com os campos que surgiram depois */
+export function completarConfig(salva: Partial<ConfigGlobal> | null | undefined): ConfigGlobal {
+  const p = configGlobalPadrao();
+  if (!salva) return p;
+  return {
+    ...p,
+    ...salva,
+    estiloTexto: { ...p.estiloTexto, ...(salva.estiloTexto ?? {}) },
+    musica: { ...p.musica, ...(salva.musica ?? {}) },
+    efeitos: { ...p.efeitos, ...(salva.efeitos ?? {}) },
+    marca: { ...p.marca, ...(salva.marca ?? {}) },
+    moldura: { ...p.moldura, ...(salva.moldura ?? {}) },
+    deteccao: { ...p.deteccao, ...(salva.deteccao ?? {}) },
   };
 }
 

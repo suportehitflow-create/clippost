@@ -5,9 +5,21 @@ import * as api from '@/lib/editor-massa/client/api';
 import { abrirVideo, capturarQuadro, carregarImagem, detectarNoNavegador, duracaoAudio, lerMeta } from '@/lib/editor-massa/client/midia';
 import { gerarOverlayPng, temOverlay } from '@/lib/editor-massa/client/render';
 import { finalizarArea } from '@/lib/editor-massa/deteccao-core';
-import { configGlobalPadrao, FONTES_GOOGLE, novoVideo } from '@/lib/editor-massa/defaults';
+import { completarConfig, configGlobalPadrao, FONTES_GOOGLE, novoVideo } from '@/lib/editor-massa/defaults';
+import {
+  areaVideoTemplate,
+  cantosDoTemplate,
+  carregarTemplateClipost,
+  estiloDoTemplate,
+  gerarImagemTemplate,
+  marcaDoTemplate,
+  prepararMarca,
+  salvarTemplateClipost,
+  type TemplateClipost,
+} from '@/lib/editor-massa/client/templateClipost';
 import type { ConfigGlobal, ConfigVideo, VideoJob } from '@/lib/editor-massa/types';
 import { novaAba, novoId, type Aba, type MusicaCliente, type ResultadoJob, type TemplateCliente, type VideoCliente } from './estado';
+import EditarTemplate from './EditarTemplate';
 import Grade from './Grade';
 import { Icone } from './icones';
 import Inspetor from './Inspetor';
@@ -31,23 +43,17 @@ function paraConfig(v: VideoCliente): ConfigVideo {
 }
 
 function carregarConfig(): ConfigGlobal {
-  const padrao = configGlobalPadrao();
   try {
-    const salvo = JSON.parse(localStorage.getItem(CHAVE_CONFIG) || 'null');
-    if (!salvo) return padrao;
-    const r: any = { ...padrao };
-    for (const k of Object.keys(padrao) as (keyof ConfigGlobal)[]) {
-      const p = padrao[k] as any;
-      if (salvo[k] === undefined) continue;
-      r[k] = p && typeof p === 'object' && !Array.isArray(p) ? { ...p, ...salvo[k] } : salvo[k];
-    }
-    r.estiloTexto = { ...padrao.estiloTexto, ...salvo.estiloTexto };
-    r.musica = { ...r.musica, musicaId: null }; // músicas não sobrevivem ao recarregar a página
-    return r;
+    const r = completarConfig(JSON.parse(localStorage.getItem(CHAVE_CONFIG) || 'null'));
+    // Agora o fundo é sempre o template Clipost (sem "fundo de cor"/imagem avulsa)
+    return { ...r, moldura: { ...r.moldura, ativo: false }, musica: { ...r.musica, musicaId: null } };
   } catch {
-    return padrao;
+    return configGlobalPadrao();
   }
 }
+
+/** Carrega uma fonte (nome simples ou pilha CSS do template) antes de desenhar no canvas */
+const carregarFonte = (f: string) => document.fonts?.load(`bold 40px ${f.includes(',') ? f : `"${f}"`}`).catch(() => null);
 
 export default function EditorMassa() {
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
@@ -65,6 +71,13 @@ export default function EditorMassa() {
   const [logAberto, setLogAberto] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [gatilhoAnalise, setGatilhoAnalise] = useState(0);
+  const [tplClipost, setTplClipost] = useState<TemplateClipost | null>(null);
+  const [carregandoTpl, setCarregandoTpl] = useState(true);
+  const [editarTplAberto, setEditarTplAberto] = useState(false);
+  const [salvandoTpl, setSalvandoTpl] = useState(false);
+  const tplRef = useRef(tplClipost);
+  tplRef.current = tplClipost;
+  const tplMudou = useRef(false);
 
   const abasRef = useRef(abas);
   abasRef.current = abas;
@@ -79,7 +92,6 @@ export default function EditorMassa() {
   const analisando = useRef(new Set<string>());
   const ultimoClicado = useRef<string | null>(null);
   const inputVideos = useRef<HTMLInputElement>(null);
-  const inputTemplate = useRef<HTMLInputElement>(null);
   const inputMusicas = useRef<HTMLInputElement>(null);
 
   const abaAtiva = abas.find((a) => a.id === abaAtivaId) ?? abas[0];
@@ -99,9 +111,7 @@ export default function EditorMassa() {
 
   // fontes do Google precisam estar carregadas antes de desenhar no canvas
   useEffect(() => {
-    Promise.all([global.estiloTexto.fonte, global.marca.fonte].map((f) => document.fonts?.load(`bold 40px "${f}"`).catch(() => null))).then(() =>
-      setGlobal((g) => ({ ...g })),
-    );
+    Promise.all([global.estiloTexto.fonte, global.marca.fonte].map(carregarFonte)).then(() => setGlobal((g) => ({ ...g })));
   }, [global.estiloTexto.fonte, global.marca.fonte]);
 
   const avisar = useCallback((msg: string) => {
@@ -195,10 +205,10 @@ export default function EditorMassa() {
       try {
         let area, origem;
         if (el) {
-          ({ area, origem } = finalizarArea(await detectarNoNavegador(el, v), v.largura, v.altura));
+          ({ area, origem } = finalizarArea(await detectarNoNavegador(el, v, globalRef.current.deteccao.cortarTexto), v.largura, v.altura));
         } else {
           const arquivoId = v.arquivoId ?? (await uploads.current.get(v.id));
-          const r = await api.analisarNoServidor(arquivoId!, 'auto');
+          const r = await api.analisarNoServidor(arquivoId!, 'auto', globalRef.current.deteccao.cortarTexto);
           area = r.area;
           origem = r.origem as VideoCliente['origemDeteccao'];
         }
@@ -228,7 +238,7 @@ export default function EditorMassa() {
         atualizarVideo(v.id, { tocavel: false });
         try {
           const arquivoId = await (uploads.current.get(v.id) ?? enviarVideo(v));
-          const r = await api.analisarNoServidor(arquivoId, globalRef.current.deteccao.modo);
+          const r = await api.analisarNoServidor(arquivoId, globalRef.current.deteccao.modo, globalRef.current.deteccao.cortarTexto);
           const img = await carregarImagem(api.urlFrame(arquivoId, Math.min(1, r.duracao * 0.3), 720));
           atualizarVideo(v.id, {
             largura: r.largura,
@@ -382,22 +392,82 @@ export default function EditorMassa() {
     [detectar, avisar],
   );
 
-  // ---------- template e músicas ----------
-  const escolherTemplate = async (arquivo: File) => {
-    try {
-      const url = URL.createObjectURL(arquivo);
-      const imagem = await carregarImagem(url);
-      const t: TemplateCliente = { nome: arquivo.name, arquivo, url, imagem, arquivoId: null };
-      setTemplate(t);
-      setGlobal((g) => ({ ...g, moldura: { ...g.moldura, ativo: false } }));
-      avisar(`Template: ${arquivo.name} (${imagem.naturalWidth}×${imagem.naturalHeight})`);
-      enviar('template:' + url, arquivo, () => {})
-        .then((id) => setTemplate((x) => (x && x.url === url ? { ...x, arquivoId: id } : x)))
-        .catch((e) => escreverLog(`[ERRO] Upload do template: ${e.message}`));
-    } catch {
-      avisar('Não foi possível abrir essa imagem');
-    }
+  // ---------- template Clipost (o mesmo do editor de Templates) ----------
+  const aplicarTemplate = useCallback(
+    async (t: TemplateClipost) => {
+      try {
+        const blob = await gerarImagemTemplate(t);
+        const arquivo = new File([blob], 'template-clipost.png', { type: 'image/png' });
+        const url = URL.createObjectURL(arquivo);
+        const imagem = await carregarImagem(url);
+        const marca = await prepararMarca(marcaDoTemplate(t));
+        setTemplate((antigo) => {
+          if (antigo) URL.revokeObjectURL(antigo.url);
+          return { nome: 'Seu template', arquivo, url, imagem, arquivoId: null };
+        });
+        setGlobal((g) => ({
+          ...g,
+          moldura: { ...g.moldura, ativo: false },
+          areaTemplate: areaVideoTemplate(t),
+          cantos: cantosDoTemplate(t),
+          marcaTemplate: marca,
+          estiloTexto: estiloDoTemplate(t, g.estiloTexto, g.textoAjustado),
+        }));
+        enviar('template:' + url, arquivo, () => {})
+          .then((id) => setTemplate((x) => (x && x.url === url ? { ...x, arquivoId: id } : x)))
+          .catch((e) => escreverLog(`[ERRO] Upload do template: ${e.message}`));
+      } catch (e: any) {
+        escreverLog(`[ERRO] Template: ${e?.message ?? e}`);
+        avisar('Não foi possível montar o seu template');
+      }
+    },
+    [enviar, escreverLog, avisar],
+  );
+
+  useEffect(() => {
+    let vivo = true;
+    carregarTemplateClipost().then(async (t) => {
+      if (!vivo) return;
+      setTplClipost(t);
+      await aplicarTemplate(t);
+      if (vivo) setCarregandoTpl(false);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // "Voltar ao tamanho e posição do template"
+  useEffect(() => {
+    const t = tplRef.current;
+    if (!global.textoAjustado && t) setGlobal((g) => ({ ...g, estiloTexto: estiloDoTemplate(t, g.estiloTexto, false) }));
+  }, [global.textoAjustado]);
+
+  // Edição rápida: redesenha o template 300ms depois da última mudança
+  const timerTpl = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mudarTemplate = (parcial: Record<string, any>) => {
+    const atual = tplRef.current;
+    if (!atual) return;
+    const novo = { ...atual, config: { ...atual.config, ...parcial } };
+    setTplClipost(novo);
+    tplMudou.current = true;
+    if (timerTpl.current) clearTimeout(timerTpl.current);
+    timerTpl.current = setTimeout(() => aplicarTemplate(novo), 300);
   };
+  const concluirTemplate = async () => {
+    const t = tplRef.current;
+    if (t && tplMudou.current) {
+      setSalvandoTpl(true);
+      const ok = await salvarTemplateClipost(t);
+      setSalvandoTpl(false);
+      tplMudou.current = false;
+      avisar(ok ? 'Template salvo' : 'Mudanças aplicadas aqui, mas não foi possível salvar no seu template');
+    }
+    setEditarTplAberto(false);
+  };
+
+  // ---------- músicas ----------
 
   const adicionarMusicas = async (arquivos: File[]) => {
     const novas: MusicaCliente[] = await Promise.all(
@@ -412,6 +482,7 @@ export default function EditorMassa() {
         .then((id) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, arquivoId: id, upload: 1 } : x))))
         .catch((e) => escreverLog(`[ERRO] Upload da música ${m.nome}: ${e.message}`)),
     );
+    // Importou = está ativa (a primeira vira a música de fundo se ainda não tiver uma)
     if (novas[0] && !globalRef.current.musica.musicaId) setGlobal((g) => ({ ...g, musica: { ...g.musica, ativo: true, musicaId: novas[0].id } }));
     avisar(`${novas.length} música(s) importada(s)`);
   };
@@ -463,7 +534,7 @@ export default function EditorMassa() {
     const aba = abaAtiva;
     if (aba.processando || !aba.videos.length) return;
     const g = globalRef.current;
-    if (!templateRef.current && !g.moldura.ativo && !window.confirm('Nenhum template escolhido. Processar com fundo preto 1080×1920?')) return;
+    if (!templateRef.current) return avisar(carregandoTpl ? 'Espere o seu template carregar' : 'Não foi possível carregar o seu template — recarregue a página');
 
     setAbas((as) => as.map((a) => (a.id === aba.id ? { ...a, processando: true, pausado: false, videos: a.videos.map((v) => ({ ...v, statusJob: 'fila', progressoJob: 0 })) } : a)));
     try {
@@ -473,7 +544,7 @@ export default function EditorMassa() {
       const templateArquivoId = tpl && !g.moldura.ativo ? (tpl.arquivoId ?? (await uploads.current.get('template:' + tpl.url)) ?? null) : null;
 
       const usadas = new Set<string>();
-      if (g.musica.ativo && g.musica.musicaId) usadas.add(g.musica.musicaId);
+      if (g.musica.musicaId) usadas.add(g.musica.musicaId);
       aba.videos.forEach((v) => v.musica && usadas.add(v.musica.musicaId));
       const musicasMapa: Record<string, string> = {};
       for (const id of usadas) {
@@ -482,7 +553,7 @@ export default function EditorMassa() {
       }
 
       setStatus('Preparando textos…');
-      await Promise.all([g.estiloTexto.fonte, g.marca.fonte].map((f) => document.fonts?.load(`bold 40px "${f}"`).catch(() => null)));
+      await Promise.all([g.estiloTexto.fonte, g.marca.fonte].map(carregarFonte));
       const tamTemplate = tpl ? { w: tpl.imagem.naturalWidth, h: tpl.imagem.naturalHeight } : null;
       // PNGs de texto em paralelo
       const videos: VideoJob[] = await Promise.all(
@@ -490,7 +561,7 @@ export default function EditorMassa() {
           const cfg = paraConfig(v);
           let overlayArquivoId: string | null = null;
           if (temOverlay(g, cfg) && v.largura) {
-            const png = await gerarOverlayPng(g, cfg, tamTemplate);
+            const png = await gerarOverlayPng(g, cfg, tamTemplate, tpl?.imagem ?? null);
             if (png) overlayArquivoId = await api.enviarArquivo(png, `overlay_${i}.png`).promessa;
           }
           return { ...cfg, arquivoId: videosIds[i], overlayArquivoId };
@@ -663,7 +734,9 @@ export default function EditorMassa() {
           global={global}
           mudarGlobal={setGlobal}
           template={template}
-          escolherTemplate={() => inputTemplate.current?.click()}
+          perfilTemplate={String(tplClipost?.config?.brandHandle || tplClipost?.config?.brandName || tplClipost?.username || '')}
+          carregandoTemplate={carregandoTpl}
+          editarTemplate={() => setEditarTplAberto(true)}
           musicas={musicas}
           importarMusicas={() => inputMusicas.current?.click()}
           removerMusica={(id) => {
@@ -698,7 +771,7 @@ export default function EditorMassa() {
             template={global.moldura.ativo ? null : template}
             soltarArquivos={adicionarVideos}
             adicionarVideos={() => inputVideos.current?.click()}
-            escolherTemplate={() => inputTemplate.current?.click()}
+            escolherTemplate={() => setEditarTplAberto(true)}
           />
         </main>
 
@@ -769,17 +842,9 @@ export default function EditorMassa() {
           if (f.length) adicionarVideos(f);
         }}
       />
-      <input
-        ref={inputTemplate}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/bmp"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = '';
-          if (f) escolherTemplate(f);
-        }}
-      />
+      {editarTplAberto && tplClipost && (
+        <EditarTemplate config={{ ...tplClipost.config }} mudar={mudarTemplate} salvando={salvandoTpl} concluir={concluirTemplate} />
+      )}
       <input
         ref={inputMusicas}
         type="file"

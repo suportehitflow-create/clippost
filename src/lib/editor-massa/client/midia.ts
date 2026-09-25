@@ -63,7 +63,7 @@ export async function capturarQuadro(v: HTMLVideoElement, t: number, larguraMax 
 }
 
 /** Detecção local (grátis) da área do vídeo dentro de um template antigo */
-export async function detectarNoNavegador(v: HTMLVideoElement, meta: MetaVideo): Promise<ResultadoDeteccao | null> {
+export async function detectarNoNavegador(v: HTMLVideoElement, meta: MetaVideo, cortarTexto = false): Promise<ResultadoDeteccao | null> {
   const w = 320;
   const h = Math.max(8, Math.round((w * meta.altura) / meta.largura / 2) * 2);
   const c = document.createElement('canvas');
@@ -83,7 +83,7 @@ export async function detectarNoNavegador(v: HTMLVideoElement, meta: MetaVideo):
     for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
     frames.push(g);
   }
-  return detectarAreaVideo(frames, w, h);
+  return detectarAreaVideo(frames, w, h, { cortarTexto });
 }
 
 export async function carregarImagem(url: string): Promise<HTMLImageElement> {

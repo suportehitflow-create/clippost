@@ -121,7 +121,9 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   filtros.push(`[${atual}]${fim.join(',')}[vout]`);
 
   // ---------- áudio ----------
-  const usarOriginal = info.temAudio && !v.mudo && !(e.musica && g.musica.mutarOriginal);
+  // Volume do áudio original vale sempre (com ou sem música); 0% = sem o áudio original
+  const volVideo = g.musica.mutarOriginal ? 0 : (g.musica.volumeVideo ?? 100) / 100;
+  const usarOriginal = info.temAudio && !v.mudo && volVideo > 0.001;
   let mapaAudio: string | null = null;
   if (usarOriginal) {
     const a = ['asetpts=PTS-STARTPTS', ...cadeiaAtempo(vel)];
@@ -133,7 +135,6 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
         'dynaudnorm=p=0.9:s=5',
       );
     }
-    const volVideo = e.musica ? g.musica.volumeVideo / 100 : 1;
     if (Math.abs(volVideo - 1) > 0.001) a.push(`volume=${n(volVideo, 3)}`);
     filtros.push(`[1:a]${a.join(',')}[va]`);
     mapaAudio = 'va';

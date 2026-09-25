@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { urlFrame } from '@/lib/editor-massa/client/api';
 import { abrirVideo, capturarQuadro } from '@/lib/editor-massa/client/midia';
 import { desenharComposicao } from '@/lib/editor-massa/client/render';
-import { MAX_MARCAS } from '@/lib/editor-massa/defaults';
 import { areaOrigem, calcularLayout } from '@/lib/editor-massa/layout';
 import type { ConfigGlobal, ConfigVideo, Lados } from '@/lib/editor-massa/types';
 import { Campo, Opcao, Slider } from './campos';
@@ -186,7 +185,7 @@ export default function Inspetor({ video: v, editando, global, template, musicas
 
   const musicaDoVideo = () => {
     if (!v) return null;
-    const id = v.musica?.musicaId ?? (global.musica.ativo ? global.musica.musicaId : null);
+    const id = v.musica?.musicaId ?? global.musica.musicaId;
     return musicas.find((m) => m.id === id) ?? null;
   };
   const inicioMusica = () => v?.musica?.inicio ?? global.musica.inicio;
@@ -202,8 +201,9 @@ export default function Inspetor({ video: v, editando, global, template, musicas
     }
     if (el.currentTime < faixa[0] || el.currentTime >= faixa[1] - 0.05) el.currentTime = faixa[0];
     const m = musicaDoVideo();
-    el.muted = v.mudo || (!!m && global.musica.mutarOriginal);
-    el.volume = m ? Math.min(1, global.musica.volumeVideo / 100) : 1;
+    const volOriginal = global.musica.mutarOriginal ? 0 : (global.musica.volumeVideo ?? 100) / 100;
+    el.muted = v.mudo || volOriginal <= 0.001;
+    el.volume = Math.max(0, Math.min(1, volOriginal));
     el.playbackRate = global.efeitos.velocidadePersonalizada ? global.efeitos.velocidade : global.efeitos.velocidade105 ? 1.05 : 1;
     if (m) {
       const a = audioRef.current ?? new Audio();
@@ -411,7 +411,7 @@ export default function Inspetor({ video: v, editando, global, template, musicas
               atualizarSelecionados(() => ({ musica: id ? { musicaId: id, inicio: 0 } : null }));
             }}
           >
-            <option value="">{global.musica.ativo ? 'Usar a música de fundo geral' : 'Nenhuma'}</option>
+            <option value="">{global.musica.musicaId ? 'Usar a música de fundo geral' : 'Nenhuma'}</option>
             {musicas.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.nome}
@@ -483,33 +483,6 @@ export default function Inspetor({ video: v, editando, global, template, musicas
                   mudar={(x) => atualizarSelecionados((y) => ({ vcrop: { ...y.vcrop, [lado]: x } }))}
                 />
               ))}
-            </div>
-          </div>
-        </details>
-
-        <details className={s.detalhes}>
-          <summary>
-            <Icone nome="chevron" tamanho={14} /> Marca d'água extra ({v.marcasExtras.length})
-          </summary>
-          <div className={s.cartao}>
-            <span className={s.dica}>Copia a marca d'água configurada ao lado só para {n > 1 ? 'estes vídeos' : 'este vídeo'} (até {MAX_MARCAS} por vídeo).</span>
-            <div className={s.linha}>
-              <button
-                type="button"
-                className={`${s.btn} ${s.btnPequeno}`}
-                style={{ flex: 1 }}
-                disabled={!global.marca.texto.trim()}
-                onClick={() =>
-                  atualizarSelecionados((x) =>
-                    x.marcasExtras.length + (global.marcaAtiva ? 1 : 0) >= MAX_MARCAS ? {} : { marcasExtras: [...x.marcasExtras, { ...global.marca }] },
-                  )
-                }
-              >
-                <Icone nome="mais" tamanho={13} /> Adicionar
-              </button>
-              <button type="button" className={`${s.btn} ${s.btnPequeno}`} style={{ flex: 1 }} disabled={!v.marcasExtras.length} onClick={() => atualizarSelecionados(() => ({ marcasExtras: [] }))}>
-                Remover extras
-              </button>
             </div>
           </div>
         </details>

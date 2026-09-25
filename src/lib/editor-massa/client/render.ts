@@ -1,5 +1,5 @@
-import { calcularLayout, type Canvas } from '../layout';
-import type { ConfigGlobal, ConfigVideo, EstiloTexto, MarcaDagua } from '../types';
+import { calcularLayout, type Canvas, type Layout } from '../layout';
+import type { ConfigGlobal, ConfigVideo, EstiloTexto, MarcaDagua, MarcaTemplate, Rect } from '../types';
 import { MAX_MARCAS } from '../defaults';
 
 // Desenho no navegador. O MESMO código faz:
@@ -19,8 +19,16 @@ function rgba(hex: string, alfa: number) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
 }
 
-function fonteCss(fonte: string, px: number, negrito: boolean, italico: boolean) {
-  return `${italico ? 'italic ' : ''}${negrito ? 'bold ' : ''}${Math.max(1, px).toFixed(1)}px "${fonte}", Arial, sans-serif`;
+function fonteCss(fonte: string, px: number, negrito: boolean, italico: boolean, peso?: number) {
+  // Fonte do template já vem como pilha CSS ("Impact, 'Anton', sans-serif"): usa como está
+  const familia = fonte.includes(',') ? fonte : `"${fonte}", Arial, sans-serif`;
+  return `${italico ? 'italic ' : ''}${negrito ? `${peso ?? 'bold'} ` : ''}${Math.max(1, px).toFixed(1)}px ${familia}`;
+}
+
+/** Imagens usadas no overlay (marca d'água em imagem do template), carregadas antes de desenhar */
+const imagensProntas = new Map<string, HTMLImageElement>();
+export function registrarImagem(url: string, img: HTMLImageElement) {
+  imagensProntas.set(url, img);
 }
 
 function quebrarLinhas(ctx: CanvasRenderingContext2D, texto: string, larguraMax: number): string[] {
@@ -56,8 +64,8 @@ function quebrarLinhas(ctx: CanvasRenderingContext2D, texto: string, larguraMax:
   return linhas;
 }
 
-function caixaArredondada(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath();
+function caixaArredondada(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, novoCaminho = true) {
+  if (novoCaminho) ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
   ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -72,8 +80,9 @@ function escalaBase(canvas: Canvas, alvo: Canvas) {
   return (Math.min(canvas.w, canvas.h) / 1080) * k;
 }
 
-function desenharTexto(ctx: CanvasRenderingContext2D, texto: string, e: EstiloTexto, canvas: Canvas, alvo: Canvas) {
-  if (!texto.trim()) return;
+function desenharTexto(ctx: CanvasRenderingContext2D, textoBruto: string, e: EstiloTexto, canvas: Canvas, alvo: Canvas) {
+  if (!textoBruto.trim()) return;
+  const texto = e.maiusculas ? textoBruto.toLocaleUpperCase('pt-BR') : textoBruto;
   const px = e.tamanho * escalaBase(canvas, alvo);
   const k = alvo.w / canvas.w;
   const caixa = {
@@ -83,14 +92,15 @@ function desenharTexto(ctx: CanvasRenderingContext2D, texto: string, e: EstiloTe
     h: (e.posicao.h / 100) * alvo.h,
   };
   ctx.save();
-  ctx.font = fonteCss(e.fonte, px, e.negrito, e.italico);
+  ctx.font = fonteCss(e.fonte, px, e.negrito, e.italico, e.peso);
   ctx.textBaseline = 'middle';
   ctx.textAlign = e.alinhamento;
   ctx.globalAlpha = Math.max(0, Math.min(1, e.opacidade / 100));
   const linhas = quebrarLinhas(ctx, texto, caixa.w);
   const altLinha = px * 1.22;
   const altBloco = linhas.length * altLinha;
-  const y0 = altBloco <= caixa.h ? caixa.y + (caixa.h - altBloco) / 2 : caixa.y;
+  // Bloco sempre centralizado na caixa (a caixa é a âncora; texto longo cresce para os dois lados)
+  const y0 = caixa.y + (caixa.h - altBloco) / 2;
   const xTexto = e.alinhamento === 'left' ? caixa.x : e.alinhamento === 'right' ? caixa.x + caixa.w : caixa.x + caixa.w / 2;
 
   if (e.fundo.ativo) {
@@ -154,13 +164,119 @@ export function marcasDoVideo(global: ConfigGlobal, v: ConfigVideo): MarcaDagua[
 }
 
 export function temOverlay(global: ConfigGlobal, v: ConfigVideo) {
-  return (global.textoAtivo && !!v.texto.trim()) || marcasDoVideo(global, v).length > 0;
+  return (
+    (global.textoAtivo && !!v.texto.trim()) ||
+    marcasDoVideo(global, v).length > 0 ||
+    !!global.marcaTemplate ||
+    (global.cantos > 0 && !global.moldura.ativo)
+  );
 }
 
-/** Texto + marcas d'água, desenhados no tamanho `alvo` (o canvas de trabalho vira `alvo`) */
-export function desenharOverlay(ctx: CanvasRenderingContext2D, global: ConfigGlobal, v: ConfigVideo, canvas: Canvas, alvo: Canvas) {
-  if (global.textoAtivo) desenharTexto(ctx, v.texto, global.estiloTexto, canvas, alvo);
-  marcasDoVideo(global, v).forEach((m) => desenharMarca(ctx, m, canvas, alvo));
+/**
+ * Cantos arredondados do vídeo: o overlay vai POR CIMA do vídeo, então basta redesenhar
+ * o fundo do template só nos 4 cantinhos que ficam fora do retângulo arredondado.
+ */
+function desenharCantos(ctx: CanvasRenderingContext2D, d: Rect, raio: number, k: number, alvo: Canvas, fundo: CanvasImageSource | null, corFundo: string) {
+  const r = Math.min(raio, d.w / 2, d.h / 2) * k;
+  if (r < 1) return;
+  const x = d.x * k;
+  const y = d.y * k;
+  const w = d.w * k;
+  const h = d.h * k;
+  ctx.save();
+  ctx.beginPath();
+  // retângulo externo um pouco maior: senão o antialias da borda deixa uma linha fina do vídeo aparecendo
+  ctx.rect(x - 2, y - 2, w + 4, h + 4);
+  caixaArredondada(ctx, x, y, w, h, r, false);
+  ctx.clip('evenodd');
+  if (fundo) ctx.drawImage(fundo, 0, 0, alvo.w, alvo.h);
+  else {
+    ctx.fillStyle = corFundo;
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.restore();
+}
+
+/** Marca d'água do template: pílula escura translúcida com o @ (ou a imagem) dentro do vídeo */
+function desenharMarcaTemplate(ctx: CanvasRenderingContext2D, m: MarcaTemplate, d: Rect, k: number) {
+  // Medidas do editor de Templates (tela de 324px) levadas para a base 1080
+  const S = (1080 / 324) * k;
+  const img = m.imagem ? imagensProntas.get(m.imagem) : undefined;
+  if (m.imagem && !img) return;
+  const texto = m.texto.trim();
+  if (!img && !texto) return;
+
+  const fontePx = 10 * S;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, m.opacidade / 100));
+  ctx.font = `bold ${fontePx.toFixed(1)}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+  const padX = 10 * S;
+  const padY = 4 * S;
+  const ponto = 6 * S;
+  const gap = 6 * S;
+  const altImg = 16 * S;
+  let conteudoW: number;
+  let conteudoH: number;
+  if (img) {
+    const esc = altImg / (img.naturalHeight || 1);
+    conteudoW = Math.min(80 * S, (img.naturalWidth || 1) * esc);
+    conteudoH = altImg;
+  } else {
+    conteudoW = ponto + gap + ctx.measureText(texto).width;
+    conteudoH = fontePx * 1.35;
+  }
+  const pw = conteudoW + padX * 2;
+  const ph = conteudoH + padY * 2;
+  const margem = 18 * S; // bottom-2 / top-2 + p-2.5 do editor
+  const dx = d.x * k;
+  const dy = d.y * k;
+  const dw = d.w * k;
+  const dh = d.h * k;
+  let px = dx + (dw - pw) / 2;
+  let py = dy + (dh - ph) / 2;
+  if (m.posicao === 'bottom_center') py = dy + dh - margem - ph;
+  else if (m.posicao === 'top_right') {
+    px = dx + dw - margem - pw;
+    py = dy + margem;
+  } else if (m.posicao === 'top_left') {
+    px = dx + margem;
+    py = dy + margem;
+  }
+  caixaArredondada(ctx, px, py, pw, ph, ph / 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, S * 0.5);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.stroke();
+  if (img) {
+    ctx.drawImage(img, px + padX, py + padY, conteudoW, conteudoH);
+  } else {
+    ctx.fillStyle = '#818cf8';
+    ctx.beginPath();
+    ctx.arc(px + padX + ponto / 2, py + ph / 2, ponto / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(texto, px + padX + ponto + gap, py + ph / 2 + fontePx * 0.04);
+  }
+  ctx.restore();
+}
+
+/** Cantos + marca do template + texto + marcas d'água, desenhados no tamanho `alvo` */
+export function desenharOverlay(
+  ctx: CanvasRenderingContext2D,
+  global: ConfigGlobal,
+  v: ConfigVideo,
+  L: Layout,
+  alvo: Canvas,
+  fundo: CanvasImageSource | null = null,
+) {
+  const k = alvo.w / L.canvas.w;
+  if (global.cantos > 0 && !global.moldura.ativo) desenharCantos(ctx, L.destino, global.cantos, k, alvo, fundo, '#000');
+  if (global.marcaTemplate) desenharMarcaTemplate(ctx, global.marcaTemplate, L.destino, k);
+  if (global.textoAtivo) desenharTexto(ctx, v.texto, global.estiloTexto, L.canvas, alvo);
+  marcasDoVideo(global, v).forEach((m) => desenharMarca(ctx, m, L.canvas, alvo));
 }
 
 /** Composição completa (template + vídeo + texto) no tamanho `alvo` — usado no preview e nas miniaturas */
@@ -207,19 +323,24 @@ export function desenharComposicao(
       ctx.drawImage(quadro.imagem, o.x * ex, o.y * ey, o.w * ex, o.h * ey, d.x * k, d.y * k, d.w * k, d.h * k);
     }
   }
-  desenharOverlay(ctx, global, v, L.canvas, alvo);
+  desenharOverlay(ctx, global, v, L, alvo, global.moldura.ativo ? null : template);
   ctx.restore();
   return L;
 }
 
 /** Gera o PNG transparente (texto + marcas) no tamanho final de saída. null = nada a desenhar */
-export async function gerarOverlayPng(global: ConfigGlobal, v: ConfigVideo, template: Canvas | null): Promise<Blob | null> {
+export async function gerarOverlayPng(
+  global: ConfigGlobal,
+  v: ConfigVideo,
+  template: Canvas | null,
+  imagemTemplate: CanvasImageSource | null = null,
+): Promise<Blob | null> {
   if (!temOverlay(global, v)) return null;
   const L = calcularLayout(global, v, global.moldura.ativo ? null : template);
   const c = document.createElement('canvas');
   c.width = L.saida.w;
   c.height = L.saida.h;
   const ctx = c.getContext('2d')!;
-  desenharOverlay(ctx, global, v, L.canvas, L.saida);
+  desenharOverlay(ctx, global, v, L, L.saida, global.moldura.ativo ? null : imagemTemplate);
   return new Promise((res) => c.toBlob((b) => res(b), 'image/png'));
 }
