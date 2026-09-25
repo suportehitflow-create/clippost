@@ -100,6 +100,20 @@ export default function EditorMassa({
   const [resultados, setResultados] = useState<ResultadoJob[]>([]);
   const [sobre, setSobre] = useState<Sobreposicao>(null);
   const [importarAberto, setImportarAberto] = useState(false);
+  // Lote aberto pelo Explorador de perfis ("Editor"): os vídeos entram sozinhos na grade
+  const [loteImportar, setLoteImportar] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const lote = localStorage.getItem('clipost:editor-importar-lote');
+      if (lote) {
+        localStorage.removeItem('clipost:editor-importar-lote');
+        setLoteImportar(lote);
+        setImportarAberto(true);
+      }
+    } catch {
+      // sem storage
+    }
+  }, []);
   const [logAberto, setLogAberto] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [gatilhoAnalise, setGatilhoAnalise] = useState(0);
@@ -1011,7 +1025,7 @@ export default function EditorMassa({
         />
       )}
       {toast && <div className={s.toast}>{toast}</div>}
-      {importarAberto && <ImportarPerfil fechar={() => setImportarAberto(false)} aoArquivos={adicionarVideos} />}
+      {importarAberto && <ImportarPerfil loteInicial={loteImportar} fechar={() => { setImportarAberto(false); setLoteImportar(null); }} aoArquivos={adicionarVideos} />}
 
       <input
         ref={inputVideos}

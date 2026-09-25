@@ -3,6 +3,7 @@ clipost Backend — FastAPI
 """
 import asyncio
 import os
+import re
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1099,6 +1100,110 @@ async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: Ba
 
     background_tasks.add_task(_run_tracked, "rerender", rerender_clip_task, clip_id, req.subtitle_preset, req.subtitle_y, req.words)
     return {"status": "rerendering", "clip_id": clip_id}
+
+
+@app.post("/api/tools/explorar")
+async def ferramenta_explorar(request: Request):
+    """Explorador de perfis. Corpo: { perfil, limite, ordem: recentes|curtidos|visualizados, periodo_dias }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    perfil = str(body.get("perfil") or "").strip()
+    if not perfil:
+        raise HTTPException(status_code=400, detail="Digite o @ ou cole o link do perfil.")
+    from services.ferramentas import explorar_perfil
+    try:
+        return await asyncio.to_thread(
+            explorar_perfil, perfil, int(body.get("limite") or 50), str(body.get("ordem") or "recentes"),
+            int(body.get("periodo_dias") or 0), user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)[:400])
+    except Exception as e:
+        print(f"[explorar] falhou: {type(e).__name__}: {str(e)[:160]}")
+        raise HTTPException(status_code=502, detail="Não consegui ler esse perfil agora.")
+
+
+# ---- download assinado (o navegador baixa direto do backend, sem cabeçalho de login) ----
+import base64 as _b64
+import hashlib as _hashlib
+import hmac as _hmac
+import json as _json
+import time as _time
+
+_URL_PERMITIDA = re.compile(
+    r"^https://([^/]*\.)?(cdninstagram\.com|fbcdn\.net|tiktokcdn[^/]*\.com|instagram\.com|tiktok\.com|youtube\.com|youtu\.be|facebook\.com)/",
+    re.I,
+)
+
+
+def _chave_download() -> bytes:
+    base = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY") or "clipost"
+    return _hashlib.sha256(f"baixar:{base}".encode()).digest()
+
+
+@app.post("/api/tools/baixar-link")
+async def ferramenta_baixar_link(request: Request):
+    """Gera um link de download assinado (15 min). Corpo: { itens: [{url, nome}] } — 1 item baixa o vídeo, vários viram .zip"""
+    await _usuario_logado(request)
+    body = await request.json()
+    itens = [
+        {"url": str(i.get("url") or ""), "nome": re.sub(r"[^\w\- ]+", "", str(i.get("nome") or "video"))[:60] or "video"}
+        for i in (body.get("itens") or [])[:100]
+    ]
+    itens = [i for i in itens if _URL_PERMITIDA.match(i["url"])]
+    if not itens:
+        raise HTTPException(status_code=400, detail="Nenhum link de vídeo válido.")
+    carga = _b64.urlsafe_b64encode(_json.dumps({"i": itens, "e": int(_time.time()) + 900}).encode()).decode()
+    assinatura = _hmac.new(_chave_download(), carga.encode(), _hashlib.sha256).hexdigest()[:32]
+    base = os.environ.get("PUBLIC_BACKEND_URL", "https://clippost-backend.fly.dev").rstrip("/")
+    return {"url": f"{base}/api/tools/baixar/{carga}.{assinatura}"}
+
+
+@app.get("/api/tools/baixar/{token}")
+async def ferramenta_baixar(token: str):
+    from fastapi.responses import FileResponse
+    from starlette.background import BackgroundTask
+    import shutil
+    import tempfile
+    import zipfile
+    from pathlib import Path
+
+    carga, _, assinatura = token.rpartition(".")
+    esperado = _hmac.new(_chave_download(), carga.encode(), _hashlib.sha256).hexdigest()[:32]
+    if not carga or not _hmac.compare_digest(assinatura, esperado):
+        raise HTTPException(status_code=403, detail="Link inválido.")
+    dados = _json.loads(_b64.urlsafe_b64decode(carga.encode()))
+    if dados.get("e", 0) < _time.time():
+        raise HTTPException(status_code=410, detail="Link expirado. Gere de novo no Clipost.")
+    itens = dados.get("i") or []
+
+    tmp = Path(tempfile.mkdtemp(prefix="clippost_baixar_"))
+
+    def _baixar_um(i: int, item: dict) -> Path | None:
+        from bulk_tasks import _download
+        pasta = tmp / f"item{i}"
+        pasta.mkdir()
+        try:
+            caminho, _ = _download(item["url"], pasta)
+            destino = tmp / f"{i + 1:02d} - {item['nome']}.mp4"
+            shutil.move(caminho, destino)
+            return destino
+        except Exception as e:
+            print(f"[baixar] item {i} falhou: {type(e).__name__}")
+            return None
+
+    arquivos = [p for p in [await asyncio.to_thread(_baixar_um, i, it) for i, it in enumerate(itens)] if p]
+    if not arquivos:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise HTTPException(status_code=502, detail="Não consegui baixar os vídeos (os links podem ter expirado).")
+    limpar = BackgroundTask(shutil.rmtree, tmp, True)
+    if len(arquivos) == 1:
+        return FileResponse(arquivos[0], media_type="video/mp4", filename=arquivos[0].name, background=limpar)
+    zip_path = tmp / "clipost-videos.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
+        for a in arquivos:
+            z.write(a, a.name)
+    return FileResponse(zip_path, media_type="application/zip", filename="clipost-videos.zip", background=limpar)
 
 
 @app.post("/api/tools/youtube-texto")

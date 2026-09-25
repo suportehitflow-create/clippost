@@ -39,15 +39,18 @@ const pill = (ativo: boolean) =>
 export default function ImportarPerfil({
   fechar,
   aoArquivos,
+  loteInicial,
 }: {
   fechar: () => void;
   aoArquivos: (arquivos: File[]) => void;
+  /** lote já criado (ex.: vídeos escolhidos no Explorador de perfis) */
+  loteInicial?: string | null;
 }) {
   const [perfil, setPerfil] = useState('');
   const [quantidade, setQuantidade] = useState(10);
   const [ordem, setOrdem] = useState<SortBy>('views');
-  const [loteId, setLoteId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('');
+  const [loteId, setLoteId] = useState<string | null>(loteInicial ?? null);
+  const [status, setStatus] = useState<string>(loteInicial ? 'processing' : '');
   const [itens, setItens] = useState<ItemLote[]>([]);
   const [importados, setImportados] = useState(0);
   const [erro, setErro] = useState('');

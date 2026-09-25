@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Clipost — Importar do Instagram",
   "short_name": "Clipost",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Envia os Reels de um perfil do Instagram para o Clipost usando a sua sessão do navegador.",
   "permissions": ["storage"],
   "host_permissions": [

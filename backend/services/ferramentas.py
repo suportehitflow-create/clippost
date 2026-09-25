@@ -71,6 +71,71 @@ def youtube_para_texto(url: str) -> dict:
     }
 
 
+def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", periodo_dias: int = 0,
+                    user_id: str | None = None) -> dict:
+    """Explorador de perfis: mídias de um perfil com totais, filtro de período e ordenação.
+    Instagram: API oficial (reels, posts, carrosséis) se configurada; senão o caminho comum (vídeos).
+    TikTok / YouTube / Facebook: caminho comum (yt-dlp)."""
+    import time
+    from services.downloader import detect_platform, list_profile_videos, normalize_profile_url
+
+    limite = max(1, min(int(limite or 50), 10000))
+    url = normalize_profile_url(perfil if ("." in perfil or perfil.startswith("http")) else f"instagram.com/{perfil.lstrip('@')}")
+    plataforma = detect_platform(url)
+    # período e ordem por curtidas/views pedem uma leitura maior que o limite
+    leitura = limite if (ordem == "recentes" and not periodo_dias) else min(limite * 3, 3000)
+
+    dados = None
+    fonte = "servidor"
+    if plataforma == "instagram":
+        try:
+            from services.instagram_oficial import credenciais, listar_midias
+            if credenciais(user_id):
+                m = re.search(r"instagram\.com/([^/?#]+)", url)
+                dados = listar_midias(m.group(1) if m else perfil, leitura, user_id)
+                fonte = "api_oficial"
+        except ValueError:
+            dados = None  # perfil não profissional: tenta o caminho comum
+    if dados is None:
+        lista = list_profile_videos(url, limit=leitura, sort_by="date", user_id=user_id)
+        dados = {
+            "perfil": {"usuario": (re.search(r"\.com/(@?[^/?#]+)", lista["profile_url"]) or re.search(r"(.+)", perfil)).group(1).lstrip("@"), "seguidores": None},
+            "itens": [{
+                "id": v.get("url"), "tipo": "reel", "url": v.get("url"), "thumbnail": v.get("thumbnail"),
+                "permalink": v.get("permalink") or v.get("url"), "legenda": v.get("title") or "",
+                "views": v.get("view_count"), "likes": v.get("like_count"), "comentarios": v.get("comment_count"),
+                "timestamp": v.get("timestamp"), "duracao": v.get("duration"),
+            } for v in lista["videos"]],
+        }
+
+    itens = dados["itens"]
+    if periodo_dias:
+        corte = time.time() - periodo_dias * 86400
+        itens = [i for i in itens if (i.get("timestamp") or 0) >= corte]
+    chave = {"curtidos": "likes", "visualizados": "views"}.get(ordem, "timestamp")
+    # sem views (API oficial não informa de terceiros): "mais visualizados" usa curtidas
+    if chave == "views" and not any(i.get("views") for i in itens):
+        chave = "likes"
+    itens = sorted(itens, key=lambda i: i.get(chave) or 0, reverse=True)[:limite]
+
+    soma = lambda k: sum(i.get(k) or 0 for i in itens)  # noqa: E731
+    return {
+        "perfil": {**dados["perfil"], "url": url},
+        "plataforma": plataforma,
+        "fonte": fonte,
+        "totais": {
+            "views": soma("views") if any(i.get("views") for i in itens) else None,
+            "likes": soma("likes"),
+            "comentarios": soma("comentarios"),
+            "posts": len(itens),
+            "reels": sum(1 for i in itens if i["tipo"] == "reel"),
+            "posts_imagem": sum(1 for i in itens if i["tipo"] == "post"),
+            "carrosseis": sum(1 for i in itens if i["tipo"] == "carrossel"),
+        },
+        "itens": itens,
+    }
+
+
 def _nota(engajamento: float, por_semana: float, consistencia: float) -> tuple[str, int]:
     """0-100: engajamento pesa 50, frequência 25, consistência das views 25."""
     p_eng = min(50, engajamento / 0.08 * 50)          # 8% de engajamento = nota cheia

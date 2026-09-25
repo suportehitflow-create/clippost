@@ -87,6 +87,63 @@ def remover() -> None:
         pass
 
 
+_TIPO = {"VIDEO": "reel", "IMAGE": "post", "CAROUSEL_ALBUM": "carrossel"}
+
+
+def listar_midias(usuario: str, limite: int = 0, user_id: str | None = None) -> dict:
+    """Perfil + TODAS as mídias (reels, posts, carrosséis), do mais novo para o mais antigo."""
+    cred = credenciais(user_id)
+    if not cred:
+        raise RuntimeError("API oficial do Instagram não configurada")
+    usuario = usuario.lstrip("@").strip("/")
+    perfil: dict = {}
+    itens: list[dict] = []
+    depois = ""
+    for _ in range(200):  # até ~10 mil mídias
+        campos = (
+            f"business_discovery.username({usuario}){{username,name,profile_picture_url,followers_count,media_count,"
+            f"media.limit(50){'.after(' + depois + ')' if depois else ''}"
+            "{id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}"
+        )
+        r = httpx.get(f"{GRAPH}/{cred['ig_id']}", params={"fields": campos, "access_token": cred["token"]}, timeout=30)
+        if not r.is_success:
+            msg = _erro_graph(r)
+            if "not a business" in msg.lower() or "cannot be found" in msg.lower() or "(#110)" in msg:
+                raise ValueError(f"@{usuario} não é um perfil profissional (Business/Creator).")
+            raise ValueError(f"API oficial do Instagram: {msg}")
+        bd = r.json().get("business_discovery") or {}
+        if not perfil:
+            perfil = {"usuario": bd.get("username") or usuario, "nome": bd.get("name"), "foto": bd.get("profile_picture_url"),
+                      "seguidores": bd.get("followers_count"), "total_posts": bd.get("media_count")}
+        midia = bd.get("media") or {}
+        for m in midia.get("data") or []:
+            ts = None
+            try:
+                ts = datetime.fromisoformat(str(m.get("timestamp")).replace("+0000", "+00:00")).timestamp()
+            except ValueError:
+                pass
+            tipo = _TIPO.get(m.get("media_type"), "post")
+            itens.append({
+                "id": m.get("id"),
+                "tipo": tipo,
+                "url": m.get("media_url"),
+                "thumbnail": m.get("thumbnail_url") or (m.get("media_url") if tipo != "reel" else None),
+                "permalink": m.get("permalink"),
+                "legenda": (m.get("caption") or "").strip(),
+                "views": None,
+                "likes": m.get("like_count"),
+                "comentarios": m.get("comments_count"),
+                "timestamp": ts,
+                "duracao": None,
+            })
+            if limite and len(itens) >= limite:
+                return {"perfil": perfil, "itens": itens}
+        depois = ((midia.get("paging") or {}).get("cursors") or {}).get("after") or ""
+        if not depois or not midia.get("data"):
+            break
+    return {"perfil": perfil, "itens": itens}
+
+
 def listar_videos(usuario: str, limite: int = 0, user_id: str | None = None) -> list[dict]:
     """Vídeos (Reels) de um perfil profissional, do mais novo para o mais antigo, no formato do downloader."""
     cred = credenciais(user_id)

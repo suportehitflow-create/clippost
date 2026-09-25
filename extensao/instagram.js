@@ -117,7 +117,7 @@
       if (qtd) itens = itens.slice(0, qtd)
       await chrome.storage.local.set({ clipostImport: { perfil: `https://www.instagram.com/${usuario}/`, usuario, itens, criadoEm: Date.now() } })
       status.textContent = `${itens.length} vídeos prontos. Abrindo o Clipost…`
-      window.open(`${CLIPOST}/bulk?aba=perfil&importar=extensao`, '_blank')
+      window.open(`${CLIPOST}/explorar?importar=extensao`, '_blank')
     } catch (e) {
       status.textContent = e.message || String(e)
     } finally {

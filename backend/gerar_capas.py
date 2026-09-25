@@ -29,7 +29,8 @@ CAPAS = {
     "roteiros": "an elegant glass fountain pen writing glowing lines on a floating translucent script page",
     "calendario": "a floating glass calendar with a few glowing checkmarked days and small vertical video thumbnails scheduled on it",
     "biblioteca": "neatly stacked translucent glass folders filled with vertical video thumbnails, soft reflections",
-    "ferramentas": "a tidy row of small precise glass tools (a hashtag symbol, a clock, a magnifying glass over a bar chart, a text cursor) floating on a dark workbench",
+    "explorar": "a glass magnifying glass hovering over a floating grid of vertical social video thumbnails with small heart and eye icons",
+    "ferramentas":"a tidy row of small precise glass tools (a hashtag symbol, a clock, a magnifying glass over a bar chart, a text cursor) floating on a dark workbench",
 }
 
 MODELO_GEMINI = "gemini-2.5-flash-image"

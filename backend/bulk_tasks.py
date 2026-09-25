@@ -322,13 +322,26 @@ def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> d
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict) -> dict:
-    """Importação para o Editor em Massa: só baixa o vídeo e deixa no Storage (a edição é no editor)."""
+def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict, options: dict | None = None) -> dict:
+    """Importação para o Editor em Massa: só baixa o vídeo e deixa no Storage (a edição é no editor).
+    Com options.salvar_biblioteca, o vídeo também vira um corte pronto na Biblioteca (dá para agendar como está)."""
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_import_"))
     try:
         video_path, _info = _download(item["url"], tmp_dir)
         url = _upload_clip_to_storage(f"{user_id}/imports/{batch_id}/{idx + 1}.mp4", _recompress_if_needed(video_path))
-        return {"status": "done", "file_url": url}
+        extra = {}
+        if (options or {}).get("salvar_biblioteca"):
+            titulo = (item.get("title") or f"Vídeo {idx + 1}").strip()[:200]
+            projeto = supabase.table("projects").insert({
+                "user_id": user_id, "title": titulo, "source_url": item.get("permalink") or item["url"][:500],
+                "source_type": "url", "platform": detect_platform(item.get("permalink") or item["url"]), "status": "done",
+            }).execute().data[0]
+            supabase.table("clips").insert({
+                "project_id": projeto["id"], "user_id": user_id, "title": titulo, "hook": titulo,
+                "start_time": 0, "end_time": 0, "score": 0, "storage_url": url, "status": "ready",
+            }).execute()
+            extra = {"project_id": projeto["id"]}
+        return {"status": "done", "file_url": url, **extra}
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -369,6 +382,7 @@ def run_batch(batch_id: str, req: dict):
             with _batches_lock:
                 _batches[batch_id]["items"] = [
                     {"url": v["url"], "title": v.get("title") or "", "thumbnail": v.get("thumbnail"),
+                     "permalink": v.get("permalink"),
                      "view_count": v.get("view_count"), "like_count": v.get("like_count"),
                      "status": "pending", "project_id": None, "error": None}
                     for v in videos if v.get("url")
@@ -385,7 +399,7 @@ def run_batch(batch_id: str, req: dict):
             if download_only:
                 _set_item(batch_id, idx, status="processing")
                 try:
-                    _set_item(batch_id, idx, **_download_only_item(user_id, batch_id, idx, item))
+                    _set_item(batch_id, idx, **_download_only_item(user_id, batch_id, idx, item, options))
                 except Exception as e:
                     print(f"[bulk] importação {idx} falhou: {e}")
                     _set_item(batch_id, idx, status="failed", error=str(e)[:300])
