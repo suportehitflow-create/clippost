@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2, type LucideIcon } from 'lucide-react'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 
 // Peças do visual padrão do Clipost (tirado do "Criar cortes"): cabeçalho com ícone, intro centralizada,
@@ -107,7 +107,7 @@ export function Aviso({ tipo = 'erro', children }: { tipo?: 'erro' | 'ok' | 'inf
   const cor = { erro: 'bg-rose-500/10 border-rose-500/20 text-rose-300', ok: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300', info: 'bg-white/[0.03] border-white/[0.08] text-zinc-400' }[tipo]
   return (
     <div className={`p-4 rounded-2xl border text-xs flex items-start gap-2.5 ${cor}`}>
-      {tipo === 'info' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-300" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+      {tipo === 'info' ? <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-300" /> : tipo === 'ok' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
       <div className="min-w-0">{children}</div>
     </div>
   )

@@ -366,11 +366,13 @@ class WatchRequest(BaseModel):
     canal: str  # YouTube: @handle, URL do canal ou ID UC... | Instagram/TikTok/Facebook: link do perfil
     clip_duration: str = "auto"
     auto_post: bool = False  # publicar sozinho os cortes de cada vídeo novo
+    modo: str | None = None  # biblioteca | aprovar | auto (substitui o auto_post)
 
 
 class WatchUpdateRequest(BaseModel):
     user_id: str
     auto_post: bool | None = None
+    modo: str | None = None
     is_active: bool | None = None
 
 
@@ -621,6 +623,19 @@ def _salvar_autopost(user_id: str, watch_id: str, valor: bool) -> None:
     save_settings(user_id, autopilot_autopost=mapa)
 
 
+_MODOS_AUTOPILOT = {"biblioteca", "aprovar", "auto"}
+
+
+def _salvar_modo(user_id: str, watch_id: str, modo: str) -> None:
+    from services.user_settings import get_settings, save_settings
+    s = get_settings(user_id)
+    modos = dict(s.get("autopilot_modo") or {})
+    modos[watch_id] = modo
+    auto = dict(s.get("autopilot_autopost") or {})
+    auto[watch_id] = modo == "auto"  # mantém o formato antigo em dia
+    save_settings(user_id, autopilot_modo=modos, autopilot_autopost=auto)
+
+
 @app.post("/api/autopilot/watches")
 async def criar_watch(req: WatchRequest):
     if req.clip_duration not in {"30", "60", "90", "120", "auto"}:
@@ -671,9 +686,10 @@ async def criar_watch(req: WatchRequest):
         "baseline_video_id": info["baseline_video_id"],
         "clip_duration": req.clip_duration,
     }).execute().data[0]
-    if req.auto_post:
-        await asyncio.to_thread(_salvar_autopost, req.user_id, row["id"], True)
-    row["auto_post"] = bool(req.auto_post)
+    modo = req.modo if req.modo in _MODOS_AUTOPILOT else ("auto" if req.auto_post else "biblioteca")
+    await asyncio.to_thread(_salvar_modo, req.user_id, row["id"], modo)
+    row["auto_post"] = modo == "auto"
+    row["modo"] = modo
     return {"watch": row, "ultimo_video": info["ultimo_video"]}
 
 
@@ -683,8 +699,13 @@ async def listar_watches(user_id: str):
         supabase.table("channel_watches").select("*")
         .eq("user_id", user_id).order("created_at", desc=True).execute()
     )
-    autopost = await asyncio.to_thread(_autopost_map, user_id)
-    watches = [{**w, "auto_post": bool(autopost.get(w["id"]))} for w in (resp.data or [])]
+    from services.user_settings import get_settings
+    from tasks import modo_autopilot
+    s = await asyncio.to_thread(get_settings, user_id)
+    watches = []
+    for w in resp.data or []:
+        modo = modo_autopilot(user_id, w["id"], s)
+        watches.append({**w, "modo": modo, "auto_post": modo == "auto"})
     return {"watches": watches}
 
 
@@ -696,9 +717,85 @@ async def atualizar_watch(watch_id: str, req: WatchUpdateRequest):
         raise HTTPException(status_code=404, detail="Monitoramento não encontrado.")
     if req.is_active is not None:
         supabase.table("channel_watches").update({"is_active": req.is_active}).eq("id", watch_id).execute()
-    if req.auto_post is not None:
-        await asyncio.to_thread(_salvar_autopost, req.user_id, watch_id, req.auto_post)
+    if req.modo in _MODOS_AUTOPILOT:
+        await asyncio.to_thread(_salvar_modo, req.user_id, watch_id, req.modo)
+    elif req.auto_post is not None:
+        await asyncio.to_thread(_salvar_modo, req.user_id, watch_id, "auto" if req.auto_post else "biblioteca")
     return {"ok": True}
+
+
+class AprovacaoRequest(BaseModel):
+    user_id: str
+    clip_ids: list[str]
+    acao: str  # aprovar | recusar
+    legenda: str | None = None
+
+
+def _dados_aprovacao(user_id: str) -> dict:
+    """Cortes do Autopilot dos monitoramentos em 'Eu aprovo antes': aguardando, aprovados e recusados."""
+    from services.user_settings import get_settings
+    from tasks import modo_autopilot
+    s = get_settings(user_id)
+    recusados = set(s.get("autopilot_recusados") or [])
+    watches = supabase.table("channel_watches").select("id, channel_name, channel_id").eq("user_id", user_id).execute().data or []
+    aprovar = {w["id"]: w.get("channel_name") or w["channel_id"] for w in watches if modo_autopilot(user_id, w["id"], s) == "aprovar"}
+    if not aprovar:
+        return {"pendentes": [], "historico": [], "monitoramentos_aprovar": 0}
+    origem = (
+        supabase.table("autopilot_processed").select("project_id, watch_id")
+        .eq("user_id", user_id).in_("watch_id", list(aprovar)).order("created_at", desc=True).limit(200).execute().data or []
+    )
+    canal_do_projeto = {o["project_id"]: aprovar.get(o["watch_id"], "") for o in origem if o.get("project_id")}
+    if not canal_do_projeto:
+        return {"pendentes": [], "historico": [], "monitoramentos_aprovar": len(aprovar)}
+    cortes = (
+        supabase.table("clips").select("id, title, hook, storage_url, score, created_at, project_id")
+        .in_("project_id", list(canal_do_projeto)).eq("status", "ready").order("created_at", desc=True).limit(300).execute().data or []
+    )
+    posts = {}
+    if cortes:
+        for p in supabase.table("scheduled_posts").select("clip_id, status, scheduled_at").in_("clip_id", [c["id"] for c in cortes]).execute().data or []:
+            posts.setdefault(p["clip_id"], p)
+    pendentes, historico = [], []
+    for c in cortes:
+        item = {**c, "canal": canal_do_projeto.get(c["project_id"], "")}
+        if c["id"] in posts:
+            historico.append({**item, "decisao": "aprovado", "post_status": posts[c["id"]]["status"], "agendado_para": posts[c["id"]]["scheduled_at"]})
+        elif c["id"] in recusados:
+            historico.append({**item, "decisao": "recusado"})
+        else:
+            pendentes.append(item)
+    pendentes.sort(key=lambda c: c.get("score") or 0, reverse=True)
+    return {"pendentes": pendentes, "historico": historico[:80], "monitoramentos_aprovar": len(aprovar)}
+
+
+@app.get("/api/autopilot/aprovacao/{user_id}")
+async def autopilot_aprovacao(user_id: str):
+    return await asyncio.to_thread(_dados_aprovacao, user_id)
+
+
+@app.post("/api/autopilot/aprovacao")
+async def autopilot_decidir(req: AprovacaoRequest):
+    """Aprovar = agenda (um a cada 3h, depois da fila atual). Recusar = some da lista (fica no histórico)."""
+    if req.acao not in ("aprovar", "recusar") or not req.clip_ids:
+        raise HTTPException(status_code=400, detail="Ação inválida.")
+    ids = list(dict.fromkeys(req.clip_ids))[:100]
+    cortes = supabase.table("clips").select("id, title, hook, score").in_("id", ids).eq("user_id", req.user_id).execute().data or []
+    if not cortes:
+        raise HTTPException(status_code=404, detail="Cortes não encontrados.")
+    if req.acao == "recusar":
+        from services.user_settings import get_settings, save_settings
+        s = await asyncio.to_thread(get_settings, req.user_id)
+        lista = [i for i in (s.get("autopilot_recusados") or []) if i not in ids] + [c["id"] for c in cortes]
+        await asyncio.to_thread(save_settings, req.user_id, autopilot_recusados=lista[-2000:])
+        return {"recusados": len(cortes)}
+    from tasks import agendar_cortes_autopilot
+    ordem = {i: k for k, i in enumerate(ids)}
+    cortes.sort(key=lambda c: ordem.get(c["id"], 0))
+    criados = await asyncio.to_thread(agendar_cortes_autopilot, req.user_id, cortes, (req.legenda or "").strip() or None)
+    if not criados:
+        raise HTTPException(status_code=400, detail="Conecte uma conta em Ajustes para agendar.")
+    return {"agendados": criados}
 
 
 class AutopilotSettingsRequest(BaseModel):

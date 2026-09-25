@@ -168,17 +168,36 @@ def _dispatch_pipeline(*args):
 AUTOPILOT_INTERVALO_POSTS_H = 3  # um corte publicado a cada 3h para não inundar o perfil
 
 
-def _agendar_autopilot(project_id: str, user_id: str) -> bool:
-    """Se o projeto veio do Autopilot e o monitoramento tem 'Postar automaticamente' ligado,
-    agenda os cortes prontos (melhor nota primeiro) nas contas conectadas. True se agendou."""
-    from datetime import timedelta
+def modo_autopilot(user_id: str, watch_id: str, settings: dict | None = None) -> str:
+    """'biblioteca' (só deixa pronto), 'aprovar' (espera o OK do usuário) ou 'auto' (agenda sozinho).
+    Monitoramentos antigos só tinham o liga/desliga de 'Postar automaticamente'."""
     from services.user_settings import get_settings
+    s = settings if settings is not None else get_settings(user_id)
+    modo = (s.get("autopilot_modo") or {}).get(watch_id)
+    if modo in ("biblioteca", "aprovar", "auto"):
+        return modo
+    return "auto" if (s.get("autopilot_autopost") or {}).get(watch_id) else "biblioteca"
 
+
+def _agendar_autopilot(project_id: str, user_id: str) -> bool:
+    """Se o projeto veio do Autopilot e o monitoramento está em 'Postar sozinho',
+    agenda os cortes prontos (melhor nota primeiro) nas contas conectadas. True se agendou."""
     origem = maybe_one(supabase.table("autopilot_processed").select("watch_id").eq("project_id", project_id))
     watch_id = (origem.data or {}).get("watch_id") if origem else None
-    if not watch_id or not (get_settings(user_id).get("autopilot_autopost") or {}).get(watch_id):
+    if not watch_id or modo_autopilot(user_id, watch_id) != "auto":
         return False
+    cortes = (
+        supabase.table("clips").select("id, title, hook, score")
+        .eq("project_id", project_id).eq("status", "ready").execute().data or []
+    )
+    cortes.sort(key=lambda c: c.get("score") or 0, reverse=True)
+    return agendar_cortes_autopilot(user_id, cortes) > 0
 
+
+def agendar_cortes_autopilot(user_id: str, cortes: list[dict], legenda: str | None = None) -> int:
+    """Agenda os cortes nas contas do usuário, um a cada AUTOPILOT_INTERVALO_POSTS_H, começando depois
+    do último post já agendado (não empilha em cima da fila). Devolve quantos posts criou."""
+    from datetime import timedelta
     # Conta ativa do perfil (profiles.active_social_account_id); sem ela, todas as conectadas.
     # (social_accounts não tem coluna is_active no banco de produção)
     contas = []
@@ -191,28 +210,38 @@ def _agendar_autopilot(project_id: str, user_id: str) -> bool:
     # scheduled_posts aceita youtube_shorts (não "youtube")
     contas = [{**c, "platform": "youtube_shorts" if c["platform"] == "youtube" else c["platform"]} for c in contas]
     if not contas:
-        print(f"[autopilot] postar automaticamente ligado, mas o usuário não tem conta conectada")
-        return False
-    cortes = (
-        supabase.table("clips").select("id, title, hook, score")
-        .eq("project_id", project_id).eq("status", "ready").execute().data or []
+        print(f"[autopilot] agendar pedido, mas o usuário não tem conta conectada")
+        return 0
+    agora = datetime.now(timezone.utc)
+    inicio = agora + timedelta(minutes=10)
+    ultimo = (
+        supabase.table("scheduled_posts").select("scheduled_at")
+        .eq("user_id", user_id).eq("status", "scheduled").gte("scheduled_at", agora.isoformat())
+        .order("scheduled_at", desc=True).limit(1).execute().data or []
     )
-    cortes.sort(key=lambda c: c.get("score") or 0, reverse=True)
-    inicio = datetime.now(timezone.utc)
+    if ultimo:
+        try:
+            inicio = max(inicio, datetime.fromisoformat(str(ultimo[0]["scheduled_at"]).replace("Z", "+00:00"))
+                         + timedelta(hours=AUTOPILOT_INTERVALO_POSTS_H))
+        except ValueError:
+            pass
+    linhas = []
     for i, c in enumerate(cortes):
         quando = (inicio + timedelta(hours=AUTOPILOT_INTERVALO_POSTS_H * i)).isoformat()
         for conta in contas:
-            supabase.table("scheduled_posts").insert({
+            linhas.append({
                 "user_id": user_id,
                 "clip_id": c["id"],
                 "platform": conta["platform"],
                 "social_account_id": conta["id"],
-                "caption": c.get("hook") or c.get("title") or "",
+                "caption": legenda or c.get("hook") or c.get("title") or "",
                 "scheduled_at": quando,
                 "status": "scheduled",
-            }).execute()
+            })
+    if linhas:
+        supabase.table("scheduled_posts").insert(linhas).execute()
     print(f"[autopilot] {len(cortes)} corte(s) agendados em {len(contas)} conta(s) (1 a cada {AUTOPILOT_INTERVALO_POSTS_H}h)")
-    return bool(cortes)
+    return len(linhas)
 
 
 @celery.task(name="check_channel_watches")
