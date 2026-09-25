@@ -1102,64 +1102,37 @@ export default function ProjectClient({
     triggerBulkFeedback("Todos os cortes foram baixados com sucesso!")
   }
 
-  // ESTÚDIO PADRÃO: com cortes prontos, o projeto abre no mesmo editor da Edição em Massa
-  // (todos os cortes num lote, com o seu template, textos, música, efeitos e exportação)
+    // ESTÚDIO PADRÃO: com cortes prontos (ou cortes sendo gerados), o projeto abre no estúdio
+  // Todos os cortes entram no estúdio: os prontos com vídeo e os pendentes com card animado com degradê!
   const cortesProntos = clips.filter(c => !!c.storage_url)
+  const isYouTubeProject = (project as any).platform === 'youtube' || (project.source_url && (project.source_url.includes('youtube') || project.source_url.includes('youtu.be')))
   const projetoEstudio = useMemo(
     () => ({
       id: project.id,
       titulo: project.title || 'Projeto',
-      clips: cortesProntos.map(c => ({ id: c.id, url: c.storage_url!, titulo: c.hook || c.title || '' })),
+      isYouTube: !!isYouTubeProject,
+      clips: clips.map(c => ({
+        id: c.id,
+        url: c.storage_url || '',
+        titulo: c.hook || c.title || '',
+        pronto: !!c.storage_url,
+        status: c.status || (c.storage_url ? 'completed' : 'processing'),
+      })),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project.id, project.title, cortesProntos.map(c => c.id + (c.storage_url ?? '')).join('|')],
+    [project.id, project.title, isYouTubeProject, clips.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')],
   )
-  if (status !== 'failed' && cortesProntos.length > 0) {
-    const processandoAinda = status === 'processing'
+  if (status !== 'failed' && (cortesProntos.length > 0 || (status === 'processing' && clips.length > 0))) {
     return (
       <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
         <EstudioEditor
           projeto={projetoEstudio}
-          titulo={project.title?.slice(0, 42) || 'Projeto'}
-          acoesExtras={
-            <>
-              <Link href="/dashboard" className="px-2.5 h-[34px] rounded-[10px] text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center gap-1.5" title="Voltar para a biblioteca">
-                <ArrowLeft className="w-3.5 h-3.5" /> Biblioteca
-              </Link>
-              {processandoAinda && (
-                <span className="px-2.5 h-[34px] rounded-[10px] text-[11px] text-zinc-300 bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Gerando cortes · {cortesProntos.length} prontos
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={handleDownloadAll}
-                disabled={downloadingAll}
-                className="px-3 h-[34px] rounded-[10px] text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
-                title="Baixar os cortes como foram gerados, sem editar"
-              >
-                <Download className="w-3.5 h-3.5" /> {downloadingAll ? 'Baixando…' : `Originais (${cortesProntos.length})`}
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleScheduleAllProject() }}
-                disabled={schedulingAllProject}
-                className="px-3 h-[34px] rounded-[10px] text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
-                title="Coloca todos os cortes na fila de agendamento"
-              >
-                <Calendar className="w-3.5 h-3.5" /> {schedulingAllProject ? 'Agendando…' : scheduleAllMsg || 'Agendar todos'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteThisProject}
-                disabled={isDeletingProject}
-                className="w-[34px] h-[34px] rounded-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center disabled:opacity-50"
-                title="Excluir projeto"
-              >
-                {isDeletingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              </button>
-            </>
-          }
+          titulo={project.title || 'Projeto'}
+          onAgendar={async () => {
+            await handleScheduleAllProject()
+            router.push('/schedule')
+          }}
+          acoesExtras={null}
         />
       </div>
     )

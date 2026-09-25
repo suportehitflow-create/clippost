@@ -130,11 +130,11 @@ export function calcularLayout(global: ConfigGlobal, v: ConfigVideo, template: C
   return { canvas, saida, area, preenchimento, origem, destino, espelhar };
 }
 
-/** Quadro de vídeo do template, com o "Espaço no topo" aplicado (a base do quadro fica fixa) */
+/** Quadro de vídeo do template, com o "Espaço no topo" aplicado: desloca o vídeo verticalmente (para cima ou para baixo) sem diminuir ou encolher a altura/escala */
 function quadroTemplate(a: Rect, espacoTopo: number, canvas: Canvas): Rect {
-  const topo = Math.max(0, Math.min(a.y + a.h - 32, a.y + (espacoTopo || 0)));
-  const r = { x: a.x, y: topo, w: a.w, h: a.y + a.h - topo };
-  return intersecao(r, { x: 0, y: 0, w: canvas.w, h: canvas.h });
+  const topo = Math.round(a.y + (espacoTopo || 0));
+  const r = { x: a.x, y: topo, w: a.w, h: a.h };
+  return r;
 }
 
 /** Velocidade final do vídeo (efeitos). O Anti-Dup multiplica por um fator extra no servidor. */

@@ -267,15 +267,18 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
         duration_desc = "Cortes longos de 60 a 120 segundos (máximo 2 minutos)."
         min_duration, max_duration = 60, 120
     else:
-        # Modo Automático padrão solicitado pelo usuário:
-        # Limite máximo de 90 segundos (1 minuto e meio) para reter atenção.
+        # Modo Automático Viral com rica variedade narrativa solicitada pelo usuário:
+        # O objetivo é respeitar a história coesa: punchlines curtas (25-45s), histórias médias (50-80s)
+        # e debates/argumentos profundos (85-120s, até 2 minutos). NUNCA concentre todos os cortes em ~43s!
         duration_desc = (
-            "Modo Automático Viral: escolha a duração ideal para cada momento (mínimo 35s, MÁXIMO RIGOROSO de 90s / 1 minuto e meio). "
-            "Para podcasts e vídeos longos, NÃO limite os clipes a apenas 30 segundos! "
-            "Explore durações ricas entre 45s e 90s para cobrir histórias completas, debates intensos, piadas com conclusão e argumentos de peso. "
-            "NUNCA crie clipes com mais de 90 segundos."
+            "Modo Automático com VARIEDADE NARRATIVA DINÂMICA: "
+            "Tenha uma distribuição equilibrada e diversificada entre os cortes: "
+            "1. Cortes rápidos (25s a 45s): punchlines afiadas, ganchos e momentos de choque; "
+            "2. Cortes médios (50s a 80s): histórias curtas, ensinamentos e explicações práticas; "
+            "3. Cortes longos e profundos (85s a 125s - até 2 minutos): histórias completas, debates intensos e raciocínios com início, meio e conclusão forte. "
+            "CRUCIAL: NÃO gere todos os cortes com a mesma duração (~40s). Varie intencionalmente respeitando a narrativa natural!"
         )
-        min_duration, max_duration = 35, 90
+        min_duration, max_duration = 25, 125
 
     chapters_ctx = ""
     if chapters:
@@ -325,7 +328,7 @@ Este vídeo possui {int(video_end // 60)} minutos de duração. Por isso, você 
    - O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
 
 DURAÇÃO: {duration_desc}
-(Mínimo: {min_duration}s | Máximo RIGOROSO: {max_duration}s [máx 1min e meio no modo automático] | Duração do vídeo: {int(video_end)}s)
+(Mínimo: {min_duration}s | Máximo flexível: {max_duration}s [até 2 minutos para histórias ricas] | Duração do vídeo: {int(video_end)}s)
 {chapters_ctx}
 TRANSCRIÇÃO COM TIMESTAMPS:
 {timeline}

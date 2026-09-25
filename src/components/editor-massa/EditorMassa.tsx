@@ -70,10 +70,22 @@ const carregarFonte = (f: string) => document.fonts?.load(`bold 40px ${f.include
 export interface ProjetoEstudio {
   id: string;
   titulo: string;
-  clips: { id: string; url: string; titulo: string }[];
+  isYouTube?: boolean;
+  clips: { id: string; url: string; titulo: string; pronto?: boolean; status?: string }[];
 }
 
-export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?: ProjetoEstudio; titulo?: string; acoesExtras?: ReactNode } = {}) {
+export default function EditorMassa({
+  projeto,
+  titulo,
+  acoesExtras,
+  onAgendar,
+}: {
+  projeto?: ProjetoEstudio;
+  titulo?: string;
+  acoesExtras?: ReactNode;
+  onAgendar?: () => void;
+} = {}) {
+  const [emMassa, setEmMassa] = useState(true);
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
   const [abas, setAbas] = useState<Aba[]>(() => [novaAba(1)]);
   const [abaAtivaId, setAbaAtivaId] = useState('');
@@ -248,7 +260,7 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
         el = await abrirVideo(v.url);
         const meta = await lerMeta(el);
         if (!meta.largura) throw new Error('sem vídeo');
-        const quadro = await capturarQuadro(el, Math.min(1, meta.duracao * 0.3), 720);
+        const quadro = await capturarQuadro(el, Math.min(1.0, Math.max(0.5, meta.duracao * 0.1)), 720);
         atualizarVideo(v.id, { ...meta, quadro, carregado: true, tocavel: true });
         // vídeo que voltou do armazenamento já tem a área detectada (e talvez ajustada à mão)
         if (!(v.restaurado && v.origemDeteccao)) await detectar(el, { ...v, ...meta });
@@ -339,23 +351,66 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
       const id = 'clip-' + c.id;
       if (existentes.has(id) || clipsEmImportacao.current.has(id)) return;
       clipsEmImportacao.current.add(id);
-      fetch(c.url)
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.blob();
-        })
-        .then((blob) => {
-          const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
-          adicionarVideos([new File([blob], nome, { type: blob.type || 'video/mp4' })], {
-            abaId,
-            silencioso: true,
-            extras: [{ id, texto: c.titulo, marcaEmbutida: true }],
+
+      if (c.url) {
+        fetch(c.url)
+          .then((r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.blob();
+          })
+          .then((blob) => {
+            const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
+            adicionarVideos([new File([blob], nome, { type: blob.type || 'video/mp4' })], {
+              abaId,
+              silencioso: true,
+              extras: [{ id, texto: c.titulo, marcaEmbutida: true }],
+            });
+          })
+          .catch((e) => {
+            clipsEmImportacao.current.delete(id);
+            escreverLog(`[ERRO] Não foi possível abrir o corte "${c.titulo}": ${e?.message ?? e}`);
           });
-        })
-        .catch((e) => {
-          clipsEmImportacao.current.delete(id);
-          escreverLog(`[ERRO] Não foi possível abrir o corte "${c.titulo}": ${e?.message ?? e}`);
-        });
+      } else {
+        // Corte pendente identificado pela IA (exibido como placeholder no grid)
+        const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}`;
+        const vPendente: VideoCliente = {
+          id,
+          nome,
+          texto: c.titulo,
+          arquivo: new File([], nome),
+          url: '',
+          upload: 1,
+          uploadErro: null,
+          quadro: null,
+          carregado: false,
+          tocavel: false,
+          detectando: false,
+          statusJob: 'fila',
+          progressoJob: 0,
+          saidaJob: null,
+          largura: 1080,
+          altura: 1920,
+          duracao: 45,
+          areaDetectada: null,
+          recorte: { topo: 0, base: 0, esq: 0, dir: 0 },
+          vcrop: { topo: 0, base: 0, esq: 0, dir: 0 },
+          posicao: { x: 0, y: 0, escala: 100 },
+          espelhar: false,
+          semBordas: null,
+          mudo: false,
+          marcasExtras: [],
+          corte: null,
+          musica: null,
+          marcaEmbutida: true,
+        };
+        setAbas((as) =>
+          as.map((a) =>
+            a.id === abaId && !a.videos.some((x) => x.id === id)
+              ? { ...a, videos: [...a.videos, vPendente] }
+              : a,
+          ),
+        );
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projeto?.id, projeto?.clips.length, restaurado]);
@@ -773,24 +828,23 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
 
       {/* ================= barra superior ================= */}
       <header className={s.barra}>
-        <div className={s.logo}>
+        <div className={s.logo} title={titulo}>
           <span className={s.logoMarca}>
             <Icone nome="sparkles" tamanho={15} />
           </span>
-          {titulo ?? 'Estúdio'}
+          <span style={{ maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+            {titulo ?? 'Estúdio'}
+          </span>
         </div>
         
 
         <div className={s.barraDireita}>
           {acoesExtras}
-          <button type="button" className={`${s.btn} ${s.btnFantasma}`} onClick={() => inputVideos.current?.click()} title="Fazer upload de vídeos do seu computador">
-            <Icone nome="upload" tamanho={14} /> Fazer upload de vídeos
-          </button>
           {abaAtiva.processando ? (
             <div className={s.processando}>
               <div className={s.processandoBarra} style={{ width: `${progressoLote * 100}%` }} />
               <span className={s.processandoTexto}>
-                {abaAtiva.pausado ? 'Pausado' : abaAtiva.jobId ? 'Processando' : 'Preparando'} · {feitos}/{total}
+                {abaAtiva.pausado ? 'Pausado' : 'Processando'} · {feitos}/{total}
               </span>
               <button type="button" className={`${s.btn} ${s.btnFantasma} ${s.btnPequeno} ${s.btnIcone}`} onClick={pausar} title={abaAtiva.pausado ? 'Continuar' : 'Pausar'} disabled={!abaAtiva.jobId}>
                 <Icone nome={abaAtiva.pausado ? 'play' : 'pausa'} tamanho={14} />
@@ -800,9 +854,28 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
               </button>
             </div>
           ) : (
-            <button type="button" className={`${s.btn} ${s.btnPrimario}`} onClick={processar} disabled={!total} style={{ minWidth: 190 }}>
-              <Icone nome="play" tamanho={14} /> {total ? `Processar ${total} vídeo${total > 1 ? 's' : ''}` : 'Processar'}
-            </button>
+            <>
+              {projeto && onAgendar && (
+                <button
+                  type="button"
+                  className={`${s.btn} ${s.btnPrimario}`}
+                  onClick={onAgendar}
+                  style={{ minWidth: 200 }}
+                  title="Agendar todos os cortes nas redes sociais"
+                >
+                  <Icone nome="calendario" tamanho={14} /> Seguir para agendamento
+                </button>
+              )}
+              <button
+                type="button"
+                className={`${s.btn} ${projeto && onAgendar ? s.btnFantasma : s.btnPrimario}`}
+                onClick={processar}
+                disabled={!total}
+                style={{ minWidth: 150 }}
+              >
+                <Icone nome="play" tamanho={14} /> {total ? `Processar ${total} vídeo${total > 1 ? 's' : ''}` : 'Processar'}
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -813,9 +886,10 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
           global={global}
           mudarGlobal={setGlobal}
           template={template}
+          tplClipost={tplClipost}
+          mudarTemplate={mudarTemplate}
           perfilTemplate={String(tplClipost?.config?.brandHandle || tplClipost?.config?.brandName || tplClipost?.username || '')}
           carregandoTemplate={carregandoTpl}
-          editarTemplate={() => setEditarTplAberto(true)}
           musicas={musicas}
           importarMusicas={() => inputMusicas.current?.click()}
           removerMusica={(id) => {
@@ -830,6 +904,12 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
             avisar(`Textos aplicados em ${Math.min(linhas.length, total)} vídeos`);
           }}
           redetectarTodos={() => redetectar(abaAtiva.videos)}
+          isYouTube={projeto?.isYouTube}
+          emMassa={emMassa}
+          setEmMassa={setEmMassa}
+          videoAtivo={ativo}
+          atualizarAtivo={(fn) => ativo && atualizarVideo(ativo.id, (v) => fn(v))}
+          atualizarTodos={atualizarSelecionados}
         />
 
         <main className={s.area}>

@@ -49,15 +49,34 @@ function Selo({ origem }: { origem: Origem }) {
   )
 }
 
-/** Miniatura: primeiro quadro do primeiro corte pronto */
-function Miniatura({ url, processando }: { url: string | null; processando?: boolean }) {
+
+function extrairCapaVideo(sourceUrl?: string): string | null {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([a-zA-Z0-9_-]{11})/);
+  if (match) {
+    return `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg`;
+  }
+  return null;
+}
+
+/** Capa do vídeo original extraído (16:9), padrão biblioteca de mídia */
+function CapaVideo({ capaUrl, videoUrl, processando }: { capaUrl: string | null; videoUrl: string | null; processando?: boolean }) {
+  const [imgErro, setImgErro] = useState(false);
   return (
-    <div className="relative aspect-[9/16] w-full rounded-xl overflow-hidden bg-gradient-to-br from-[#15151c] to-[#0c0c10] border border-white/[0.06]">
-      {url ? (
-        <video src={`${url}#t=1`} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+    <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#15151c] to-[#0c0c10] border border-white/[0.08] shadow-md group-hover:border-indigo-500/40 transition-all">
+      {capaUrl && !imgErro ? (
+        <img
+          src={capaUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setImgErro(true)}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : videoUrl ? (
+        <video src={`${videoUrl}#t=1`} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
-          {processando ? <Loader2 className="w-5 h-5 animate-spin text-indigo-400" /> : <Film className="w-6 h-6" />}
+          {processando ? <Loader2 className="w-6 h-6 animate-spin text-indigo-400" /> : <Film className="w-7 h-7 text-zinc-600" />}
         </div>
       )}
     </div>
@@ -233,45 +252,45 @@ export default function Biblioteca() {
         {projetosVisiveis.length > 0 && (
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Projetos · cortes com IA</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {projetosVisiveis.map(p => {
                 const cs = cortesPorProjeto.get(p.id) ?? []
                 const prontos = cs.filter(c => c.storage_url)
                 const processando = p.status === 'processing' || p.status === 'pending'
                 const falhou = p.status === 'failed'
                 return (
-                  <article key={p.id} className="group relative flex flex-col gap-2">
+                  <article key={p.id} className="group relative flex flex-col gap-2.5 bg-white/[0.02] hover:bg-white/[0.04] p-3 rounded-2xl border border-white/[0.06] hover:border-white/[0.12] transition-all">
                     <Link href={`/project/${p.id}`} className="block relative" title="Abrir no estúdio">
-                      <Miniatura url={prontos[0]?.storage_url ?? null} processando={processando} />
-                      <span className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity px-3 py-1.5 rounded-lg bg-white text-zinc-900 text-[11px] font-semibold flex items-center gap-1">
-                          <Play className="w-3 h-3 fill-current" /> Abrir no estúdio
+                      <CapaVideo capaUrl={extrairCapaVideo(p.source_url)} videoUrl={prontos[0]?.storage_url ?? null} processando={processando} />
+                      <span className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                          <Play className="w-3.5 h-3.5 fill-current" /> Abrir no estúdio
                         </span>
                       </span>
-                      <span className="absolute top-2 left-2">
+                      <span className="absolute top-2.5 left-2.5">
                         <Selo origem={origemProjeto(p.id)} />
                       </span>
-                      <span className={`absolute bottom-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md ${
-                        falhou ? 'bg-red-500/80 text-white' : processando ? 'bg-black/70 text-indigo-200' : 'bg-black/70 text-white'
+                      <span className={`absolute bottom-2.5 left-2.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg backdrop-blur-md border border-white/10 shadow-sm ${
+                        falhou ? 'bg-red-500/80 text-white' : processando ? 'bg-black/75 text-indigo-300' : 'bg-black/75 text-white'
                       }`}>
                         {falhou ? (
-                          <span className="inline-flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Falhou</span>
+                          <span className="inline-flex items-center gap-1.5"><AlertCircle className="w-3 h-3 text-red-300" /> Falhou</span>
                         ) : processando ? (
-                          <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Gerando{prontos.length ? ` · ${prontos.length}` : ''}</span>
+                          <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin text-indigo-400" /> Gerando{prontos.length ? ` · ${prontos.length}` : ''}</span>
                         ) : (
-                          `${prontos.length} corte${prontos.length === 1 ? '' : 's'}`
+                          `${cs.length || prontos.length} corte${(cs.length || prontos.length) === 1 ? '' : 's'}`
                         )}
                       </span>
                     </Link>
-                    <div className="min-w-0 px-0.5">
+                    <div className="min-w-0 px-1">
                       <h3 className="text-xs font-semibold text-white leading-snug line-clamp-2" title={p.title}>{p.title}</h3>
-                      <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.04]">
                         <span className="text-[10px] text-zinc-500 tabular-nums">{data(p.created_at)}</span>
                         <button
                           type="button"
                           onClick={() => apagarProjeto(p.id)}
                           disabled={apagando === p.id}
-                          className="p-1 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                          className="p-1 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
                           title="Excluir projeto"
                         >
                           {apagando === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}

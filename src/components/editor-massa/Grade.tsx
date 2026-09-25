@@ -4,7 +4,6 @@ import { memo, useDeferredValue, useEffect, useRef, useState, type MouseEvent } 
 import { desenharComposicao } from '@/lib/editor-massa/client/render';
 import { calcularLayout } from '@/lib/editor-massa/layout';
 import type { ConfigGlobal, ConfigVideo } from '@/lib/editor-massa/types';
-import { Segmentado } from './campos';
 import type { TemplateCliente, VideoCliente } from './estado';
 import { Icone } from './icones';
 import s from './editor-massa.module.css';
@@ -26,14 +25,10 @@ export interface PropsGrade {
   escolherTemplate: () => void;
 }
 
-const TAMANHOS = { P: 130, M: 175, G: 240 } as const;
-
 const ehVideo = (f: File) => f.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(f.name);
 
 export default function Grade(p: PropsGrade) {
-  const [tamanho, setTamanho] = useState<keyof typeof TAMANHOS>('M');
   const [arrastando, setArrastando] = useState(false);
-  // miniaturas redesenham "depois" — arrastar um slider não trava a tela com muitos vídeos
   const global = useDeferredValue(p.global);
   const template = useDeferredValue(p.template?.imagem ?? null);
 
@@ -60,29 +55,13 @@ export default function Grade(p: PropsGrade) {
       <div className={`${s.vazio} ${arrastando ? s.arrastando : ''}`} {...eventosSoltar}>
         <div className={s.vazioCaixa}>
           <div className={s.vazioIcone}>
-            <Icone nome="upload" tamanho={24} />
+            <Icone nome="sparkles" tamanho={24} />
           </div>
-          <div className={s.vazioTitulo}>Arraste seus vídeos para cá</div>
-          <div className={s.dica}>MP4, MOV, AVI, MKV ou WEBM · quantos quiser</div>
+          <div className={s.vazioTitulo}>Nenhum corte carregado</div>
+          <div className={s.dica}>Aguardando finalização da IA ou adicione vídeos manualmente</div>
           <button type="button" className={`${s.btn} ${s.btnPrimario}`} onClick={p.adicionarVideos}>
             <Icone nome="mais" /> Adicionar vídeos
           </button>
-          <div className={s.passos}>
-            <span className={s.passo}>
-              <span className={s.passoNum}>1</span> Adicione os vídeos
-            </span>
-            <span className={s.passo}>
-              <span className={`${s.passoNum} ${p.template || p.global.moldura.ativo ? s.passoFeito : ''}`}>
-                {p.template || p.global.moldura.ativo ? <Icone nome="check" tamanho={12} /> : 2}
-              </span>
-              <a href="#" onClick={(e) => (e.preventDefault(), p.escolherTemplate())} style={{ color: 'inherit' }}>
-                {p.template ? 'Seu template (editar)' : 'Carregando seu template…'}
-              </a>
-            </span>
-            <span className={s.passo}>
-              <span className={s.passoNum}>3</span> Processe todos de uma vez
-            </span>
-          </div>
         </div>
       </div>
     );
@@ -91,11 +70,9 @@ export default function Grade(p: PropsGrade) {
   return (
     <>
       <div className={s.areaCabeca}>
-        <span className={s.areaTitulo}>{p.videos.length} vídeos</span>
-        {nSel > 1 ? (
+        <span className={s.areaTitulo}>{p.videos.length} corte{p.videos.length === 1 ? '' : 's'}</span>
+        {nSel > 1 && (
           <span className={`${s.chip} ${s.chipAcento}`}>{nSel} selecionados · edições valem para todos</span>
-        ) : (
-          <span className={s.areaSub}>Ctrl/Shift + clique para selecionar vários</span>
         )}
         <span className={s.espaco} />
         {nSel > 0 ? (
@@ -107,24 +84,10 @@ export default function Grade(p: PropsGrade) {
             Selecionar todos
           </button>
         )}
-        <div style={{ width: 96 }}>
-          <Segmentado
-            valor={tamanho}
-            mudar={setTamanho}
-            opcoes={[
-              { valor: 'P', rotulo: 'P', titulo: 'Miniaturas pequenas' },
-              { valor: 'M', rotulo: 'M', titulo: 'Miniaturas médias' },
-              { valor: 'G', rotulo: 'G', titulo: 'Miniaturas grandes' },
-            ]}
-          />
-        </div>
-        <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={p.adicionarVideos}>
-          <Icone nome="mais" tamanho={14} /> Adicionar
-        </button>
       </div>
       <div
         className={`${s.grade} ${arrastando ? s.arrastando : ''}`}
-        style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${TAMANHOS[tamanho]}px, 1fr))` }}
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
         {...eventosSoltar}
       >
         {p.videos.map((v) => (
@@ -160,10 +123,14 @@ interface PropsCard {
 
 const Card = memo(function Card({ v, selecionado, ativo, global, template, clicar, alternarSelecao, acao, remover }: PropsCard) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [videoPronto, setVideoPronto] = useState(false);
+
+  // Se o corte ainda está sendo gerado pela IA no backend
+  const ehPendente = !v.carregado && (!v.url || v.statusJob === 'fila' || v.statusJob === 'detectando');
 
   useEffect(() => {
     const c = ref.current;
-    if (!c) return;
+    if (!c || ehPendente) return;
     const tpl = template && !global.moldura.ativo ? { w: template.naturalWidth, h: template.naturalHeight } : null;
     const L = calcularLayout(global, v, tpl);
     const w = 300;
@@ -174,9 +141,34 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
     }
     const quadro = v.quadro ? { imagem: v.quadro, largura: v.quadro.width, altura: v.quadro.height } : null;
     desenharComposicao(c.getContext('2d')!, global, v, template, quadro, { w, h });
-  }, [v, global, template]);
+  }, [v, global, template, ehPendente]);
 
-  const sb = v.semBordas ?? global.semBordas;
+  if (ehPendente) {
+    return (
+      <div className={`${s.card} ${s.cardPendente}`}>
+        <div className={s.thumbPendente}>
+          <div className={s.pendenteBordaGirando} />
+          <div className={s.pendenteConteudo}>
+            <div className={s.pendenteSpinner}>
+              <Icone nome="refresh" tamanho={18} className={s.girando} />
+            </div>
+            <span className={s.pendenteStatus}>Gerando corte com IA…</span>
+            <div className={s.pendenteOnda} />
+          </div>
+        </div>
+        <input
+          className={s.cardTexto}
+          placeholder="Título do corte"
+          value={v.texto}
+          onChange={(e) => {
+            const t = e.target.value;
+            acao(v.id, () => ({ texto: t }), true);
+          }}
+        />
+      </div>
+    );
+  }
+
   const espelhado = global.efeitos.espelhar !== v.espelhar;
   const recortado = Object.values(v.recorte).some(Boolean) || Object.values(v.vcrop).some(Boolean);
 
@@ -185,9 +177,7 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
   else if (v.statusJob === 'ok') estado = { texto: '✓ Pronto', classe: s.estadoOk };
   else if (v.statusJob === 'erro') estado = { texto: 'Erro', classe: s.estadoErro };
   else if (v.statusJob === 'processando') estado = { texto: `${Math.round(v.progressoJob * 100)}%`, classe: s.estadoAviso };
-  else if (v.statusJob === 'detectando' || v.statusJob === 'fila') estado = { texto: 'Na fila', classe: s.estadoAviso };
   else if (!v.carregado) estado = { texto: 'Carregando…' };
-  else if (v.detectando) estado = { texto: 'Detectando…' };
   else if (v.upload < 1) estado = { texto: `Enviando ${Math.round(v.upload * 100)}%` };
 
   const barra = v.statusJob === 'processando' ? v.progressoJob : v.upload < 1 && !v.uploadErro ? v.upload : null;
@@ -196,6 +186,17 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
     <div className={`${s.card} ${ativo ? s.cardAtivo : ''} ${selecionado ? s.cardSel : ''}`}>
       <div className={s.thumb} onClick={(e) => clicar(v.id, e)}>
         <canvas ref={ref} />
+        {/* Fallback de vídeo caso o quadro do canvas ainda não esteja pronto */}
+        {!v.quadro && v.url && (
+          <video
+            src={`${v.url}#t=1`}
+            preload="metadata"
+            muted
+            playsInline
+            onLoadedData={() => setVideoPronto(true)}
+            style={{ display: videoPronto ? 'block' : 'none', position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
         <button
           type="button"
           className={s.cardCheck}
@@ -207,25 +208,6 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
         >
           {selecionado && <Icone nome="check" tamanho={12} strokeWidth={3} />}
         </button>
-        <div className={s.cardAcoes} onClick={(e) => e.stopPropagation()}>
-          <button type="button" className={`${s.acao} ${v.espelhar ? s.acaoLigada : ''}`} title="Espelhar" onClick={() => acao(v.id, (x) => ({ espelhar: !x.espelhar }))}>
-            <Icone nome="espelhar" tamanho={14} />
-          </button>
-          <button
-            type="button"
-            className={`${s.acao} ${v.semBordas != null ? s.acaoLigada : ''}`}
-            title={sb ? 'Sem bordas: ligado' : 'Sem bordas: desligado'}
-            onClick={() => acao(v.id, (x) => ({ semBordas: !(x.semBordas ?? global.semBordas) }))}
-          >
-            <Icone nome="expandir" tamanho={14} />
-          </button>
-          <button type="button" className={`${s.acao} ${v.mudo ? s.acaoLigada : ''}`} title={v.mudo ? 'Sem áudio' : 'Tirar áudio'} onClick={() => acao(v.id, (x) => ({ mudo: !x.mudo }))}>
-            <Icone nome={v.mudo ? 'somOff' : 'som'} tamanho={14} />
-          </button>
-          <button type="button" className={`${s.acao} ${s.acaoPerigo}`} title="Remover" onClick={() => remover(v.id)}>
-            <Icone nome="lixo" tamanho={14} />
-          </button>
-        </div>
         {estado && <span className={`${s.estado} ${estado.classe ?? ''}`}>{estado.texto}</span>}
         <div className={s.indicadores}>
           {espelhado && (
@@ -255,12 +237,9 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
           </div>
         )}
       </div>
-      <div className={s.cardNome} title={v.nome}>
-        {v.nome}
-      </div>
       <input
         className={s.cardTexto}
-        placeholder="Texto deste vídeo"
+        placeholder="Título do corte"
         value={v.texto}
         onChange={(e) => {
           const t = e.target.value;
