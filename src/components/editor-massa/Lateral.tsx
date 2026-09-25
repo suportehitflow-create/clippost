@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from 'react';
 import type { ConfigGlobal, Qualidade } from '@/lib/editor-massa/types';
+import { PRESETS_LEGENDA } from '@/lib/editor-massa/defaults';
 import { Campo, Opcao, Segmentado, Slider, Toggle } from './campos';
 import type { MusicaCliente, TemplateCliente } from './estado';
 import { Icone, type NomeIcone } from './icones';
@@ -23,7 +24,7 @@ export interface PropsLateral {
   redetectarTodos: () => void;
 }
 
-type IdSecao = 'template' | 'limpeza' | 'texto' | 'musica' | 'efeitos' | 'exportar';
+type IdSecao = 'template' | 'limpeza' | 'texto' | 'legendas' | 'musica' | 'efeitos' | 'exportar';
 
 function Secao(p: {
   id: IdSecao;
@@ -82,6 +83,7 @@ export default function Lateral(p: PropsLateral) {
   const canvasH = g.moldura.ativo ? g.moldura.altura : (p.template?.imagem.naturalHeight ?? 1920);
   const musicaSel = p.musicas.find((m) => m.id === g.musica.musicaId);
   const volOriginal = g.musica.mutarOriginal ? 0 : g.musica.volumeVideo;
+  const leg = g.legendas ?? { ativo: false, preset: 'hormozi_yellow', posicaoY: 75 };
   const velocidade = g.efeitos.velocidadePersonalizada ? 'custom' : g.efeitos.velocidade105 ? '105' : '1';
   const efeitosAtivos = [
     g.efeitos.removerSilencio && 'Sem silêncios',
@@ -247,6 +249,33 @@ export default function Lateral(p: PropsLateral) {
             <Icone nome="reset" tamanho={13} /> Voltar ao tamanho e posição do template
           </button>
         )}
+      </Secao>
+
+      {/* ---------------- LEGENDAS ---------------- */}
+      <Secao
+        {...comum}
+        id="legendas"
+        icone="texto"
+        titulo="Legendas automáticas"
+        resumo={leg.ativo ? (PRESETS_LEGENDA.find((x) => x.id === leg.preset)?.nome ?? leg.preset) : 'Desligadas'}
+        ligado={leg.ativo}
+        mudarLigado={ligar('legendas', () => mudar('legendas', { ...leg, ativo: !leg.ativo }))}
+        aberta={abertas.has('legendas')}
+      >
+        <span className={s.dica}>
+          A fala de cada vídeo é transcrita e vira legenda animada, já sincronizada com cortes, silêncios removidos e velocidade.
+          Cortes do Criar Cortes já vêm legendados.
+        </span>
+        <Campo rotulo="Estilo">
+          <select id="legenda-preset" className={s.select} value={leg.preset} onChange={(e) => mudar('legendas', { ...leg, preset: e.target.value })}>
+            {PRESETS_LEGENDA.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.nome}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <Slider rotulo="Altura na tela" min={20} max={92} valor={leg.posicaoY} formatar={(v) => `${v}%`} padrao={75} mudar={(v) => mudar('legendas', { ...leg, posicaoY: v })} />
       </Secao>
 
       {/* ---------------- MÚSICA ---------------- */}

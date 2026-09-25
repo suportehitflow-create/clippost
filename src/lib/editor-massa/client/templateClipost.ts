@@ -152,6 +152,13 @@ export function estiloDoTemplate(t: TemplateClipost, atual: EstiloTexto, manterA
   };
 }
 
+/** Preset e altura das legendas definidos no editor de Templates */
+export function legendaDoTemplate(t: TemplateClipost): { preset: string; posicaoY: number } {
+  const c = cfg(t);
+  const y = Number(c.subtitlePos?.y ?? 75);
+  return { preset: String(c.subtitle_preset || 'hormozi_yellow'), posicaoY: Math.max(20, Math.min(92, Number.isFinite(y) ? y : 75)) };
+}
+
 export function marcaDoTemplate(t: TemplateClipost): MarcaTemplate | null {
   const c = cfg(t);
   if (c.showWatermark === false) return null;

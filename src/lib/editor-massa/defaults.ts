@@ -47,6 +47,23 @@ export const FORMATOS_MOLDURA = [
 
 export const MAX_MARCAS = 3;
 
+/** Presets de legenda (mesmos ids do backend: services/subtitle_generator.py) — cores só para o preview */
+export const PRESETS_LEGENDA: { id: string; nome: string; texto: string; caixa?: string; destaque?: string; umaPalavra?: boolean }[] = [
+  { id: 'hormozi_yellow', nome: 'Hormozi Amarelo', texto: '#000000', caixa: '#facc15' },
+  { id: 'hormozi_orange', nome: 'Hormozi Laranja', texto: '#ffffff', caixa: '#ea580c' },
+  { id: 'clean_white', nome: 'Caixa Branca', texto: '#09090b', caixa: '#ffffff' },
+  { id: 'dark_box', nome: 'Caixa Escura', texto: '#f97316', caixa: '#18181b' },
+  { id: 'karaoke_amarelo', nome: 'Karaokê Amarelo', texto: '#ffffff', destaque: '#facc15' },
+  { id: 'karaoke_roxo', nome: 'Karaokê Roxo', texto: '#ffffff', destaque: '#a855f7' },
+  { id: 'palavra_unica', nome: 'Palavra Única', texto: '#facc15', umaPalavra: true },
+  { id: 'revelacao', nome: 'Revelação', texto: '#ffffff' },
+  { id: 'pop_branco', nome: 'Pop Branco', texto: '#ffffff' },
+  { id: 'caixa_pop', nome: 'Caixa Pop', texto: '#000000', caixa: '#facc15' },
+  { id: 'neon_cyan', nome: 'Neon Ciano', texto: '#22d3ee' },
+  { id: 'neon_magenta', nome: 'Neon Rosa', texto: '#f472b6' },
+  { id: 'fade_suave', nome: 'Suave', texto: '#f4f4f5' },
+];
+
 export function marcaPadrao(): MarcaDagua {
   return {
     texto: '',
@@ -113,6 +130,7 @@ export function configGlobalPadrao(): ConfigGlobal {
     cantos: 0,
     marcaTemplate: null,
     textoAjustado: false,
+    legendas: { ativo: false, preset: 'hormozi_yellow', posicaoY: 75 },
   };
 }
 
@@ -129,6 +147,7 @@ export function completarConfig(salva: Partial<ConfigGlobal> | null | undefined)
     marca: { ...p.marca, ...(salva.marca ?? {}) },
     moldura: { ...p.moldura, ...(salva.moldura ?? {}) },
     deteccao: { ...p.deteccao, ...(salva.deteccao ?? {}) },
+    legendas: { ...p.legendas!, ...(salva.legendas ?? {}) },
   };
 }
 

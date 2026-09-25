@@ -115,6 +115,8 @@ export interface ConfigGlobal {
   marcaTemplate: MarcaTemplate | null;
   /** O usuário mexeu no tamanho/posição do texto: o template não sobrescreve mais */
   textoAjustado: boolean;
+  /** Legendas automáticas (transcrição no backend, queimadas no FFmpeg) */
+  legendas?: { ativo: boolean; preset: string; posicaoY: number };
 }
 
 export interface ConfigVideo {

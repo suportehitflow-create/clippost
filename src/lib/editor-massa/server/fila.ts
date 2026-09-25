@@ -4,12 +4,13 @@ import path from 'node:path';
 import type { CriarJobPayload, ItemJobInfo, JobInfo, StatusJob } from '../types';
 import { gerarAntiDup } from './antidup';
 import { caminhoUpload, limparAntigos, pastaJob } from './armazenamento';
-import { registrarVideoProcessado } from './autorizacao';
+import { registrarVideoProcessado, tokenDoUsuario } from './autorizacao';
+import { gerarLegendas } from './legendas';
 import { detectarArea } from './deteccao';
 import { executar, FFMPEG, sondar } from './ffmpeg';
 import { montarComando } from './filtro';
 import { trechosComFala, type Segmento } from './silencio';
-import { trechoVideo } from '../layout';
+import { trechoVideo, velocidadeEfeitos } from '../layout';
 
 // Fila em memória do processo Node. Roda N vídeos ao mesmo tempo (EDITOR_MASSA_CONCURRENCIA).
 // Para escalar em vários servidores, troque por BullMQ/Redis mantendo a mesma interface.
@@ -213,6 +214,30 @@ async function processarItem(job: Job, indice: number) {
       manter = await trechosComFala(arquivo, t.inicio, t.duracao).catch(() => null);
     }
 
+    // Legendas automáticas (cortes do Criar Cortes já vêm legendados → não duplica)
+    let legendas: string | null = null;
+    const lg = global.legendas;
+    if (lg?.ativo && info.temAudio && !v.marcaEmbutida) {
+      const token = tokenDoUsuario(job.usuarioId);
+      if (!token) log(job, `[LEGENDA] ${v.nome}: sessão expirada, seguindo sem legenda`);
+      else {
+        log(job, `[LEGENDA] Transcrevendo ${v.nome}…`);
+        const t = trechoVideo(global, video);
+        try {
+          const r = await gerarLegendas({
+            arquivo, inicio: t.inicio, duracao: t.duracao, manter,
+            velocidade: velocidadeEfeitos(global) * (antiDup ? antiDup.atempo : 1),
+            preset: lg.preset, posicaoY: lg.posicaoY, fonte: global.estiloTexto.fonte,
+            token, pasta, nome: String(indice + 1),
+          });
+          legendas = r?.arquivo ?? null;
+          log(job, r ? `[LEGENDA] ${v.nome}: ${r.palavras} palavras` : `[LEGENDA] ${v.nome}: sem fala, sem legenda`);
+        } catch (e: any) {
+          log(job, `[LEGENDA] ${v.nome}: falhou (${e?.message ?? e}), seguindo sem legenda`);
+        }
+      }
+    }
+
     item.status = 'processando';
     for (const seguro of [false, true]) {
       const cmd = montarComando({
@@ -227,6 +252,8 @@ async function processarItem(job: Job, indice: number) {
         saida,
         seguro,
         manter,
+        // no retry sai sem legenda: se o problema era o filtro "ass", o vídeo ao menos fica pronto
+        legendas: seguro ? null : legendas,
       });
       log(job, `[FFMPEG] ${seguro ? '[RETRY] ' : ''}Processando ${v.nome}: ${cmd.resumo}`);
       const timeoutMs = Math.max(120_000, cmd.duracaoSaida * 20_000);

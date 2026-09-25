@@ -3,6 +3,7 @@ import type { ConfigGlobal, ConfigVideo } from '../types';
 import type { ParametrosAntiDup } from './antidup';
 import type { InfoMidia } from './ffmpeg';
 import { expressaoTrechos, type Segmento } from './silencio';
+import { caminhoFiltro } from './legendas';
 
 // Monta o comando FFmpeg de um vídeo. Estrutura portada do log [FFMPEG-FILTER] do original:
 //   entrada 0 = template em loop, 1 = vídeo, 2 = PNG de texto/marca, 3 = música
@@ -23,6 +24,8 @@ export interface EntradaFiltro {
   seguro?: boolean;
   /** Remover silêncios: trechos com fala (segundos relativos ao início do trecho) */
   manter?: Segmento[] | null;
+  /** Arquivo .ass das legendas automáticas (já no tempo final do vídeo) */
+  legendas?: string | null;
 }
 
 const hex = (cor: string) => '0x' + cor.replace('#', '').slice(0, 6).padEnd(6, '0').toUpperCase();
@@ -113,6 +116,10 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   if (idxOverlay >= 0) {
     filtros.push(`[${atual}][${idxOverlay}:v]overlay=0:0[txt]`);
     atual = 'txt';
+  }
+  if (e.legendas) {
+    filtros.push(`[${atual}]ass=filename='${caminhoFiltro(e.legendas)}'[leg]`);
+    atual = 'leg';
   }
   const fim: string[] = [];
   if (ad) {

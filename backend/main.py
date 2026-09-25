@@ -947,6 +947,60 @@ async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: Ba
     return {"status": "rerendering", "clip_id": clip_id}
 
 
+@app.post("/api/subtitles/ass")
+async def gerar_legendas_ass(request: Request):
+    """Legendas para o Editor em Massa: recebe o ÁUDIO já no tempo final do vídeo (cortado,
+    sem silêncios e com a velocidade aplicada), transcreve (Groq Whisper, fallback Whisper local)
+    e devolve o .ass no preset escolhido. Exige o token de login do usuário (Bearer)."""
+    token = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    if not token or supabase is None:
+        raise HTTPException(status_code=401, detail="Faça login para gerar legendas.")
+    try:
+        user = await asyncio.to_thread(lambda: supabase.auth.get_user(token))
+        if not getattr(user, "user", None):
+            raise ValueError("sem usuário")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+
+    form = await request.form()
+    arquivo = form.get("file")
+    if arquivo is None or not hasattr(arquivo, "read"):
+        raise HTTPException(status_code=400, detail="Envie o áudio no campo 'file'.")
+    dados = await arquivo.read()
+    if len(dados) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Áudio grande demais (máx. 25MB).")
+    preset = str(form.get("preset") or "hormozi_yellow")
+    font_family = str(form.get("font_family") or "") or None
+    try:
+        margin_v = max(10, min(1200, int(float(form.get("margin_v") or 120))))
+    except ValueError:
+        margin_v = 120
+
+    import tempfile
+    from pathlib import Path
+    from tasks import transcribe_media
+    from services.subtitle_generator import generate_ass
+
+    def _rodar() -> tuple[str, int]:
+        with tempfile.TemporaryDirectory(prefix="clippost_leg_") as tmp:
+            entrada = Path(tmp) / "entrada.mp3"
+            entrada.write_bytes(dados)
+            tr = transcribe_media(str(entrada), str(Path(tmp) / "audio.mp3"))
+            saida = generate_ass(
+                tr.get("segments") or [], str(Path(tmp) / "legenda.ass"),
+                words=tr.get("words") or None, margin_v=margin_v,
+                subtitle_preset=preset, font_family=font_family,
+            )
+            return Path(saida).read_text(encoding="utf-8"), len(tr.get("words") or [])
+
+    try:
+        ass, palavras = await asyncio.to_thread(_rodar)
+    except Exception as e:
+        print(f"[legendas] falhou: {e}")
+        raise HTTPException(status_code=500, detail=f"Não foi possível gerar as legendas: {e}")
+    return {"ass": ass, "palavras": palavras}
+
+
 @app.get("/api/clips/{project_id}")
 async def list_clips(project_id: str):
     """Lista os clipes gerados para um projeto, ordenados por ai_score."""

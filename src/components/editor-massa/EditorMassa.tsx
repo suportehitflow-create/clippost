@@ -12,6 +12,7 @@ import {
   carregarTemplateClipost,
   estiloDoTemplate,
   gerarImagemTemplate,
+  legendaDoTemplate,
   marcaDoTemplate,
   prepararMarca,
   salvarTemplateClipost,
@@ -474,6 +475,8 @@ export default function EditorMassa({ projeto, titulo, acoesExtras }: { projeto?
           cantos: cantosDoTemplate(t),
           marcaTemplate: marca,
           estiloTexto: estiloDoTemplate(t, g.estiloTexto, g.textoAjustado),
+          // estilo e altura da legenda escolhidos no editor de Templates (liga/desliga continua do usuário)
+          legendas: { ativo: g.legendas?.ativo ?? false, ...legendaDoTemplate(t) },
         }));
         enviar('template:' + url, arquivo, () => {})
           .then((id) => setTemplate((x) => (x && x.url === url ? { ...x, arquivoId: id } : x)))

@@ -33,7 +33,10 @@ export async function obterUsuario(req: Request): Promise<string | null> {
   }
 }
 
-export const naoAutenticado = () => Response.json({ erro: 'Faça login no Clipost para usar o editor.' }, { status: 401 });
+/** Token mais recente do usuário (renovado a cada consulta de status da tela) */
+export const tokenDoUsuario = (usuarioId: string | null) => (usuarioId ? tokens.get(usuarioId) ?? null : null);
+
+export const naoAutenticado =() => Response.json({ erro: 'Faça login no Clipost para usar o editor.' }, { status: 401 });
 
 // Mesmo contador e mesmas regras dos cortes (stripe_service.py): grátis = 3 por mês, Pro = ilimitado
 const LIMITE_GRATIS = 3;

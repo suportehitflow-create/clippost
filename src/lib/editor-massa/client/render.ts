@@ -1,6 +1,40 @@
 import { calcularLayout, type Canvas, type Layout } from '../layout';
 import type { ConfigGlobal, ConfigVideo, EstiloTexto, MarcaDagua, MarcaTemplate, Rect } from '../types';
-import { MAX_MARCAS } from '../defaults';
+import { MAX_MARCAS, PRESETS_LEGENDA } from '../defaults';
+
+/** Amostra da legenda no preview, no estilo do preset e na altura escolhida */
+function desenharAmostraLegenda(ctx: CanvasRenderingContext2D, preset: string, posicaoY: number, alvo: Canvas) {
+  const p = PRESETS_LEGENDA.find((x) => x.id === preset) ?? PRESETS_LEGENDA[0];
+  const px = alvo.w * (p.umaPalavra ? 0.085 : 0.052);
+  const palavras = p.umaPalavra ? ['LEGENDA'] : ['SUA', 'LEGENDA', 'AQUI'];
+  ctx.save();
+  ctx.font = `900 ${px.toFixed(1)}px Roboto, "Segoe UI", Arial, sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const espaco = ctx.measureText(' ').width;
+  const larguras = palavras.map((w) => ctx.measureText(w).width);
+  const total = larguras.reduce((a, b) => a + b, 0) + espaco * (palavras.length - 1);
+  const y = (posicaoY / 100) * alvo.h;
+  let x = (alvo.w - total) / 2;
+  if (p.caixa) {
+    const pad = px * 0.35;
+    caixaArredondada(ctx, x - pad, y - px * 0.7, total + pad * 2, px * 1.4, px * 0.18);
+    ctx.fillStyle = p.caixa;
+    ctx.fill();
+  }
+  palavras.forEach((w, i) => {
+    if (!p.caixa) {
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = px * 0.16;
+      ctx.strokeStyle = '#000';
+      ctx.strokeText(w, x, y);
+    }
+    ctx.fillStyle = p.destaque && i === 1 ? p.destaque : p.texto;
+    ctx.fillText(w, x, y);
+    x += larguras[i] + espaco;
+  });
+  ctx.restore();
+}
 
 // Desenho no navegador. O MESMO código faz:
 //  - o preview (canvas na tela)
@@ -326,6 +360,8 @@ export function desenharComposicao(
     }
   }
   desenharOverlay(ctx, global, v, L, alvo, global.moldura.ativo ? null : template);
+  // Só no preview: amostra da legenda automática (a de verdade é gerada no servidor)
+  if (global.legendas?.ativo && !v.marcaEmbutida) desenharAmostraLegenda(ctx, global.legendas.preset, global.legendas.posicaoY, alvo);
   ctx.restore();
   return L;
 }

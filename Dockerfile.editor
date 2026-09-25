@@ -9,7 +9,12 @@ COPY . .
 RUN npm run build
 
 FROM node:22-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+# Fontes das legendas automáticas (filtro "ass"/libass): as mesmas do backend
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates wget \
+    fonts-dejavu-core fonts-roboto-unhinted fonts-montserrat fontconfig \
+    && mkdir -p /usr/local/share/fonts/anton \
+    && (wget -q https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf -O /usr/local/share/fonts/anton/Anton-Regular.ttf || true) \
+    && fc-cache -f >/dev/null 2>&1 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production \
