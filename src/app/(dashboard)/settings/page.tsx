@@ -80,6 +80,8 @@ export default function SettingsPage() {
 
   async function loadAccounts(uid: string) {
     try {
+      // Contas conectadas pelo Upload-Post (Instagram, TikTok, YouTube) entram na lista do Clipost
+      await fetch('/api/social/sync', { method: 'POST' }).catch(() => null)
       const { data } = await supabase
         .from('social_accounts')
         .select('id, platform, username, created_at')
@@ -138,9 +140,15 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId }),
       })
-      const data = await res.json()
-      if (data.access_url) window.location.href = data.access_url
-    } catch {}
+      const data = await res.json().catch(() => ({}))
+      if (data.access_url) {
+        window.location.href = data.access_url
+        return
+      }
+      setMetaError(data.detail || data.error || 'Não foi possível abrir a conexão agora. Tente de novo em instantes.')
+    } catch {
+      setMetaError('Sem conexão com o servidor. Tente de novo.')
+    }
     setConnectingUpload(false)
   }
 
@@ -288,36 +296,37 @@ export default function SettingsPage() {
 
           {/* Botões de conexão */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Upload-Post: conecta Instagram, TikTok e YouTube numa tela só (é o que publica hoje) */}
+            <button
+              onClick={connectViaUploadPost}
+              disabled={connectingUpload}
+              className="flex items-center gap-3 p-4 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/25 hover:border-indigo-500/50 transition-all cursor-pointer text-left disabled:opacity-50"
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
+                <span>📲</span>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-white block">
+                  {connectingUpload ? 'Redirecionando...' : 'Instagram, TikTok e YouTube'}
+                </span>
+                <span className="text-[10px] text-indigo-300/80">Recomendado · conecta tudo de uma vez</span>
+              </div>
+              <Plus className="w-4 h-4 text-zinc-500 ml-auto" />
+            </button>
+
             <button
               onClick={connectViaMeta}
               disabled={connectingMeta}
               className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-purple-500/30 hover:bg-purple-500/[0.03] transition-all cursor-pointer text-left disabled:opacity-50"
             >
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                <span>📸</span>
+                <span>📘</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-white block">
-                  {connectingMeta ? 'Redirecionando...' : 'Instagram & Facebook'}
+                  {connectingMeta ? 'Redirecionando...' : 'Página do Facebook (Meta)'}
                 </span>
-                <span className="text-[10px] text-zinc-500">Via Meta API direta</span>
-              </div>
-              <Plus className="w-4 h-4 text-zinc-600 ml-auto" />
-            </button>
-
-            <button
-              onClick={connectViaUploadPost}
-              disabled={connectingUpload}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-indigo-500/30 hover:bg-indigo-500/[0.03] transition-all cursor-pointer text-left disabled:opacity-50"
-            >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                <span>🎵▶️</span>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-white block">
-                  {connectingUpload ? 'Redirecionando...' : 'TikTok & YouTube'}
-                </span>
-                <span className="text-[10px] text-zinc-500">Via Upload-Post</span>
+                <span className="text-[10px] text-zinc-500">Precisa do app da Meta configurado</span>
               </div>
               <Plus className="w-4 h-4 text-zinc-600 ml-auto" />
             </button>

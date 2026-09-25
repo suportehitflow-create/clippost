@@ -41,7 +41,8 @@ META_PLATFORMS = {"instagram", "facebook"}
 def _get_meta_token(user_id: str, platform: str, social_account_id: str | None) -> dict | None:
     """Retorna a conta social com page_token para publicação Meta."""
     try:
-        q = supabase.table("social_accounts").select("account_id, page_token, access_token")
+        # page_token não existe no banco de produção: o token da página fica em access_token
+        q = supabase.table("social_accounts").select("account_id, access_token")
         if social_account_id:
             q = q.eq("id", social_account_id)
         else:
@@ -96,9 +97,21 @@ def check_and_publish_scheduled_posts():
             continue
 
         try:
-            if platform in META_PLATFORMS:
-                # Usa token direto da tabela social_accounts
-                account = _get_meta_token(post["user_id"], platform, post.get("social_account_id"))
+            # Instagram conectado pelo Upload-Post (sem token da Meta na tabela) publica pelo Upload-Post
+            meta_account = _get_meta_token(post["user_id"], platform, post.get("social_account_id")) if platform in META_PLATFORMS else None
+            if platform == "instagram" and not (meta_account and (meta_account.get("page_token") or meta_account.get("access_token"))):
+                result = publish_video(
+                    user_id=post["user_id"],
+                    platform="instagram",
+                    video_url=video_url,
+                    caption=caption,
+                    title=clip_data.get("title") or "",
+                    post_id=post["id"],
+                )
+                _finish(post["id"], "published", result.get("url", ""))
+            elif platform in META_PLATFORMS:
+                # Usa token direto da tabela social_accounts (conexão pela Meta)
+                account = meta_account
                 if not account:
                     raise Exception(f"Nenhuma conta {platform} conectada ou sem token para o usuário.")
                 token = account.get("page_token") or account.get("access_token")

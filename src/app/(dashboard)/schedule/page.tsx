@@ -131,6 +131,8 @@ function Conteudo() {
   }
 
   async function carregar(uid: string) {
+    // contas conectadas pelo Upload-Post (a conexão volta para esta página) entram na lista
+    await fetch('/api/social/sync', { method: 'POST' }).catch(() => null)
     const [c, k, p] = await Promise.all([
       supabase.from('social_accounts').select('id, platform, username').eq('user_id', uid),
       supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('user_id', uid).not('storage_url', 'is', null).order('created_at', { ascending: false }).limit(120),

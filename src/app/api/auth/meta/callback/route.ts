@@ -41,54 +41,59 @@ export async function GET(req: NextRequest) {
   const pagesData = await pagesRes.json()
 
   const supabase = await createClient()
-  const userId = state // state = user_id passed in the OAuth init
+  // O dono das contas é quem está logado (o state só confirma que o fluxo começou nesta sessão)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.redirect(`${siteUrl}/login`)
+  if (state !== user.id) return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent('Sessão diferente da que iniciou a conexão. Tente de novo.')}`)
+  const userId = user.id
 
+  // Colunas que existem em social_accounts: user_id, platform, account_id, username, access_token
+  // (o token da página vai em access_token — é o que o publicador usa)
+  let salvas = 0
+  let erroSalvar = ''
   for (const page of (pagesData.data || [])) {
-    // Save Facebook Page
-    await supabase.from('social_accounts').upsert({
+    const fb = await supabase.from('social_accounts').upsert({
       user_id: userId,
       platform: 'facebook',
       account_id: page.id,
       username: page.name.toLowerCase().replace(/\s+/g, '_'),
-      display_name: page.name,
-      page_token: page.access_token,
       access_token: page.access_token,
     }, { onConflict: 'user_id,platform,account_id' })
+    if (fb.error) erroSalvar = fb.error.message
+    else salvas++
 
-    // Save Instagram Business Account linked to this Page
+    // Instagram profissional ligado a esta Página
     if (page.instagram_business_account?.id) {
       try {
         const igRes = await fetch(
-          `https://graph.facebook.com/v19.0/${page.instagram_business_account.id}?fields=id,name,username,profile_picture_url&access_token=${page.access_token}`
+          `https://graph.facebook.com/v19.0/${page.instagram_business_account.id}?fields=id,username&access_token=${page.access_token}`
         )
         const ig = await igRes.json()
         if (!ig.error) {
-          await supabase.from('social_accounts').upsert({
+          const r = await supabase.from('social_accounts').upsert({
             user_id: userId,
             platform: 'instagram',
             account_id: ig.id,
             username: ig.username,
-            display_name: ig.name,
-            avatar_url: ig.profile_picture_url || null,
-            page_token: page.access_token,
             access_token: page.access_token,
           }, { onConflict: 'user_id,platform,account_id' })
+          if (r.error) erroSalvar = r.error.message
+          else salvas++
         }
       } catch {}
     }
   }
 
-  // Set first account active if none is
-  const { data: existing } = await supabase
-    .from('social_accounts')
-    .select('id, is_active')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+  if (!salvas) {
+    const motivo = erroSalvar || 'Nenhuma Página do Facebook/Instagram profissional foi autorizada.'
+    return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent(motivo)}`)
+  }
 
-  const hasActive = (existing || []).some((a: any) => a.is_active)
-  if (!hasActive && existing && existing.length > 0) {
-    await supabase.from('social_accounts').update({ is_active: true }).eq('id', existing[0].id)
-    await supabase.from('profiles').update({ active_social_account_id: existing[0].id }).eq('id', userId)
+  // Sem conta ativa no perfil: a primeira passa a ser a ativa
+  const { data: perfil } = await supabase.from('profiles').select('active_social_account_id').eq('id', userId).maybeSingle()
+  if (!perfil?.active_social_account_id) {
+    const { data: primeira } = await supabase.from('social_accounts').select('id').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    if (primeira) await supabase.from('profiles').update({ active_social_account_id: primeira.id }).eq('id', userId)
   }
 
   return NextResponse.redirect(`${siteUrl}/settings?meta_connected=1`)
