@@ -140,7 +140,7 @@ function Conteudo() {
     await fetch('/api/social/sync', { method: 'POST' }).catch(() => null)
     const [c, k, p] = await Promise.all([
       supabase.from('social_accounts').select('id, platform, username').eq('user_id', uid),
-      supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('user_id', uid).not('storage_url', 'is', null).order('created_at', { ascending: false }).limit(120),
+      supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('user_id', uid).not('storage_url', 'is', null).not('storage_url', 'like', '%.json').order('created_at', { ascending: false }).limit(120),
       supabase.from('scheduled_posts').select('id, clip_id, platform, caption, scheduled_at, status, social_account_id, clips(title, storage_url)').eq('user_id', uid).order('scheduled_at', { ascending: true }).limit(1000),
     ])
     const ativa = contaAtivaSalva()

@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
-import { calcularHorarios, plataformaPost, NOME_REDE } from '@/lib/publicacao'
 import BibliotecaMusicas from '@/components/musicas/BibliotecaMusicas'
+import AgendarEmMassa from '@/components/agendar/AgendarEmMassa'
 import type { MusicaNuvem } from '@/lib/musicas'
 import { Pagina, Intro, Cartao, Rotulo, Opcoes, BotaoPrincipal, Aviso } from '@/components/pagina/Base'
-import { Quote, ImagePlus, Loader2, Music2, X, Type, Palette, Clock, Calendar, CheckCircle2, AlertCircle, FolderOpen, Plus, Layers } from 'lucide-react'
+import { Quote, ImagePlus, Loader2, Music2, X, Type, Palette, Clock, CheckCircle2, AlertCircle, FolderOpen, Plus, Layers } from 'lucide-react'
 
 // Vídeos com frases: fotos × frases × música → vídeos 9:16 prontos na Biblioteca, e já agenda.
 // A prévia aqui desenha igual ao servidor (backend/services/frases.py).
@@ -18,7 +18,6 @@ type Posicao = 'topo' | 'centro' | 'base'
 interface Foto { id: string; previa: string; url: string | null; erro?: boolean }
 interface ItemJob { frase: string; status: 'pending' | 'processing' | 'done' | 'failed'; url: string | null; clip_id: string | null; erro: string | null }
 interface Job { status: 'processing' | 'done' | 'failed'; itens: ItemJob[]; project_id?: string; erro?: string }
-interface Conta { id: string; platform: string; username: string }
 
 const FONTES: { id: Fonte; label: string; css: string }[] = [
   { id: 'Montserrat', label: 'Montserrat', css: '800 {px}px Montserrat, sans-serif' },
@@ -27,7 +26,6 @@ const FONTES: { id: Fonte; label: string; css: string }[] = [
   { id: 'DejaVu', label: 'Clássica', css: '700 {px}px Verdana, DejaVu Sans, sans-serif' },
 ]
 const CORES = ['#ffffff', '#fde047', '#f472b6', '#60a5fa', '#34d399', '#111111']
-const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 // ---------- prévia (mesmo cálculo do servidor, em escala) ----------
 function quebrar(ctx: CanvasRenderingContext2D, texto: string, largura: number) {
@@ -336,7 +334,9 @@ export default function FrasesPage() {
       </Cartao>
 
       {job && <Resultado job={job} />}
-      {job && prontos.length > 0 && !gerando && <Agendar itens={prontos} />}
+      {job && prontos.length > 0 && !gerando && (
+        <AgendarEmMassa titulo={`Agendar os ${prontos.length} vídeos`} itens={prontos.map(i => ({ clip_id: i.clip_id, texto: i.frase }))} legendaInicial={'{texto}\n\n#motivacao #frases #reflexao'} />
+      )}
 
       {biblioteca && <BibliotecaMusicas multiplas={false} fechar={() => setBiblioteca(false)} aoEscolher={(_, ms) => setMusica(ms[0] ?? null)} />}
     </Pagina>
@@ -362,105 +362,6 @@ function Resultado({ job }: { job: Job }) {
         ))}
       </div>
       {job.status === 'failed' && <Aviso>{job.erro || 'A geração falhou.'}</Aviso>}
-    </Cartao>
-  )
-}
-
-function Agendar({ itens }: { itens: ItemJob[] }) {
-  const supabase = useMemo(() => createClient(), [])
-  const [contas, setContas] = useState<Conta[]>([])
-  const [sel, setSel] = useState<string[]>([])
-  const [dias, setDias] = useState<number[]>([1, 2, 3, 4, 5])
-  const [horarios, setHorarios] = useState<string[]>(['12:00', '19:00'])
-  const [novoHorario, setNovoHorario] = useState('09:00')
-  const [inicio, setInicio] = useState(() => new Date().toISOString().slice(0, 10))
-  const [legenda, setLegenda] = useState('{frase}\n\n#motivacao #frases #reflexao')
-  const [salvando, setSalvando] = useState(false)
-  const [feito, setFeito] = useState<string | null>(null)
-  const [erro, setErro] = useState('')
-
-  useEffect(() => {
-    ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('social_accounts').select('id, platform, username').eq('user_id', user.id)
-      const lista = (data || []) as Conta[]
-      setContas(lista)
-      let ativa: string | null = null
-      try { ativa = JSON.parse(localStorage.getItem('clippost_active_account') || 'null')?.id ?? null } catch {}
-      setSel(lista.some(c => c.id === ativa) ? [ativa!] : lista.slice(0, 1).map(c => c.id))
-    })()
-  }, [supabase])
-
-  const horas = calcularHorarios(dias, horarios, inicio, itens.length)
-
-  async function agendar() {
-    setErro('')
-    if (!dias.length || !horarios.length) return setErro('Escolha pelo menos um dia e um horário.')
-    if (!sel.length) return setErro('Conecte uma conta em Ajustes para agendar.')
-    setSalvando(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Faça login de novo.')
-      const registros = sel.flatMap(id => {
-        const c = contas.find(x => x.id === id)!
-        return itens.map((i, k) => ({
-          user_id: user.id, clip_id: i.clip_id, platform: plataformaPost(c.platform), social_account_id: c.id,
-          caption: legenda.replaceAll('{frase}', i.frase), scheduled_at: horas[k].toISOString(), status: 'scheduled',
-        }))
-      })
-      const { error } = await supabase.from('scheduled_posts').insert(registros)
-      if (error) throw new Error(error.message)
-      setFeito(`${registros.length} post(s) agendado(s), de ${horas[0].toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} a ${horas[horas.length - 1].toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`)
-    } catch (e: any) {
-      setErro(e.message)
-    } finally {
-      setSalvando(false)
-    }
-  }
-
-  if (feito) return <Cartao><Aviso tipo="ok">{feito} <Link href="/schedule" className="underline font-semibold">Ver no calendário</Link></Aviso></Cartao>
-
-  return (
-    <Cartao>
-      <Rotulo><Calendar className="w-3.5 h-3.5 text-indigo-400" /> Agendar os {itens.length} vídeos</Rotulo>
-      {erro && <Aviso>{erro}</Aviso>}
-      {contas.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {contas.map(c => (
-            <button key={c.id} type="button" onClick={() => setSel(s => (s.includes(c.id) ? s.filter(x => x !== c.id) : [...s, c.id]))}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${sel.includes(c.id) ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'border-white/[0.08] text-zinc-400'}`}>
-              @{(c.username || '').replace(/^@/, '')} · {NOME_REDE[c.platform as keyof typeof NOME_REDE] || c.platform}
-            </button>
-          ))}
-        </div>
-      ) : <p className="text-xs text-zinc-400">Nenhuma conta conectada. <Link href="/settings" className="underline">Conectar em Ajustes</Link></p>}
-      <div className="flex flex-wrap gap-1.5">
-        {DIAS.map((d, i) => (
-          <button key={d} type="button" onClick={() => setDias(s => (s.includes(i) ? s.filter(x => x !== i) : [...s, i]))}
-            className={`w-11 py-2 rounded-xl text-xs font-bold border ${dias.includes(i) ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'border-white/[0.08] text-zinc-500'}`}>{d}</button>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {horarios.map(h => (
-          <span key={h} className="px-2.5 py-1.5 rounded-xl text-xs font-mono bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5">
-            {h}<button type="button" aria-label={`Tirar ${h}`} onClick={() => setHorarios(s => s.filter(x => x !== h))}><X className="w-3 h-3 text-zinc-500" /></button>
-          </span>
-        ))}
-        <input id="frases-novo-horario" type="time" value={novoHorario} onChange={e => setNovoHorario(e.target.value)} className="px-2 py-1.5 rounded-xl bg-[#0c0c10] border border-white/[0.1] text-xs" />
-        <button type="button" onClick={() => novoHorario && !horarios.includes(novoHorario) && setHorarios(s => [...s, novoHorario])} className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/[0.06]">+ horário</button>
-        <span className="ml-auto text-[11px] text-zinc-400 flex items-center gap-1.5">a partir de
-          <input id="frases-inicio" type="date" value={inicio} onChange={e => setInicio(e.target.value)} className="px-2 py-1.5 rounded-xl bg-[#0c0c10] border border-white/[0.1] text-xs" />
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        <textarea id="frases-legenda" value={legenda} onChange={e => setLegenda(e.target.value)} rows={3}
-          className="w-full px-4 py-3 rounded-2xl bg-[#0c0c10] border border-white/[0.1] text-sm focus:outline-none focus:border-indigo-500" />
-        <p className="text-[10px] text-zinc-500 font-mono">{'{frase}'} vira a frase de cada vídeo</p>
-      </div>
-      <BotaoPrincipal icone={Calendar} onClick={agendar} carregando={salvando} textoCarregando="Agendando…" disabled={horas.length < itens.length}>
-        Agendar {itens.length * Math.max(1, sel.length)} post(s)
-      </BotaoPrincipal>
     </Cartao>
   )
 }

@@ -44,6 +44,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/raio-x-pagina') ||
     request.nextUrl.pathname.startsWith('/musicas') ||
     request.nextUrl.pathname.startsWith('/frases') ||
+    request.nextUrl.pathname.startsWith('/posts') ||
     request.nextUrl.pathname.startsWith('/clips')
 
   if (!user && isProtected) {

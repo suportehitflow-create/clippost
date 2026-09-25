@@ -1337,6 +1337,49 @@ async def ferramenta_raio_x(request: Request):
         raise HTTPException(status_code=502, detail="Não consegui analisar esse perfil agora.")
 
 
+@app.post("/api/posts/criar")
+async def posts_criar(request: Request):
+    """Posts em massa: cada grupo de mídias vira um post (foto, carrossel ou story) pronto para agendar.
+    Corpo: { tipo: post|carrossel|story, grupos: [[{url, tipo: imagem|video}]], textos?: [str] }
+    Cada post é um manifesto JSON no Storage + um item na tabela clips (o agendador reconhece o .json)."""
+    import json as _json
+    user = await _usuario_logado(request)
+    body = await request.json()
+    tipo = body.get("tipo") if body.get("tipo") in ("post", "carrossel", "story") else "post"
+    base = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/videos/"
+    grupos = []
+    for g in (body.get("grupos") or [])[:100]:
+        midias = [{"url": m["url"], "tipo": "video" if m.get("tipo") == "video" else "imagem"}
+                  for m in (g or []) if isinstance(m, dict) and str(m.get("url") or "").startswith(base)][:10]
+        if midias:
+            grupos.append(midias)
+    if not grupos:
+        raise HTTPException(status_code=400, detail="Envie as fotos primeiro.")
+    textos = [str(t) for t in (body.get("textos") or [])]
+    nome = {"post": "Posts", "carrossel": "Carrosséis", "story": "Stories"}[tipo]
+
+    def criar():
+        projeto = supabase.table("projects").insert({
+            "user_id": user.id, "title": f"{nome} em massa ({len(grupos)})", "source_url": "clipost:posts",
+            "source_type": "file", "platform": "posts", "status": "done",
+        }).execute().data[0]
+        itens = []
+        for i, midias in enumerate(grupos):
+            chave = f"{user.id}/posts/{projeto['id']}/{i + 1}.json"
+            supabase.storage.from_("videos").upload(chave, _json.dumps({"tipo": tipo, "midias": midias}).encode(),
+                                                    {"content-type": "application/json", "upsert": "true"})
+            texto = (textos[i % len(textos)] if textos else "").strip()
+            titulo = (texto.split("\n")[0] if texto else f"{ {'post': 'Post', 'carrossel': 'Carrossel', 'story': 'Story'}[tipo]} {i + 1}")[:200]
+            clip = supabase.table("clips").insert({
+                "project_id": projeto["id"], "user_id": user.id, "title": titulo, "hook": titulo,
+                "start_time": 0, "end_time": 0, "score": 0, "storage_url": base + chave, "status": "ready",
+            }).execute().data[0]
+            itens.append({"clip_id": clip["id"], "texto": texto, "capa": midias[0]["url"], "midias": len(midias)})
+        return {"project_id": projeto["id"], "itens": itens}
+
+    return await asyncio.to_thread(criar)
+
+
 @app.post("/api/frases/gerar")
 async def frases_gerar(request: Request):
     """Vídeos com frases: fotos × frases × música → MP4 9:16 prontos na Biblioteca.

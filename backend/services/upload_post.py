@@ -92,26 +92,56 @@ def connected_accounts(user_id: str) -> list[dict]:
 
 
 def publish_video(user_id: str, platform: str, video_url: str, caption: str,
-                  title: str, post_id: str, timeout: int = 300) -> dict:
-    """Publica agora e espera o resultado. Retorna {"url": ...} ou levanta UploadPostError."""
-    resp = httpx.post(
-        f"{API_BASE}/upload",
-        headers={**_headers(), "Idempotency-Key": post_id},
-        data={
-            "user": user_id,
-            "platform[]": platform,
-            "video": video_url,
-            "title": (title or caption or "clipost")[:100],
-            "description": caption,
-            f"{platform}_title": caption[:2200] if platform != "youtube" else (title or caption)[:100],
-            "external_id": post_id,
-            "async_upload": "true",
-        },
-        timeout=60,
-    )
+                  title: str, post_id: str, timeout: int = 300, media_type: str | None = None) -> dict:
+    """Publica agora e espera o resultado. Retorna {"url": ...} ou levanta UploadPostError.
+    media_type="STORIES" publica como story (Instagram / Facebook)."""
+    dados = {
+        "user": user_id,
+        "platform[]": platform,
+        "video": video_url,
+        "title": (title or caption or "clipost")[:100],
+        "description": caption,
+        f"{platform}_title": caption[:2200] if platform != "youtube" else (title or caption)[:100],
+        "external_id": post_id,
+        "async_upload": "true",
+    }
+    if media_type:
+        dados["facebook_media_type" if platform == "facebook" else "media_type"] = media_type
+    resp = httpx.post(f"{API_BASE}/upload", headers={**_headers(), "Idempotency-Key": post_id}, data=dados, timeout=60)
     if not resp.is_success:
         raise UploadPostError(f"Upload recusado ({resp.status_code}): {_error_message(resp)}")
-    body = resp.json()
+    return _esperar(resp.json(), platform, timeout)
+
+
+def publish_photos(user_id: str, platform: str, arquivos: list, caption: str, post_id: str,
+                   media_type: str | None = None, timeout: int = 300) -> dict:
+    """Post de foto ou carrossel (2+ fotos). arquivos = caminhos locais (a API pede os arquivos).
+    media_type="STORIES" (Instagram) publica como story."""
+    dados = {
+        "user": user_id,
+        "platform[]": platform,
+        "title": (caption or "")[:2200],
+        "description": caption or "",
+        f"{platform}_title": (caption or "")[:2200],
+        "external_id": post_id,
+        "async_upload": "true",
+    }
+    if media_type and platform == "instagram":
+        dados["media_type"] = media_type
+    abertos = [open(a, "rb") for a in arquivos]
+    try:
+        files = [("photos[]", (os.path.basename(str(a)), f, "image/jpeg")) for a, f in zip(arquivos, abertos)]
+        resp = httpx.post(f"{API_BASE}/upload_photos", headers={**_headers(), "Idempotency-Key": post_id},
+                          data=dados, files=files, timeout=180)
+    finally:
+        for f in abertos:
+            f.close()
+    if not resp.is_success:
+        raise UploadPostError(f"Upload recusado ({resp.status_code}): {_error_message(resp)}")
+    return _esperar(resp.json(), platform, timeout)
+
+
+def _esperar(body: dict, platform: str, timeout: int) -> dict:
     if "results" in body:
         return _platform_result(body["results"], platform)
 

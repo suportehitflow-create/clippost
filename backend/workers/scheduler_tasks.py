@@ -80,6 +80,49 @@ def _finish(post_id: str, status: str, detail: str) -> None:
     print(f"[scheduler] post {post_id} -> {status}: {detail}")
 
 
+_REDES_FOTO = {"instagram", "facebook", "tiktok"}
+
+
+def _publicar_manifesto(post: dict, manifesto_url: str, caption: str) -> str:
+    """Manifesto {tipo: post|carrossel|story, midias: [{url, tipo: imagem|video}]} → Upload-Post.
+    Fotos vão como arquivo (a API de fotos não aceita link); vídeo de story vai por link."""
+    import tempfile
+    import shutil
+    from pathlib import Path
+    import httpx
+    from services.upload_post import publish_photos
+
+    platform = post["platform"]
+    if platform not in _REDES_FOTO:
+        raise UploadPostError(f"{platform} não publica fotos, carrosséis nem stories.")
+    m = httpx.get(manifesto_url, timeout=30).json()
+    tipo = m.get("tipo") or "post"
+    midias = [x for x in (m.get("midias") or []) if x.get("url")][:10]
+    if not midias:
+        raise UploadPostError("post sem mídias")
+    story = "STORIES" if tipo == "story" else None
+    if story and platform == "tiktok":
+        raise UploadPostError("O TikTok não tem stories pela API.")
+    if midias[0].get("tipo") == "video":
+        res = publish_video(user_id=post["user_id"], platform=platform, video_url=midias[0]["url"],
+                            caption="" if story else caption, title="", post_id=post["id"], media_type=story)
+        return res.get("url", "")
+    tmp = Path(tempfile.mkdtemp(prefix="clippost_fotos_"))
+    try:
+        arquivos = []
+        with httpx.Client(timeout=60, follow_redirects=True) as c:
+            for i, x in enumerate(midias if tipo == "carrossel" else midias[:1]):
+                r = c.get(x["url"])
+                r.raise_for_status()
+                ext = (x["url"].split("?")[0].rsplit(".", 1)[-1] or "jpg").lower()[:4]
+                p = tmp / f"{i + 1}.{ext}"
+                p.write_bytes(r.content)
+                arquivos.append(p)
+        res = publish_photos(post["user_id"], platform, arquivos, "" if story else caption, post["id"], media_type=story)
+        return res.get("url", "")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
 @celery.task(name="check_and_publish_scheduled_posts")
 def check_and_publish_scheduled_posts():
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -106,6 +149,17 @@ def check_and_publish_scheduled_posts():
         if not video_url:
             _finish(post["id"], "failed", "clipe sem video_url")
             failed += 1
+            continue
+
+        # Posts de foto, carrosséis e stories (Posts em massa): o "corte" aponta para um manifesto JSON
+        if video_url.split("?")[0].endswith(".json"):
+            try:
+                url_final = _publicar_manifesto(post, video_url, caption)
+                _finish(post["id"], "published", url_final)
+                published += 1
+            except Exception as e:
+                _finish(post["id"], "failed", str(e)[:500])
+                failed += 1
             continue
 
         try:
