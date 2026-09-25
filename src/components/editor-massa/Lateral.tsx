@@ -631,32 +631,19 @@ export default function Lateral(p: PropsLateral) {
         <Opcao rotulo="Melhorar áudio" descricao="Remove ruído e normaliza o volume" valor={g.melhorarAudio} mudar={(v) => mudar('melhorarAudio', v)} />
       </Secao>
 
-      {/* ---------------- BARRA INFERIOR: EDIÇÃO EM MASSA (PÍLULA ATIVO / DESATIVO) ---------------- */}
+      {/* ---------------- BARRA INFERIOR: APLICAR A TODOS (TOGGLE PADRÃO DO SITE) ---------------- */}
       <div className={s.barraMassaFixa}>
         <div className={s.massaInfo}>
-          <span className={s.massaTitulo}>Edição em massa</span>
+          <span className={s.massaTitulo}>Aplicar a todos</span>
           <span className={s.massaDesc}>
-            {p.emMassa ? 'Aplica ajustes em todos os cortes' : 'Aplica apenas no corte ativo'}
+            {p.emMassa ? 'Ajustes valem para todos os cortes' : 'Ajustes valem apenas para este corte'}
           </span>
         </div>
-        <div className={s.massaPillContainer}>
-          <button
-            type="button"
-            className={`${s.massaPillBtn} ${p.emMassa ? s.massaPillAtivo : ''}`}
-            onClick={() => p.setEmMassa(true)}
-            title="Ativar edição em massa"
-          >
-            Ativo
-          </button>
-          <button
-            type="button"
-            className={`${s.massaPillBtn} ${!p.emMassa ? s.massaPillAtivo : ''}`}
-            onClick={() => p.setEmMassa(false)}
-            title="Desativar edição em massa (apenas corte selecionado)"
-          >
-            Desativo
-          </button>
-        </div>
+        <Toggle
+          valor={p.emMassa}
+          mudar={p.setEmMassa}
+          rotulo="Aplicar a todos"
+        />
       </div>
     </aside>
   );
