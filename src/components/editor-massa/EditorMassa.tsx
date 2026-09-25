@@ -36,6 +36,8 @@ import Inspetor from './Inspetor';
 import Lateral from './Lateral';
 import { GavetaLog, ModalConcluido, PainelResultados } from './Paineis';
 import ImportarPerfil from './ImportarPerfil';
+import BibliotecaMusicas from '@/components/musicas/BibliotecaMusicas';
+import { enviarMusicaNuvem, listarMusicas } from '@/lib/musicas';
 import s from './editor-massa.module.css';
 
 type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string } | null;
@@ -95,6 +97,7 @@ export default function EditorMassa({
   const [ativoId, setAtivoId] = useState<string | null>(null);
   const [template, setTemplate] = useState<TemplateCliente | null>(null);
   const [musicas, setMusicas] = useState<MusicaCliente[]>([]);
+  const [bibliotecaMusicas, setBibliotecaMusicas] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [status, setStatus] = useState('Pronto');
   const [resultados, setResultados] = useState<ResultadoJob[]>([]);
@@ -653,7 +656,7 @@ export default function EditorMassa({
       .then((id) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, arquivoId: id, upload: 1 } : x))))
       .catch((e) => escreverLog(`[ERRO] Upload da música ${m.nome}: ${e.message}`));
 
-  const adicionarMusicas = async (arquivos: File[]) => {
+  const adicionarMusicas = async (arquivos: File[], daNuvem = false) => {
     const novas: MusicaCliente[] = await Promise.all(
       arquivos.map(async (arquivo) => {
         const url = URL.createObjectURL(arquivo);
@@ -668,6 +671,15 @@ export default function EditorMassa({
     // Importou = está ativa (a primeira vira a música de fundo se ainda não tiver uma)
     if (novas[0] && !globalRef.current.musica.musicaId) setGlobal((g) => ({ ...g, musica: { ...g.musica, ativo: true, musicaId: novas[0].id } }));
     avisar(`${novas.length} música(s) importada(s)`);
+    // Importada do computador: guarda também na biblioteca da conta (sem repetir o mesmo nome)
+    if (!daNuvem) {
+      listarMusicas()
+        .then((salvas) => {
+          const nomes = new Set(salvas.map((m) => m.nome.toLowerCase()));
+          return Promise.all(arquivos.filter((a) => !nomes.has(a.name.replace(/\.[^.]+$/, '').toLowerCase())).map(enviarMusicaNuvem));
+        })
+        .catch(() => undefined);
+    }
   };
 
   // ---------- processamento ----------
@@ -925,6 +937,7 @@ export default function EditorMassa({
           carregandoTemplate={carregandoTpl}
           musicas={musicas}
           importarMusicas={() => inputMusicas.current?.click()}
+          abrirBibliotecaMusicas={() => setBibliotecaMusicas(true)}
           removerMusica={(id) => {
             apagarArquivo('musica:' + id);
             setMusicas((ms) => ms.filter((m) => m.id !== id));
@@ -1025,6 +1038,7 @@ export default function EditorMassa({
         />
       )}
       {toast && <div className={s.toast}>{toast}</div>}
+      {bibliotecaMusicas && <BibliotecaMusicas fechar={() => setBibliotecaMusicas(false)} aoEscolher={(arquivos) => adicionarMusicas(arquivos, true)} />}
       {importarAberto && <ImportarPerfil loteInicial={loteImportar} fechar={() => { setImportarAberto(false); setLoteImportar(null); }} aoArquivos={adicionarVideos} />}
 
       <input

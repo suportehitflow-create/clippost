@@ -25,6 +25,7 @@ export interface PropsLateral {
   editarTemplate?: () => void;
   musicas: MusicaCliente[];
   importarMusicas: () => void;
+  abrirBibliotecaMusicas?: () => void;
   removerMusica: (id: string) => void;
   totalVideos: number;
   aplicarTextosEmMassa: (linhas: string[]) => void;
@@ -545,6 +546,11 @@ export default function Lateral(p: PropsLateral) {
         <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={p.importarMusicas}>
           <Icone nome="mais" tamanho={14} /> Importar músicas
         </button>
+        {p.abrirBibliotecaMusicas && (
+          <button type="button" className={`${s.btn} ${s.btnPequeno}`} onClick={p.abrirBibliotecaMusicas}>
+            <Icone nome="musica" tamanho={14} /> Minhas músicas (salvas)
+          </button>
+        )}
         {musicaSel && (
           <>
             <Slider
