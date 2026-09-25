@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import {
-  Calendar, ChevronLeft, ChevronRight, Plus, Loader2, X, Send, Trash2, Clock, CheckCircle2, AlertCircle, Layers, Activity, Film, ExternalLink,
+  Calendar, ChevronLeft, ChevronRight, Plus, Loader2, X, Send, Trash2, Clock, CheckCircle2, AlertCircle, Layers, Activity, Film, ExternalLink, Sparkles,
 } from 'lucide-react'
 
 // Calendário & Publicações (baseado no Agendador do usuário): calendário do mês com o ciclo de cada
@@ -38,6 +38,46 @@ const STATUS: Record<Status, { nome: string; cor: string; fundo: string }> = {
   failed: { nome: 'Falhou', cor: '#ef4444', fundo: 'rgba(239,68,68,0.14)' },
 }
 const PLAT: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', youtube_shorts: 'YouTube', youtube: 'YouTube', twitter: 'X' }
+
+// Limite de caracteres da legenda (YouTube: é o título do Short) e onde o Instagram corta com "...mais"
+const LIMITE_LEGENDA: Record<string, number> = { instagram: 2200, facebook: 2200, tiktok: 2200, youtube_shorts: 100 }
+const CORTE_MAIS_IG = 125
+
+// Horários de pico gerais por rede (horário do público). São referências de mercado, não dados da sua conta.
+const MELHORES_HORARIOS: Record<string, string[]> = {
+  instagram: ['11:00', '13:00', '19:00', '21:00'],
+  tiktok: ['12:00', '15:00', '19:00', '22:00'],
+  youtube_shorts: ['12:00', '17:00', '20:00'],
+  facebook: ['09:00', '13:00', '18:00'],
+}
+const FUSOS = [
+  { id: 'America/Sao_Paulo', nome: 'Brasil (Brasília)' },
+  { id: 'Europe/Lisbon', nome: 'Portugal' },
+  { id: 'America/New_York', nome: 'EUA (Nova York)' },
+  { id: 'local', nome: 'Meu fuso' },
+]
+
+// Limite diário de publicações pela API de cada rede (por conta)
+const LIMITE_DIARIO: Record<string, { n: number; fonte: string }> = {
+  instagram: { n: 100, fonte: 'a Meta aceita até 100 posts por conta a cada 24h pela API' },
+  tiktok: { n: 15, fonte: 'a API do TikTok aceita cerca de 15 vídeos por dia por conta' },
+  youtube_shorts: { n: 6, fonte: 'a cota padrão da API do YouTube dá para cerca de 6 envios por dia' },
+}
+
+/** Diferença (min) entre o fuso do público e o do navegador, para converter "18:00 no Brasil" em hora local */
+function diferencaFuso(fuso: string): number {
+  if (fuso === 'local') return 0
+  const agora = new Date()
+  const noFuso = new Date(agora.toLocaleString('en-US', { timeZone: fuso }))
+  const local = new Date(agora.toLocaleString('en-US'))
+  return Math.round((noFuso.getTime() - local.getTime()) / 60000)
+}
+
+function horarioLocal(hhmm: string, fuso: string) {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total = (((h * 60 + m - diferencaFuso(fuso)) % 1440) + 1440) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
 
 const mesmoDia = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 const hm = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -118,9 +158,12 @@ function Conteudo() {
   const [horarios, setHorarios] = useState<string[]>(['09:00', '12:00', '18:00', '21:00'])
   const [novoHorario, setNovoHorario] = useState('')
   const [inicio, setInicio] = useState(() => paraInput(new Date()).slice(0, 10))
-  const [legendaModo, setLegendaModo] = useState<'corte' | 'comum'>('corte')
+  const [legendaModo, setLegendaModo] = useState<'corte' | 'comum' | 'ia'>('corte')
   const [legendaComum, setLegendaComum] = useState('')
+  const [tomIA, setTomIA] = useState('viral')
   const [agendando, setAgendando] = useState(false)
+  const [progresso, setProgresso] = useState('')
+  const [fusoPublico, setFusoPublico] = useState('America/Sao_Paulo')
 
   // atividade
   const [filtro, setFiltro] = useState<'todos' | Status>('todos')
@@ -206,10 +249,30 @@ function Conteudo() {
     if (slots.length < escolhidos.length) return avisar('erro', 'Não há horários suficientes a partir dessa data.')
     setAgendando(true)
     try {
+      // "IA para cada corte": uma legenda com hashtags por corte (2 por vez; se falhar, usa o título)
+      const legendas = new Map<string, string>()
+      if (legendaModo === 'ia') {
+        const rede = redesSelecionadas.includes('instagram') ? 'instagram' : redesSelecionadas[0] ?? 'instagram'
+        let feitos = 0
+        const fila = [...escolhidos]
+        const trabalhar = async () => {
+          for (let c = fila.shift(); c; c = fila.shift()) {
+            try {
+              const [o] = await gerarLegendasIA({ clipId: c.id, titulo: c.hook || c.title || '', plataforma: rede, tom: tomIA })
+              if (o) legendas.set(c.id, juntarLegenda(o, rede))
+            } catch {
+              // fica o título do corte
+            }
+            setProgresso(`Escrevendo legendas com IA… ${++feitos}/${escolhidos.length}`)
+          }
+        }
+        await Promise.all([trabalhar(), trabalhar()])
+        setProgresso('')
+      }
       const linhas = escolhidos.flatMap((c, i) =>
         (destino.length ? destino : [null]).map(conta => ({
           clip_id: c.id,
-          caption: legendaModo === 'comum' ? legendaComum : c.hook || c.title || '',
+          caption: legendaModo === 'comum' ? legendaComum : legendas.get(c.id) ?? (c.hook || c.title || ''),
           scheduled_at: slots[i].toISOString(),
           conta,
         })),
@@ -225,7 +288,14 @@ function Conteudo() {
       avisar('erro', `Não foi possível agendar: ${e.message}`)
     } finally {
       setAgendando(false)
+      setProgresso('')
     }
+  }
+
+  function usarMelhoresHorarios() {
+    const redes = redesSelecionadas.length ? redesSelecionadas : ['instagram']
+    const todos = redes.flatMap(r => MELHORES_HORARIOS[r] ?? MELHORES_HORARIOS.instagram).map(h => horarioLocal(h, fusoPublico))
+    setHorarios([...new Set(todos)].sort())
   }
 
   async function salvarDetalhe(p: Post, campos: Partial<Post>) {
@@ -248,6 +318,31 @@ function Conteudo() {
   const grade = gradeDoMes(mes)
   const doDia = posts.filter(p => mesmoDia(new Date(p.scheduled_at), diaSel))
   const previa = calcularHorarios(dias, horarios, inicio, Math.max(1, selCortes.length))
+  const redesSelecionadas = [...new Set(selContas.map(id => contaPorId.get(id)).filter(Boolean).map(c => plataformaPost((c as Conta).platform)))]
+
+  // Limite diário da API por conta: posts já agendados naquele dia + os deste lote
+  const avisosLimite = (() => {
+    if (!selCortes.length) return [] as string[]
+    const chave = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    const novosPorDia = new Map<string, { n: number; d: Date }>()
+    previa.slice(0, selCortes.length).forEach(d => {
+      const k = chave(d)
+      novosPorDia.set(k, { n: (novosPorDia.get(k)?.n ?? 0) + 1, d })
+    })
+    const avisos: string[] = []
+    for (const id of selContas) {
+      const c = contaPorId.get(id)
+      const lim = c && LIMITE_DIARIO[plataformaPost(c.platform)]
+      if (!c || !lim) continue
+      for (const [k, { n, d }] of novosPorDia) {
+        const existentes = posts.filter(p => p.social_account_id === id && p.status === 'scheduled' && chave(new Date(p.scheduled_at)) === k).length
+        if (existentes + n > lim.n) {
+          avisos.push(`${nomeConta(c)} teria ${existentes + n} posts em ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} — ${lim.fonte}.`)
+        }
+      }
+    }
+    return avisos
+  })()
   const atividade = [...posts].reverse().filter(p => filtro === 'todos' || p.status === filtro)
 
   return (
@@ -433,7 +528,17 @@ function Conteudo() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-[11px] text-zinc-500">Horários</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-zinc-500">Horários (no seu relógio)</span>
+                    <div className="flex items-center gap-1.5">
+                      <select id="massa-fuso" value={fusoPublico} onChange={e => setFusoPublico(e.target.value)} className="px-2 py-1 rounded-lg bg-black/40 border border-white/[0.1] text-[11px]" aria-label="Fuso do público">
+                        {FUSOS.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                      </select>
+                      <button type="button" onClick={usarMelhoresHorarios} className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-[11px] font-semibold text-indigo-200 flex items-center gap-1" title="Horários de pico gerais de cada rede, no fuso do seu público">
+                        <Sparkles className="w-3 h-3" /> Melhores horários
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-1 items-center">
                     {horarios.map(h => (
                       <span key={h} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-zinc-900 flex items-center gap-1 tabular-nums">
@@ -453,12 +558,25 @@ function Conteudo() {
 
               <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-4 space-y-2.5">
                 <h3 className="text-sm font-semibold">4. Legenda</h3>
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
+                  <button type="button" className={pilula(legendaModo === 'ia')} onClick={() => setLegendaModo('ia')}>✨ IA para cada corte</button>
                   <button type="button" className={pilula(legendaModo === 'corte')} onClick={() => setLegendaModo('corte')}>Título de cada corte</button>
                   <button type="button" className={pilula(legendaModo === 'comum')} onClick={() => setLegendaModo('comum')}>Mesma para todos</button>
                 </div>
+                {legendaModo === 'ia' && (
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                    Tom:
+                    <select id="massa-tom" value={tomIA} onChange={e => setTomIA(e.target.value)} className="px-2 py-1 rounded-lg bg-black/40 border border-white/[0.1] text-[11px]">
+                      <option value="viral">Viral</option>
+                      <option value="engracado">Engraçado</option>
+                      <option value="informativo">Informativo</option>
+                      <option value="polemico">Polêmico</option>
+                    </select>
+                    <span>legenda + hashtags a partir do que é falado em cada corte</span>
+                  </div>
+                )}
                 {legendaModo === 'comum' && (
-                  <textarea id="massa-legenda" value={legendaComum} onChange={e => setLegendaComum(e.target.value)} rows={4} placeholder="Legenda, hashtags…" className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
+                  <EditorLegenda id="massa-legenda" valor={legendaComum} mudar={setLegendaComum} plataformas={redesSelecionadas} titulo={legendaComum} linhas={4} />
                 )}
               </div>
 
@@ -468,9 +586,16 @@ function Conteudo() {
                     ? <>{selCortes.length} corte(s) × {Math.max(1, selContas.length)} conta(s) = <b>{selCortes.length * Math.max(1, selContas.length)} publicações</b>{previa.length ? <>, de {dataHora(previa[0])} até {dataHora(previa[previa.length - 1])}.</> : '.'}</>
                     : 'Escolha os cortes para ver a prévia da agenda.'}
                 </p>
+                {avisosLimite.length > 0 && (
+                  <div className="space-y-1 rounded-xl bg-amber-500/10 border border-amber-500/25 p-2.5">
+                    <p className="text-[11px] font-semibold text-amber-200 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> Passa do limite diário</p>
+                    {avisosLimite.slice(0, 4).map(a => <p key={a} className="text-[11px] text-amber-100/90">{a}</p>)}
+                    <p className="text-[10px] text-amber-100/70">Os posts acima do limite costumam falhar. Tire horários ou comece em outra data.</p>
+                  </div>
+                )}
                 <button type="button" onClick={agendarEmMassa} disabled={agendando || !selCortes.length}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                  {agendando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Agendar
+                  {agendando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {progresso || 'Agendar'}
                 </button>
               </div>
             </div>
@@ -567,10 +692,7 @@ function DetalhePost({ p, conta, fechar, salvar, excluir }: { p: Post; conta?: C
           )}
           {editavel ? (
             <>
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">Legenda</span>
-                <textarea id="detalhe-legenda" value={legenda} onChange={e => setLegenda(e.target.value)} rows={5} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
-              </label>
+              <EditorLegenda id="detalhe-legenda" valor={legenda} mudar={setLegenda} plataformas={[p.platform]} clipId={p.clip_id} titulo={p.clips?.title ?? undefined} />
               <label className="block space-y-1">
                 <span className="text-[11px] text-zinc-500">Data e hora</span>
                 <input id="detalhe-quando" type="datetime-local" value={quando} onChange={e => setQuando(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
@@ -641,10 +763,14 @@ function NovoPost({ dia, cortes, contas, fechar, agendar }: {
                 </div>
               </div>
             )}
-            <label className="block space-y-1">
-              <span className="text-[11px] text-zinc-500">Legenda</span>
-              <textarea id="novo-legenda" value={legenda} onChange={e => setLegenda(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
-            </label>
+            <EditorLegenda
+              id="novo-legenda"
+              valor={legenda}
+              mudar={setLegenda}
+              plataformas={contas.filter(c => sel.includes(c.id)).map(c => plataformaPost(c.platform))}
+              clipId={clip || undefined}
+              linhas={4}
+            />
             <label className="block space-y-1">
               <span className="text-[11px] text-zinc-500">Data e hora</span>
               <input id="novo-quando" type="datetime-local" value={quando} onChange={e => setQuando(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
@@ -663,6 +789,106 @@ function NovoPost({ dia, cortes, contas, fechar, agendar }: {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Pede ao backend 3 legendas com hashtags para um corte */
+async function gerarLegendasIA(p: { clipId?: string; titulo?: string; plataforma: string; tom: string }) {
+  const r = await fetch('/api/captions/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clip_id: p.clipId, titulo: p.titulo, plataforma: p.plataforma, tom: p.tom }),
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(d.detail || 'Não foi possível gerar a legenda.')
+  return (d.opcoes ?? []) as { legenda: string; hashtags: string[] }[]
+}
+
+const juntarLegenda = (o: { legenda: string; hashtags: string[] }, plataforma: string) =>
+  plataforma === 'youtube_shorts' ? o.legenda : `${o.legenda}\n\n${o.hashtags.join(' ')}`.trim()
+
+/** Legenda com contador por rede, prévia do "...mais" do Instagram e geração com IA */
+function EditorLegenda({ id, valor, mudar, plataformas, clipId, titulo, linhas = 5 }: {
+  id: string
+  valor: string
+  mudar: (v: string) => void
+  plataformas: string[]
+  clipId?: string
+  titulo?: string
+  linhas?: number
+}) {
+  const [tom, setTom] = useState('viral')
+  const [gerando, setGerando] = useState(false)
+  const [opcoes, setOpcoes] = useState<{ legenda: string; hashtags: string[] }[]>([])
+  const [erro, setErro] = useState('')
+  const redes = [...new Set(plataformas.length ? plataformas : ['instagram'])]
+  const principal = redes.includes('instagram') ? 'instagram' : redes[0]
+
+  async function gerar() {
+    setGerando(true)
+    setErro('')
+    try {
+      setOpcoes(await gerarLegendasIA({ clipId, titulo, plataforma: principal, tom }))
+    } catch (e: any) {
+      setErro(e.message)
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-zinc-500">Legenda</span>
+        <div className="flex items-center gap-1.5">
+          <select id={`${id}-tom`} value={tom} onChange={e => setTom(e.target.value)} className="px-2 py-1 rounded-lg bg-black/40 border border-white/[0.1] text-[11px]" aria-label="Tom da legenda">
+            <option value="viral">Viral</option>
+            <option value="engracado">Engraçado</option>
+            <option value="informativo">Informativo</option>
+            <option value="polemico">Polêmico</option>
+          </select>
+          <button type="button" onClick={gerar} disabled={gerando || (!clipId && !titulo && !valor)}
+            className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-[11px] font-semibold text-indigo-200 flex items-center gap-1 disabled:opacity-50">
+            {gerando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Gerar com IA
+          </button>
+        </div>
+      </div>
+      <textarea id={id} value={valor} onChange={e => mudar(e.target.value)} rows={linhas} className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm" />
+      {erro && <p className="text-[11px] text-red-300">{erro}</p>}
+      {opcoes.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[11px] text-zinc-500">Escolha uma opção (dá para editar depois):</span>
+          {opcoes.map((o, i) => (
+            <button key={i} type="button" onClick={() => { mudar(juntarLegenda(o, principal)); setOpcoes([]) }}
+              className="w-full text-left p-2.5 rounded-xl bg-black/30 border border-white/[0.08] hover:border-indigo-400/60">
+              <p className="text-xs text-zinc-200 whitespace-pre-line line-clamp-4">{o.legenda}</p>
+              {principal !== 'youtube_shorts' && <p className="text-[10px] text-indigo-300/80 mt-1 line-clamp-1">{o.hashtags.join(' ')}</p>}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* contador por rede */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {redes.map(r => {
+          const lim = LIMITE_LEGENDA[r] ?? 2200
+          const passou = valor.length > lim
+          return (
+            <span key={r} className={`text-[10px] tabular-nums ${passou ? 'text-red-300' : 'text-zinc-500'}`}>
+              {PLAT[r] ?? r}: {valor.length}/{lim}{r === 'youtube_shorts' && passou ? ' (vira título: corta aqui)' : ''}
+            </span>
+          )
+        })}
+      </div>
+      {/* prévia do Instagram: o que aparece antes do "...mais" */}
+      {redes.includes('instagram') && valor.trim() && (
+        <div className="rounded-xl bg-black/30 border border-white/[0.06] p-2.5">
+          <span className="text-[10px] text-zinc-500 block mb-1">Prévia no Instagram</span>
+          <p className="text-xs text-zinc-200 whitespace-pre-line">
+            {valor.length > CORTE_MAIS_IG ? <>{valor.slice(0, CORTE_MAIS_IG).trimEnd()}<span className="text-zinc-500">... mais</span></> : valor}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

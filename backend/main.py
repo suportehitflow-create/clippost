@@ -861,8 +861,8 @@ def _storage_privado():
     return supabase.storage.from_(_BUCKET_PRIVADO)
 
 
-async def _exigir_login(request: Request) -> str:
-    """Valida o token de login (Bearer) no Supabase; com ADMIN_EMAILS definido, só esses e-mails passam."""
+async def _usuario_logado(request: Request):
+    """Usuário do token de login (Bearer) validado no Supabase; 401 se não houver."""
     token = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
     if not token or supabase is None:
         raise HTTPException(status_code=401, detail="Faça login.")
@@ -873,6 +873,12 @@ async def _exigir_login(request: Request) -> str:
         user = None
     if not user:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+    return user
+
+
+async def _exigir_login(request: Request) -> str:
+    """Login obrigatório; com ADMIN_EMAILS definido, só esses e-mails passam."""
+    user = await _usuario_logado(request)
     admins = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
     if admins and (user.email or "").lower() not in admins:
         raise HTTPException(status_code=403, detail="Só o administrador pode alterar os cookies do servidor.")
@@ -1053,6 +1059,71 @@ async def rerender_clip(clip_id: str, req: RerenderRequest, background_tasks: Ba
 
     background_tasks.add_task(_run_tracked, "rerender", rerender_clip_task, clip_id, req.subtitle_preset, req.subtitle_y, req.words)
     return {"status": "rerendering", "clip_id": clip_id}
+
+
+@app.post("/api/tools/youtube-texto")
+async def ferramenta_youtube_texto(request: Request):
+    """Legenda de um vídeo do YouTube em texto/Markdown (base para roteiros). Corpo: { url }"""
+    await _usuario_logado(request)
+    body = await request.json()
+    from services.ferramentas import youtube_para_texto
+    try:
+        return await asyncio.to_thread(youtube_para_texto, str(body.get("url") or "").strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"[youtube-texto] falhou: {type(e).__name__}: {str(e)[:160]}")
+        raise HTTPException(status_code=502, detail="Não consegui ler esse vídeo agora. Confira o link e tente de novo.")
+
+
+@app.post("/api/tools/raio-x")
+async def ferramenta_raio_x(request: Request):
+    """Nota de desempenho de um perfil a partir dos vídeos recentes. Corpo: { perfil }"""
+    await _usuario_logado(request)
+    body = await request.json()
+    perfil = str(body.get("perfil") or "").strip()
+    if not perfil:
+        raise HTTPException(status_code=400, detail="Cole o link do perfil ou canal.")
+    from services.ferramentas import raio_x_perfil
+    try:
+        return await asyncio.to_thread(raio_x_perfil, perfil, 20)
+    except ValueError as e:
+        dica = " Para Instagram, conecte o Instagram no Autopilot." if "instagram" in perfil.lower() else ""
+        raise HTTPException(status_code=400, detail=f"{str(e)[:200]}{dica}")
+    except Exception as e:
+        print(f"[raio-x] falhou: {type(e).__name__}: {str(e)[:160]}")
+        raise HTTPException(status_code=502, detail="Não consegui analisar esse perfil agora.")
+
+
+@app.post("/api/captions/generate")
+async def gerar_legenda_post(request: Request):
+    """3 opções de legenda + hashtags para um corte (usa o título e o que é falado nele).
+    Corpo: { clip_id?, titulo?, plataforma?, tom? }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    titulo = str(body.get("titulo") or "")[:300]
+    plataforma = str(body.get("plataforma") or "instagram")
+    tom = str(body.get("tom") or "viral")
+    transcricao = ""
+    clip_id = body.get("clip_id")
+    if clip_id:
+        from services.legenda_post import texto_do_trecho
+        clip = maybe_one(supabase.table("clips").select("title, hook, start_time, end_time, project_id, user_id").eq("id", clip_id))
+        c = clip.data if clip else None
+        if c and c.get("user_id") == user.id:
+            titulo = titulo or c.get("hook") or c.get("title") or ""
+            proj = maybe_one(supabase.table("projects").select("transcript").eq("id", c.get("project_id")))
+            transcricao = texto_do_trecho((proj.data or {}).get("transcript") if proj else None,
+                                          float(c.get("start_time") or 0), float(c.get("end_time") or 0))
+    if not titulo and not transcricao:
+        raise HTTPException(status_code=400, detail="Informe um título ou escolha um corte.")
+    from services.legenda_post import gerar_legendas
+    try:
+        opcoes = await asyncio.to_thread(gerar_legendas, titulo, transcricao, plataforma, tom)
+    except Exception as e:
+        print(f"[legenda-post] falhou: {type(e).__name__}")
+        raise HTTPException(status_code=502, detail="A IA não conseguiu gerar agora. Tente de novo em instantes.")
+    return {"opcoes": opcoes}
 
 
 @app.post("/api/subtitles/ass")

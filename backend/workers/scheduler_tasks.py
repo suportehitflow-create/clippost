@@ -54,6 +54,16 @@ def _get_meta_token(user_id: str, platform: str, social_account_id: str | None) 
         return None
 
 
+def _quebras_seguras(caption: str) -> str:
+    """Instagram/TikTok/Facebook juntam linhas em branco e cortam espaços no fim de linha:
+    tira os espaços finais e troca cada linha vazia por um caractere invisível (U+2800),
+    assim o espaçamento que a pessoa escreveu aparece igual no post."""
+    linhas = [l.rstrip() for l in (caption or "").replace("\r\n", "\n").split("\n")]
+    while linhas and not linhas[-1]:
+        linhas.pop()
+    return "\n".join(l if l else "⠀" for l in linhas)
+
+
 def _finish(post_id: str, status: str, detail: str) -> None:
     campos = {"status": status}
     # motivo da falha / data de publicação aparecem no Calendário & Publicações
@@ -90,6 +100,8 @@ def check_and_publish_scheduled_posts():
         clip_data = (clip.data if clip else None) or {}
         video_url = clip_data.get("storage_url")
         caption = post.get("caption") or clip_data.get("title") or ""
+        if platform in ("instagram", "facebook", "tiktok"):
+            caption = _quebras_seguras(caption)
 
         if not video_url:
             _finish(post["id"], "failed", "clipe sem video_url")
