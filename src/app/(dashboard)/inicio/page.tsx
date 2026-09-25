@@ -16,6 +16,7 @@ import {
   Video,
   Clock,
   TrendingUp,
+  Radio,
   CheckCircle2,
   type LucideIcon,
 } from 'lucide-react'
@@ -34,16 +35,23 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     number: '01',
-    title: 'Criar cortes a partir de vídeos longos',
-    description: 'Transforme vídeos longos do YouTube ou arquivos MP4 em clipes curtos verticais 9:16 com os melhores momentos e legendas virais automáticas.',
+    title: 'Criar cortes de vídeos longos',
+    description: 'Cole o link de um vídeo longo do YouTube e gere dezenas de cortes verticais 9:16 prontos com enquadramento inteligente e legendas dinâmicas.',
     href: '/upload',
     icon: Scissors,
-    badge: 'Ferramenta #1',
-    badgeColor: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
     wide: true,
   },
   {
     number: '02',
+    title: 'Cortes Ao Vivo (Twitch & YouTube)',
+    description: 'Acompanhe lives e clipe retroativamente até 2 minutos para trás em 1 clique, já com seu template e legendas dinâmicas aplicados.',
+    href: '/live',
+    icon: Radio,
+    badge: 'Ao Vivo',
+    badgeColor: 'bg-red-500/15 text-red-400 border-red-500/30',
+  },
+  {
+    number: '03',
     title: 'Edição em Massa & Perfis',
     description: 'Editor visual em grade com recorte 9:16, templates de marca e servidor FFmpeg dedicado para processar dezenas de vídeos.',
     href: '/bulk',
@@ -52,7 +60,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   },
   {
-    number: '03',
+    number: '04',
     title: 'Radar de Viralidade',
     description: 'Monitore vídeos que estão explodindo em engajamento nas últimas 24h para minerar antes da concorrência.',
     href: '/trends',
@@ -61,7 +69,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
   },
   {
-    number: '04',
+    number: '05',
     title: 'Estúdio de Roteiros IA',
     description: 'Gere roteiros persuasivos e ganchos magnéticos estruturados com técnicas de retenção e storytelling.',
     href: '/creator',
@@ -70,7 +78,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   },
   {
-    number: '05',
+    number: '06',
     title: 'Identidade Visual & Templates',
     description: 'Configure layout, cores, fontes Apple/Instagram e posições de títulos e legendas para os seus cortes.',
     href: '/templates',
@@ -79,7 +87,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
   },
   {
-    number: '06',
+    number: '07',
     title: 'Autopilot 24/7',
     description: 'Monitore canais do YouTube e perfis para minerar, cortar e preparar clipes sozinho a cada novo upload.',
     href: '/autopilot',
@@ -88,7 +96,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   },
   {
-    number: '07',
+    number: '08',
     title: 'Calendário & Publicações',
     description: 'Agende publicações programadas com legendas prontas e hashtags direto para Instagram, TikTok e Shorts.',
     href: '/schedule',
@@ -97,7 +105,7 @@ const FEATURES: Feature[] = [
     badgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   },
   {
-    number: '08',
+    number: '09',
     title: 'Meus Projetos & Vídeos',
     description: 'Acesse todo o histórico de vídeos processados, transcrições e cortes renderizados prontos para download.',
     href: '/dashboard',

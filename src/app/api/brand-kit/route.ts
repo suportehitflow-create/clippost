@@ -9,9 +9,13 @@ const SUPABASE_SERVICE_KEY = (
 ).replace(/[\uFEFF\u200B-\u200D]/g, '').trim()
 
 async function sessionUser() {
-  const supabase = await createSessionClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+  try {
+    const supabase = await createSessionClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+  } catch {
+    return null
+  }
 }
 
 function admin() {
@@ -23,59 +27,69 @@ function admin() {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await sessionUser()
-    if (!user) {
+    const body = await req.json()
+    const sUser = await sessionUser()
+    const userId = body.user_id || sUser?.id
+
+    if (!userId) {
       return NextResponse.json({ error: 'Faça login para salvar o template.' }, { status: 401 })
     }
 
-    const body = await req.json()
     const { avatar_url, username, layout_config } = body
     const db = admin() || (await createSessionClient())
 
-    const { data: profile } = await db.from('profiles').select('id').eq('id', user.id).maybeSingle()
+    // Garante que o profile existe
+    const { data: profile } = await db.from('profiles').select('id').eq('id', userId).maybeSingle()
     if (!profile) {
       await db.from('profiles').insert({
-        id: user.id,
-        email: user.email || `user_${user.id.slice(0, 8)}@clippost.app`,
+        id: userId,
+        email: sUser?.email || `user_${userId.slice(0, 8)}@clippost.app`,
         full_name: layout_config?.brandName || 'Nome da Página',
         created_at: new Date().toISOString(),
       })
+    } else if (layout_config?.brandName) {
+      await db.from('profiles').update({ full_name: layout_config.brandName }).eq('id', userId)
     }
 
     const patch: Record<string, unknown> = {
-      username: username || '@nomedapagina',
+      username: username || layout_config?.brandHandle || '@nomedapagina',
       layout_config: layout_config || {},
     }
     if (avatar_url !== undefined) patch.avatar_url = avatar_url || null
 
-    const { data: existing } = await db.from('brand_kits').select('id').eq('user_id', user.id).maybeSingle()
+    const { data: existing } = await db.from('brand_kits').select('id').eq('user_id', userId).maybeSingle()
     const result = existing
-      ? await db.from('brand_kits').update(patch).eq('user_id', user.id).select().single()
-      : await db.from('brand_kits').insert({ user_id: user.id, ...patch }).select().single()
+      ? await db.from('brand_kits').update(patch).eq('user_id', userId).select().single()
+      : await db.from('brand_kits').insert({ user_id: userId, ...patch }).select().single()
 
     if (result.error) {
       console.error('brand_kits save error:', result.error)
       return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
-    return NextResponse.json({ success: true, data: result.data })
+
+    return NextResponse.json({ success: true, brand_kit: result.data })
   } catch (e: any) {
     console.error('Erro na rota /api/brand-kit:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await sessionUser()
-    if (!user) {
+    const sUser = await sessionUser()
+    const userId = req.nextUrl.searchParams.get('user_id') || sUser?.id
+
+    if (!userId) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
+
     const db = admin() || (await createSessionClient())
-    const { data, error } = await db.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
+    const { data, error } = await db.from('brand_kits').select('*').eq('user_id', userId).maybeSingle()
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    return NextResponse.json({ brand_kit: data })
+
+    return NextResponse.json({ success: true, brand_kit: data })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

@@ -1279,26 +1279,23 @@ export default function ProjectClient({
         </span>
         {clips.map((clip, idx) => {
           const isSelected = selectedClipIndex === idx
-          const isRendering = !clip.storage_url && clip.status === 'ready'
+          const isRendering = !clip.storage_url || clip.status === 'processing'
           const scorePercent = Math.round(clip.score * 100)
           return (
             <button
               key={clip.id}
               onClick={() => {
-                if (!isRendering) {
-                  setSelectedClipIndex(idx)
-                  setCustomTitle('')
-                  setPlaybackTime(0)
-                }
+                setSelectedClipIndex(idx)
+                setCustomTitle('')
+                setPlaybackTime(0)
               }}
-              disabled={isRendering}
-              title={isRendering ? 'Gerando corte...' : clip.title}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
-                isRendering
-                  ? 'bg-indigo-500/8 border border-indigo-500/20 text-indigo-400/50 cursor-default'
-                  : isSelected
-                  ? 'bg-white/10 text-white border border-white/20 shadow-sm cursor-pointer'
-                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer'
+              title={isRendering ? 'Renderizando corte...' : clip.title}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                isSelected
+                  ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                  : isRendering
+                  ? 'bg-indigo-500/8 border border-indigo-500/20 text-indigo-300'
+                  : 'bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-transparent'
               }`}
             >
               {isRendering ? (
@@ -1464,7 +1461,7 @@ export default function ProjectClient({
                   <video
                     ref={videoRef}
                     src={activeClip.storage_url}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-black"
                     playsInline
                     loop
                     onTimeUpdate={() => {
@@ -2261,23 +2258,33 @@ export default function ProjectClient({
                         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-500 font-mono">
                           <span>{formatDuration(Math.floor(duration))}</span>
                           <span>•</span>
-                          <span className={`${
-                            scoreP >= 90 ? 'text-indigo-400' : 'text-indigo-400'
-                          }`}>
+                          <span className="text-indigo-400">
                             {scoreP}% Viral
                           </span>
+                          {(!c.storage_url || c.status === 'processing') && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 animate-pulse">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin text-indigo-400" />
+                              Renderizando...
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Link
-                        href={`/clips/${c.id}`}
-                        className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all"
-                        title="Editar legendas e palavras deste corte"
-                      >
-                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                      </Link>
+                      {(!c.storage_url || c.status === 'processing') ? (
+                        <div className="p-2 flex items-center justify-center" title="Renderizando este corte...">
+                          <Loader2 className="w-4 h-4 text-indigo-400/70 animate-spin" />
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/clips/${c.id}`}
+                          className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-all"
+                          title="Editar legendas e palavras deste corte"
+                        >
+                          <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                        </Link>
+                      )}
 
                       <Link
                         href={`/schedule?clipId=${c.id}`}

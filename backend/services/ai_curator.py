@@ -402,7 +402,7 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 
     # Validação e saneamento (incluindo filtro de intro/outro e limite de 90s)
     validated = []
-    for c in clips[:20]:
+    for c in clips[:35]:
         try:
             start = max(0.0, float(c.get("start_time", 0)))
             end = float(c.get("end_time", start + 60))

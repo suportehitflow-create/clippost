@@ -453,16 +453,23 @@ def generate_ass(segments: list[dict], output_path: str | None = None,
     # Revelação: a cor "ainda não falada" é transparente
     secondary_color = "&HFF000000" if animation == "reveal" else "&H000000FF"
 
-    # Header oficial ASS no canvas 720x1280
+    # Header oficial ASS no canvas 1080x1920 (Full HD vertical padrão)
+    # Margens laterais generosas (80px) evitam corte de texto em celulares e telas estreitas
+    scale_factor = 1080.0 / 720.0
+    f_size_scaled = int(round(f_size * scale_factor))
+    outline_scaled = max(4, int(round(outline_val * scale_factor)))
+    shadow_scaled = int(round(shadow_val * scale_factor))
+    margin_lr = 80
+
     header = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 720
-PlayResY: 1280
+PlayResX: 1080
+PlayResY: 1920
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Viral,{font_name},{f_size},{primary_color},{secondary_color},{outline_color},{back_color},{bold_val},0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},2,54,54,{margin_v},1
+Style: Viral,{font_name},{f_size_scaled},{primary_color},{secondary_color},{outline_color},{back_color},{bold_val},0,0,0,100,100,0,0,{border_style},{outline_scaled},{shadow_scaled},2,{margin_lr},{margin_lr},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

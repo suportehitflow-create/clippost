@@ -13,7 +13,8 @@ import {
   Zap,
   Calendar,
   Settings,
-  FolderOpen
+  FolderOpen,
+  Radio
 } from 'lucide-react'
 import { useHorizontalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { label: 'Início', href: '/inicio', icon: Home },
   { label: 'Biblioteca', href: '/dashboard', icon: FolderOpen },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
+  { label: 'Cortes Ao Vivo', href: '/live', icon: Radio },
   { label: 'Radar Viral', href: '/trends', icon: Flame },
   { label: 'Roteiros IA', href: '/creator', icon: PenTool },
   { label: 'Edição em Massa', href: '/bulk', icon: Layers },

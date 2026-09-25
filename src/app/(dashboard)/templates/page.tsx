@@ -215,6 +215,7 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [userId, setUserId] = useState<string | null>(null)
   // Só salva depois de carregar o template existente; senão os valores padrão sobrescrevem o salvo
   const hydratedRef = useRef(false)
   const pendingSaveRef = useRef<string | null>(null)
@@ -272,23 +273,35 @@ export default function TemplatesPage() {
     if (c.customBgImage !== undefined) setCustomBgImage(c.customBgImage || null)
   }
 
-  // Carregar template salvo: localStorage primeiro (instantâneo), depois o banco (fonte da verdade)
+  // Carregar template salvo: busca no banco com fallback para localStorage
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('clippost_active_template')
-      if (saved) {
-        const p = JSON.parse(saved)
-        applyConfig({ ...(p.config || {}), subtitle_preset: p.config?.subtitle_preset || p.subtitle_preset }, p.avatar_url)
-      }
-    } catch {}
-
     ;(async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: bk } = await supabase.from('brand_kits').select('*').eq('user_id', user.id).maybeSingle()
-        if (bk?.layout_config && Object.keys(bk.layout_config).length > 0) {
-          applyConfig({ ...bk.layout_config, brandHandle: bk.layout_config.brandHandle || bk.username }, bk.avatar_url)
+        if (user) {
+          setUserId(user.id)
+          // Busca diretamente da API com service role (garante leitura sem falha de RLS)
+          const res = await fetch('/api/brand-kit?user_id=' + user.id).then(r => r.json()).catch(() => null)
+          if (res?.brand_kit?.layout_config && Object.keys(res.brand_kit.layout_config).length > 0) {
+            applyConfig({
+              ...res.brand_kit.layout_config,
+              brandName: res.brand_kit.layout_config.brandName || 'Nome da Página',
+              brandHandle: res.brand_kit.layout_config.brandHandle || res.brand_kit.username || '@nomedapagina',
+            }, res.brand_kit.avatar_url)
+            hydratedRef.current = true
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar template do servidor:', e)
+      }
+
+      // Fallback para localStorage
+      try {
+        const saved = localStorage.getItem('clippost_active_template')
+        if (saved) {
+          const p = JSON.parse(saved)
+          applyConfig({ ...(p.config || {}), subtitle_preset: p.config?.subtitle_preset || p.subtitle_preset }, p.avatar_url)
         }
       } catch {} finally {
         hydratedRef.current = true
@@ -355,10 +368,11 @@ export default function TemplatesPage() {
   }
 
   const buildSaveBody = () => JSON.stringify({
+    user_id: userId,
     // blob: é só a prévia local enquanto o upload do avatar não termina
     avatar_url: avatarUrl.startsWith('blob:') ? undefined : avatarUrl,
     username: brandHandle,
-    layout_config: layoutConfig,
+    layout_config: { ...layoutConfig, brandName, brandHandle },
   })
 
   const sendSave = async (body: string, keepalive = false) => {

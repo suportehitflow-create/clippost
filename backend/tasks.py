@@ -1026,24 +1026,60 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             existing_cfg = brand_kit.get("layout_config") or {}
             brand_kit["layout_config"] = {**existing_cfg, **template_config}
             if template_config.get("brandName"):
-                brand_kit["username"] = template_config.get("brandHandle") or brand_kit.get("username")
+                brand_kit["layout_config"]["brandName"] = template_config.get("brandName")
+            if template_config.get("brandHandle") or template_config.get("username"):
+                brand_kit["username"] = template_config.get("brandHandle") or template_config.get("username")
+            if template_config.get("avatar_url") and not brand_kit.get("avatar_url"):
+                brand_kit["avatar_url"] = template_config.get("avatar_url")
 
         # 7, 8, 9. Cortar + upload + salvar cada clipe (streaming: pre-insere como
-        # "rendering" para o frontend mostrar progresso, atualiza para "ready" ao concluir)
+        # "processing" para o frontend mostrar todos os cortes e abrir no primeiro pronto)
         _set_step(project_id, "gerando_clipes")
 
         _MAX_CLIP_DURATION = 300.0  # 5 min — clips mais longos causam arquivos >50 MB
+
+        # Pré-insere todos os cortes como "processing" com storage_url=None
+        # Permite ao estúdio abrir com o 1º clipe pronto enquanto exibe os demais em processamento
+        pre_inserted_ids = []
         for i, clip in enumerate(clips_meta):
+            try:
+                c_start, c_end = snap_to_words(clip["start_time"], clip["end_time"], words)
+                if video_duration:
+                    c_end = min(c_end, float(video_duration))
+                c_end = min(c_end, c_start + _MAX_CLIP_DURATION)
+                ins = supabase.table("clips").insert({
+                    "project_id": project_id,
+                    "user_id": user_id,
+                    "title": clip["hook_title"],
+                    "hook": clip["hook_title"],
+                    "start_time": c_start,
+                    "end_time": c_end,
+                    "score": clip["ai_score"],
+                    "storage_url": None,
+                    "status": "processing",
+                }).execute()
+                pre_inserted_ids.append(ins.data[0]["id"] if ins.data else None)
+            except Exception as pre_err:
+                print(f"[pipeline] aviso ao pre-inserir corte {i}: {pre_err}")
+                pre_inserted_ids.append(None)
+
+        for i, clip in enumerate(clips_meta):
+            cid = pre_inserted_ids[i] if i < len(pre_inserted_ids) else None
             start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
             if video_duration:
                 end = min(end, float(video_duration))
             end = min(end, start + _MAX_CLIP_DURATION)
             if end - start < 1:
+                if cid:
+                    try:
+                        supabase.table("clips").delete().eq("id", cid).execute()
+                    except Exception:
+                        pass
                 continue
 
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
-            margin_v = max(75, min(1200, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 35))
+            margin_v = max(75, min(1400, int(1920 * (1.0 - (float(sub_y) / 100.0))) - 35))
             sub_preset = ((brand_kit or {}).get("layout_config") or {}).get("subtitle_preset") or "hormozi_yellow"
             layout_cfg = (brand_kit or {}).get("layout_config") or {}
             sub_font_family = layout_cfg.get("fontFamily")
@@ -1069,31 +1105,52 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 )
             except Exception as e:
                 print(f"[ffmpeg] erro no clipe {i}: {e}")
+                if cid:
+                    try:
+                        supabase.table("clips").delete().eq("id", cid).execute()
+                    except Exception:
+                        pass
                 continue
 
             if not os.path.exists(clip_out):
+                if cid:
+                    try:
+                        supabase.table("clips").delete().eq("id", cid).execute()
+                    except Exception:
+                        pass
                 continue
 
             check = validate_clip(clip_out, expected_duration=end - start)
             if not check["ok"]:
                 print(f"[clip {i}] descartado: {'; '.join(check['issues'])}")
+                if cid:
+                    try:
+                        supabase.table("clips").delete().eq("id", cid).execute()
+                    except Exception:
+                        pass
                 continue
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
             clip_data = _recompress_if_needed(clip_out)
             clip_url = _upload_clip_to_storage(clip_key, clip_data)
 
-            supabase.table("clips").insert({
-                "project_id": project_id,
-                "user_id": user_id,
-                "title": clip["hook_title"],
-                "hook": clip["hook_title"],
-                "start_time": start,
-                "end_time": end,
-                "score": clip["ai_score"],
-                "storage_url": clip_url,
-                                "status": "ready",
-            }).execute()
+            if cid:
+                supabase.table("clips").update({
+                    "storage_url": clip_url,
+                    "status": "ready",
+                }).eq("id", cid).execute()
+            else:
+                supabase.table("clips").insert({
+                    "project_id": project_id,
+                    "user_id": user_id,
+                    "title": clip["hook_title"],
+                    "hook": clip["hook_title"],
+                    "start_time": start,
+                    "end_time": end,
+                    "score": clip["ai_score"],
+                    "storage_url": clip_url,
+                    "status": "ready",
+                }).execute()
             print(f"[pipeline] clip {i+1} pronto — '{clip['hook_title'][:40]}'")
 
         # Atualizar status final

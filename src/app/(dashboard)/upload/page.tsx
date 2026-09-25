@@ -353,7 +353,7 @@ export default function CreateClipsPage() {
             </div>
             <div className="space-y-0.5">
               <span className="text-indigo-400 font-bold block">4. Render</span>
-              <span>60fps com Legendas</span>
+              <span>Legendas & Enquadramento</span>
             </div>
           </div>
 
@@ -365,7 +365,7 @@ export default function CreateClipsPage() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Iniciando Processamento em 60fps...</span>
+                <span>Iniciando Processamento com IA...</span>
               </>
             ) : (
               <>
