@@ -340,13 +340,34 @@ def profile_key(raw: str) -> tuple[str, str, str] | None:
     return platform, m.group(1).lstrip("@"), url
 
 
-def latest_profile_videos(url: str, limit: int = 6) -> list[dict]:
-    """Vídeos mais recentes de um perfil (do mais novo para o mais antigo), com 'key' estável."""
-    videos = list_profile_videos(url, limit=limit, sort_by="date")["videos"]
-    return [{**v, "key": video_key(v["url"])} for v in videos]
+def latest_profile_videos(url: str, limit: int = 6, user_id: str | None = None) -> list[dict]:
+    """Vídeos mais recentes de um perfil (do mais novo para o mais antigo), com 'key' estável.
+    O 'key' sai do link público (permalink) quando existe: o link direto da CDN muda a cada leitura."""
+    videos = list_profile_videos(url, limit=limit, sort_by="date", user_id=user_id)["videos"]
+    return [{**v, "key": video_key(v.get("permalink") or v["url"])} for v in videos]
 
 
-def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views") -> dict:
+def _instagram_oficial(url: str, limit: int, sort_by: str, user_id: str | None) -> tuple[list[dict] | None, str]:
+    """Tenta a API oficial da Meta (Business Discovery). (videos, aviso) — videos None se não deu."""
+    try:
+        from services.instagram_oficial import credenciais, listar_videos
+        if not credenciais(user_id):
+            return None, ""
+        m = re.search(r"instagram\.com/([^/?#]+)", url)
+        if not m:
+            return None, ""
+        # para ordenar por curtidas/engajamento lê mais que o pedido e escolhe os melhores
+        alvo = limit if (sort_by == "date" or not limit) else min(limit * 3, 300)
+        return listar_videos(m.group(1), alvo, user_id), ""
+    except ValueError as e:
+        print(f"[profile] API oficial do Instagram: {e}")
+        return None, str(e)
+    except Exception as e:
+        print(f"[profile] API oficial do Instagram falhou: {type(e).__name__}")
+        return None, ""
+
+
+def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", user_id: str | None = None) -> dict:
     """
     Vídeos de um perfil/página (TikTok, Instagram, Facebook, YouTube) ordenados.
     limit=0 traz todos. sort_by: views | likes | engagement | date.
@@ -355,6 +376,17 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views") ->
     url = normalize_profile_url(profile)
     platform = detect_platform(url)
     cookies = _cookies_args(platform)
+
+    # Instagram: primeiro a API oficial da Meta (sem cookies, sem 429), se estiver configurada
+    aviso_oficial = ""
+    if platform == "instagram":
+        oficiais, aviso_oficial = _instagram_oficial(url, limit, sort_by, user_id)
+        if oficiais:
+            # sem views de terceiros na API oficial: "mais vistos" usa as curtidas
+            chave = _sort_key("date" if sort_by == "date" else "likes" if sort_by in ("views", "likes") else sort_by)
+            oficiais.sort(key=chave, reverse=True)
+            return {"profile_url": url, "platform": platform, "total_found": len(oficiais),
+                    "videos": oficiais[:limit] if limit else oficiais, "fonte": "api_oficial"}
 
     scan = limit if (sort_by == "date" and limit) else _MAX_PROFILE_SCAN
     cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
@@ -372,6 +404,8 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views") ->
         hint = ""
         if platform in ("instagram", "facebook"):
             hint = f" O {platform.capitalize()} costuma exigir login para listar perfis; configure {platform.upper()}_COOKIES_FILE no servidor."
+        if aviso_oficial:
+            hint = f" {aviso_oficial}{hint}"
         raise ValueError(f"Não encontrei vídeos em {url}.{hint} {erro}".strip())
 
     metric = {"views": "view_count", "likes": "like_count", "engagement": "like_count", "date": "timestamp"}[sort_by]

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
 import { ModalExtensao, useExtensaoClipost, type ListaExtensao } from './ExtensaoInstagram'
+import { ModalInstagramOficial, useInstagramOficial } from './InstagramOficial'
 import {
   Layers, UploadCloud, Link2, X, Loader2, CheckCircle2, AlertCircle, Play, Sparkles, Wand2, FileVideo,
 } from 'lucide-react'
@@ -126,6 +127,8 @@ export default function PerfilEmMassa() {
   const [batchId, setBatchId] = useState<string | null>(null)
   const [batch, setBatch] = useState<Batch | null>(null)
   const { instalada: extensaoInstalada, lista: listaExtensao, consumir: consumirExtensao } = useExtensaoClipost()
+  const { status: oficial, recarregar: recarregarOficial } = useInstagramOficial()
+  const [showOficialModal, setShowOficialModal] = useState(false)
 
   useEffect(() => {
     try {
@@ -338,7 +341,15 @@ export default function PerfilEmMassa() {
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowOficialModal(true)}
+                      className="p-3 rounded-xl bg-sky-600/15 hover:bg-sky-600/25 border border-sky-500/30 text-left transition-all cursor-pointer"
+                    >
+                      <span className="font-semibold text-sky-300 block text-xs">🔐 Direto no site (API oficial)</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Conecte a API da Meta uma vez e cole o link do perfil de novo.</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setShowExtractorModal(true)}
@@ -450,6 +461,33 @@ export default function PerfilEmMassa() {
 
             {source === 'profile' ? (
               <section className="space-y-5">
+                {/* Instagram: duas formas que não travam no 429 */}
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-zinc-300">Instagram sem bloqueio — escolha uma das formas</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setShowOficialModal(true)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${oficial?.configurado ? 'bg-emerald-500/[0.07] border-emerald-500/30' : 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.18]'}`}>
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">🔐 Direto no site</span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${oficial?.configurado ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/[0.06] text-zinc-400'}`}>
+                          {oficial === null ? '…' : oficial.configurado ? 'Pronto' : 'Configurar'}
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-zinc-400 block mt-1">API oficial da Meta. É só colar o link do perfil abaixo. Perfis profissionais (Business/Creator).</span>
+                    </button>
+                    <button type="button" onClick={() => setShowExtractorModal(true)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${extensaoInstalada ? 'bg-emerald-500/[0.07] border-emerald-500/30' : 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.18]'}`}>
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">🧩 Com a extensão</span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${extensaoInstalada ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/[0.06] text-zinc-400'}`}>
+                          {extensaoInstalada === null ? '…' : extensaoInstalada ? 'Instalada' : 'Instalar'}
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-zinc-400 block mt-1">Clique em “Enviar para o Clipost” no perfil do Instagram. Funciona com qualquer perfil, até pessoal.</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <label htmlFor="bulk-profile" className="text-xs font-medium text-zinc-300">
@@ -639,6 +677,7 @@ export default function PerfilEmMassa() {
       </div>
     
       {showExtractorModal && <ModalExtensao instalada={extensaoInstalada} fechar={() => setShowExtractorModal(false)} />}
+      {showOficialModal && <ModalInstagramOficial status={oficial} fechar={() => setShowOficialModal(false)} aoSalvar={recarregarOficial} />}
 
       {/* MODAL DE COOKIES DO INSTAGRAM */}
       {showCookieModal && (

@@ -266,7 +266,7 @@ def check_channel_watches():
             else:
                 # Instagram / TikTok / Facebook: listagem do perfil (Instagram precisa dos cookies no servidor)
                 from services.downloader import latest_profile_videos
-                recentes = latest_profile_videos(w.get("channel_handle") or "", 6)
+                recentes = latest_profile_videos(w.get("channel_handle") or "", 6, w["user_id"])
                 itens = [(f"{prefixo}:{v['key']}", (v.get("title") or nome_canal or "Vídeo")[:200], v["url"]) for v in recentes]
 
             # Baseline guardado sem o prefixo nos perfis (é o 'key' do vídeo)
@@ -829,7 +829,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _direct_downloaded = False
 
         # Download direto ultrarrápido para arquivos já hospedados (ex: upload manual via Supabase Storage)
-        if "supabase.co/storage" in url or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
+        # (link direto da CDN do Instagram/Facebook — API oficial ou extensão — também baixa direto)
+        _cdn_direto = re.match(r"^https://[^/]*(cdninstagram\.com|fbcdn\.net)/", url or "")
+        if "supabase.co/storage" in url or _cdn_direto or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
             print(f"[pipeline] arquivo já hospedado — baixando diretamente: {url[:80]}...")
             try:
                 with httpx.Client(timeout=180, follow_redirects=True) as client:

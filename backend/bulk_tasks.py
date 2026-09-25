@@ -349,7 +349,7 @@ def run_batch(batch_id: str, req: dict):
                     _set_batch(batch_id, profile_url=raw_input[:100], platform=videos[0]["platform"])
                 else:
                     try:
-                        listing = list_profile_videos(raw_input, int(req.get("limit") or 0), req.get("sort_by") or "views")
+                        listing = list_profile_videos(raw_input, int(req.get("limit") or 0), req.get("sort_by") or "views", user_id)
                         videos = listing["videos"]
                         _set_batch(batch_id, profile_url=listing["profile_url"], platform=listing["platform"])
                     except Exception as e:
@@ -357,7 +357,8 @@ def run_batch(batch_id: str, req: dict):
                         if "429" in err_str or "exigir login" in err_str or "Too Many Requests" in err_str:
                             clean_err = (
                                 f"O Instagram bloqueou a listagem automática do perfil {raw_input} (Erro 429: limite de requisições sem login). "
-                                "DICA: Você pode colar os links diretos dos Reels (um por linha) ou usar a aba 'Editor de vídeos' para enviar os arquivos MP4 diretamente sem nenhum bloqueio!"
+                                "Use uma das formas sem bloqueio: 'Direto no site' (API oficial da Meta, perfis profissionais) "
+                                "ou a extensão do Clipost (qualquer perfil, com o seu login do navegador)."
                             )
                         else:
                             clean_err = err_str

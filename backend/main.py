@@ -636,7 +636,7 @@ async def criar_watch(req: WatchRequest):
     if perfil:
         plataforma, nome, url_perfil = perfil
         try:
-            recentes = await asyncio.to_thread(latest_profile_videos, url_perfil, 3)
+            recentes = await asyncio.to_thread(latest_profile_videos, url_perfil, 3, req.user_id)
         except Exception as e:
             dica = " Conecte os cookies do Instagram em Edição em Massa → Baixar de um perfil." if plataforma == "instagram" else ""
             raise HTTPException(status_code=400, detail=f"Não consegui ler os vídeos desse perfil agora.{dica} ({str(e)[:160]})")
@@ -920,6 +920,46 @@ async def set_instagram_cookies(request: Request):
         return {"ok": True, "bytes_written": len(raw), "path": cookies_path}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"falha ao salvar cookies do Instagram: {e}")
+
+
+@app.get("/api/instagram-oficial/status")
+async def instagram_oficial_status(request: Request):
+    """Se a API oficial (Business Discovery) está pronta para este usuário — sem expor o token."""
+    user = await _usuario_logado(request)
+    from services.instagram_oficial import credenciais
+    cred = await asyncio.to_thread(credenciais, user.id)
+    if not cred:
+        return {"configurado": False}
+    return {"configurado": True, "origem": cred["origem"], "usuario": cred.get("usuario")}
+
+
+@app.post("/api/instagram-oficial")
+async def instagram_oficial_salvar(request: Request):
+    """Salva a credencial da API oficial (token de longa duração + ID da conta IG Business). Exige login."""
+    await _exigir_login(request)
+    body = await request.json()
+    token = str(body.get("token") or "").strip()
+    ig_id = str(body.get("ig_id") or "").strip()
+    if not token or not ig_id.isdigit():
+        raise HTTPException(status_code=400, detail="Informe o token e o ID numérico da conta Instagram Business.")
+    from services.instagram_oficial import salvar, validar
+    try:
+        usuario = await asyncio.to_thread(validar, token, ig_id)
+        await asyncio.to_thread(salvar, token, ig_id, usuario)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"[instagram-oficial] não salvou: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="Não foi possível salvar agora.")
+    return {"configurado": True, "usuario": usuario}
+
+
+@app.delete("/api/instagram-oficial")
+async def instagram_oficial_remover(request: Request):
+    await _exigir_login(request)
+    from services.instagram_oficial import remover
+    await asyncio.to_thread(remover)
+    return {"configurado": False}
 
 
 @app.get("/api/admin/instagram-cookies-status")
