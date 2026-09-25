@@ -154,6 +154,17 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
           <span style={{ fontSize: '9px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
             Carregando
           </span>
+          <button
+            type="button"
+            className={s.btnRemoverCard}
+            title="Excluir este vídeo"
+            onClick={(e) => {
+              e.stopPropagation();
+              remover(v.id);
+            }}
+          >
+            <Icone nome="x" tamanho={11} strokeWidth={2.5} />
+          </button>
         </div>
         <div className={s.skeletonCentro} style={{ zIndex: 2 }}>
           <Icone nome="sparkles" tamanho={22} className={s.girando} style={{ color: '#818cf8' }} />
@@ -205,6 +216,17 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
           }}
         >
           {selecionado && <Icone nome="check" tamanho={12} strokeWidth={3} />}
+        </button>
+        <button
+          type="button"
+          className={s.btnRemoverCard}
+          title="Excluir este vídeo da edição em massa"
+          onClick={(e) => {
+            e.stopPropagation();
+            remover(v.id);
+          }}
+        >
+          <Icone nome="x" tamanho={11} strokeWidth={2.5} />
         </button>
         {estado && <span className={`${s.estado} ${estado.classe ?? ''}`}>{estado.texto}</span>}
         <div className={s.indicadores}>
