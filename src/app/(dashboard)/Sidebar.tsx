@@ -20,7 +20,7 @@ import type { User } from '@supabase/supabase-js'
 
 const NAV_ITEMS = [
   { label: 'Início', href: '/inicio', icon: Home },
-  { label: 'Meus Projetos', href: '/dashboard', icon: FolderOpen },
+  { label: 'Biblioteca', href: '/dashboard', icon: FolderOpen },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
   { label: 'Radar Viral', href: '/trends', icon: Flame },
   { label: 'Roteiros IA', href: '/creator', icon: PenTool },
