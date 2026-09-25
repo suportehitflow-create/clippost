@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Clipost — Importar do Instagram",
+  "short_name": "Clipost",
+  "version": "1.0.0",
+  "description": "Envia os Reels de um perfil do Instagram para o Clipost usando a sua sessão do navegador.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "https://clippost-three.vercel.app/*",
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["instagram.js"],
+      "css": ["instagram.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://clippost-three.vercel.app/*", "http://localhost:3000/*"],
+      "js": ["clipost.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "icons": { "128": "icone.png" }
+}

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
+import { ModalExtensao, useExtensaoClipost, type ListaExtensao } from './ExtensaoInstagram'
 import {
   Layers, UploadCloud, Link2, X, Loader2, CheckCircle2, AlertCircle, Play, Sparkles, Wand2, FileVideo,
 } from 'lucide-react'
@@ -124,6 +125,7 @@ export default function PerfilEmMassa() {
   const [error, setError] = useState('')
   const [batchId, setBatchId] = useState<string | null>(null)
   const [batch, setBatch] = useState<Batch | null>(null)
+  const { instalada: extensaoInstalada, lista: listaExtensao, consumir: consumirExtensao } = useExtensaoClipost()
 
   useEffect(() => {
     try {
@@ -193,9 +195,9 @@ export default function PerfilEmMassa() {
     }
   }
 
-  async function start() {
+  async function start(daExtensao?: ListaExtensao) {
     setError('')
-    if (source === 'profile' && !profileUrl.trim()) {
+    if (!daExtensao && source === 'profile' && !profileUrl.trim()) {
       setError('Cole o link do perfil.')
       return
     }
@@ -208,8 +210,11 @@ export default function PerfilEmMassa() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Faça login para continuar.')
 
-      let videos: Array<{ url: string; title: string }> = []
-      if (source === 'files') {
+      let videos: Array<{ url: string; title: string; thumbnail?: string | null; view_count?: number | null; like_count?: number | null }> = []
+      if (daExtensao) {
+        // links diretos dos vídeos que a extensão pegou com o login do navegador
+        videos = daExtensao.itens.map(i => ({ url: i.url, title: i.title, thumbnail: i.thumbnail, view_count: i.view_count, like_count: i.like_count }))
+      } else if (source === 'files') {
         for (let i = 0; i < files.length; i++) {
           const f = files[i]
           setUploadProgress(`Enviando ${i + 1} de ${files.length}: ${f.name}`)
@@ -226,8 +231,8 @@ export default function PerfilEmMassa() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          source,
-          profile_url: source === 'profile' ? profileUrl.trim() : null,
+          source: daExtensao ? 'files' : source,
+          profile_url: daExtensao ? null : source === 'profile' ? profileUrl.trim() : null,
           limit: count,
           sort_by: sortBy,
           videos,
@@ -245,6 +250,7 @@ export default function PerfilEmMassa() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.batch_id) throw new Error(data.error || 'Não foi possível iniciar o lote.')
       try { localStorage.setItem(ACTIVE_BATCH_KEY, data.batch_id) } catch {}
+      if (daExtensao) consumirExtensao()
       setBatch(null)
       setBatchId(data.batch_id)
       setFiles([])
@@ -338,8 +344,8 @@ export default function PerfilEmMassa() {
                       onClick={() => setShowExtractorModal(true)}
                       className="p-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-left transition-all cursor-pointer"
                     >
-                      <span className="font-semibold text-purple-300 block text-xs">⚡ Extrator de Reels (1 Clique)</span>
-                      <span className="text-[10px] text-zinc-400 block mt-0.5">Copie todos os links dos Reels diretamente da sua aba do Instagram.</span>
+                      <span className="font-semibold text-purple-300 block text-xs">🧩 Extensão do Clipost (recomendado)</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">Baixa os Reels do perfil com o seu login do navegador, sem bloqueio.</span>
                     </button>
                     <button
                       type="button"
@@ -410,6 +416,31 @@ export default function PerfilEmMassa() {
           </section>
         ) : (
           <>
+            {/* lista que a extensão montou no Instagram */}
+            {listaExtensao && (
+              <section className="rounded-2xl bg-indigo-500/[0.07] border border-indigo-500/25 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{listaExtensao.itens.length} vídeos de @{listaExtensao.usuario} recebidos da extensão</p>
+                    <p className="text-[11px] text-zinc-400">Eles saem com o seu template e as opções abaixo. Os links do Instagram valem por algumas horas: comece logo.</p>
+                  </div>
+                  <button type="button" onClick={consumirExtensao} className="text-[11px] text-zinc-500 hover:text-white shrink-0">Descartar</button>
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {listaExtensao.itens.slice(0, 14).map(i => (
+                    <div key={i.permalink} className="w-12 h-[84px] rounded-lg bg-white/[0.04] overflow-hidden shrink-0" title={i.title}>
+                      {i.thumbnail && <img src={i.thumbnail} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />}
+                    </div>
+                  ))}
+                  {listaExtensao.itens.length > 14 && <span className="text-[11px] text-zinc-500 self-center px-2">+{listaExtensao.itens.length - 14}</span>}
+                </div>
+                <button type="button" onClick={() => start(listaExtensao)} disabled={starting}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white text-xs font-semibold disabled:opacity-50">
+                  {starting ? 'Enviando…' : `Editar os ${listaExtensao.itens.length} vídeos com o meu template`}
+                </button>
+              </section>
+            )}
+
             {error && (
               <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.1] text-zinc-200 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-zinc-400" />
@@ -431,7 +462,7 @@ export default function PerfilEmMassa() {
                         className="text-[11px] font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
                         title="Como copiar 10+ reels do perfil em 1 clique"
                       >
-                        ⚡ Extrator de Reels
+                        🧩 Extensão do Instagram{extensaoInstalada ? ' ✓' : ''}
                       </button>
                       <button
                         type="button"
@@ -585,7 +616,7 @@ export default function PerfilEmMassa() {
 
             <button
               type="button"
-              onClick={start}
+              onClick={() => start()}
               disabled={starting}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-lg shadow-indigo-500/20"
             >
@@ -607,6 +638,8 @@ export default function PerfilEmMassa() {
         )}
       </div>
     
+      {showExtractorModal && <ModalExtensao instalada={extensaoInstalada} fechar={() => setShowExtractorModal(false)} />}
+
       {/* MODAL DE COOKIES DO INSTAGRAM */}
       {showCookieModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

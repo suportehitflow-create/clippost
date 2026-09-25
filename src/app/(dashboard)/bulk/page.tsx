@@ -23,6 +23,9 @@ export default function EdicaoEmMassaPage() {
   useEffect(() => {
     let salva: string | null = null
     try { salva = localStorage.getItem(CHAVE_ABA) } catch {}
+    // ?aba=perfil (a extensão do Instagram abre assim) tem prioridade sobre a última aba usada
+    const pedida = new URLSearchParams(window.location.search).get('aba')
+    if (pedida === 'editor' || pedida === 'perfil') salva = pedida
     if (salva === 'editor' || salva === 'perfil') setAba(salva)
 
     const local = ['localhost', '127.0.0.1'].includes(window.location.hostname)

@@ -8,6 +8,7 @@ mesmas telas dos cortes. O andamento do lote fica em memória (GET /api/bulk/{id
 import copy
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -15,6 +16,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 import yt_dlp
@@ -141,7 +143,24 @@ def _load_brand_kit(user_id: str, template_config: dict | None) -> dict:
     return brand_kit
 
 
+_CDN_DIRETO = re.compile(r"^https://[^/]*(cdninstagram\.com|fbcdn\.net|tiktokcdn[^/]*\.com|googlevideo\.com)/", re.I)
+
+
 def _download(url: str, tmp_dir: Path) -> tuple[str, dict]:
+    # Link direto de vídeo (ex.: enviado pela extensão do Clipost a partir da sessão do usuário
+    # no Instagram): baixa o arquivo como está, sem login e sem yt-dlp
+    if _CDN_DIRETO.match(url) or urlparse(url).path.lower().endswith((".mp4", ".mov", ".webm")):
+        dest = tmp_dir / "source.mp4"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"}
+        with httpx.stream("GET", url, timeout=600.0, follow_redirects=True, headers=headers) as resp:
+            resp.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in resp.iter_bytes(1024 * 1024):
+                    f.write(chunk)
+        if dest.stat().st_size < 10_000:
+            raise RuntimeError("o link do vídeo expirou ou não devolveu um arquivo de vídeo")
+        return str(dest), {}
+
     if "/storage/v1/object/" in url:
         dest = tmp_dir / "source.mp4"
         with httpx.stream("GET", url, timeout=600.0, follow_redirects=True) as resp:
