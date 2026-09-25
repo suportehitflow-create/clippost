@@ -95,7 +95,7 @@ def _recompress_if_needed(file_path: str) -> bytes:
             try:
                 with _compress_lock:
                     subprocess.run([
-                        "ffmpeg", "-y", "-i", file_path,
+                        "ffmpeg", "-y", "-threads", "2", "-i", file_path,
                         "-vf", vf,
                         "-vcodec", "libx264", "-preset", "ultrafast", "-crf", crf,
                         "-maxrate", maxrate, "-bufsize", str(int(maxrate[:-1]) * 2) + "k",
@@ -1221,6 +1221,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     "status": "ready",
                 }).execute()
             print(f"[pipeline] clip {i+1} pronto — '{clip['hook_title'][:40]}'")
+            import gc
+            gc.collect()
 
         # Atualizar status final
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
@@ -1285,6 +1287,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         return {"status": "error", "message": str(e)}
 
     finally:
+        import gc
+        gc.collect()
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 

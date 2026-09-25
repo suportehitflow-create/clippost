@@ -30,7 +30,7 @@ kill_timeout = 300
     grace_period = "60s"
     interval = "30s"
     method = "GET"
-    timeout = "10s"
+    timeout = "20s"
     path = "/health"
 
 [[vm]]

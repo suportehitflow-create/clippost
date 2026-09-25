@@ -105,10 +105,16 @@ async def _mark_stuck_projects(label: str = "recovery"):
             if is_startup:
                 clips = row.get("clips") or []
                 ready = [c for c in clips if c.get("storage_url")]
-                if ready:
+                if ready and len(clips) > 0 and len(ready) == len(clips):
                     supabase.table("projects").update({"status": "done", "error_message": None}).eq("id", row["id"]).execute()
                     done_count += 1
-                    print(f"[{label}] projeto {row['id'][:8]} -> done ({len(ready)} clips)")
+                    print(f"[{label}] projeto {row['id'][:8]} -> done ({len(ready)}/{len(clips)} clips)")
+                    continue
+                elif ready:
+                    msg = f"Processamento interrompido após {len(ready)}/{len(clips)} clipes prontos. Clique em Tentar Novamente."
+                    supabase.table("projects").update({"status": "failed", "error_message": msg}).eq("id", row["id"]).execute()
+                    failed_count += 1
+                    print(f"[{label}] projeto {row['id'][:8]} -> failed ({len(ready)}/{len(clips)} clips prontos)")
                     continue
             step_key = (row.get("error_message") or "").strip()
             friendly = _STEP_MESSAGES.get(step_key, "Pipeline interrompido. Clique em Tentar Novamente.")

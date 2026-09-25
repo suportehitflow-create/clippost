@@ -422,7 +422,7 @@ def create_vertical_clip(
         filter_complex = ";".join(filter_parts)
 
         cmd = (
-            ["ffmpeg", "-y"]
+            ["ffmpeg", "-y", "-threads", "2"]
             + input_files
             + [
                 "-filter_complex", filter_complex,
@@ -464,7 +464,7 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
     """Fallback: crop 9:16 simples sem overlays."""
     fallback_timeout = max(600, int(duration * 12))
     subprocess.run([
-        "ffmpeg", "-y",
+        "ffmpeg", "-y", "-threads", "2",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
         "-vf", "crop=ih*9/16:ih,scale=1080:1920",
         "-af", ",".join(_edge_fades(duration)),
