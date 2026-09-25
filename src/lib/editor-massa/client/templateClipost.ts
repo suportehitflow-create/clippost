@@ -98,12 +98,21 @@ export async function salvarTemplateClipost(t: TemplateClipost): Promise<boolean
   }
 }
 
-export function fundoDoTemplate(t: TemplateClipost): FundoTemplate {
+export function fundoDoTemplate(t: TemplateClipost): string {
   const bg = cfg(t).templateBg;
+  if (bg && bg.startsWith('#')) return bg;
   return bg === 'white' ? 'white' : bg === 'gray' || bg === 'zinc' ? 'gray' : 'dark';
 }
 
-const COR_FUNDO: Record<FundoTemplate, string> = { dark: '#000000', white: '#ffffff', gray: '#18181b' };
+export function corFundoHex(t: TemplateClipost): string {
+  const bg = cfg(t).templateBg;
+  if (bg && bg.startsWith('#')) return bg;
+  if (bg === 'white') return '#ffffff';
+  if (bg === 'gray' || bg === 'zinc') return '#18181b';
+  return '#000000';
+}
+
+const COR_FUNDO: Record<string, string> = { dark: '#000000', white: '#ffffff', gray: '#18181b' };
 
 /** Quadro de vídeo do template em px do canvas 1080×1920 */
 export function areaVideoTemplate(t: TemplateClipost): Rect {
@@ -324,7 +333,7 @@ function desenharPerfil(ctx: CanvasRenderingContext2D, t: TemplateClipost, avata
 }
 
 function desenharFundo(ctx: CanvasRenderingContext2D, t: TemplateClipost, bg: HTMLImageElement | null) {
-  ctx.fillStyle = COR_FUNDO[fundoDoTemplate(t)];
+  ctx.fillStyle = corFundoHex(t);
   ctx.fillRect(0, 0, LARGURA, ALTURA);
   if (bg) {
     const e = Math.max(LARGURA / bg.naturalWidth, ALTURA / bg.naturalHeight);

@@ -41,7 +41,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   { capa: 'cortes', title: 'Criar cortes', description: 'Cole um vídeo longo e receba os melhores momentos em 9:16, com legenda e o seu template.', href: '/upload', icon: Scissors, cor: '99,102,241', wide: true },
   { capa: 'massa', title: 'Edição em Massa', description: 'Dezenas de vídeos no seu template de uma vez: texto, música, legendas e efeitos.', href: '/bulk', icon: Layers, cor: '147,51,234' },
-  { capa: 'autopilot', title: 'Autopilot', description: 'Monitora YouTube, Instagram e TikTok e deixa os cortes de cada vídeo novo prontos sozinho.', href: '/autopilot', icon: Zap, cor: '16,185,129', badge: '24/7', wide: true },
+  { capa: 'autopilot', title: 'Autopilot', description: 'Monitora YouTube, Instagram e TikTok e deixa os cortes de cada vídeo novo prontos sozinho.', href: '/autopilot', icon: Zap, cor: '16,185,129', badge: '24/7' },
   { capa: 'templates', title: 'Identidade Visual', description: 'Seu template: perfil, fontes, cores, marca d’água e posição do vídeo e das legendas.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
   { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
   { capa: 'radar', title: 'Radar de Viralidade', description: 'Os vídeos que estão explodindo nas últimas 24h, antes da concorrência.', href: '/trends', icon: Flame, cor: '249,115,22' },

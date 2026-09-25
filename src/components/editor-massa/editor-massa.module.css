@@ -1635,3 +1635,218 @@
   0%, 100% { opacity: 0.2; transform: scaleX(0.7); }
   50% { opacity: 1; transform: scaleX(1.3); }
 }
+
+
+/* ================= BARRA LATERAL TOPO & RECOLHIMENTO ================= */
+.lateralTopoBarra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--linha);
+  background: rgba(255, 255, 255, 0.02);
+  user-select: none;
+}
+.lateralTopoTitulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto);
+}
+.btnRecolherTopo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--linha2);
+  background: var(--sup2);
+  color: var(--suave);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btnRecolherTopo:hover {
+  background: var(--sup3);
+  color: var(--texto);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* ================= EDIÇÃO EM MASSA: PÍLULA ATIVO / DESATIVO ================= */
+.massaPillContainer {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 2px;
+}
+.massaPillBtn {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: var(--suave);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.massaPillBtn:hover {
+  color: var(--texto);
+}
+.massaPillAtivo {
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 6px rgba(99, 102, 241, 0.4);
+}
+
+/* ================= SKELETON SHIMMER CARDS (CARREGAMENTO RÁPIDO) ================= */
+.cardSkeleton {
+  aspect-ratio: 9 / 16;
+  border-radius: 16px;
+  background: #111116;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px;
+}
+.shimmerEffect {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: animarShimmer 1.8s infinite linear;
+  pointer-events: none;
+}
+@keyframes animarShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeletonBadge {
+  width: 38px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.skeletonCentro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-weight: 500;
+}
+.skeletonLinhas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.skeletonBarra {
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ================= TIMELINE PLAYER SCRUBBER (CELULAR) ================= */
+.playerTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(18, 18, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  z-index: 20;
+}
+.playerBotoes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.btnPlayerPlay {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  transition: transform 0.15s, background 0.15s;
+}
+.btnPlayerPlay:hover {
+  background: #4f46e5;
+  transform: scale(1.05);
+}
+.btnPlayerSecundario {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btnPlayerSecundario:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+.timelineScrubberLinha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.tempoTexto {
+  font-size: 10px;
+  font-family: monospace;
+  color: #a1a1aa;
+  min-width: 32px;
+}
+.timelineSlider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.timelineSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.8);
+  transition: transform 0.1s;
+}
+.timelineSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}

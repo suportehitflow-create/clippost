@@ -145,26 +145,24 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
 
   if (ehPendente) {
     return (
-      <div className={`${s.card} ${s.cardPendente}`}>
-        <div className={s.thumbPendente}>
-          <div className={s.pendenteBordaGirando} />
-          <div className={s.pendenteConteudo}>
-            <div className={s.pendenteSpinner}>
-              <Icone nome="refresh" tamanho={18} className={s.girando} />
-            </div>
-            <span className={s.pendenteStatus}>Gerando corte com IA…</span>
-            <div className={s.pendenteOnda} />
-          </div>
+      <div className={`${s.card} ${s.cardSkeleton}`}>
+        <div className={s.shimmerEffect} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+            {v.nome.slice(0, 4)}
+          </span>
+          <span style={{ fontSize: '9px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+            Carregando
+          </span>
         </div>
-        <input
-          className={s.cardTexto}
-          placeholder="Título do corte"
-          value={v.texto}
-          onChange={(e) => {
-            const t = e.target.value;
-            acao(v.id, () => ({ texto: t }), true);
-          }}
-        />
+        <div className={s.skeletonCentro} style={{ zIndex: 2 }}>
+          <Icone nome="sparkles" tamanho={22} className={s.girando} style={{ color: '#818cf8' }} />
+          <span>{v.texto || 'Carregando corte…'}</span>
+        </div>
+        <div className={s.skeletonLinhas} style={{ zIndex: 2 }}>
+          <div className={s.skeletonBarra} style={{ width: '85%' }} />
+          <div className={s.skeletonBarra} style={{ width: '55%' }} />
+        </div>
       </div>
     );
   }

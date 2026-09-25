@@ -187,6 +187,32 @@ export default function Inspetor({
     arrasto.current = null;
   };
 
+
+  const formatarTempo = (seg: number) => {
+    if (!Number.isFinite(seg) || seg < 0) return '00:00';
+    const m = Math.floor(seg / 60);
+    const s = Math.floor(seg % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const duracaoTotal = v?.duracao || videoRef.current?.duration || 45;
+
+  const buscarTempo = (t: number) => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.currentTime = t;
+    setTempo(t);
+    desenhar();
+  };
+
+  const pularSegundos = (delta: number) => {
+    const el = videoRef.current;
+    if (!el) return;
+    const dur = duracaoTotal;
+    const novo = Math.max(0, Math.min(dur, (el.currentTime || 0) + delta));
+    buscarTempo(novo);
+  };
+
   if (!v) {
     return (
       <aside className={s.inspetor}>
@@ -217,7 +243,7 @@ export default function Inspetor({
       </div>
 
       <div className={s.palco} ref={palcoRef}>
-        {/* iPhone Mockup Apple HIG */}
+        {/* iPhone Mockup Apple HIG com enquadramento proporcional */}
         <div
           className={s.celular}
           onPointerDown={iniciarArrasto}
@@ -242,9 +268,52 @@ export default function Inspetor({
           onPause={() => setTocando(false)}
         />
 
-        <button type="button" className={s.play} onClick={alternarPlay} title="Play / Pausa (Barra de espaço)">
-          <Icone nome={tocando ? 'pausa' : 'play'} tamanho={16} />
-        </button>
+        {/* Player Completo Apple com Linha do Tempo / Scrubber Interativo */}
+        <div className={s.playerTimeline}>
+          <div className={s.playerBotoes}>
+            <button
+              type="button"
+              className={s.btnPlayerSecundario}
+              onClick={() => pularSegundos(-5)}
+              title="Voltar 5 segundos"
+            >
+              <span>-5s</span>
+            </button>
+
+            <button
+              type="button"
+              className={s.btnPlayerPlay}
+              onClick={alternarPlay}
+              title={tocando ? 'Pausar (Barra de espaço)' : 'Reproduzir (Barra de espaço)'}
+            >
+              <Icone nome={tocando ? 'pausa' : 'play'} tamanho={16} />
+            </button>
+
+            <button
+              type="button"
+              className={s.btnPlayerSecundario}
+              onClick={() => pularSegundos(5)}
+              title="Avançar 5 segundos"
+            >
+              <span>+5s</span>
+            </button>
+          </div>
+
+          <div className={s.timelineScrubberLinha}>
+            <span className={s.tempoTexto}>{formatarTempo(tempo)}</span>
+            <input
+              type="range"
+              min={0}
+              max={duracaoTotal || 1}
+              step={0.1}
+              value={tempo}
+              onChange={(e) => buscarTempo(Number(e.target.value))}
+              className={s.timelineSlider}
+              title="Arrastar na linha do tempo para navegar no vídeo"
+            />
+            <span className={s.tempoTexto}>{formatarTempo(duracaoTotal)}</span>
+          </div>
+        </div>
       </div>
     </aside>
   );

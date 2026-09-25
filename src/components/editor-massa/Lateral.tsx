@@ -11,6 +11,10 @@ import { Icone, type NomeIcone } from './icones';
 import s from './editor-massa.module.css';
 
 export interface PropsLateral {
+  largura?: number;
+  setLargura?: (w: number) => void;
+  recolhido?: boolean;
+  setRecolhido?: (r: boolean) => void;
   global: ConfigGlobal;
   mudarGlobal: (fn: (g: ConfigGlobal) => ConfigGlobal) => void;
   template: TemplateCliente | null;
@@ -72,10 +76,15 @@ export default function Lateral(p: PropsLateral) {
   const [tocando, setTocando] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
 
-  // Redimensionamento e recolhimento da barra lateral
-  const [largura, setLargura] = useState(330);
-  const [recolhido, setRecolhido] = useState(false);
+  // Redimensionamento e recolhimento da barra lateral (controlado via props ou local)
+  const [larguraLocal, setLarguraLocal] = useState(330);
+  const [recolhidoLocal, setRecolhidoLocal] = useState(false);
+  const largura = p.largura ?? larguraLocal;
+  const setLargura = p.setLargura ?? setLarguraLocal;
+  const recolhido = p.recolhido ?? recolhidoLocal;
+  const setRecolhido = p.setRecolhido ?? setRecolhidoLocal;
   const redimensionando = useRef(false);
+  const inputCorRef = useRef<HTMLInputElement>(null);
 
   const alternar = (id: IdSecao) =>
     setAbertas((a) => {
@@ -116,7 +125,13 @@ export default function Lateral(p: PropsLateral) {
     velocidade !== '1' && `${velocidade === '105' ? 1.05 : g.efeitos.velocidade}x`,
   ].filter(Boolean);
 
-  const corFundoAtual = (p.tplClipost?.config?.templateBg as 'dark' | 'white' | 'gray') || 'dark';
+  const corFundoRaw = String(p.tplClipost?.config?.templateBg || 'dark');
+  const corFundoAtual = corFundoRaw;
+  const ehDark = corFundoRaw === 'dark' || corFundoRaw === '#000000';
+  const ehWhite = corFundoRaw === 'white' || corFundoRaw.toLowerCase() === '#ffffff';
+  const ehGray = corFundoRaw === 'gray' || corFundoRaw === 'zinc' || corFundoRaw.toLowerCase() === '#18181b';
+  const ehCustom = !ehDark && !ehWhite && !ehGray;
+  const corHexAtual = ehDark ? '#000000' : ehWhite ? '#ffffff' : ehGray ? '#18181b' : (corFundoRaw.startsWith('#') ? corFundoRaw : '#6366f1');
 
   // Redimensionar por arrasto na borda direita
   const iniciarResize = (e: React.PointerEvent) => {
@@ -194,33 +209,30 @@ export default function Lateral(p: PropsLateral) {
   const comum = { alternar };
 
   if (recolhido) {
-    return (
-      <button
-        type="button"
-        className={s.btnExpandirLateral}
-        onClick={() => setRecolhido(false)}
-        title="Expandir painel de edições"
-      >
-        <Icone nome="chevron" tamanho={14} style={{ transform: 'rotate(-90deg)' }} />
-        Editar
-      </button>
-    );
+    return null;
   }
 
   return (
-    <aside className={s.lateral} style={{ width: largura }}>
+    <aside className={s.lateral} style={{ width: '100%', position: 'relative' }}>
       {/* Alça para redimensionar arrastando para a direita */}
-      <div className={s.alcaResize} onPointerDown={iniciarResize} title="Arraste para redimensionar" />
+      <div className={s.alcaResize} onPointerDown={iniciarResize} title="Arraste para ajustar a largura da barra lateral" />
 
-      {/* Botão de recolher o painel */}
-      <button
-        type="button"
-        className={s.btnRecolher}
-        onClick={() => setRecolhido(true)}
-        title="Recolher painel"
-      >
-        <Icone nome="chevron" tamanho={13} style={{ transform: 'rotate(90deg)' }} />
-      </button>
+      {/* Cabeçalho Apple HIG com botão recolher bem visível */}
+      <div className={s.lateralTopoBarra}>
+        <div className={s.lateralTopoTitulo}>
+          <Icone nome="ferramentas" tamanho={14} />
+          <span>Configurações</span>
+        </div>
+        <button
+          type="button"
+          className={s.btnRecolherTopo}
+          onClick={() => setRecolhido(true)}
+          title="Recolher barra lateral"
+        >
+          <Icone nome="chevron" tamanho={12} style={{ transform: 'rotate(90deg)' }} />
+          <span>Recolher</span>
+        </button>
+      </div>
 
       {/* ---------------- 1. TEMPLATE E LAYOUT (SÓ COR DO FUNDO + ENCAIXE + SEM BORDAS + TOPO) ---------------- */}
       <Secao
@@ -236,7 +248,7 @@ export default function Lateral(p: PropsLateral) {
           <div className={s.gradeCores}>
             <button
               type="button"
-              className={`${s.btnCor} ${corFundoAtual === 'dark' ? s.btnCorAtiva : ''}`}
+              className={`${s.btnCor} ${ehDark ? s.btnCorAtiva : ''}`}
               onClick={() => p.mudarTemplate?.({ templateBg: 'dark' })}
               title="Fundo Preto"
             >
@@ -245,21 +257,38 @@ export default function Lateral(p: PropsLateral) {
             </button>
             <button
               type="button"
-              className={`${s.btnCor} ${corFundoAtual === 'white' ? s.btnCorAtiva : ''}`}
+              className={`${s.btnCor} ${ehWhite ? s.btnCorAtiva : ''}`}
               onClick={() => p.mudarTemplate?.({ templateBg: 'white' })}
               title="Fundo Branco"
             >
-              <span className={s.amostraCor} style={{ background: '#ffffff' }} />
+              <span className={s.amostraCor} style={{ background: '#ffffff', border: '1px solid #444' }} />
               Branco
             </button>
             <button
               type="button"
-              className={`${s.btnCor} ${corFundoAtual === 'gray' ? s.btnCorAtiva : ''}`}
+              className={`${s.btnCor} ${ehGray ? s.btnCorAtiva : ''}`}
               onClick={() => p.mudarTemplate?.({ templateBg: 'gray' })}
               title="Fundo Cinza"
             >
               <span className={s.amostraCor} style={{ background: '#18181b' }} />
               Cinza
+            </button>
+            <button
+              type="button"
+              className={`${s.btnCor} ${ehCustom ? s.btnCorAtiva : ''}`}
+              onClick={() => inputCorRef.current?.click()}
+              title="Cor Personalizada (clique para escolher qualquer cor)"
+              style={{ position: 'relative' }}
+            >
+              <span className={s.amostraCor} style={{ background: corHexAtual }} />
+              <span>{ehCustom ? corHexAtual.toUpperCase() : 'Outra'}</span>
+              <input
+                ref={inputCorRef}
+                type="color"
+                value={corHexAtual}
+                onChange={(e) => p.mudarTemplate?.({ templateBg: e.target.value.toLowerCase() })}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+              />
             </button>
           </div>
         </Campo>
@@ -602,23 +631,31 @@ export default function Lateral(p: PropsLateral) {
         <Opcao rotulo="Melhorar áudio" descricao="Remove ruído e normaliza o volume" valor={g.melhorarAudio} mudar={(v) => mudar('melhorarAudio', v)} />
       </Secao>
 
-      {/* ---------------- BARRA INFERIOR: EDIÇÃO EM MASSA (SIM / NÃO) ---------------- */}
+      {/* ---------------- BARRA INFERIOR: EDIÇÃO EM MASSA (PÍLULA ATIVO / DESATIVO) ---------------- */}
       <div className={s.barraMassaFixa}>
         <div className={s.massaInfo}>
-          <span className={s.massaTitulo}>Edição em massa em todos os vídeos</span>
+          <span className={s.massaTitulo}>Edição em massa</span>
           <span className={s.massaDesc}>
-            {p.emMassa ? 'Ajustes valem para todos os cortes' : 'Ajustes valem apenas para o vídeo selecionado'}
+            {p.emMassa ? 'Aplica ajustes em todos os cortes' : 'Aplica apenas no corte ativo'}
           </span>
         </div>
-        <div style={{ width: 100 }}>
-          <Segmentado
-            valor={p.emMassa ? 'sim' : 'nao'}
-            mudar={(v) => p.setEmMassa(v === 'sim')}
-            opcoes={[
-              { valor: 'sim', rotulo: 'Sim' },
-              { valor: 'nao', rotulo: 'Não' },
-            ]}
-          />
+        <div className={s.massaPillContainer}>
+          <button
+            type="button"
+            className={`${s.massaPillBtn} ${p.emMassa ? s.massaPillAtivo : ''}`}
+            onClick={() => p.setEmMassa(true)}
+            title="Ativar edição em massa"
+          >
+            Ativo
+          </button>
+          <button
+            type="button"
+            className={`${s.massaPillBtn} ${!p.emMassa ? s.massaPillAtivo : ''}`}
+            onClick={() => p.setEmMassa(false)}
+            title="Desativar edição em massa (apenas corte selecionado)"
+          >
+            Desativo
+          </button>
         </div>
       </div>
     </aside>

@@ -54,6 +54,38 @@ def _font(kind: str, size: float) -> ImageFont.ImageFont:
     return ImageFont.load_default(size)
 
 
+
+@lru_cache(maxsize=None)
+def _emoji_font_path() -> str | None:
+    for name in ["NotoColorEmoji.ttf", "Symbola.ttf", "seguiemj.ttf"]:
+        for root in ("/usr/share/fonts", "/usr/local/share/fonts", "C:/Windows/Fonts"):
+            hits = glob.glob(f"{root}/**/{name}", recursive=True)
+            if hits:
+                return hits[0]
+    return None
+
+
+def _draw_line_with_emojis(draw: ImageDraw.ImageDraw, line: str, x: float, y: float, font: ImageFont.ImageFont, emoji_font: ImageFont.ImageFont | None, fill, stroke_w: int, stroke_fill):
+    curr_x = x
+    # Divide a linha em partes de texto e emojis
+    parts = _EMOJI_RE.split(line)
+    emojis = _EMOJI_RE.findall(line)
+    for i, part in enumerate(parts):
+        if part:
+            try:
+                draw.text((curr_x, y), part, font=font, fill=fill, anchor="lm", stroke_width=stroke_w, stroke_fill=stroke_fill)
+                curr_x += draw.textlength(part, font=font)
+            except Exception:
+                curr_x += len(part) * 20
+        if i < len(emojis):
+            em = emojis[i]
+            ef = emoji_font or font
+            try:
+                draw.text((curr_x, y), em, font=ef, fill=fill, anchor="lm")
+                curr_x += (draw.textlength(em, font=ef) if ef else 30)
+            except Exception:
+                curr_x += 30
+
 def _title_font_kind(font_family: str) -> str:
     fam = (font_family or "").lower()
     if "anton" in fam or "impact" in fam:
@@ -230,12 +262,12 @@ def _draw_header(canvas: Image.Image, layout: dict, brand_kit: dict, s: float, l
 
 
 def _draw_title(canvas: Image.Image, layout: dict, hook_title: str, s: float, light: bool):
-    text = _EMOJI_RE.sub("", hook_title or "")
+    text = (hook_title or "").strip()
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return
     if layout.get("titleCapsLock", True) is not False:
-        text = text.upper()
+        text = "".join(c.upper() if c.isalpha() else c for c in text)
 
     W, H = canvas.size
     draw = ImageDraw.Draw(canvas)
@@ -257,16 +289,34 @@ def _draw_title(canvas: Image.Image, layout: dict, hook_title: str, s: float, li
     cx_pct, cy_pct = _pos(layout, "titlePos", (50, 24))
     box_x0 = W * cx_pct / 100.0 - box_w / 2
     y = H * cy_pct / 100.0 - (line_h * len(lines)) / 2
+
+    emoji_font = None
+    try:
+        e_path = _emoji_font_path()
+        if e_path:
+            emoji_font = ImageFont.truetype(e_path, int(round(fs * 0.95)))
+    except Exception:
+        emoji_font = None
+
     for line in lines:
-        lw = draw.textlength(line, font=font)
+        try:
+            lw = draw.textlength(line, font=font)
+        except Exception:
+            lw = fs * len(line) * 0.55
+
         if align == "left":
             x = box_x0
         elif align == "right":
             x = box_x0 + box_w - lw
         else:
             x = box_x0 + (box_w - lw) / 2
-        draw.text((x, y + line_h / 2), line, font=font, fill=fill, anchor="lm",
-                  stroke_width=stroke_w, stroke_fill=stroke_fill)
+
+        try:
+            draw.text((x, y + line_h / 2), line, font=font, fill=fill, anchor="lm",
+                      stroke_width=stroke_w, stroke_fill=stroke_fill)
+        except Exception:
+            _draw_line_with_emojis(draw, line, x, y + line_h / 2, font, emoji_font, fill, stroke_w, stroke_fill)
+
         y += line_h
 
 

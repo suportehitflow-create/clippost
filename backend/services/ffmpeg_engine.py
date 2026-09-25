@@ -221,9 +221,23 @@ def create_vertical_clip(
         box_x -= (box_x % 2)
         box_y -= (box_y % 2)
 
-        # 2. IA Smart Framing: Identifica o foco do vídeo bruto
-        # O centro (50%) é a âncora prioritária principal; se o falante estiver deslocado, a IA acompanha.
+        # 2. IA Smart Framing & Detecção Automática de Gameplay / Tela Dividida
         manual_pan = layout.get("cropPanX") or layout.get("manualPanX")
+        use_split = False
+        fc_crop_box, g_crop_box = None, None
+
+        # Verifica se o vídeo possui webcam em canto (gameplay/react) para dividir a tela: pessoa em cima, jogo embaixo
+        try:
+            from services.smart_framing import detect_gameplay_split
+            is_gameplay, fc_box, g_box = detect_gameplay_split(input_video, start, duration)
+            if is_gameplay and fc_box and g_box and (layout.get("splitScreen") in ("auto", "top_bottom", True) or layout.get("splitScreen") is None):
+                use_split = True
+                fc_crop_box, g_crop_box = fc_box, g_box
+                print(f"[ffmpeg_engine] Gameplay detectado! Aplicando tela dividida: webcam={fc_box}, game={g_box}")
+        except Exception as split_err:
+            print(f"[ffmpeg_engine] split detection aviso: {split_err}")
+            use_split = False
+
         try:
             from services.smart_framing import detect_smart_focus
             target_aspect = target_w / float(target_h)
@@ -252,12 +266,14 @@ def create_vertical_clip(
                 crop_x = 0
                 crop_y = max(0, (in_h - crop_h) // 2)
 
-        # 3. Cor de fundo do Template
+        # 3. Cor de fundo do Template (preto, branco, cinza ou hex personalizado)
         template_bg = layout.get("templateBg", "dark")
         if template_bg == "white":
             bg_color = "white"
         elif template_bg in ("zinc", "gray"):
             bg_color = "0x18181b"
+        elif template_bg and str(template_bg).startswith("#"):
+            bg_color = "0x" + str(template_bg).lstrip("#")
         else:
             bg_color = "black"
 
@@ -350,7 +366,22 @@ def create_vertical_clip(
             next_input += 1
         else:
             filter_parts.append(f"color=c={bg_color}:s={CANVAS_W}x{CANVAS_H}:d={actual_duration}[bg]")
-        filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
+
+        if use_split and fc_crop_box and g_crop_box:
+            # Tela dividida: pessoa/webcam em cima (38% da altura), jogo/gameplay embaixo (62% da altura)
+            fc_x, fc_y, fc_w, fc_h = fc_crop_box
+            g_x, g_y, g_w, g_h = g_crop_box
+            top_h = int(round(target_h * 0.40))
+            top_h -= (top_h % 2)
+            bot_h = target_h - top_h
+            bot_h -= (bot_h % 2)
+            filter_parts.append(f"{v_src}split=2[v_fc_in][v_gm_in]")
+            filter_parts.append(f"[v_fc_in]crop={fc_w}:{fc_h}:{fc_x}:{fc_y},scale={target_w}:{top_h}:force_original_aspect_ratio=increase,crop={target_w}:{top_h},setsar=1[v_top]")
+            filter_parts.append(f"[v_gm_in]crop={g_w}:{g_h}:{g_x}:{g_y},scale={target_w}:{bot_h}:force_original_aspect_ratio=increase,crop={target_w}:{bot_h},setsar=1[v_bot]")
+            filter_parts.append(f"[v_top][v_bot]vstack[vbox]")
+        else:
+            filter_parts.append(f"{v_src}{','.join(vbox_transforms)}[vbox]")
+
         filter_parts.append(f"[bg][vbox]overlay={box_x}:{box_y}[base]")
 
         # Áudio: velocidade, limpeza da voz (opcional), fades e música de fundo (opcional)

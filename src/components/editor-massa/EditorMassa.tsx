@@ -86,6 +86,8 @@ export default function EditorMassa({
   onAgendar?: () => void;
 } = {}) {
   const [emMassa, setEmMassa] = useState(true);
+  const [larguraLateral, setLarguraLateral] = useState(330);
+  const [lateralRecolhida, setLateralRecolhida] = useState(false);
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
   const [abas, setAbas] = useState<Aba[]>(() => [novaAba(1)]);
   const [abaAtivaId, setAbaAtivaId] = useState('');
@@ -347,74 +349,73 @@ export default function EditorMassa({
     setAbaAtivaId(abaId);
 
     const existentes = new Set(abasRef.current.flatMap((a) => a.videos.map((v) => v.id)));
+    const novosParaInserir: VideoCliente[] = [];
+
     projeto.clips.forEach((c, i) => {
       const id = 'clip-' + c.id;
       if (existentes.has(id) || clipsEmImportacao.current.has(id)) return;
       clipsEmImportacao.current.add(id);
 
+      const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
+      const vInicial: VideoCliente = {
+        ...novoVideo({ id, nome, largura: 1080, altura: 1920, duracao: 45 }),
+        texto: c.titulo,
+        arquivo: new File([], nome),
+        url: c.url || '',
+        upload: 1,
+        uploadErro: null,
+        quadro: null,
+        carregado: false,
+        tocavel: !!c.url,
+        marcaEmbutida: true,
+        detectando: false,
+        statusJob: null,
+        progressoJob: 0,
+        saidaJob: null,
+      };
+      novosParaInserir.push(vInicial);
+
       if (c.url) {
-        fetch(c.url)
-          .then((r) => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.blob();
-          })
-          .then((blob) => {
-            const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
-            adicionarVideos([new File([blob], nome, { type: blob.type || 'video/mp4' })], {
-              abaId,
-              silencioso: true,
-              extras: [{ id, texto: c.titulo, marcaEmbutida: true }],
+        abrirVideo(c.url)
+          .then(async (vid) => {
+            const bmp = await capturarQuadro(vid, Math.min(1.5, vid.duration * 0.2));
+            vid.remove();
+            atualizarVideo(id, {
+              quadro: bmp,
+              carregado: true,
+              largura: bmp.width,
+              altura: bmp.height,
+              duracao: vid.duration || 45,
             });
           })
-          .catch((e) => {
-            clipsEmImportacao.current.delete(id);
-            escreverLog(`[ERRO] Não foi possível abrir o corte "${c.titulo}": ${e?.message ?? e}`);
+          .catch(() => {
+            fetch(c.url)
+              .then((r) => r.blob())
+              .then(async (blob) => {
+                const vid = await abrirVideo(URL.createObjectURL(blob));
+                const bmp = await capturarQuadro(vid, Math.min(1.5, vid.duration * 0.2));
+                vid.remove();
+                atualizarVideo(id, {
+                  quadro: bmp,
+                  carregado: true,
+                  largura: bmp.width,
+                  altura: bmp.height,
+                  duracao: vid.duration || 45,
+                });
+              })
+              .catch(() => {
+                atualizarVideo(id, { carregado: true });
+              });
           });
-      } else {
-        // Corte pendente identificado pela IA (exibido como placeholder no grid)
-        const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}`;
-        const vPendente: VideoCliente = {
-          id,
-          nome,
-          texto: c.titulo,
-          arquivo: new File([], nome),
-          url: '',
-          upload: 1,
-          uploadErro: null,
-          quadro: null,
-          carregado: false,
-          tocavel: false,
-          detectando: false,
-          statusJob: 'fila',
-          progressoJob: 0,
-          saidaJob: null,
-          largura: 1080,
-          altura: 1920,
-          duracao: 45,
-          areaDetectada: null,
-          recorte: { topo: 0, base: 0, esq: 0, dir: 0 },
-          vcrop: { topo: 0, base: 0, esq: 0, dir: 0 },
-          posicao: { x: 0, y: 0, escala: 100 },
-          espelhar: false,
-          semBordas: null,
-          mudo: false,
-          marcasExtras: [],
-          corte: null,
-          musica: null,
-          marcaEmbutida: true,
-        };
-        setAbas((as) =>
-          as.map((a) =>
-            a.id === abaId && !a.videos.some((x) => x.id === id)
-              ? { ...a, videos: [...a.videos, vPendente] }
-              : a,
-          ),
-        );
       }
     });
+
+    if (novosParaInserir.length) {
+      setAbas((as) => as.map((a) => (a.id === abaId ? { ...a, videos: [...a.videos, ...novosParaInserir] } : a)));
+      if (!ativoId && novosParaInserir[0]) setAtivoId(novosParaInserir[0].id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projeto?.id, projeto?.clips.length, restaurado]);
-
   const removerVideos = useCallback(
     (ids: string[]) => {
       const set = new Set(ids);
@@ -880,8 +881,26 @@ export default function EditorMassa({
         </div>
       </header>
 
-      {/* ================= corpo ================= */}
-      <div className={s.corpo}>
+      {/* ================= corpo com largura dinâmica da lateral ================= */}
+      <div
+        className={s.corpo}
+        style={{
+          gridTemplateColumns: `${lateralRecolhida ? '0px' : `${larguraLateral}px`} minmax(0, 1fr) 390px`,
+          transition: 'grid-template-columns 0.15s ease',
+        }}
+      >
+        {lateralRecolhida && (
+          <button
+            type="button"
+            className={s.btnExpandirLateral}
+            onClick={() => setLateralRecolhida(false)}
+            title="Expandir barra lateral de configurações"
+          >
+            <Icone nome="chevron" tamanho={14} style={{ transform: 'rotate(-90deg)' }} />
+            <span>Editar</span>
+          </button>
+        )}
+
         <Lateral
           global={global}
           mudarGlobal={setGlobal}
@@ -910,6 +929,10 @@ export default function EditorMassa({
           videoAtivo={ativo}
           atualizarAtivo={(fn) => ativo && atualizarVideo(ativo.id, (v) => fn(v))}
           atualizarTodos={atualizarSelecionados}
+          largura={larguraLateral}
+          setLargura={setLarguraLateral}
+          recolhido={lateralRecolhida}
+          setRecolhido={setLateralRecolhida}
         />
 
         <main className={s.area}>

@@ -19,7 +19,7 @@ import time
 import httpx
 
 # ─── configuração por env vars ───────────────────────────────────────────────
-MAX_TOKENS = int(os.environ.get("AI_CURATOR_MAX_TOKENS", "4096"))
+MAX_TOKENS = int(os.environ.get("AI_CURATOR_MAX_TOKENS", "8192"))
 TIMEOUT = float(os.environ.get("AI_CURATOR_TIMEOUT", "90"))
 
 # Gemini
@@ -43,6 +43,7 @@ def _call_openai_compat(base_url: str, api_key: str, model: str, prompt: str) ->
         {
             "model": model,
             "max_tokens": MAX_TOKENS,
+            "temperature": 0.2,
             "messages": [{"role": "user", "content": prompt}],
         },
         ensure_ascii=False,
@@ -73,7 +74,7 @@ def _call_gemini(prompt: str) -> str:
     payload = json.dumps(
         {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": MAX_TOKENS},
+            "generationConfig": {"maxOutputTokens": MAX_TOKENS, "temperature": 0.2},
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -144,7 +145,7 @@ def _try_providers(prompt: str) -> str:
 _call_free_model = _try_providers
 
 
-def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 150000) -> str:
+def prepare_full_transcript_timeline(segments: list[dict], max_chars: int = 450000) -> str:
     if not segments:
         return "[]"
 
@@ -303,7 +304,7 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
 
 TAREFA OBRIGATÓRIA:
 Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético, humor ou ensinamentos profundos.
-Este vídeo possui {int(video_end // 60)} minutos de duração. Por isso, você DEVE gerar OBRIGATORIAMENTE entre {min_clips_target} e {max_clips_target} cortes virais de alto nível, distribuídos ao longo de todo o vídeo (início, meio e fim)! Não gere menos que {min_clips_target} cortes.
+Este vídeo possui {int(video_end // 60)} minutos de duração. Por ser um vídeo de {int(video_end // 60)} minutos, você DEVE gerar OBRIGATORIAMENTE entre {min_clips_target} e {max_clips_target} cortes virais de altíssimo nível, distribuídos proporcionalmente ao longo de TODO o vídeo (início, meio e fim)! NUNCA gere menos que {min_clips_target} cortes.
 
 ⚠️ REGRAS RIGOROSAS DE EXCLUSÃO (FILTRO OBRIGATÓRIO):
 1. EXCLUA TOTALMENTE A INTRODUÇÃO / ABERTURA:
@@ -405,7 +406,7 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 
     # Validação e saneamento (incluindo filtro de intro/outro e limite de 90s)
     validated = []
-    for c in clips[:35]:
+    for c in clips[:60]:
         try:
             start = max(0.0, float(c.get("start_time", 0)))
             end = float(c.get("end_time", start + 60))
