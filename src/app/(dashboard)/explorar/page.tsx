@@ -114,8 +114,11 @@ export default function ExplorarPage() {
 
   // ?u=@perfil (vindo do Assistente) já preenche o @
   useEffect(() => {
-    const u = new URLSearchParams(window.location.search).get('u')
+    const q = new URLSearchParams(window.location.search)
+    const u = q.get('u')
     if (u) setPerfil(u)
+    const o = q.get('o')
+    if (o && ORDENS.some(x => x.v === o)) setOrdem(o)
   }, [])
 
   function avisar(tipo: 'ok' | 'erro', texto: string) {

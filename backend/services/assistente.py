@@ -30,18 +30,54 @@ ACOES = {
 }
 
 _URL = re.compile(r"https?://\S+", re.I)
-_ARROBA = re.compile(r"(?<![\w.])@([A-Za-z0-9_.]{2,30})")
+# links das redes com ou sem https:// ("youtube.com/@canal", "instagram.com/perfil")
+_LINK_REDE = re.compile(
+    r"(?:https?://)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com|fb\.com|twitch\.tv|kick\.com)"
+    r"/[^\s,;!\"')]+", re.I)
+_LINK_VIDEO = re.compile(r"watch\?|youtu\.be/|/shorts/|/live/|/reel/|/reels/|/p/|/video/|/videos/|/tv/|/clip/", re.I)
+_ARROBA = re.compile(r"(?<![\w./])@([A-Za-z0-9_.]{2,30})")
 
 
-def _href(acao: str, url: str = "", perfil: str = "") -> str:
+def _extrair(texto: str) -> tuple[str, str]:
+    """(link de vídeo, perfil). Perfil de rede vai inteiro ("youtube.com/@canal") para a ferramenta saber a rede."""
+    url, perfil = "", ""
+    for m in _LINK_REDE.finditer(texto):
+        link = m.group(0).rstrip(").,;!?\"'")
+        if _LINK_VIDEO.search(link):
+            url = url or (link if link.lower().startswith("http") else f"https://{link}")
+        else:
+            perfil = perfil or re.sub(r"^https?://(www\.|m\.)?", "", link, flags=re.I).rstrip("/")
+    if not url:
+        m = _URL.search(texto)
+        url = m.group(0).rstrip(").,;!?\"'") if m else ""
+    if not perfil:
+        a = _ARROBA.search(_LINK_REDE.sub(" ", _URL.sub(" ", texto)))
+        perfil = a.group(1) if a else ""
+    return url, perfil
+
+
+def _ordem(texto: str) -> str:
+    t = texto.lower()
+    if any(p in t for p in ("mais vist", "visualiza", "views", "mais assistid")):
+        return "visualizados"
+    if any(p in t for p in ("curtid", "likes", "mais curti")):
+        return "curtidos"
+    return ""
+
+
+def _href(acao: str, url: str = "", perfil: str = "", ordem: str = "") -> str:
     _, rota, param, _ = ACOES[acao]
     valor = {"url": url, "u": perfil}.get(param or "", "")
+    # monitorar um perfil (sem link de vídeo): manda o perfil no lugar do link
+    if acao == "monitorar" and not valor and "." in perfil:
+        valor = perfil
     if not valor:
         return rota
-    return f"{rota}{'&' if '?' in rota else '?'}{param}={quote(valor, safe='')}"
+    extra = f"&o={ordem}" if acao == "explorar" and ordem else ""
+    return f"{rota}{'&' if '?' in rota else '?'}{param}={quote(valor, safe='')}{extra}"
 
 
-def _montar(ids: list, url: str, perfil: str) -> list[dict]:
+def _montar(ids: list, url: str, perfil: str, ordem: str = "") -> list[dict]:
     vistos, acoes = set(), []
     for item in ids:
         aid = item.get("id") if isinstance(item, dict) else item
@@ -49,7 +85,7 @@ def _montar(ids: list, url: str, perfil: str) -> list[dict]:
             continue
         vistos.add(aid)
         # link e @ vêm só do que o usuário escreveu, nunca da IA
-        acoes.append({"id": aid, "rotulo": ACOES[aid][0], "href": _href(aid, url, perfil)})
+        acoes.append({"id": aid, "rotulo": ACOES[aid][0], "href": _href(aid, url, perfil, ordem)})
     return acoes[:3]
 
 
@@ -78,7 +114,7 @@ def _palavras(texto: str, url: str, perfil: str) -> dict:
         ids.append("explorar")
     if not ids:
         ids = ["cortar", "explorar", "massa"]
-    return {"resposta": "Separei o melhor caminho para isso no Clipost:", "acoes": _montar(ids, url, perfil)}
+    return {"resposta": "Separei o melhor caminho para isso no Clipost:", "acoes": _montar(ids, url, perfil, _ordem(texto))}
 
 
 def _prompt(texto: str, historico: list[dict], url: str, perfil: str) -> str:
@@ -104,11 +140,7 @@ Responda SÓ com JSON válido, sem markdown:
 
 def responder(texto: str, historico: list[dict] | None = None) -> dict:
     texto = (texto or "").strip()
-    url_m = _URL.search(texto)
-    url = url_m.group(0).rstrip(").,;!?\"'") if url_m else ""
-    sem_url = _URL.sub(" ", texto)
-    arroba = _ARROBA.search(sem_url)
-    perfil = arroba.group(1) if arroba else ""
+    url, perfil = _extrair(texto)
 
     bruto = ""
     try:
@@ -121,7 +153,7 @@ def responder(texto: str, historico: list[dict] | None = None) -> dict:
             i, f = limpo.find("{"), limpo.rfind("}")
             dados = json.loads(limpo[i:f + 1] if i >= 0 else limpo)
             resposta = str(dados.get("resposta") or "").strip()[:600]
-            acoes = _montar(list(dados.get("acoes") or []), url, perfil)
+            acoes = _montar(list(dados.get("acoes") or []), url, perfil, _ordem(texto))
             if resposta or acoes:
                 if not acoes:
                     acoes = _palavras(texto, url, perfil)["acoes"]
