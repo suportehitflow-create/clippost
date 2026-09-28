@@ -151,6 +151,9 @@ export default function AutopilotPage() {
     // abre direto em "Aguardando aprovação" pelo link ?aba=aprovacao
     const a = new URLSearchParams(window.location.search).get('aba')
     if (a === 'aprovacao' || a === 'historico') setAba(a)
+    // ?url=... (vindo do Assistente) já preenche o canal/perfil a monitorar
+    const u = new URLSearchParams(window.location.search).get('url')
+    if (u) setCanal(u)
   }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function monitorar() {

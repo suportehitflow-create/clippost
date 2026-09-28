@@ -33,6 +33,7 @@ CAPAS = {
     "raiox": "a translucent glass smartphone showing glowing bar charts, a rising line graph and a small heatmap grid, x-ray scan light passing through it",
     "frases": "a vertical glass phone frame showing a bold glowing quotation mark over a soft blurred sunset photo, floating music notes",
     "posts": "a fan of floating glass photo cards arranged like an Instagram carousel with small dots below and a story ring, soft reflections",
+    "assistente": "a glowing glass chat bubble with a small sparkle inside, floating above soft light trails that branch into tiny app icons",
     "musicas": "a glossy glass vinyl record and floating translucent music notes with a soft pink sound wave, headphones resting beside it",
     "ferramentas":"a tidy row of small precise glass tools (a hashtag symbol, a clock, a magnifying glass over a bar chart, a text cursor) floating on a dark workbench",
 }

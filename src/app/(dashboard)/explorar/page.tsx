@@ -112,6 +112,12 @@ export default function ExplorarPage() {
     consumir()
   }, [lista, consumir])
 
+  // ?u=@perfil (vindo do Assistente) já preenche o @
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get('u')
+    if (u) setPerfil(u)
+  }, [])
+
   function avisar(tipo: 'ok' | 'erro', texto: string) {
     setAviso({ tipo, texto })
     setTimeout(() => setAviso(null), 7000)

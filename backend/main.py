@@ -1337,6 +1337,20 @@ async def ferramenta_raio_x(request: Request):
         raise HTTPException(status_code=502, detail="Não consegui analisar esse perfil agora.")
 
 
+@app.post("/api/assistente")
+async def assistente(request: Request):
+    """Assistente "O que vamos criar?": pedido em texto livre → resposta curta + ações (links do Clipost).
+    Corpo: { texto, historico?: [{de: usuario|assistente, texto}] }"""
+    await _usuario_logado(request)
+    body = await request.json()
+    texto = str(body.get("texto") or "").strip()[:2000]
+    if not texto:
+        raise HTTPException(status_code=400, detail="Escreva o que você quer criar.")
+    historico = [m for m in (body.get("historico") or []) if isinstance(m, dict)][-6:]
+    from services.assistente import responder
+    return await asyncio.to_thread(responder, texto, historico)
+
+
 @app.post("/api/posts/criar")
 async def posts_criar(request: Request):
     """Posts em massa: cada grupo de mídias vira um post (foto, carrossel ou story) pronto para agendar.

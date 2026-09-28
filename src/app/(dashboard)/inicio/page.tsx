@@ -26,6 +26,7 @@ import {
   Radio,
   CheckCircle2,
   BarChart3,
+  Bot,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -60,6 +61,7 @@ const FEATURES: Feature[] = [
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
   { capa: 'frases', title: 'Vídeos com frases', description: 'Fotos, frases e música viram vídeos 9:16 em série — prontos na Biblioteca e já agendados.', href: '/frases', icon: Quote, cor: '168,85,247', badge: 'Novo' },
   { capa: 'posts', title: 'Posts em massa', description: 'Fotos, carrosséis e stories de uma vez — agendados nas suas contas.', href: '/posts', icon: Images, cor: '14,165,233', badge: 'Novo' },
+  { capa: 'assistente', title: 'Assistente IA', description: 'Diga o que quer criar — um link, um @ ou uma ideia — e ele abre a ferramenta certa já preenchida.', href: '/assistente', icon: Bot, cor: '99,102,241', badge: 'Novo' },
   { capa: 'musicas', title: 'Músicas', description: 'Sua biblioteca de faixas salva na conta, pronta para o Editor em Massa e os vídeos com frases.', href: '/musicas', icon: Music2, cor: '219,39,119' },
   { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, Raio-X de perfil, YouTube → texto, melhores horários, contador, quebra de linha e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', wide: true },
 ]
