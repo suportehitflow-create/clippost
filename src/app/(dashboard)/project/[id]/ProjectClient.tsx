@@ -1137,6 +1137,23 @@ export default function ProjectClient({
     : faltando > 0
       ? (faltando === 1 ? '1 corte não terminou de gerar.' : `${faltando} cortes não terminaram de gerar.`)
       : ''
+  // Gerando e nenhum corte pronto ainda: mostra o progresso (%). Quando o 1º fica pronto, abre o estúdio
+  // com ele e os demais cortes identificados carregando em degradê.
+  if (status === 'processing' && cortesProntos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] -mb-24 bg-[#0a0a0c] px-4">
+        <div className="w-full max-w-2xl">
+          <div className="text-center mb-2 px-4">
+            <h1 className="text-sm font-semibold text-white truncate">{project.title || 'Gerando cortes'}</h1>
+            {clips.length > 0 && (
+              <p className="text-[11px] text-zinc-400 mt-1">{clips.length} cortes identificados — o estúdio abre quando o primeiro ficar pronto</p>
+            )}
+          </div>
+          <PipelineProgress elapsedSecs={elapsedSecs} clipsReady={0} backendStep={errorMessage} />
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
       <EstudioEditor

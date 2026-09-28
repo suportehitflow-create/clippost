@@ -1137,7 +1137,7 @@ export default function EditorMassa({
               {projeto && onAgendar && (
                 <button
                   type="button"
-                  className={`${s.btn} ${s.btnPequeno}`}
+                  className={`${s.btn} ${s.btnPrimario} ${s.btnPequeno}`}
                   onClick={onAgendar}
                   title="Agendar todos os cortes nas redes sociais"
                 >
