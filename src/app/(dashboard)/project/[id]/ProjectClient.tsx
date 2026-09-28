@@ -1113,7 +1113,8 @@ export default function ProjectClient({
       isYouTube: !!isYouTubeProject,
       // perfil baixado inteiro (Buscar de um perfil): vídeos crus, o estúdio aplica o template
       crus: String(project.source_url || '').startsWith('clipost:perfil'),
-      clips: clips.map(c => ({
+      // projeto que falhou: cortes que nunca ficaram prontos não aparecem (ficariam "carregando" para sempre)
+      clips: clips.filter(c => status !== 'failed' || !!c.storage_url).map(c => ({
         id: c.id,
         url: c.storage_url || '',
         titulo: c.hook || c.title || '',
