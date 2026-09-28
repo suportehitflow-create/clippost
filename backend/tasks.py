@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+import time
 
 import yt_dlp
 from celery_app import celery
@@ -128,13 +129,23 @@ def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
         "Content-Type": "video/mp4",
         "x-upsert": "true",
     }
-    with httpx.Client(timeout=httpx.Timeout(300.0)) as client:
-        resp = client.post(endpoint, headers=headers, content=data)
-        if not resp.is_success:
-            raise RuntimeError(
-                f"Upload falhou {resp.status_code} para {clip_key}: {resp.text[:400]}"
-            )
-    return f"{SUPABASE_URL}/storage/v1/object/public/videos/{clip_key}"
+    ultimo = ""
+    for tentativa in range(4):
+        try:
+            with httpx.Client(timeout=httpx.Timeout(300.0)) as client:
+                resp = client.post(endpoint, headers=headers, content=data)
+            if resp.is_success:
+                return f"{SUPABASE_URL}/storage/v1/object/public/videos/{clip_key}"
+            ultimo = f"HTTP {resp.status_code}"
+            # erro do lado do Storage (fora do ar/sobrecarregado): espera e tenta de novo
+            if resp.status_code not in (408, 429, 500, 502, 503, 504):
+                raise RuntimeError(f"Upload falhou {resp.status_code} para {clip_key}: {resp.text[:300]}")
+        except (httpx.TimeoutException, httpx.NetworkError) as e:
+            ultimo = type(e).__name__
+        espera = 5 * (tentativa + 1)
+        print(f"[upload] {clip_key}: {ultimo} — tentando de novo em {espera}s ({tentativa + 1}/4)")
+        time.sleep(espera)
+    raise RuntimeError(f"Upload falhou para {clip_key} depois de 4 tentativas ({ultimo}). O armazenamento está instável; tente de novo.")
 
 
 @celery.task(name="process_bulk_videos")
@@ -1243,7 +1254,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
             clip_data = _recompress_if_needed(clip_out)
-            clip_url = _upload_clip_to_storage(clip_key, clip_data)
+            try:
+                clip_url = _upload_clip_to_storage(clip_key, clip_data)
+            except Exception as up_err:
+                print(f"[pipeline] corte {i + 1} não subiu, seguindo com os outros: {up_err}")
+                if cid:
+                    try:
+                        supabase.table("clips").update({"status": "failed"}).eq("id", cid).execute()
+                    except Exception:
+                        pass
+                continue
 
             if cid:
                 supabase.table("clips").update({
@@ -1266,7 +1286,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             import gc
             gc.collect()
 
-        # Atualizar status final
+        # Atualizar status final ("Falhou" só se nenhum corte ficou pronto)
+        prontos = supabase.table("clips").select("id").eq("project_id", project_id).eq("status", "ready").execute().data or []
+        if not prontos:
+            supabase.table("projects").update({
+                "status": "failed",
+                "error_message": "Nenhum corte ficou pronto (o armazenamento ou a renderização falharam). Tente novamente.",
+            }).eq("id", project_id).execute()
+            return {"status": "failed", "reason": "no_ready_clips"}
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
         try:
             increment_clips_used(user_id)

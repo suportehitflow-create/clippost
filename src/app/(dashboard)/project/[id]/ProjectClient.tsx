@@ -1124,7 +1124,9 @@ export default function ProjectClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [project.id, project.title, isYouTubeProject, clips.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')],
   )
-  if (status !== 'failed' && (cortesProntos.length > 0 || (status === 'processing' && clips.length > 0))) {
+  // Com qualquer corte pronto abre SEMPRE o estúdio (mesmo se algum corte falhou); a tela antiga só
+  // aparece quando não sobrou nenhum corte para mostrar
+  if (cortesProntos.length > 0 || (status === 'processing' && clips.length > 0)) {
     return (
       <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
         <EstudioEditor
