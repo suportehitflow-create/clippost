@@ -367,10 +367,13 @@ def _instagram_oficial(url: str, limit: int, sort_by: str, user_id: str | None) 
         return None, ""
 
 
-def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", user_id: str | None = None) -> dict:
+def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", user_id: str | None = None,
+                        enriquecer: bool = True) -> dict:
     """
     Vídeos de um perfil/página (TikTok, Instagram, Facebook, YouTube) ordenados.
     limit=0 traz todos. sort_by: views | likes | engagement | date.
+    enriquecer=False não abre vídeo por vídeo para completar números/datas que a listagem rápida não traz
+    (bem mais rápido; a ordem do próprio perfil já é do mais novo para o mais antigo).
     """
     sort_by = sort_by if sort_by in _PROFILE_SORTS else "views"
     url = normalize_profile_url(profile)
@@ -409,7 +412,7 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", us
         raise ValueError(f"Não encontrei vídeos em {url}.{hint} {erro}".strip())
 
     metric = {"views": "view_count", "likes": "like_count", "engagement": "like_count", "date": "timestamp"}[sort_by]
-    missing = [v for v in videos[:_MAX_ENRICH] if v.get(metric) is None]
+    missing = [v for v in videos[:_MAX_ENRICH] if v.get(metric) is None] if enriquecer else []
     if missing:
         with ThreadPoolExecutor(max_workers=6) as pool:
             enriched = list(pool.map(lambda v: _enrich(v, cookies), missing))

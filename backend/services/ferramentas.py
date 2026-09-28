@@ -97,7 +97,10 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
         except ValueError:
             dados = None  # perfil não profissional: tenta o caminho comum
     if dados is None:
-        lista = list_profile_videos(url, limit=leitura, sort_by="date", user_id=user_id)
+        # ordem pedida direto na listagem; abrir vídeo a vídeo (lento) só se precisar de data ou curtidas
+        lista = list_profile_videos(url, limit=leitura, user_id=user_id,
+                                    sort_by={"curtidos": "likes", "visualizados": "views"}.get(ordem, "date"),
+                                    enriquecer=bool(periodo_dias) or ordem == "curtidos")
         dados = {
             "perfil": {"usuario": (re.search(r"\.com/(@?[^/?#]+)", lista["profile_url"]) or re.search(r"(.+)", perfil)).group(1).lstrip("@"), "seguidores": None},
             "itens": [{
