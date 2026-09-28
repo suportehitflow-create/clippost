@@ -147,9 +147,6 @@ export default function EditarTemplate(p: {
           <a href="/templates" className={`${s.btn} ${s.btnFantasma}`} style={{ flex: 1, justifyContent: 'center' }}>
             Editor completo
           </a>
-          <button type="button" className={`${s.btn} ${s.btnPrimario}`} style={{ flex: 1 }} onClick={p.concluir} disabled={p.salvando}>
-            {p.salvando ? 'Salvando…' : 'Concluir'}
-          </button>
         </div>
       </div>
     </div>

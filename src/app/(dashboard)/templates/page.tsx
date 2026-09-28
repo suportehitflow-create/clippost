@@ -781,7 +781,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <h1 className="text-xs sm:text-sm font-semibold text-white tracking-tight flex items-center gap-2">
-                <span>Editor de Template • Reels 9:16</span>
+                <span>Template</span>
               </h1>
               <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1" aria-live="polite">
                 {saveStatus === 'saving' ? (
@@ -796,27 +796,8 @@ export default function TemplatesPage() {
           </div>
         </div>
 
-        <div className="flex justify-center">
-          <ProfileSwitcher align="center" />
-        </div>
-
-        {/* Ações da Direita */}
-        <div className="flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? (
-              <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-            ) : savedSuccess ? (
-              <Check className="w-3.5 h-3.5 text-indigo-300" />
-            ) : (
-              <Save className="w-3.5 h-3.5" />
-            )}
-            <span>{savedSuccess ? 'Template Salvo!' : 'Salvar'}</span>
-          </button>
+        <div className="flex items-center justify-end">
+          <ProfileSwitcher />
         </div>
       </header>
 
@@ -893,7 +874,7 @@ export default function TemplatesPage() {
 
         {/* PAINEL EXPANSÍVEL LATERAL DO CANVA (DRAWER 280px - SEM COBRIR O CANVAS) */}
         {activeTool && (
-          <div className="w-72 sm:w-80 bg-[#121215] border-r border-white/[0.08] p-4 flex flex-col gap-4 z-10 shrink-0 animate-in slide-in-from-left-4 duration-200 overflow-y-auto">
+          <div className="w-72 sm:w-80 bg-[#121215] border-r border-white/[0.08] p-4 flex flex-col gap-4 z-10 shrink-0 overflow-y-auto">
             
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -1565,7 +1546,7 @@ export default function TemplatesPage() {
               transformOrigin: 'center center',
               transition: 'transform 0.15s ease-out'
             }}
-            className="relative p-[10px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[54px] shadow-[0_30px_90px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.8)] ring-1 ring-white/20 shrink-0 select-none my-auto"
+            className="relative p-[10px] bg-gradient-to-b from-[#38383e] via-[#202025] to-[#121215] rounded-[54px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),inset_0_-1px_1px_rgba(0,0,0,0.8)] ring-1 ring-white/20 shrink-0 select-none my-auto"
           >
             {/* BOTÕES LATERAIS FÍSICOS DO IPHONE (TITÂNIO 3D) */}
             <div className="absolute -left-[4px] top-[110px] w-[4px] h-[26px] bg-zinc-600 rounded-l-sm shadow-sm" />

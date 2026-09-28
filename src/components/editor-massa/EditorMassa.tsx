@@ -816,7 +816,16 @@ export default function EditorMassa({
     tplMudou.current = true;
     if (timerTpl.current) clearTimeout(timerTpl.current);
     timerTpl.current = setTimeout(() => aplicarTemplate(novo), 300);
+    // salva sozinho no template da conta (sem botão de salvar)
+    if (timerSalvarTpl.current) clearTimeout(timerSalvarTpl.current);
+    timerSalvarTpl.current = setTimeout(() => {
+      tplMudou.current = false;
+      void salvarTemplateClipost(novo).then((ok) => {
+        if (!ok) avisar('Não foi possível salvar o template — as mudanças valem só aqui por enquanto');
+      });
+    }, 1200);
   };
+  const timerSalvarTpl = useRef<ReturnType<typeof setTimeout> | null>(null);
   const concluirTemplate = async () => {
     const t = tplRef.current;
     if (t && tplMudou.current) {
