@@ -25,6 +25,8 @@ export interface ListaExtensao {
 }
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
+/** Versão da pasta extensao/ (manifest.json): a extensão instalada mais velha se recarrega sozinha (1.3.1+) */
+export const VERSAO_EXTENSAO = '1.3.1'
 
 /** Detecta a extensão e recebe a lista que ela montou no Instagram */
 export function useExtensaoClipost() {
@@ -37,6 +39,14 @@ export function useExtensaoClipost() {
       if (e.source !== window || e.origin !== origem) return
       if (e.data?.tipo === 'CLIPOST_EXTENSAO_PONG') {
         setInstalada(true)
+        // extensão carregada da pasta e mais velha que a do site: pede para ela se recarregar (1x por sessão)
+        const numero = (v: string) => v.split('.').map(Number).reduce((a, n) => a * 1000 + (n || 0), 0)
+        try {
+          if (numero(String(e.data.versao || '0')) < numero(VERSAO_EXTENSAO) && !sessionStorage.getItem('clipost:ext-recarregada')) {
+            sessionStorage.setItem('clipost:ext-recarregada', '1')
+            window.postMessage({ tipo: 'CLIPOST_EXTENSAO_RECARREGAR' }, origem)
+          }
+        } catch {}
         window.postMessage({ tipo: 'CLIPOST_EXTENSAO_PEGAR' }, origem)
       } else if (e.data?.tipo === 'CLIPOST_EXTENSAO_LISTA' && e.data.dados?.itens?.length) {
         setLista(e.data.dados)
