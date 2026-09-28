@@ -1,77 +1,96 @@
-// Clipost — serviço em segundo plano. O site do Clipost pede "busque o @fulano" e a extensão lista
-// os posts pela API web do Instagram com a SUA sessão do navegador — sem abrir o Instagram e sem
-// clique. Se o Instagram não aceitar o pedido vindo daqui, abre uma aba escondida do Instagram,
-// busca por lá (mesma origem) e fecha a aba sozinha.
+// Clipost — serviço em segundo plano. O site do Clipost pede "busque o @fulano" e a extensão abre o
+// perfil numa janelinha sem foco (com a SUA sessão do Instagram), rola a grade sozinha e junta os
+// posts que o próprio Instagram carrega (instagram-captura.js anota). No fim fecha a janela.
 
-const APP_ID = '936619743392459' // id público do app web do Instagram
-
-// Roda dentro da página do Instagram (aba escondida) OU aqui no serviço: precisa ser autossuficiente
-async function buscarPerfil(usuario, limite) {
+// Roda DENTRO da página do perfil (mundo da página): rola e devolve os posts anotados
+async function coletarPerfil(limite) {
   const esperar = ms => new Promise(r => setTimeout(r, ms))
-  const base = 'https://www.instagram.com'
-  const api = async caminho => {
-    const r = await fetch(base + caminho, {
-      headers: { 'x-ig-app-id': '936619743392459', 'x-requested-with': 'XMLHttpRequest' },
-      credentials: 'include',
-    })
-    if (r.status === 429) throw new Error('O Instagram pediu para ir mais devagar (429). Espere alguns minutos.')
-    if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    return r.json()
-  }
-  const melhorVideo = m => (m.video_versions || []).slice().sort((a, b) => (b.width || 0) - (a.width || 0))[0]
-  const melhorImagem = m => m.image_versions2?.candidates?.[0]?.url || null
-
-  const info = await api(`/api/v1/users/web_profile_info/?username=${encodeURIComponent(usuario)}`)
-  const u = info?.data?.user
-  if (!u?.id) throw new Error('Perfil não encontrado (ou privado sem você seguir).')
-  const itens = []
-  let proximo = ''
-  for (let pagina = 0; pagina < 120; pagina++) {
-    const feed = await api(`/api/v1/feed/user/${u.id}/?count=33${proximo ? `&max_id=${encodeURIComponent(proximo)}` : ''}`)
-    for (const m of feed.items || []) {
-      const carrossel = m.media_type === 8
-      const video = m.media_type === 2 ? m : carrossel ? (m.carousel_media || []).find(c => c.media_type === 2) : null
-      const v = video && melhorVideo(video)
-      const capa = melhorImagem(m) || (carrossel ? melhorImagem((m.carousel_media || [])[0] || {}) : null)
-      itens.push({
-        tipo: m.media_type === 2 ? 'reel' : carrossel ? 'carrossel' : 'post',
-        url: v?.url || (carrossel ? melhorImagem((m.carousel_media || [])[0] || {}) : melhorImagem(m)),
-        video: !!v?.url,
-        permalink: `https://www.instagram.com/${m.media_type === 2 ? 'reel' : 'p'}/${m.code}/`,
-        title: (m.caption?.text || '').replace(/\s+/g, ' ').trim().slice(0, 200),
-        thumbnail: capa,
-        view_count: m.play_count ?? m.ig_play_count ?? m.view_count ?? null,
-        like_count: m.like_count ?? null,
-        comment_count: m.comment_count ?? null,
-        timestamp: m.taken_at ?? null,
-        duration: video?.video_duration ?? null,
-      })
+  // espera o anotador (instagram-captura.js) e a primeira leva de posts
+  for (let i = 0; i < 40 && !(window.__clipostColeta && window.__clipostColeta.size); i++) await esperar(250)
+  const vistos = window.__clipostColeta || new Map()
+  // posts que já vieram embutidos no HTML (quando o Instagram manda assim)
+  document.querySelectorAll('script[type="application/json"]').forEach(s => {
+    if (s.textContent.includes('xdt_api__v1__feed__user_timeline_graphql_connection') && window.__clipostVarrer) {
+      try { window.__clipostVarrer(JSON.parse(s.textContent)) } catch (e) {}
     }
-    if (limite && itens.length >= limite) break
-    if (!feed.more_available || !feed.next_max_id) break
-    proximo = feed.next_max_id
-    await esperar(700 + Math.random() * 600) // devagar, como uma pessoa rolando o perfil
+  })
+  let parado = 0, ultimo = vistos.size
+  while ((!limite || vistos.size < limite) && parado < 6) {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    await esperar(1400)
+    window.scrollBy(0, -200)
+    await esperar(300)
+    if (vistos.size === ultimo) parado++
+    else { parado = 0; ultimo = vistos.size }
   }
+  const melhorImagem = m => (m && m.image_versions2 && m.image_versions2.candidates && m.image_versions2.candidates[0] && m.image_versions2.candidates[0].url) || null
+  const itens = [...vistos.values()].map(m => {
+    const carrossel = m.media_type === 8
+    const video = m.media_type === 2 ? m : carrossel ? (m.carousel_media || []).find(c => c.media_type === 2) : null
+    const v = video && (video.video_versions || []).slice().sort((a, b) => (b.width || 0) - (a.width || 0))[0]
+    const primeira = carrossel ? (m.carousel_media || [])[0] : null
+    return {
+      tipo: m.media_type === 2 ? 'reel' : carrossel ? 'carrossel' : 'post',
+      url: (v && v.url) || melhorImagem(primeira || m),
+      video: !!(v && v.url),
+      permalink: `https://www.instagram.com/${m.media_type === 2 ? 'reel' : 'p'}/${m.code}/`,
+      title: ((m.caption && m.caption.text) || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+      thumbnail: melhorImagem(m) || melhorImagem(primeira),
+      view_count: m.play_count ?? m.ig_play_count ?? m.view_count ?? null,
+      like_count: m.like_count ?? null,
+      comment_count: m.comment_count ?? null,
+      timestamp: m.taken_at ?? null,
+      duration: (video && video.video_duration) ?? null,
+    }
+  })
+  // dados do perfil pela descrição da página ("104M seguidores, 93 seguindo, 4,935 posts")
+  const desc = (document.querySelector('meta[name="description"]') || {}).content || ''
+  const num = t => {
+    if (!t) return null
+    const x = t.trim().toLowerCase()
+    const n = parseFloat(x.replace(/[^\d.,]/g, '').replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'))
+    if (isNaN(n)) return null
+    return /mi|m$/.test(x) ? Math.round(n * 1e6) : /mil|k$/.test(x) ? Math.round(n * 1e3) : Math.round(n)
+  }
+  const seg = (desc.match(/([\d.,]+\s*(?:mi|mil|k|m)?)\s*(?:seguidores|followers)/i) || [])[1]
+  const posts = (desc.match(/([\d.,]+\s*(?:mi|mil|k|m)?)\s*(?:posts|publicações)/i) || [])[1]
   return {
-    perfil: { usuario: u.username, nome: u.full_name || null, foto: u.profile_pic_url_hd || u.profile_pic_url || null, seguidores: u.edge_followed_by?.count ?? null, total_posts: u.edge_owner_to_timeline_media?.count ?? null },
+    perfil: {
+      usuario: location.pathname.split('/').filter(Boolean)[0],
+      nome: null,
+      foto: (document.querySelector('meta[property="og:image"]') || {}).content || null,
+      seguidores: num(seg),
+      total_posts: num(posts),
+    },
     itens: limite ? itens.slice(0, limite) : itens,
+    logado: document.cookie.includes('ds_user_id'),
   }
 }
 
-async function pelaAbaEscondida(usuario, limite) {
-  const aba = await chrome.tabs.create({ url: `https://www.instagram.com/${encodeURIComponent(usuario)}/`, active: false })
+async function pelaJanela(usuario, limite) {
+  // janela pequena e sem foco: precisa estar visível para o Instagram carregar mais posts ao rolar
+  const janela = await chrome.windows.create({
+    url: `https://www.instagram.com/${encodeURIComponent(usuario)}/?clipost=1`,
+    type: 'popup', focused: false, width: 480, height: 820, left: 0, top: 0,
+  })
+  const abaId = janela.tabs && janela.tabs[0] && janela.tabs[0].id
   try {
-    // espera a página carregar (a sessão/cookies passam a valer como no site)
     await new Promise(res => {
-      const pronto = (id, info) => { if (id === aba.id && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(pronto); res() } }
+      const pronto = (id, info) => { if (id === abaId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(pronto); res() } }
       chrome.tabs.onUpdated.addListener(pronto)
-      setTimeout(() => { chrome.tabs.onUpdated.removeListener(pronto); res() }, 20000)
+      setTimeout(() => { chrome.tabs.onUpdated.removeListener(pronto); res() }, 25000)
     })
-    const [r] = await chrome.scripting.executeScript({ target: { tabId: aba.id }, world: 'MAIN', func: buscarPerfil, args: [usuario, limite] })
-    if (!r?.result) throw new Error('Não consegui ler o perfil. Confira se você está logado no Instagram neste navegador.')
-    return r.result
+    const [r] = await chrome.scripting.executeScript({ target: { tabId: abaId }, world: 'MAIN', func: coletarPerfil, args: [limite] })
+    const dados = r && r.result
+    if (!dados) throw new Error('Não consegui ler o perfil.')
+    if (!dados.itens.length) {
+      throw new Error(dados.logado
+        ? 'O Instagram não mostrou posts desse perfil (privado, inexistente ou sem posts).'
+        : 'Entre no Instagram neste navegador e tente de novo.')
+    }
+    return dados
   } finally {
-    chrome.tabs.remove(aba.id).catch(() => {})
+    chrome.windows.remove(janela.id).catch(() => {})
   }
 }
 
@@ -81,14 +100,7 @@ chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {
   const limite = Math.max(0, Math.min(Number(msg.limite) || 0, 3000))
   ;(async () => {
     try {
-      let dados
-      try {
-        dados = await buscarPerfil(usuario, limite)
-      } catch (e) {
-        if (String(e.message).includes('429')) throw e
-        dados = await pelaAbaEscondida(usuario, limite)
-      }
-      responder({ ok: true, dados })
+      responder({ ok: true, dados: await pelaJanela(usuario, limite) })
     } catch (e) {
       responder({ ok: false, erro: e?.message || String(e) })
     }
