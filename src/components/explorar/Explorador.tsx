@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal } from '@/components/pagina/Base'
-import { useExtensaoClipost, ModalExtensao, buscarPelaExtensao } from '@/components/bulk/ExtensaoInstagram'
+import { useExtensaoClipost, ModalExtensao, buscarPelaExtensao, ZIP_EXTENSAO } from '@/components/bulk/ExtensaoInstagram'
 import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import {
-  Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink, AtSign, ArrowDownWideNarrow,
+  Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink, AtSign, ArrowDownWideNarrow, Puzzle, RotateCw,
 } from 'lucide-react'
 
 // Explorador de perfis: busca os posts de um perfil (Instagram, TikTok, YouTube), mostra em grade com
@@ -288,11 +288,18 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
             <Campo icone={AtSign} id="explorar-perfil" value={perfil} onChange={e => setPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && !buscando && buscar()}
               placeholder="@perfil, tiktok.com/@perfil ou youtube.com/@canal" />
             {instagram && !res && (
-              <p className="text-[11px] text-zinc-500">
-                {oficial?.configurado
-                  ? <span className="text-emerald-300">Instagram pela API oficial da Meta — sem bloqueio.</span>
-                  : <>Instagram bloqueando? <button type="button" onClick={() => setModalOficial(true)} className="underline text-zinc-300">conecte a API oficial</button> ou <button type="button" onClick={() => setModalExtensao(true)} className="underline text-zinc-300">use a extensão{instalada ? ' ✓' : ''}</button>.</>}
-              </p>
+              oficial?.configurado ? (
+                <p className="text-[11px] text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Instagram pela API oficial da Meta — sem bloqueio.</p>
+              ) : instalada ? (
+                <p className="text-[11px] text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Extensão do Clipost ativa — o Instagram é lido pelo seu navegador, sem bloqueio.</p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.02] border border-white/[0.06] px-3 py-2.5">
+                  <Puzzle className="w-4 h-4 text-indigo-300 shrink-0" />
+                  <span className="text-[11px] text-zinc-400 flex-1 min-w-[180px]">Para o Instagram nunca bloquear, instale a extensão do Clipost (1 minuto, uma vez só).</span>
+                  <a href={ZIP_EXTENSAO} download className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> Baixar extensão</a>
+                  <button type="button" onClick={() => setModalExtensao(true)} className="px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-white/[0.06] border border-white/[0.08]">Como instalar</button>
+                </div>
+              )
             )}
           </div>
 
@@ -323,15 +330,33 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
           </div>
         )}
         {erro && (
-          <div className="rounded-2xl bg-amber-500/10 border border-amber-500/25 p-4 text-xs text-amber-100 space-y-2">
-            <p className="flex items-start gap-2"><AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-300" /> {erro}</p>
-            {instagram && (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setModalOficial(true)} className="px-3 py-1.5 rounded-lg bg-white/[0.08] font-semibold">🔐 Conectar API oficial</button>
-                <button type="button" onClick={() => setModalExtensao(true)} className="px-3 py-1.5 rounded-lg bg-white/[0.08] font-semibold">🧩 Usar a extensão</button>
+          instagram && !instalada ? (
+            <section className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-5 sm:p-6 space-y-4 max-w-3xl w-full mx-auto">
+              <div className="flex items-start gap-3">
+                <span className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shrink-0"><Puzzle className="w-5 h-5" /></span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">O Instagram não deixou ler esse perfil agora</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">Sem login, o Instagram libera a leitura só em alguns momentos. Tente de novo daqui a pouco — ou instale a extensão do Clipost: ela usa o seu login do Instagram neste navegador e busca sempre, sem você clicar em nada.</p>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="flex flex-wrap gap-2">
+                <a href={ZIP_EXTENSAO} download className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-2"><Download className="w-4 h-4" /> Baixar extensão</a>
+                <button type="button" onClick={buscar} disabled={buscando} className="px-4 py-2.5 rounded-2xl text-xs font-semibold bg-white/[0.06] border border-white/[0.08] flex items-center gap-2 disabled:opacity-50">
+                  {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />} Tentar de novo
+                </button>
+                <button type="button" onClick={() => setModalExtensao(true)} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-300 hover:text-white">Como instalar</button>
+                <button type="button" onClick={() => setModalOficial(true)} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-500 hover:text-white">API oficial da Meta</button>
+              </div>
+              <details className="text-[11px] text-zinc-600">
+                <summary className="cursor-pointer select-none">Detalhes técnicos</summary>
+                <p className="mt-1 font-mono break-words">{erro}</p>
+              </details>
+            </section>
+          ) : (
+            <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 text-xs text-rose-200 flex items-start gap-2.5 max-w-3xl w-full mx-auto">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span className="break-words">{erro}</span>
+            </div>
+          )
         )}
         {aviso && (
           <div className={`flex items-start gap-2 px-4 py-3 rounded-2xl border text-sm ${aviso.tipo === 'ok' ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200' : 'bg-red-500/10 border-red-500/25 text-red-200'}`}>

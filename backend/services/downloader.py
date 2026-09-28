@@ -263,41 +263,87 @@ def _enrich(video: dict, cookies: list[str]) -> dict:
     return video
 
 
-def _instagram_web_profile(url: str) -> list[dict]:
-    """Posts recentes via endpoint público da web do Instagram (sem login traz ~12)."""
+_IG_APP_ID = "936619743392459"  # id público do app web do Instagram
+# o mesmo pedido por dois caminhos: o do site e o do app (o do app costuma passar quando o do site dá 401/429)
+_IG_ROTAS = [
+    ("https://www.instagram.com", {"x-ig-app-id": _IG_APP_ID, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36", "X-Requested-With": "XMLHttpRequest", "Referer": "https://www.instagram.com/"}),
+    ("https://i.instagram.com", {"x-ig-app-id": _IG_APP_ID, "User-Agent": "Instagram 309.1.0.41.113 Android (33/13; 420dpi; 1080x2340; samsung; SM-S918B; dm3q; qcom; pt_BR; 541635890)"}),
+]
+_IG_QUERY_HASH = "69cba40317214236af40e7efa697781d"  # posts do perfil (paginação pública)
+
+
+def _ig_no(n: dict) -> dict | None:
+    """Nó do Instagram (edge da timeline) → vídeo no formato do Clipost (só vídeos)."""
+    if not n.get("is_video"):
+        return None
+    caption = ((n.get("edge_media_to_caption") or {}).get("edges") or [{}])[0].get("node", {}).get("text", "")
+    return {
+        "url": f"https://www.instagram.com/reel/{n.get('shortcode')}/",
+        "permalink": f"https://www.instagram.com/reel/{n.get('shortcode')}/",
+        "title": caption[:120],
+        "duration": n.get("video_duration"),
+        "thumbnail": n.get("thumbnail_src") or n.get("display_url"),
+        "view_count": n.get("video_view_count") or n.get("video_play_count"),
+        "like_count": (n.get("edge_liked_by") or n.get("edge_media_preview_like") or {}).get("count"),
+        "comment_count": (n.get("edge_media_to_comment") or {}).get("count"),
+        "timestamp": n.get("taken_at_timestamp"),
+    }
+
+
+def _instagram_web_profile(url: str, limit: int = 0) -> list[dict]:
+    """Vídeos do perfil pela API web pública do Instagram, SEM login: primeiro os ~12 mais novos
+    (web_profile_info), depois pagina pela consulta pública. Tenta o caminho do site e o do app,
+    com uma nova tentativa quando o Instagram pede para ir devagar."""
+    import time
     import httpx
     m = re.search(r"instagram\.com/([^/?#]+)", url)
     if not m or m.group(1) in ("reel", "reels", "p", "explore"):
         return []
-    try:
-        resp = httpx.get(
-            "https://www.instagram.com/api/v1/users/web_profile_info/",
-            params={"username": m.group(1)},
-            headers={"x-ig-app-id": "936619743392459", "User-Agent": "Mozilla/5.0"},
-            timeout=20,
-        )
-        resp.raise_for_status()
-        edges = resp.json()["data"]["user"]["edge_owner_to_timeline_media"]["edges"]
-    except Exception as e:
-        print(f"[profile] instagram web_profile_info falhou: {e}")
-        return []
-    videos = []
-    for edge in edges:
-        n = edge.get("node") or {}
-        if not n.get("is_video"):
-            continue
-        caption = ((n.get("edge_media_to_caption") or {}).get("edges") or [{}])[0].get("node", {}).get("text", "")
-        videos.append({
-            "url": f"https://www.instagram.com/reel/{n.get('shortcode')}/",
-            "title": caption[:120],
-            "duration": n.get("video_duration"),
-            "thumbnail": n.get("thumbnail_src") or n.get("display_url"),
-            "view_count": n.get("video_view_count"),
-            "like_count": (n.get("edge_liked_by") or n.get("edge_media_preview_like") or {}).get("count"),
-            "comment_count": (n.get("edge_media_to_comment") or {}).get("count"),
-            "timestamp": n.get("taken_at_timestamp"),
-        })
-    return videos
+    usuario = m.group(1)
+    user = None
+    rota_ok = None
+    with httpx.Client(timeout=20, follow_redirects=True, **({"proxy": os.environ["YTDLP_PROXY"]} if os.environ.get("YTDLP_PROXY") else {})) as c:
+        for tentativa in range(2):
+            for base, cab in _IG_ROTAS:
+                try:
+                    r = c.get(f"{base}/api/v1/users/web_profile_info/", params={"username": usuario}, headers=cab)
+                    if r.status_code == 200:
+                        user = (r.json().get("data") or {}).get("user")
+                        if user:
+                            rota_ok = (base, cab)
+                            break
+                    print(f"[profile] instagram {base.split('//')[1]}: HTTP {r.status_code}")
+                except Exception as e:
+                    print(f"[profile] instagram {base.split('//')[1]}: {type(e).__name__}")
+            if user:
+                break
+            time.sleep(3)
+        if not user:
+            return []
+        timeline = user.get("edge_owner_to_timeline_media") or {}
+        videos = [v for v in (_ig_no(e.get("node") or {}) for e in timeline.get("edges") or []) if v]
+        cursor = (timeline.get("page_info") or {}).get("end_cursor")
+        tem_mais = (timeline.get("page_info") or {}).get("has_next_page")
+        # paginação pública (sem login) — o Instagram às vezes bloqueia; aí fica com o que já veio
+        paginas = 0
+        while tem_mais and cursor and (not limit or len(videos) < limit) and paginas < 40:
+            paginas += 1
+            try:
+                r = c.get("https://www.instagram.com/graphql/query/", headers=rota_ok[1] if rota_ok[0].startswith("https://www.") else _IG_ROTAS[0][1],
+                          params={"query_hash": _IG_QUERY_HASH, "variables": json.dumps({"id": user["id"], "first": 50, "after": cursor})})
+                if r.status_code != 200:
+                    print(f"[profile] instagram paginação: HTTP {r.status_code} (fica com {len(videos)} vídeos)")
+                    break
+                midia = (((r.json().get("data") or {}).get("user") or {}).get("edge_owner_to_timeline_media") or {})
+                videos += [v for v in (_ig_no(e.get("node") or {}) for e in midia.get("edges") or []) if v]
+                cursor = (midia.get("page_info") or {}).get("end_cursor")
+                tem_mais = (midia.get("page_info") or {}).get("has_next_page")
+                time.sleep(1.2)
+            except Exception as e:
+                print(f"[profile] instagram paginação: {type(e).__name__}")
+                break
+    print(f"[profile] instagram sem login: {len(videos)} vídeos de @{usuario}")
+    return videos[:limit] if limit else videos
 
 
 def _sort_key(sort_by: str):
@@ -393,16 +439,19 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", us
                     "videos": oficiais[:limit] if limit else oficiais, "fonte": "api_oficial"}
 
     scan = limit if (sort_by == "date" and limit) else _MAX_PROFILE_SCAN
-    cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
-           "--playlist-end", str(scan), *cookies, *_proxy_args(), url]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-
     videos: list[dict] = []
-    if result.returncode == 0 and result.stdout.strip():
-        info = json.loads(result.stdout)
-        videos = [v for v in (_entry_to_video(e) for e in (info.get("entries") or []) if e) if v]
-    if not videos and platform == "instagram":
-        videos = _instagram_web_profile(url)
+    # Instagram: API web pública primeiro (sem login); o extrator de perfil do yt-dlp costuma falhar
+    if platform == "instagram":
+        videos = _instagram_web_profile(url, scan)
+
+    result = subprocess.CompletedProcess([], 0, "", "")
+    if not videos:
+        cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
+               "--playlist-end", str(scan), *cookies, *_proxy_args(), url]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode == 0 and result.stdout.strip():
+            info = json.loads(result.stdout)
+            videos = [v for v in (_entry_to_video(e) for e in (info.get("entries") or []) if e) if v]
     if not videos:
         erro = (result.stderr.strip().split("\n") or [""])[-1]
         hint = ""

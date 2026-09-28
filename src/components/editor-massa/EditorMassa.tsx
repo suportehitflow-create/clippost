@@ -378,6 +378,8 @@ export default function EditorMassa({
   // ---------- projeto do Criar Cortes: todos os cortes prontos entram num lote próprio ----------
   const [restaurado, setRestaurado] = useState(false);
   const clipsEmImportacao = useRef(new Set<string>());
+  // cortes cujo vídeo já começou a carregar (os que ainda estavam sendo gerados entram quando ficam prontos)
+  const clipsComVideo = useRef(new Set<string>());
   useEffect(() => {
     if (!projeto || !restaurado) return;
     const abaId = 'projeto-' + projeto.id;
@@ -393,8 +395,10 @@ export default function EditorMassa({
 
     projeto.clips.forEach((c, i) => {
       const id = 'clip-' + c.id;
-      if (existentes.has(id) || clipsEmImportacao.current.has(id)) return;
-      clipsEmImportacao.current.add(id);
+      const jaTem = existentes.has(id) || clipsEmImportacao.current.has(id);
+      // corte que ainda estava sendo gerado: quando o vídeo fica pronto, carrega sozinho (sem F5)
+      if (jaTem && (!c.url || clipsComVideo.current.has(id))) return;
+      if (!jaTem) clipsEmImportacao.current.add(id);
 
       const nome = `${String(i + 1).padStart(2, '0')} - ${(c.titulo || 'corte').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').slice(0, 50)}.mp4`;
       const vInicial: VideoCliente = {
@@ -413,9 +417,10 @@ export default function EditorMassa({
         progressoJob: 0,
         saidaJob: null,
       };
-      novosParaInserir.push(vInicial);
+      if (!jaTem) novosParaInserir.push(vInicial);
 
       if (c.url) {
+        clipsComVideo.current.add(id);
         fetch(c.url)
           .then((r) => r.blob())
           .then(async (blob) => {
@@ -474,7 +479,7 @@ export default function EditorMassa({
       if (!ativoId && novosParaInserir[0]) setAtivoId(novosParaInserir[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projeto?.id, projeto?.clips.length, restaurado]);
+  }, [projeto?.id, projeto?.clips.map((c) => c.id + (c.url ? '1' : '0')).join(','), restaurado]);
   const removerVideos = useCallback(
     (ids: string[]) => {
       const set = new Set(ids);
