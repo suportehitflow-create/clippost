@@ -293,7 +293,13 @@ export default function EditorMassa({
       analisando.current.add(v.id);
       let el: HTMLVideoElement | null = null;
       try {
-        el = await abrirVideo(v.url);
+        try {
+          el = await abrirVideo(v.url);
+        } catch (e) {
+          // da internet: demorou (muitos abrindo juntos), não é formato ruim — tenta mais uma vez com calma
+          if (!/^https?:/.test(v.url)) throw e;
+          el = await abrirVideo(v.url, 90000);
+        }
         const meta = await lerMeta(el);
         if (!meta.largura) throw new Error('sem vídeo');
         const quadro = await capturarQuadro(el, Math.min(1.0, Math.max(0.5, meta.duracao * 0.1)), 720);

@@ -32,14 +32,16 @@ function esperar(el: HTMLMediaElement, evento: string, timeoutMs = 15000) {
   });
 }
 
-export async function abrirVideo(url: string): Promise<HTMLVideoElement> {
+// Vídeo da internet (cortes no Storage) pode demorar quando vários abrem juntos: timeout maior,
+// senão um MP4 comum era tratado como "formato que não toca" e ia para o servidor à toa
+export async function abrirVideo(url: string, timeoutMs = /^https?:/.test(url) ? 45000 : 15000): Promise<HTMLVideoElement> {
   const v = document.createElement('video');
   v.muted = true;
   v.playsInline = true;
   v.preload = 'auto';
   v.crossOrigin = 'anonymous';
   v.src = url;
-  await esperar(v, 'loadeddata');
+  await esperar(v, 'loadeddata', timeoutMs);
   return v;
 }
 

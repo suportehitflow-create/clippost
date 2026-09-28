@@ -132,7 +132,8 @@ export default function Inspetor({
 
   const alternarPlay = async () => {
     const el = videoRef.current;
-    if (!el || !v?.tocavel) return avisar('Este formato não toca no navegador — o preview mostra um quadro parado');
+    // MP4 da internet (cortes no Storage) sempre tenta tocar; só arquivo local num formato estranho cai no quadro parado
+    if (!el || !(v?.tocavel || /^https?:/.test(v?.url ?? ''))) return avisar('Este formato não toca no navegador — o preview mostra um quadro parado');
     if (tocando) {
       el.pause();
       audioRef.current?.pause();
@@ -262,7 +263,7 @@ export default function Inspetor({
 
         <video
           ref={videoRef}
-          src={v.tocavel ? v.url : undefined}
+          src={v.tocavel || /^https?:/.test(v.url) ? v.url : undefined}
           playsInline
           preload="auto"
           style={{ display: 'none' }}
