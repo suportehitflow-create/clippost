@@ -239,6 +239,8 @@ export default function EditorMassa({
   const enviarVideo = useCallback(
     async (v: VideoCliente) => {
       let arquivo = v.arquivo;
+      // card ainda "carregando" (sem arquivo e sem link): nada para enviar — antes virava um 500 no servidor
+      if (arquivo.size === 0 && !(v.url && v.url.startsWith('http'))) throw new Error('vídeo ainda não chegou');
       if (arquivo.size === 0 && v.url && v.url.startsWith('http')) {
         escreverLog(`[DIAG] Baixando ${v.nome} antes do upload...`);
         try {
@@ -349,7 +351,8 @@ export default function EditorMassa({
   // fila automática: analisa todos os vídeos, alguns por vez, lote ativo primeiro
   useEffect(() => {
     const todos = [abaAtiva, ...abas.filter((a) => a.id !== abaAtiva.id)].flatMap((a) => a.videos);
-    const pendentes = todos.filter((v) => !v.carregado && !analisando.current.has(v.id));
+    // card ainda "carregando" (sem arquivo e sem link) espera o vídeo chegar antes de ser analisado
+    const pendentes = todos.filter((v) => !v.carregado && !analisando.current.has(v.id) && (v.arquivo.size > 0 || !!v.url));
     pendentes.slice(0, Math.max(0, ANALISES_SIMULTANEAS - analisando.current.size)).forEach((v) => analisar(v));
   }, [abas, abaAtiva, gatilhoAnalise, analisar]);
 
@@ -800,14 +803,16 @@ export default function EditorMassa({
           // Na Edição em Massa (sem projeto) nunca abre no lote de um projeto do Criar Cortes:
           // esses lotes só aparecem na página do próprio projeto
           const deProjeto = (id: string) => id.startsWith('projeto-');
-          let lista = e.abas.length ? e.abas : [novaAba(1)];
+          // cards que ficaram "carregando" numa sessão anterior (sem arquivo e sem link) não voltam
+          const semVazios = e.abas.map((a) => ({ ...a, videos: a.videos.filter((v) => v.arquivo.size > 0 || /^https?:/.test(v.url || '')) }));
+          let lista = semVazios.length ? semVazios : [novaAba(1)];
           if (!projeto && lista.every((a) => deProjeto(a.id))) lista = [...lista, novaAba(1)];
           const preferida = lista.find((a) => a.id === e.abaAtivaId && (projeto || !deProjeto(a.id))) ?? lista.find((a) => projeto || !deProjeto(a.id)) ?? lista[0];
           setAbas(lista);
           setAbaAtivaId(preferida.id);
           setAtivoId(preferida.videos[0]?.id ?? null);
           setMusicas(e.musicas);
-          e.abas.forEach((a) => a.videos.forEach((v) => enviarVideo(v).catch(() => {})));
+          lista.forEach((a) => a.videos.forEach((v) => enviarVideo(v).catch(() => {})));
           e.musicas.forEach((m) => enviarMusica(m));
           const n = e.abas.reduce((t, a) => t + a.videos.length, 0);
           if (n) avisar(`${n} vídeo(s) da última sessão recuperados`);
