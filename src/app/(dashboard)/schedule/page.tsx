@@ -192,13 +192,17 @@ function Conteudo() {
 
   useEffect(() => {
     if (!userId || !projetoId) return
-    supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('project_id', projetoId)
-      .not('storage_url', 'is', null).order('created_at', { ascending: true })
-      .then(({ data }) => {
-        const lista = ((data as Corte[]) ?? []).filter(c => !!c.storage_url)
-        setCortesProjeto(lista)
-        setSelCortes(lista.map(c => c.id))
-      })
+    const buscar = () =>
+      supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('project_id', projetoId)
+        .not('storage_url', 'is', null).order('created_at', { ascending: true })
+        .then(({ data }) => {
+          const lista = ((data as Corte[]) ?? []).filter(c => !!c.storage_url)
+          setCortesProjeto(lista)
+          setSelCortes(lista.map(c => c.id))
+        })
+    buscar()
+    const t = setInterval(buscar, 15000)
+    return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, projetoId])
   const listaCortes = projetoId ? cortesProjeto : cortes
@@ -365,11 +369,11 @@ function Conteudo() {
           <Plus className="w-3.5 h-3.5" /> Agendar
         </button>
       }>
-        <Intro selo="Calendário" titulo="Suas publicações, no dia e hora certos"
-          descricao="Agende um corte por vez ou vários de uma vez, e acompanhe o que foi publicado." />
+        {!projetoId && <Intro titulo="Suas publicações, no dia e hora certos"
+          descricao="Agende um corte por vez ou vários de uma vez, e acompanhe o que foi publicado." />}
 
         {/* resumo */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {!projetoId && <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { r: 'Agendados', v: stats.agendados, c: '#f59e0b' },
             { r: 'Publicados', v: stats.publicados, c: '#10b981' },
@@ -381,7 +385,7 @@ function Conteudo() {
               <p className="text-2xl font-bold tabular-nums" style={{ color: x.c }}>{x.v}</p>
             </div>
           ))}
-        </section>
+        </section>}
 
         {contas.length === 0 && !carregando && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-100">
