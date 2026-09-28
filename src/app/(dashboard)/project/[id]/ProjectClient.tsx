@@ -489,6 +489,7 @@ export default function ProjectClient({
   }, [processingSince])
 
   const [clips, setClips] = useState<Clip[]>(initialClips)
+  const [avisoFechado, setAvisoFechado] = useState(false)
   const [status, setStatus] = useState(project.status)
   const [errorMessage, setErrorMessage] = useState<string | null>((project as any).error_message || null)
   const [selectedClipIndex, setSelectedClipIndex] = useState(0)
@@ -1126,60 +1127,18 @@ export default function ProjectClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [project.id, project.title, isYouTubeProject, status, clips.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')],
   )
-  // Projeto abre SEMPRE no estúdio (a tela antiga foi removida). Sem nenhum corte e com erro/fim,
-  // só aparece uma faixa em cima com o motivo e o botão de tentar de novo.
+  // Projeto abre SEMPRE no estúdio (a tela antiga foi removida). Se algo deu errado, aparece só uma
+  // notificação de erro no canto (fecha no X) — o estúdio fica igual.
   const semCortes = projetoEstudio.clips.length === 0 && status !== 'processing'
   // cortes que o servidor começou mas não terminou (ex.: envio falhou antes das novas tentativas)
   const faltando = status !== 'processing' ? clips.filter(c => !c.storage_url).length : 0
-  const gerarDeNovo = async () => {
-    if (!confirm(`Gerar os cortes deste vídeo de novo? Os ${cortesProntos.length} cortes prontos são refeitos junto.`)) return
-    // apaga os cortes antigos (senão o novo processamento duplica tudo)
-    await supabase.from('clips').delete().eq('project_id', project.id)
-    setClips([])
-    await reprocessProject()
-  }
+  const avisoErro = semCortes
+    ? (status === 'failed' ? `Não deu para gerar os cortes deste vídeo${errorMessage ? `: ${String(errorMessage).slice(0, 140)}` : '.'}` : 'Nenhum corte foi gerado para este vídeo.')
+    : faltando > 0
+      ? (faltando === 1 ? '1 corte não terminou de gerar.' : `${faltando} cortes não terminaram de gerar.`)
+      : ''
   return (
     <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
-      {!semCortes && faltando > 0 && (
-        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.08] bg-[#0b0b0e] text-xs">
-          <span className="text-zinc-300">
-            {faltando === 1 ? '1 corte não terminou de gerar.' : `${faltando} cortes não terminaram de gerar.`}
-          </span>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={() => { void gerarDeNovo() }}
-            className="px-3 py-1.5 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
-          >
-            Gerar de novo
-          </button>
-        </div>
-      )}
-      {semCortes && (
-        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.08] bg-[#0b0b0e] text-xs">
-          <span className="text-zinc-300">
-            {status === 'failed'
-              ? `Não deu para gerar os cortes deste vídeo${errorMessage ? `: ${String(errorMessage).slice(0, 160)}` : '.'}`
-              : 'Nenhum corte foi gerado para este vídeo.'}
-          </span>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={() => { void reprocessProject() }}
-            className="px-3 py-1.5 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
-          >
-            Tentar de novo
-          </button>
-          <button
-            type="button"
-            onClick={handleDeleteThisProject}
-            disabled={isDeletingProject}
-            className="px-3 py-1.5 rounded-lg text-zinc-300 hover:text-red-400 bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.08] transition-all cursor-pointer disabled:opacity-50"
-          >
-            Excluir projeto
-          </button>
-        </div>
-      )}
       <EstudioEditor
         projeto={projetoEstudio}
         titulo={project.title || 'Projeto'}
@@ -1189,6 +1148,24 @@ export default function ProjectClient({
         }}
         acoesExtras={null}
       />
+      {avisoErro && !avisoFechado && (
+        <div role="alert" className="fixed z-50 right-4 bottom-24 sm:bottom-6 max-w-[340px] flex items-start gap-3 rounded-xl border border-red-500/25 bg-[#161013]/95 backdrop-blur px-3.5 py-3 text-xs text-zinc-200 shadow-2xl">
+          <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+          <div className="flex-1">
+            <div>{avisoErro}</div>
+            <button
+              type="button"
+              onClick={() => { setAvisoFechado(true); void reprocessProject() }}
+              className="mt-2 font-semibold text-indigo-300 hover:text-indigo-200 cursor-pointer"
+            >
+              Gerar de novo
+            </button>
+          </div>
+          <button type="button" onClick={() => setAvisoFechado(true)} title="Fechar" className="text-zinc-500 hover:text-white cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

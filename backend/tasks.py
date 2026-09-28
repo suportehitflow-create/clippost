@@ -1162,6 +1162,13 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         # Pré-insere todos os cortes como "processing" com storage_url=None
         # Permite ao estúdio abrir com o 1º clipe pronto enquanto exibe os demais em processamento
+        # "Gerar de novo": tira os cortes da tentativa anterior só agora, com os novos já decididos
+        # (assim o projeto não fica vazio enquanto baixa/transcreve, e nada duplica)
+        try:
+            supabase.table("clips").delete().eq("project_id", project_id).execute()
+        except Exception as del_err:
+            print(f"[pipeline] aviso ao limpar cortes antigos: {del_err}")
+
         pre_inserted_ids = []
         for i, clip in enumerate(clips_meta):
             try:
