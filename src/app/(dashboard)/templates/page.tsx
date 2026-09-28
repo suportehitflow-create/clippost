@@ -1868,41 +1868,6 @@ export default function TemplatesPage() {
 
       </div>
 
-      {/* 3. BARRA INFERIOR PADRÃO CANVA (ZOOM, CONTROLE DE ESCALA E DIMENSÕES) */}
-      <footer className="h-10 bg-[#0e0e11] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between text-xs text-zinc-400 z-30 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[11px] text-zinc-400">iPhone 18 Pro (19.5:9 Display) • 1080 × 1920 px</span>
-          <div className="h-3 w-px bg-white/10" />
-          <span className="text-[11px] flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${instagramDecal ? 'bg-indigo-400' : 'bg-zinc-600'}`} />
-            <span>Decalque Reels</span>
-          </span>
-        </div>
-
-        {/* Controles de Zoom do Canvas (Bencho Sweep Stepper) */}
-        <div className="flex items-center gap-2">
-          <ZoomOut className="w-3.5 h-3.5 text-zinc-500" />
-          <SweepStepper
-            value={canvasZoom}
-            onChange={setCanvasZoom}
-            min={50}
-            max={150}
-            step={5}
-            unit="%"
-            size="sm"
-            className="w-28"
-          />
-          <ZoomIn className="w-3.5 h-3.5 text-zinc-500" />
-          <button
-            type="button"
-            onClick={() => setCanvasZoom(100)}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/[0.05] hover:bg-white/10 text-zinc-300 hover:text-white cursor-pointer transition-colors border border-white/[0.06]"
-            title="Restaurar zoom para 100%"
-          >
-            100%
-          </button>
-        </div>
-      </footer>
 
     </div>
   )
