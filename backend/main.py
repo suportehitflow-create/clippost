@@ -1526,6 +1526,47 @@ async def gerar_legenda_post(request: Request):
     return {"opcoes": opcoes}
 
 
+@app.post("/api/captions/variacoes")
+async def gerar_variacoes_legenda(request: Request):
+    """Agendar em massa → "Gerar variações": a pessoa escreve UMA legenda e a IA devolve N versões
+    dizendo a mesma coisa de outro jeito (uma por corte). Corpo: { texto, quantidade }"""
+    await _usuario_logado(request)
+    body = await request.json()
+    texto = str(body.get("texto") or "").strip()[:1500]
+    if not texto:
+        raise HTTPException(status_code=400, detail="Escreva a legenda base.")
+    try:
+        n = max(1, min(40, int(body.get("quantidade") or 1)))
+    except (TypeError, ValueError):
+        n = 1
+    from services.ai_curator import _try_providers
+    prompt = (
+        f"Reescreva a legenda abaixo de {n} jeitos diferentes para posts de Reels/TikTok. Cada versão diz a MESMA "
+        "coisa com outras palavras, mantendo o tom, os emojis (se houver) e as hashtags do original. "
+        "Não numere e não explique.\n\n"
+        f"LEGENDA:\n{texto}\n\n"
+        f'Responda SÓ com um array JSON de {n} strings: ["versão 1", "versão 2", ...]'
+    )
+    try:
+        raw = await asyncio.to_thread(_try_providers, prompt) or ""
+    except Exception:
+        raw = ""
+    import json as _json, re as _re
+    versoes: list[str] = []
+    m = _re.search(r"\[.*\]", raw, _re.S)
+    if m:
+        try:
+            versoes = [str(v).strip() for v in _json.loads(m.group(0)) if str(v).strip()]
+        except ValueError:
+            versoes = []
+    if not versoes:
+        raise HTTPException(status_code=502, detail="A IA não conseguiu gerar as variações agora. Tente de novo em instantes.")
+    # completa repetindo se a IA devolver menos que o pedido
+    while len(versoes) < n:
+        versoes.append(versoes[len(versoes) % max(1, len(versoes))])
+    return {"variacoes": versoes[:n]}
+
+
 @app.post("/api/subtitles/ass")
 async def gerar_legendas_ass(request: Request):
     """Legendas para o Editor em Massa: recebe o ÁUDIO já no tempo final do vídeo (cortado,

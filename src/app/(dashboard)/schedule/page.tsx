@@ -129,8 +129,12 @@ function Conteudo() {
   const [horarios, setHorarios] = useState<string[]>(['09:00', '12:00', '18:00', '21:00'])
   const [novoHorario, setNovoHorario] = useState('')
   const [inicio, setInicio] = useState(() => paraInput(new Date()).slice(0, 10))
-  const [legendaModo, setLegendaModo] = useState<'corte' | 'comum' | 'ia'>('corte')
+  const [legendaModo, setLegendaModo] = useState<'corte' | 'comum' | 'ia' | 'variacoes'>('corte')
   const [legendaComum, setLegendaComum] = useState('')
+  const [legendaBase, setLegendaBase] = useState('')
+  // veio do botão Agendar do estúdio: só os cortes daquele vídeo, todos entram
+  const [projetoId, setProjetoId] = useState<string | null>(null)
+  const [cortesProjeto, setCortesProjeto] = useState<Corte[]>([])
   const [tomIA, setTomIA] = useState('viral')
   const [agendando, setAgendando] = useState(false)
   const [progresso, setProgresso] = useState('')
@@ -172,6 +176,12 @@ function Conteudo() {
     if (params.get('aba') === 'massa') setAba('massa')
     const tipo = params.get('tipo')
     if (tipo && TIPOS_MASSA.some(x => x.id === tipo)) setTipoMassa(tipo as TipoMassa)
+    const proj = params.get('projeto')
+    if (proj) {
+      setProjetoId(proj)
+      setAba('massa')
+      setTipoMassa('reels')
+    }
     const clip = params.get('clipId')
     if (clip) {
       setAba('massa')
@@ -179,6 +189,19 @@ function Conteudo() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!userId || !projetoId) return
+    supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('project_id', projetoId)
+      .not('storage_url', 'is', null).order('created_at', { ascending: true })
+      .then(({ data }) => {
+        const lista = ((data as Corte[]) ?? []).filter(c => !!c.storage_url)
+        setCortesProjeto(lista)
+        setSelCortes(lista.map(c => c.id))
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, projetoId])
+  const listaCortes = projetoId ? cortesProjeto : cortes
 
   const contaPorId = useMemo(() => new Map(contas.map(c => [c.id, c])), [contas])
   const agora = Date.now()
@@ -216,11 +239,12 @@ function Conteudo() {
   }
 
   async function agendarEmMassa() {
-    const escolhidos = selCortes.map(id => cortes.find(c => c.id === id)).filter(Boolean) as Corte[]
+    const escolhidos = selCortes.map(id => listaCortes.find(c => c.id === id)).filter(Boolean) as Corte[]
     if (!escolhidos.length) return avisar('erro', 'Escolha os cortes que vão ser publicados.')
     if (!dias.length || !horarios.length) return avisar('erro', 'Escolha pelo menos um dia e um horário.')
     const destino = selContas.map(id => contaPorId.get(id)).filter(Boolean) as Conta[]
     if (!destino.length && contas.length) return avisar('erro', 'Escolha em quais contas publicar.')
+    if (legendaModo === 'variacoes' && !legendaBase.trim()) return avisar('erro', 'Escreva a legenda base para gerar as variações.')
     const slots = calcularHorarios(dias, horarios, inicio, escolhidos.length)
     if (slots.length < escolhidos.length) return avisar('erro', 'Não há horários suficientes a partir dessa data.')
     setAgendando(true)
@@ -245,6 +269,18 @@ function Conteudo() {
         await Promise.all([trabalhar(), trabalhar()])
         setProgresso('')
       }
+      if (legendaModo === 'variacoes') {
+        setProgresso('Gerando variações da legenda…')
+        const r = await fetch('/api/captions/variacoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texto: legendaBase, quantidade: escolhidos.length }),
+        })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d.detail || 'A IA não conseguiu gerar as variações.')
+        escolhidos.forEach((c, i) => legendas.set(c.id, d.variacoes?.[i] || legendaBase))
+        setProgresso('')
+      }
       const linhas = escolhidos.flatMap((c, i) =>
         (destino.length ? destino : [null]).map(conta => ({
           clip_id: c.id,
@@ -256,6 +292,7 @@ function Conteudo() {
       const n = await inserir(linhas)
       avisar('ok', `${n} publicações agendadas (${dataHora(slots[0])} → ${dataHora(slots[slots.length - 1])}).`)
       setSelCortes([])
+      setProjetoId(null)
       setAba('calendario')
       setMes(slots[0])
       setDiaSel(slots[0])
@@ -439,7 +476,7 @@ function Conteudo() {
         )}
 
         {/* ---------------- EM MASSA ---------------- */}
-        {!carregando && aba === 'massa' && (
+        {!carregando && aba === 'massa' && !projetoId && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5" role="radiogroup" aria-label="O que vai publicar">
             {TIPOS_MASSA.map(o => (
               <button key={o.id} type="button" role="radio" aria-checked={tipoMassa === o.id} onClick={() => setTipoMassa(o.id)}
@@ -455,21 +492,25 @@ function Conteudo() {
           <section className="grid lg:grid-cols-[1fr_340px] gap-5">
             <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-4 sm:p-5 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">1. Cortes da Biblioteca <span className="text-zinc-500 font-normal">· {selCortes.length} escolhidos</span></h3>
-                <div className="flex gap-1.5">
-                  <button type="button" className={pilula(false)} onClick={() => setSelCortes(cortes.map(c => c.id))}>Todos</button>
-                  <button type="button" className={pilula(false)} onClick={() => setSelCortes([])}>Nenhum</button>
-                </div>
+                <h3 className="text-sm font-semibold">
+                  {projetoId ? <>1. Cortes deste vídeo <span className="text-zinc-500 font-normal">· {listaCortes.length}</span></> : <>1. Cortes da Biblioteca <span className="text-zinc-500 font-normal">· {selCortes.length} escolhidos</span></>}
+                </h3>
+                {!projetoId && (
+                  <div className="flex gap-1.5">
+                    <button type="button" className={pilula(false)} onClick={() => setSelCortes(cortes.map(c => c.id))}>Todos</button>
+                    <button type="button" className={pilula(false)} onClick={() => setSelCortes([])}>Nenhum</button>
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-zinc-500">A ordem de escolha é a ordem de publicação.</p>
-              {cortes.length === 0 ? (
+              <p className="text-[11px] text-zinc-500">{projetoId ? 'Publicados nesta ordem.' : 'A ordem de escolha é a ordem de publicação.'}</p>
+              {listaCortes.length === 0 ? (
                 <p className="text-xs text-zinc-500 py-8 text-center">Nenhum corte pronto ainda. <Link href="/upload" className="underline">Crie cortes</Link> ou exporte na <Link href="/bulk" className="underline">Edição em Massa</Link>.</p>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 max-h-[560px] overflow-y-auto pr-1">
-                  {cortes.map(c => {
+                  {listaCortes.map(c => {
                     const ordem = selCortes.indexOf(c.id)
                     return (
-                      <button key={c.id} type="button" onClick={() => setSelCortes(s => (s.includes(c.id) ? s.filter(x => x !== c.id) : [...s, c.id]))}
+                      <button key={c.id} type="button" disabled={!!projetoId} onClick={() => setSelCortes(s => (s.includes(c.id) ? s.filter(x => x !== c.id) : [...s, c.id]))}
                         className={`relative rounded-xl overflow-hidden border text-left ${ordem >= 0 ? 'border-indigo-400 ring-2 ring-indigo-500/40' : 'border-white/[0.06] hover:border-white/[0.2]'}`}>
                         <div className="aspect-[9/16] bg-black">
                           {c.storage_url && <video src={`${c.storage_url}#t=1`} preload="metadata" muted playsInline className="w-full h-full object-cover" />}
@@ -517,7 +558,7 @@ function Conteudo() {
                         {FUSOS.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                       </select>
                       <button type="button" onClick={usarMelhoresHorarios} className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-[11px] font-semibold text-indigo-200 flex items-center gap-1" title="Horários de pico gerais de cada rede, no fuso do seu público">
-                        <Sparkles className="w-3 h-3" /> Melhores horários
+                        Melhores horários
                       </button>
                     </div>
                   </div>
@@ -541,8 +582,9 @@ function Conteudo() {
               <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-4 space-y-2.5">
                 <h3 className="text-sm font-semibold">4. Legenda</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  <button type="button" className={pilula(legendaModo === 'ia')} onClick={() => setLegendaModo('ia')}>✨ IA para cada corte</button>
                   <button type="button" className={pilula(legendaModo === 'corte')} onClick={() => setLegendaModo('corte')}>Título de cada corte</button>
+                  <button type="button" className={pilula(legendaModo === 'ia')} onClick={() => setLegendaModo('ia')}>IA para cada corte</button>
+                  <button type="button" className={pilula(legendaModo === 'variacoes')} onClick={() => setLegendaModo('variacoes')}>Gerar variações</button>
                   <button type="button" className={pilula(legendaModo === 'comum')} onClick={() => setLegendaModo('comum')}>Mesma para todos</button>
                 </div>
                 {legendaModo === 'ia' && (
@@ -555,6 +597,13 @@ function Conteudo() {
                       <option value="polemico">Polêmico</option>
                     </select>
                     <span>legenda + hashtags a partir do que é falado em cada corte</span>
+                  </div>
+                )}
+                {legendaModo === 'variacoes' && (
+                  <div className="space-y-1.5">
+                    <textarea id="massa-legenda-base" value={legendaBase} onChange={e => setLegendaBase(e.target.value)} rows={4}
+                      placeholder="Escreva uma legenda. A IA cria uma versão diferente para cada corte, dizendo a mesma coisa de outro jeito."
+                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-sm placeholder-zinc-600 resize-y" />
                   </div>
                 )}
                 {legendaModo === 'comum' && (

@@ -1159,10 +1159,8 @@ export default function ProjectClient({
       <EstudioEditor
         projeto={projetoEstudio}
         titulo={project.title || 'Projeto'}
-        onAgendar={async () => {
-          await handleScheduleAllProject()
-          router.push('/schedule')
-        }}
+        // Agendar leva ao Agendar em massa só com os cortes deste vídeo (horários e contas escolhidos lá)
+        onAgendar={() => router.push(`/schedule?aba=massa&tipo=reels&projeto=${project.id}`)}
         acoesExtras={null}
       />
       {avisoErro && !avisoFechado && (
