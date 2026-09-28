@@ -127,7 +127,9 @@ export default function Biblioteca() {
     return m
   }, [cortes])
 
-  const origemProjeto = (id: string): Origem => (doAutopilot.has(id) ? 'autopilot' : 'cortes')
+  // perfil baixado inteiro (Edição em Massa → Buscar de um perfil) aparece como Edição em Massa
+  const doPerfil = new Set(projetos.filter(p => String(p.source_url || '').startsWith('clipost:perfil')).map(p => p.id))
+  const origemProjeto = (id: string): Origem => (doAutopilot.has(id) ? 'autopilot' : doPerfil.has(id) ? 'editor' : 'cortes')
   const termo = busca.trim().toLowerCase()
   const projetosVisiveis = projetos.filter(
     p => (filtro === 'tudo' || filtro === origemProjeto(p.id)) && (!termo || p.title?.toLowerCase().includes(termo)),
@@ -140,7 +142,7 @@ export default function Biblioteca() {
     tudo: projetos.length + exportados.filter(r => r.itens.some(i => i.saida)).length,
     cortes: projetos.filter(p => origemProjeto(p.id) === 'cortes').length,
     autopilot: projetos.filter(p => origemProjeto(p.id) === 'autopilot').length,
-    editor: exportados.filter(r => r.itens.some(i => i.saida)).length,
+    editor: exportados.filter(r => r.itens.some(i => i.saida)).length + doPerfil.size,
   }
 
   async function apagarProjeto(id: string) {
