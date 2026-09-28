@@ -133,7 +133,8 @@ export default function Inspetor({
   const alternarPlay = async () => {
     const el = videoRef.current;
     // MP4 da internet (cortes no Storage) sempre tenta tocar; só arquivo local num formato estranho cai no quadro parado
-    if (!el || !(v?.tocavel || /^https?:/.test(v?.url ?? ''))) return avisar('Este formato não toca no navegador — o preview mostra um quadro parado');
+    if (!el || !v) return;
+    if (!(v.tocavel || /^https?:/.test(v.url ?? ''))) return avisar('Este formato não toca no navegador — o preview mostra um quadro parado');
     if (tocando) {
       el.pause();
       audioRef.current?.pause();
