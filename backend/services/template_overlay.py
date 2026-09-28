@@ -17,7 +17,9 @@ from PIL import Image, ImageDraw, ImageFont
 EDITOR_PHONE_W = 324.0
 
 _EMOJI_RE = re.compile(
-    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF\U0000FE0F\U0000200D]"
+    "(?:[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF]"
+    "(?:\U0000FE0F|[\U0001F3FB-\U0001F3FF])?"
+    "(?:\U0000200D[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF](?:\U0000FE0F)?)*)"
 )
 
 _FONT_PATTERNS = {
@@ -65,26 +67,62 @@ def _emoji_font_path() -> str | None:
     return None
 
 
-def _draw_line_with_emojis(draw: ImageDraw.ImageDraw, line: str, x: float, y: float, font: ImageFont.ImageFont, emoji_font: ImageFont.ImageFont | None, fill, stroke_w: int, stroke_fill):
+@lru_cache(maxsize=512)
+def _emoji_bitmap(em: str, px: int) -> Image.Image | None:
+    """Emoji colorido como imagem do tamanho do texto. A Noto Color Emoji só abre no tamanho 109
+    (é bitmap), então desenha nele e reduz."""
+    path = _emoji_font_path()
+    if not path:
+        return None
+    try:
+        f = ImageFont.truetype(path, 109)
+        tela = Image.new("RGBA", (220, 160), (0, 0, 0, 0))
+        ImageDraw.Draw(tela).text((110, 80), em, font=f, embedded_color=True, anchor="mm")
+        caixa = tela.getbbox()
+        if not caixa:
+            return None
+        img = tela.crop(caixa)
+        escala = px / max(1, img.height)
+        return img.resize((max(1, int(img.width * escala)), max(1, int(px))), Image.LANCZOS)
+    except Exception:
+        return None
+
+
+def _tem_emoji(texto: str) -> bool:
+    return bool(_EMOJI_RE.search(texto or ""))
+
+
+def _largura_com_emojis(draw: ImageDraw.ImageDraw, line: str, font: ImageFont.ImageFont, px: int) -> float:
+    total = 0.0
+    for parte in _EMOJI_RE.split(line):
+        if parte:
+            total += draw.textlength(parte, font=font)
+    for em in _EMOJI_RE.findall(line):
+        bmp = _emoji_bitmap(em, px)
+        total += (bmp.width if bmp else px) + px * 0.08
+    return total
+
+
+def _draw_line_with_emojis(draw: ImageDraw.ImageDraw, line: str, x: float, y: float, font: ImageFont.ImageFont, emoji_font: ImageFont.ImageFont | None, fill, stroke_w: int, stroke_fill, px: int | None = None):
+    """Texto + emojis coloridos na mesma linha (y = meio da linha)."""
+    canvas = getattr(draw, "_image", None)
+    px = int(px or getattr(font, "size", 40))
     curr_x = x
-    # Divide a linha em partes de texto e emojis
     parts = _EMOJI_RE.split(line)
     emojis = _EMOJI_RE.findall(line)
     for i, part in enumerate(parts):
         if part:
-            try:
-                draw.text((curr_x, y), part, font=font, fill=fill, anchor="lm", stroke_width=stroke_w, stroke_fill=stroke_fill)
-                curr_x += draw.textlength(part, font=font)
-            except Exception:
-                curr_x += len(part) * 20
+            draw.text((curr_x, y), part, font=font, fill=fill, anchor="lm", stroke_width=stroke_w, stroke_fill=stroke_fill)
+            curr_x += draw.textlength(part, font=font)
         if i < len(emojis):
-            em = emojis[i]
-            ef = emoji_font or font
-            try:
-                draw.text((curr_x, y), em, font=ef, fill=fill, anchor="lm")
-                curr_x += (draw.textlength(em, font=ef) if ef else 30)
-            except Exception:
-                curr_x += 30
+            bmp = _emoji_bitmap(emojis[i], px)
+            if bmp is not None and canvas is not None:
+                canvas.alpha_composite(bmp, (int(round(curr_x + px * 0.04)), int(round(y - bmp.height / 2)))) if canvas.mode == "RGBA" \
+                    else canvas.paste(bmp, (int(round(curr_x + px * 0.04)), int(round(y - bmp.height / 2))), bmp)
+                curr_x += bmp.width + px * 0.08
+            else:
+                curr_x += px
+
 
 def _title_font_kind(font_family: str) -> str:
     fam = (font_family or "").lower()
@@ -264,6 +302,9 @@ def _draw_header(canvas: Image.Image, layout: dict, brand_kit: dict, s: float, l
 def _draw_title(canvas: Image.Image, layout: dict, hook_title: str, s: float, light: bool):
     text = (hook_title or "").strip()
     text = re.sub(r"\s+", " ", text).strip()
+    # opção "Emojis no título" desligada no template: tira os emojis
+    if layout.get("showTitleEmojis", True) is False:
+        text = re.sub(r"\s+", " ", _EMOJI_RE.sub("", text)).strip()
     if not text:
         return
     if layout.get("titleCapsLock", True) is not False:
@@ -290,17 +331,11 @@ def _draw_title(canvas: Image.Image, layout: dict, hook_title: str, s: float, li
     box_x0 = W * cx_pct / 100.0 - box_w / 2
     y = H * cy_pct / 100.0 - (line_h * len(lines)) / 2
 
-    emoji_font = None
-    try:
-        e_path = _emoji_font_path()
-        if e_path:
-            emoji_font = ImageFont.truetype(e_path, int(round(fs * 0.95)))
-    except Exception:
-        emoji_font = None
+    emoji_px = int(round(fs * 0.95))
 
     for line in lines:
         try:
-            lw = draw.textlength(line, font=font)
+            lw = _largura_com_emojis(draw, line, font, emoji_px) if _tem_emoji(line) else draw.textlength(line, font=font)
         except Exception:
             lw = fs * len(line) * 0.55
 
@@ -311,11 +346,11 @@ def _draw_title(canvas: Image.Image, layout: dict, hook_title: str, s: float, li
         else:
             x = box_x0 + (box_w - lw) / 2
 
-        try:
+        if _tem_emoji(line):
+            _draw_line_with_emojis(draw, line, x, y + line_h / 2, font, None, fill, stroke_w, stroke_fill, emoji_px)
+        else:
             draw.text((x, y + line_h / 2), line, font=font, fill=fill, anchor="lm",
                       stroke_width=stroke_w, stroke_fill=stroke_fill)
-        except Exception:
-            _draw_line_with_emojis(draw, line, x, y + line_h / 2, font, emoji_font, fill, stroke_w, stroke_fill)
 
         y += line_h
 

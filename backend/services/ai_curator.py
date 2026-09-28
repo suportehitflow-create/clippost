@@ -385,7 +385,8 @@ def _manual() -> str:
 
 def _montar_prompt(manual: str, transcricao: str, duration_desc: str, min_duration: int, max_duration: int,
                    video_end: float, chapters_ctx: str) -> str:
-    duracao = (f"DURAÇÃO DE CADA CORTE: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s). "
+    duracao = ("TÍTULOS: termine cada título com 1 emoji que combine com o assunto (ex.: 😱 🔥 💰 🤯 😂).\n"
+               f"DURAÇÃO DE CADA CORTE: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s). "
                f"O vídeo tem {int(video_end)}s ({int(video_end // 60)} min).")
     # replace (não format): o manual tem chaves do exemplo de JSON
     return (manual.replace("{duracao}", duracao).replace("{capitulos}", chapters_ctx or "")
@@ -572,7 +573,7 @@ def generate_hook_title(transcript_text: str, original_title: str = "") -> str:
     if not text and not fallback:
         return ""
     prompt = f"""Escreva UM título-gancho viral em português para este vídeo curto de Reels/TikTok.
-Regras: MAIÚSCULAS, no máximo 60 caracteres, sem hashtags, sem emojis, sem aspas.
+Regras: MAIÚSCULAS, no máximo 60 caracteres, sem hashtags, sem aspas, terminando com 1 emoji que combine com o assunto.
 Provoque curiosidade ou emoção, como quem quer parar o dedo de quem rola o feed.
 Responda apenas com o título.
 

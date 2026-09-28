@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-dejavu-core \
     fonts-roboto-unhinted \
     fonts-montserrat \
+    fonts-noto-color-emoji \
     git \
     unzip \
     wget \
