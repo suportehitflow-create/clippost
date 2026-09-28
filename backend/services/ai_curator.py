@@ -311,7 +311,8 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
 
     manual = _manual()
     if manual:
-        prompt = _montar_prompt(manual, timeline, duration_desc, min_duration, max_duration, video_end, chapters_ctx)
+        prompt = _montar_prompt(manual, timeline, duration_desc, min_duration, max_duration, video_end, chapters_ctx,
+                                (min_clips_target, max_clips_target))
     else:
         prompt = f"""Você é um editor de vídeo sênior especializado em cortes virais (Shorts, Reels, TikTok) a partir de podcasts, entrevistas e vídeos longos.
 
@@ -366,6 +367,10 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     if not clips and len(timeline) > _BLOCO_CHARS:
         print("[ai_curator] sem cortes com a transcrição inteira — tentando em blocos menores")
         clips = _curadoria_em_blocos(segments, duration_desc, min_duration, max_duration, video_end, max_clips_target)
+    elif len(clips) < min_clips_target and len(timeline) > _BLOCO_CHARS:
+        print(f"[ai_curator] só {len(clips)} corte(s) para {int(video_end // 60)} min — completando trecho por trecho")
+        extras = _curadoria_em_blocos(segments, duration_desc, min_duration, max_duration, video_end, max_clips_target)
+        clips = _juntar_sem_repetir(clips, extras)
 
     return _validar(clips, segments, min_duration, max_duration, video_end)
 
@@ -384,10 +389,13 @@ def _manual() -> str:
 
 
 def _montar_prompt(manual: str, transcricao: str, duration_desc: str, min_duration: int, max_duration: int,
-                   video_end: float, chapters_ctx: str) -> str:
+                   video_end: float, chapters_ctx: str, quantos: tuple[int, int] | None = None) -> str:
     duracao = ("TÍTULOS: termine cada título com 1 emoji que combine com o assunto (ex.: 😱 🔥 💰 🤯 😂).\n"
                f"DURAÇÃO DE CADA CORTE: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s). "
                f"O vídeo tem {int(video_end)}s ({int(video_end // 60)} min).")
+    if quantos:
+        duracao += (f"\nQUANTIDADE OBRIGATÓRIA: entregue ENTRE {quantos[0]} E {quantos[1]} cortes, espalhados do início "
+                    f"ao fim da transcrição. NUNCA entregue menos que {quantos[0]} cortes.")
     # replace (não format): o manual tem chaves do exemplo de JSON
     return (manual.replace("{duracao}", duracao).replace("{capitulos}", chapters_ctx or "")
             .replace("{transcricao}", transcricao))
@@ -428,6 +436,32 @@ def _normalizar(c: dict) -> dict:
     }
 
 
+def _juntar_sem_repetir(base: list, extras: list) -> list:
+    """Adiciona os extras que não repetem (mais da metade sobreposta) um corte já escolhido."""
+    def faixa(c):
+        try:
+            return float(c.get("start_time")), float(c.get("end_time"))
+        except (TypeError, ValueError):
+            return None
+    juntos = list(base)
+    for e in extras:
+        fe = faixa(e)
+        if not fe or fe[1] <= fe[0]:
+            continue
+        repete = False
+        for c in juntos:
+            fc = faixa(c)
+            if not fc:
+                continue
+            sobra = min(fe[1], fc[1]) - max(fe[0], fc[0])
+            if sobra > 0.5 * min(fe[1] - fe[0], max(1.0, fc[1] - fc[0])):
+                repete = True
+                break
+        if not repete:
+            juntos.append(e)
+    return juntos
+
+
 def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration: int, max_duration: int,
                          video_end: float, max_total: int) -> list[dict]:
     linhas = [f"[{round(float(s.get('start', 0)), 1)}s - {round(float(s.get('end', 0)), 1)}s] {str(s.get('text', '')).strip()}"
@@ -440,14 +474,15 @@ def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration:
         atual.append(l)
     if atual:
         blocos.append(atual)
-    por_bloco = max(1, min(4, round(max_total / max(1, len(blocos))) + 1))
+    por_bloco = max(2, min(6, -(-max_total // max(1, len(blocos))) + 1))
     todos = []
     for i, b in enumerate(blocos[:24]):
         manual = _manual()
         if manual:
             trecho = (f"ATENÇÃO: este é só um TRECHO (parte {i + 1} de {len(blocos)}) de um vídeo longo; "
                       "extraia os cortes deste trecho.\n" + "\n".join(b))
-            prompt = _montar_prompt(manual, trecho, duration_desc, min_duration, max_duration, video_end, "")
+            prompt = _montar_prompt(manual, trecho, duration_desc, min_duration, max_duration, video_end, "",
+                                    (max(1, por_bloco - 2), por_bloco))
         else:
             prompt = (
                 "Você é um editor de cortes virais (Reels, TikTok, Shorts). Abaixo está UM TRECHO da transcrição de um vídeo "

@@ -1137,12 +1137,11 @@ export default function EditorMassa({
               {projeto && onAgendar && (
                 <button
                   type="button"
-                  className={`${s.btn} ${s.btnPrimario}`}
+                  className={`${s.btn} ${s.btnPequeno}`}
                   onClick={onAgendar}
-                  style={{ minWidth: 200 }}
                   title="Agendar todos os cortes nas redes sociais"
                 >
-                  <Icone nome="calendario" tamanho={14} /> Seguir para agendamento
+                  <Icone nome="calendario" tamanho={13} /> Agendar
                 </button>
               )}
             </>
