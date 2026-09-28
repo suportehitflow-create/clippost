@@ -95,6 +95,12 @@ async function pelaJanela(usuario, limite) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {
+  // extensão carregada da pasta: o Clipost pede para ela se recarregar quando houver versão nova
+  if (msg?.tipo === 'RECARREGAR') {
+    responder({ ok: true })
+    setTimeout(() => chrome.runtime.reload(), 200)
+    return
+  }
   if (msg?.tipo !== 'BUSCAR_INSTAGRAM') return
   const usuario = String(msg.usuario || '').replace(/^@/, '').trim()
   const limite = Math.max(0, Math.min(Number(msg.limite) || 0, 3000))

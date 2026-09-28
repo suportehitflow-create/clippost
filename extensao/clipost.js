@@ -16,6 +16,9 @@
       window.postMessage({ tipo: 'CLIPOST_EXTENSAO_LISTA', dados: valida ? clipostImport : null }, ORIGEM)
     } else if (tipo === 'CLIPOST_EXTENSAO_RECEBIDO') {
       await chrome.storage.local.remove('clipostImport')
+    } else if (tipo === 'CLIPOST_EXTENSAO_RECARREGAR') {
+      // versão nova na pasta: recarrega sozinha (sem abrir chrome://extensions)
+      try { await chrome.runtime.sendMessage({ tipo: 'RECARREGAR' }) } catch (err) {}
     } else if (tipo === 'CLIPOST_EXTENSAO_BUSCAR') {
       // busca direto do site: a extensão lê o perfil com a sessão do Instagram deste navegador
       const { id, usuario, limite } = e.data
