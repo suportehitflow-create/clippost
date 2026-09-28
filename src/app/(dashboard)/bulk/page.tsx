@@ -24,7 +24,18 @@ export default function EdicaoEmMassaPage() {
   const [loteAtivo, setLoteAtivo] = useState(false)
 
   useEffect(() => {
-    try { setLoteAtivo(!!localStorage.getItem('clippost_bulk_batch')) } catch {}
+    // só mostra o andamento se o lote ainda estiver rodando; lote antigo (pronto ou que falhou) sai do caminho
+    let loteSalvo: string | null = null
+    try { loteSalvo = localStorage.getItem('clippost_bulk_batch') } catch {}
+    if (loteSalvo) {
+      fetch(`/api/bulk/${loteSalvo}`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d && ['pending', 'listing', 'processing'].includes(d.status)) setLoteAtivo(true)
+          else try { localStorage.removeItem('clippost_bulk_batch') } catch {}
+        })
+        .catch(() => {})
+    }
     let salva: string | null = null
     try { salva = localStorage.getItem(CHAVE_ABA) } catch {}
     // ?aba=perfil (a extensão do Instagram abre assim) tem prioridade sobre a última aba usada

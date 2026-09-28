@@ -144,9 +144,10 @@ function Conteudo() {
     setTimeout(() => setAviso(null), 6000)
   }
 
-  async function carregar(uid: string) {
-    // contas conectadas pelo Upload-Post (a conexão volta para esta página) entram na lista
-    await fetch('/api/social/sync', { method: 'POST' }).catch(() => null)
+  async function carregar(uid: string, sincronizar = true) {
+    // contas conectadas pelo Upload-Post entram na lista: a sincronização é lenta (~15s), então roda em
+    // segundo plano e recarrega quando termina — a tela não espera por ela
+    if (sincronizar) fetch('/api/social/sync', { method: 'POST' }).then(() => carregar(uid, false)).catch(() => null)
     const [c, k, p] = await Promise.all([
       supabase.from('social_accounts').select('id, platform, username').eq('user_id', uid),
       supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('user_id', uid).not('storage_url', 'is', null).not('storage_url', 'like', '%.json').order('created_at', { ascending: false }).limit(120),
