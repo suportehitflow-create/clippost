@@ -1,5 +1,6 @@
 'use client'
 
+import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -154,17 +155,12 @@ export default function SettingsPage() {
 
   async function connectViaMeta() {
     setConnectingMeta(true)
-    const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID
     if (!META_APP_ID) {
       setMetaError('META_APP_ID não configurado. Configure NEXT_PUBLIC_META_APP_ID no Vercel.')
       setConnectingMeta(false)
       return
     }
-    const siteUrl = window.location.origin
-    const callbackUrl = `${siteUrl}/api/auth/meta/callback`
-    const scope = ['instagram_basic', 'instagram_content_publish', 'pages_manage_posts', 'pages_read_engagement', 'pages_show_list'].join(',')
-    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(scope)}&state=${userId}`
-    window.location.href = url
+    window.location.href = urlConectarMeta(userId || '', '/settings')
   }
 
   async function removeAccount(id: string) {

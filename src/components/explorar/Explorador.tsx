@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal } from '@/components/pagina/Base'
 import { useExtensaoClipost, ModalExtensao, buscarPelaExtensao, ZIP_EXTENSAO } from '@/components/bulk/ExtensaoInstagram'
+import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
+import { createClient } from '@/lib/supabase/client'
 import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import {
   Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink, AtSign, ArrowDownWideNarrow, Puzzle, RotateCw,
@@ -103,6 +105,14 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
   const [modalExtensao, setModalExtensao] = useState(false)
   const { status: oficial, recarregar } = useInstagramOficial()
   const { instalada, lista, consumir } = useExtensaoClipost()
+  const [modalConectar, setModalConectar] = useState(false)
+
+  /** Login com o Facebook (API oficial): volta para esta mesma tela depois de aprovar */
+  async function conectarFacebook() {
+    const { data: { user } } = await createClient().auth.getUser()
+    if (!user) return
+    window.location.href = urlConectarMeta(user.id, embutido ? '/bulk?aba=perfil' : '/explorar')
+  }
 
   // lista enviada pela extensão (Instagram com o login do navegador)
   useEffect(() => {
@@ -123,6 +133,15 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     setSel(new Set())
     consumir()
   }, [lista, consumir])
+
+  // volta do "Conectar com Facebook"
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('meta_connected')) { recarregar(); avisar('ok', 'Instagram conectado pela API oficial da Meta. Pode buscar.') }
+    const erroMeta = q.get('meta_error')
+    if (erroMeta) setErro(erroMeta === 'app_not_configured' ? 'O app da Meta ainda não foi configurado no Clipost.' : `Facebook: ${erroMeta}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ?u=@perfil (vindo do Assistente) já preenche o @
   useEffect(() => {
@@ -175,7 +194,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     // Instagram sem API oficial: a extensão busca com o login do navegador (sem clique); o servidor é bloqueado
     if (ehInstagram && !instalada && !oficial?.configurado) {
       setBuscando(false)
-      setModalExtensao(true)
+      setModalConectar(true)
       return
     }
     const extensaoPrimeiro = ehInstagram && instalada && !oficial?.configurado
@@ -301,10 +320,10 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                 <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-indigo-500/[0.07] border border-indigo-500/25 px-4 py-3">
                   <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shrink-0"><Puzzle className="w-4 h-4" /></span>
                   <div className="flex-1 min-w-[180px]">
-                    <p className="text-xs font-semibold text-white">Instagram precisa da extensão do Clipost</p>
-                    <p className="text-[11px] text-zinc-400">Instale uma vez: a busca passa a ser automática, pelo seu login do Instagram.</p>
+                    <p className="text-xs font-semibold text-white">Conecte o Instagram para buscar</p>
+                    <p className="text-[11px] text-zinc-400">Uma vez só — depois a busca é automática.</p>
                   </div>
-                  <button type="button" onClick={() => setModalExtensao(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-lg shadow-indigo-600/30">Instalar extensão</button>
+                  <button type="button" onClick={() => setModalConectar(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-lg shadow-indigo-600/30">Conectar</button>
                 </div>
               )
             )}
@@ -485,6 +504,27 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
         )}
 
       {modalOficial && <ModalInstagramOficial status={oficial} fechar={() => setModalOficial(false)} aoSalvar={recarregar} />}
+      {modalConectar && (
+        <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal aria-label="Conectar Instagram" onClick={() => setModalConectar(false)}>
+          <div className="w-full max-w-md bg-[#111114] border border-white/[0.1] rounded-3xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <h3 className="text-base font-bold text-white">Conectar o Instagram</h3>
+              <p className="text-xs text-zinc-400 mt-1">O Instagram bloqueia quem não está conectado. Escolha um jeito — é só uma vez.</p>
+            </div>
+            <button type="button" onClick={conectarFacebook} disabled={!META_APP_ID}
+              className="w-full text-left p-4 rounded-2xl bg-indigo-600/15 border border-indigo-500/40 hover:bg-indigo-600/25 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span className="text-sm font-bold text-white flex items-center gap-2">Conectar com Facebook <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">oficial</span></span>
+              <span className="text-[11px] text-zinc-400 block mt-1">API oficial da Meta: estável e sem bloqueio. Lê perfis profissionais (Business/Criador). Você só aprova no Facebook.</span>
+              {!META_APP_ID && <span className="text-[11px] text-amber-300 block mt-1.5">Ainda falta configurar o app da Meta no Clipost.</span>}
+            </button>
+            <button type="button" onClick={() => { setModalConectar(false); setModalExtensao(true) }}
+              className="w-full text-left p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06]">
+              <span className="text-sm font-bold text-white">Extensão do Clipost</span>
+              <span className="text-[11px] text-zinc-400 block mt-1">Usa o seu login do Instagram neste navegador. Qualquer perfil público.</span>
+            </button>
+          </div>
+        </div>
+      )}
       {modalExtensao && <ModalExtensao instalada={instalada} fechar={() => setModalExtensao(false)} />}
     </Moldura>
   )

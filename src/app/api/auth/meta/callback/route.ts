@@ -7,16 +7,20 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state')
   const error = searchParams.get('error')
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://clippost-three.vercel.app'
+  // state = "<id do usuário>~<página de volta>" (ex.: volta para a Edição em Massa depois de aprovar)
+  const [stateUsuario, voltarBruto] = (state || '').split('~')
+  const voltar = voltarBruto && voltarBruto.startsWith('/') && !voltarBruto.startsWith('//') ? voltarBruto : '/settings'
+  const para = (param: string) => `${siteUrl}${voltar}${voltar.includes('?') ? '&' : '?'}${param}`
 
-  if (error) return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent(error)}`)
-  if (!code || !state) return NextResponse.redirect(`${siteUrl}/settings?meta_error=missing_params`)
+  if (error) return NextResponse.redirect(para(`meta_error=${encodeURIComponent(error)}`))
+  if (!code || !state) return NextResponse.redirect(para('meta_error=missing_params'))
 
   const META_APP_ID = process.env.META_APP_ID
   const META_APP_SECRET = process.env.META_APP_SECRET
   const CALLBACK_URL = `${siteUrl}/api/auth/meta/callback`
 
   if (!META_APP_ID || !META_APP_SECRET) {
-    return NextResponse.redirect(`${siteUrl}/settings?meta_error=app_not_configured`)
+    return NextResponse.redirect(para('meta_error=app_not_configured'))
   }
 
   // 1. Code -> short-lived token
@@ -24,7 +28,7 @@ export async function GET(req: NextRequest) {
     `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&code=${code}`
   )
   const tokenData = await tokenRes.json()
-  if (tokenData.error) return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent(tokenData.error.message)}`)
+  if (tokenData.error) return NextResponse.redirect(para(`meta_error=${encodeURIComponent(tokenData.error.message)}`))
   const shortToken = tokenData.access_token
 
   // 2. short-lived -> long-lived (60 days)
@@ -44,7 +48,7 @@ export async function GET(req: NextRequest) {
   // O dono das contas é quem está logado (o state só confirma que o fluxo começou nesta sessão)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(`${siteUrl}/login`)
-  if (state !== user.id) return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent('Sessão diferente da que iniciou a conexão. Tente de novo.')}`)
+  if (stateUsuario !== user.id) return NextResponse.redirect(para(`meta_error=${encodeURIComponent('Sessão diferente da que iniciou a conexão. Tente de novo.')}`))
   const userId = user.id
 
   // Colunas que existem em social_accounts: user_id, platform, account_id, username, access_token
@@ -86,7 +90,7 @@ export async function GET(req: NextRequest) {
 
   if (!salvas) {
     const motivo = erroSalvar || 'Nenhuma Página do Facebook/Instagram profissional foi autorizada.'
-    return NextResponse.redirect(`${siteUrl}/settings?meta_error=${encodeURIComponent(motivo)}`)
+    return NextResponse.redirect(para(`meta_error=${encodeURIComponent(motivo)}`))
   }
 
   // Sem conta ativa no perfil: a primeira passa a ser a ativa
@@ -96,5 +100,5 @@ export async function GET(req: NextRequest) {
     if (primeira) await supabase.from('profiles').update({ active_social_account_id: primeira.id }).eq('id', userId)
   }
 
-  return NextResponse.redirect(`${siteUrl}/settings?meta_connected=1`)
+  return NextResponse.redirect(para('meta_connected=1'))
 }
