@@ -40,7 +40,8 @@ export function tamanhoSaida(canvas: Canvas, qualidade: number): Canvas {
 
 /** Área útil do vídeo de origem: detecção (sem template antigo) + recortes manuais */
 export function areaOrigem(v: ConfigVideo): Rect {
-  const a = v.areaDetectada ?? { x: 0, y: 0, w: v.largura, h: v.altura };
+  // vídeo com o template já gravado (Criar cortes): usa o quadro inteiro, a faixa preta tem o perfil/título
+  const a = (!v.marcaEmbutida && v.areaDetectada) || { x: 0, y: 0, w: v.largura, h: v.altura };
   let x = a.x + v.recorte.esq;
   let y = a.y + v.recorte.topo;
   let w = a.w - v.recorte.esq - v.recorte.dir;

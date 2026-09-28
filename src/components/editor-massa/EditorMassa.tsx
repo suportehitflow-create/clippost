@@ -296,9 +296,11 @@ export default function EditorMassa({
 
   // ---------- análise: dimensões, miniatura e detecção do template antigo ----------
   const detectar = useCallback(
-    async (el: HTMLVideoElement | null, v: { id: string; nome: string; largura: number; altura: number; duracao: number; arquivoId?: string }) => {
+    async (el: HTMLVideoElement | null, v: { id: string; nome: string; largura: number; altura: number; duracao: number; arquivoId?: string; marcaEmbutida?: boolean }) => {
       const modo = globalRef.current.deteccao.modo;
-      if (modo === 'nenhuma') return atualizarVideo(v.id, { areaDetectada: null, origemDeteccao: 'completo', detectando: false });
+      // corte do Criar cortes já vem com o template gravado: a faixa preta de cima tem o perfil e o título,
+      // então nunca corta bordas (antes a detecção cortava o topo e sumia com o cabeçalho do template)
+      if (modo === 'nenhuma' || v.marcaEmbutida) return atualizarVideo(v.id, { areaDetectada: null, origemDeteccao: 'completo', detectando: false });
       if (modo === 'margem') {
         const f = finalizarArea(null, v.largura, v.altura);
         return atualizarVideo(v.id, { areaDetectada: f.area, origemDeteccao: f.origem, detectando: false });
@@ -355,8 +357,8 @@ export default function EditorMassa({
             duracao: r.duracao,
             quadro: img,
             carregado: true,
-            areaDetectada: r.area,
-            origemDeteccao: (r.origem as VideoCliente['origemDeteccao']) ?? undefined,
+            areaDetectada: v.marcaEmbutida ? null : r.area,
+            origemDeteccao: v.marcaEmbutida ? 'completo' : (r.origem as VideoCliente['origemDeteccao']) ?? undefined,
           });
           escreverLog(`[DIAG] ${v.nome} analisado no servidor (${r.largura}x${r.altura})`);
         } catch (e: any) {
@@ -816,6 +818,7 @@ export default function EditorMassa({
 
   // ---------- vídeos, músicas e resultados salvos no navegador ----------
   const restaurou = useRef(false);
+  const abasGuardadas = useRef<typeof abas>([]);
   useEffect(() => {
     pedirArmazenamentoPersistente();
     setResultados(carregarResultados());
@@ -831,8 +834,13 @@ export default function EditorMassa({
           const deProjeto = (id: string) => id.startsWith('projeto-');
           // cards que ficaram "carregando" numa sessão anterior (sem arquivo e sem link) não voltam
           const semVazios = e.abas.map((a) => ({ ...a, videos: a.videos.filter((v) => v.arquivo.size > 0 || /^https?:/.test(v.url || '')) }));
-          let lista = semVazios.length ? semVazios : [novaAba(1)];
-          if (!projeto && lista.every((a) => deProjeto(a.id))) lista = [...lista, novaAba(1)];
+          // Só volta o que é desta tela: no projeto, só o lote dele; na Edição em Massa, só os lotes soltos.
+          // Antes voltavam TODOS (dezenas de vídeos de outros projetos baixando/analisando juntos) e travava.
+          // Os lotes soltos ficam guardados (não se perdem ao abrir um projeto); os de outros projetos se refazem sozinhos.
+          const minha = (a: { id: string }) => (projeto ? a.id === 'projeto-' + projeto.id : !deProjeto(a.id));
+          abasGuardadas.current = projeto ? semVazios.filter((a) => !deProjeto(a.id)) : [];
+          let lista = semVazios.filter(minha);
+          if (!lista.length) lista = [novaAba(1)];
           const preferida = lista.find((a) => a.id === e.abaAtivaId && (projeto || !deProjeto(a.id))) ?? lista.find((a) => projeto || !deProjeto(a.id)) ?? lista[0];
           setAbas(lista);
           setAbaAtivaId(preferida.id);
@@ -840,7 +848,7 @@ export default function EditorMassa({
           setMusicas(e.musicas);
           lista.forEach((a) => a.videos.forEach((v) => enviarVideo(v).catch(() => {})));
           e.musicas.forEach((m) => enviarMusica(m));
-          const n = e.abas.reduce((t, a) => t + a.videos.length, 0);
+          const n = lista.reduce((t, a) => t + a.videos.length, 0);
           if (n) avisar(`${n} vídeo(s) da última sessão recuperados`);
         }
       })
@@ -853,7 +861,7 @@ export default function EditorMassa({
 
   useEffect(() => {
     if (!restaurou.current) return;
-    const t = setTimeout(() => salvarEstado(abas, abaAtivaId, musicas), 700);
+    const t = setTimeout(() => salvarEstado([...abas, ...abasGuardadas.current.filter((g) => !abas.some((a) => a.id === g.id))], abaAtivaId, musicas), 700);
     return () => clearTimeout(t);
   }, [abas, abaAtivaId, musicas]);
 
