@@ -14,18 +14,13 @@ import {
   Settings,
   FolderOpen,
   Wrench,
-  Search,
-  Activity,
-  Music2,
   Quote,
-  Images,
   ArrowUpRight,
   Video,
   Clock,
   TrendingUp,
   Radio,
   CheckCircle2,
-  BarChart3,
   Bot,
   type LucideIcon,
 } from 'lucide-react'
@@ -48,24 +43,18 @@ interface Feature {
 // Ordem = ranking das ferramentas (o número do card é a posição)
 const FEATURES: Feature[] = [
   { capa: 'cortes', title: 'Criar cortes', description: 'Cole um vídeo longo e receba os melhores momentos em 9:16, com legenda e o seu template.', href: '/upload', icon: Scissors, cor: '99,102,241', wide: true },
-  { capa: 'massa', title: 'Edição em Massa', description: 'Dezenas de vídeos no seu template de uma vez: texto, música, legendas e efeitos.', href: '/bulk', icon: Layers, cor: '147,51,234' },
+  { capa: 'massa', title: 'Edição em Massa', description: 'Busque os vídeos de qualquer perfil e edite dezenas no seu template de uma vez.', href: '/bulk', icon: Layers, cor: '147,51,234' },
   { capa: 'autopilot', title: 'Autopilot', description: 'Monitora YouTube, Instagram e TikTok e deixa os cortes de cada vídeo novo prontos sozinho.', href: '/autopilot', icon: Zap, cor: '16,185,129', badge: '24/7' },
   { capa: 'templates', title: 'Identidade Visual', description: 'Seu template: perfil, fontes, cores, marca d’água e posição do vídeo e das legendas.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
-  { capa: 'explorar', title: 'Explorar perfis', description: 'Digite um @ e veja reels, posts e carrosséis com views e curtidas. Baixe, salve ou edite com o seu template.', href: '/explorar', icon: Search, cor: '14,165,233', badge: 'Novo' },
-  { capa: 'raiox', title: 'Raio-X da página', description: 'Views, engajamento, melhor horário, formato campeão, mapa de calor e top posts da sua conta.', href: '/raio-x-pagina', icon: Activity, cor: '244,63,94', badge: 'Novo' },
-  { capa: 'resultados', title: 'Resultados & Acompanhamento', description: 'Ritmo diário de posts, analytics de visualizações, tempo economizado e métricas.', href: '/resultados', icon: BarChart3, cor: '16,185,129', badge: 'Ao vivo' },
-  { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
-  { capa: 'radar', title: 'Radar de Viralidade', description: 'Os vídeos que estão explodindo nas últimas 24h, antes da concorrência.', href: '/trends', icon: Flame, cor: '249,115,22' },
-  { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246' },
-  { capa: 'calendario', title: 'Calendário & Publicações', description: 'Programe as postagens no Instagram, TikTok e YouTube e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
+  { capa: 'calendario', title: 'Calendário & Publicações', description: 'Reels, posts, carrosséis e stories: agende em massa e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
-  { capa: 'frases', title: 'Vídeos com frases', description: 'Fotos, frases e música viram vídeos 9:16 em série — prontos na Biblioteca e já agendados.', href: '/frases', icon: Quote, cor: '168,85,247', badge: 'Novo' },
-  { capa: 'posts', title: 'Posts em massa', description: 'Fotos, carrosséis e stories de uma vez — agendados nas suas contas.', href: '/posts', icon: Images, cor: '14,165,233', badge: 'Novo' },
-  { capa: 'assistente', title: 'Assistente IA', description: 'Diga o que quer criar — um link, um @ ou uma ideia — e ele abre a ferramenta certa já preenchida.', href: '/assistente', icon: Bot, cor: '99,102,241', badge: 'Novo' },
-  { capa: 'musicas', title: 'Músicas', description: 'Sua biblioteca de faixas salva na conta, pronta para o Editor em Massa e os vídeos com frases.', href: '/musicas', icon: Music2, cor: '219,39,119' },
-  { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, Raio-X de perfil, YouTube → texto, melhores horários, contador, quebra de linha e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', wide: true },
+  { capa: 'frases', title: 'Vídeos com frases', description: 'Fotos, frases e música viram vídeos 9:16 em série — prontos na Biblioteca e já agendados.', href: '/frases', icon: Quote, cor: '168,85,247' },
+  { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
+  { capa: 'assistente', title: 'Assistente IA', description: 'Diga o que quer criar — um link, um @ ou uma ideia — e ele abre a ferramenta certa já preenchida.', href: '/assistente', icon: Bot, cor: '99,102,241' },
+  { capa: 'ferramentas', title: 'Ferramentas', description: 'Legenda e hashtags com IA, melhores horários, quebra de linha segura e limites das redes.', href: '/ferramentas', icon: Wrench, cor: '129,140,248', wide: true },
+  { capa: 'radar', title: 'Radar de Viralidade', description: 'Os vídeos que estão explodindo nas últimas 24h, antes da concorrência.', href: '/trends', icon: Flame, cor: '249,115,22' },
+  { capa: 'roteiros', title: 'Roteiros IA', description: 'Roteiros e ganchos com técnicas de retenção e storytelling.', href: '/creator', icon: PenTool, cor: '59,130,246', wide: true },
 ]
-
 const CAPAS_URL = `${(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co').replace(/[﻿​-‍\s]/g, '').replace(/\/$/, '')}/storage/v1/object/public/videos/site/capas`
 
 function FeatureCard({ feature, posicao }: { feature: Feature; posicao: number }) {

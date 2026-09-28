@@ -654,7 +654,7 @@ async def criar_watch(req: WatchRequest):
         try:
             recentes = await asyncio.to_thread(latest_profile_videos, url_perfil, 3, req.user_id)
         except Exception as e:
-            dica = " Conecte os cookies do Instagram em Edição em Massa → Baixar de um perfil." if plataforma == "instagram" else ""
+            dica = " No Autopilot, conecte a API oficial da Meta ou os cookies do Instagram e tente de novo." if plataforma == "instagram" else ""
             raise HTTPException(status_code=400, detail=f"Não consegui ler os vídeos desse perfil agora.{dica} ({str(e)[:160]})")
         info = {
             "channel_id": f"{_PREFIXO_PERFIL[plataforma]}:{nome.lower()}",

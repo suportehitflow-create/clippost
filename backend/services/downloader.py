@@ -343,7 +343,8 @@ def profile_key(raw: str) -> tuple[str, str, str] | None:
 def latest_profile_videos(url: str, limit: int = 6, user_id: str | None = None) -> list[dict]:
     """Vídeos mais recentes de um perfil (do mais novo para o mais antigo), com 'key' estável.
     O 'key' sai do link público (permalink) quando existe: o link direto da CDN muda a cada leitura."""
-    videos = list_profile_videos(url, limit=limit, sort_by="date", user_id=user_id)["videos"]
+    # sem abrir vídeo a vídeo: a listagem do perfil já vem do mais novo para o mais antigo (e menos bloqueio)
+    videos = list_profile_videos(url, limit=limit, sort_by="date", user_id=user_id, enriquecer=False)["videos"]
     return [{**v, "key": video_key(v.get("permalink") or v["url"])} for v in videos]
 
 

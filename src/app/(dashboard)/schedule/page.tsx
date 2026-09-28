@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Pagina, Intro } from '@/components/pagina/Base'
 import EditorLegenda from '@/components/ferramentas/EditorLegenda'
+import PostsEmMassa from '@/components/posts/PostsEmMassa'
 import { FUSOS, gerarLegendasIA, horarioLocal, juntarLegenda, LIMITE_DIARIO, MELHORES_HORARIOS, NOME_REDE } from '@/lib/publicacao'
 import {
   Calendar, ChevronLeft, ChevronRight, Plus, Loader2, X, Send, Trash2, Clock, CheckCircle2, AlertCircle, Layers, Activity, Film, ExternalLink, Sparkles,
@@ -17,6 +18,13 @@ import {
 
 type Status = 'scheduled' | 'published' | 'failed'
 type Aba = 'calendario' | 'massa' | 'atividade'
+type TipoMassa = 'reels' | 'post' | 'carrossel' | 'story'
+const TIPOS_MASSA: { id: TipoMassa; label: string; desc: string }[] = [
+  { id: 'reels', label: 'Reels', desc: 'Cortes da Biblioteca' },
+  { id: 'post', label: 'Post', desc: '1 foto por post' },
+  { id: 'carrossel', label: 'Carrossel', desc: 'Várias fotos' },
+  { id: 'story', label: 'Stories', desc: 'Foto ou vídeo · 24h' },
+]
 
 // is_active vem do seletor de perfil (localStorage), não do banco
 interface Conta { id: string; platform: string; username: string | null; is_active: boolean }
@@ -101,6 +109,7 @@ function Conteudo() {
   const params = useSearchParams()
   const [userId, setUserId] = useState<string | null>(null)
   const [aba, setAba] = useState<Aba>('calendario')
+  const [tipoMassa, setTipoMassa] = useState<TipoMassa>('reels')
   const [contas, setContas] = useState<Conta[]>([])
   const [cortes, setCortes] = useState<Corte[]>([])
   const [posts, setPosts] = useState<Post[]>([])
@@ -158,6 +167,10 @@ function Conteudo() {
       setUserId(data.user.id)
       carregar(data.user.id)
     })
+    // ?aba=massa&tipo=carrossel (Assistente, links antigos de Posts em massa)
+    if (params.get('aba') === 'massa') setAba('massa')
+    const tipo = params.get('tipo')
+    if (tipo && TIPOS_MASSA.some(x => x.id === tipo)) setTipoMassa(tipo as TipoMassa)
     const clip = params.get('clipId')
     if (clip) {
       setAba('massa')
@@ -426,6 +439,18 @@ function Conteudo() {
 
         {/* ---------------- EM MASSA ---------------- */}
         {!carregando && aba === 'massa' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5" role="radiogroup" aria-label="O que vai publicar">
+            {TIPOS_MASSA.map(o => (
+              <button key={o.id} type="button" role="radio" aria-checked={tipoMassa === o.id} onClick={() => setTipoMassa(o.id)}
+                className={`p-3 rounded-2xl border text-left transition-all ${tipoMassa === o.id ? 'bg-indigo-600/20 border-indigo-500/50 ring-1 ring-indigo-500/30' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'}`}>
+                <span className={`text-xs font-bold block ${tipoMassa === o.id ? 'text-white' : 'text-zinc-200'}`}>{o.label}</span>
+                <span className="text-[10px] text-zinc-500 mt-0.5 block font-mono">{o.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {!carregando && aba === 'massa' && tipoMassa !== 'reels' && <PostsEmMassa tipo={tipoMassa} />}
+        {!carregando && aba === 'massa' && tipoMassa === 'reels' && (
           <section className="grid lg:grid-cols-[1fr_340px] gap-5">
             <div className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-4 sm:p-5 space-y-3">
               <div className="flex items-center justify-between gap-2">

@@ -8,9 +8,9 @@ import time
 
 from supabase import create_client
 
-AUTOPILOT_MIN_MINUTES = 15
+AUTOPILOT_MIN_MINUTES = 60
 AUTOPILOT_DEFAULT_MINUTES = 60
-AUTOPILOT_ALLOWED = (15, 30, 60, 180, 360, 720, 1440)
+AUTOPILOT_ALLOWED = (60, 180, 240, 360, 720, 1440)  # mínimo 1h
 
 _BUCKET = "videos"
 _CACHE_TTL = 120

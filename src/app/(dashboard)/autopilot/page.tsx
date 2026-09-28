@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
-import { ModalRaioX } from '@/components/ferramentas/RaioX'
+import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal, Aviso } from '@/components/pagina/Base'
 import {
   Zap, Plus, Loader2, Trash2, CheckCircle2, Clock, ExternalLink, Play, Cookie, X, Link2, Send, Check, Ban, History, Inbox, Radar,
@@ -16,7 +16,7 @@ import {
 
 type Plataforma = 'youtube' | 'instagram' | 'tiktok' | 'facebook'
 type Modo = 'biblioteca' | 'aprovar' | 'auto'
-type Aba = 'monitorados' | 'aprovacao' | 'historico'
+type Aba = 'monitorados' | 'aprovacao'
 
 interface Watch {
   id: string
@@ -42,8 +42,9 @@ const PLATAFORMAS: Record<Plataforma, { nome: string; cor: string; letra: string
   tiktok: { nome: 'TikTok', cor: '#22d3ee', letra: 'TT' },
   facebook: { nome: 'Facebook', cor: '#3b82f6', letra: 'FB' },
 }
-const INTERVALOS = [15, 30, 60, 180, 360, 720, 1440]
-const nomeIntervalo = (m: number) => (m < 60 ? `${m} min` : `${m / 60} h`)
+// mínimo 1h: verificar mais que isso não traz vídeo mais rápido e aumenta o bloqueio das redes
+const INTERVALOS = [60, 180, 240, 360, 720, 1440]
+const nomeIntervalo = (m: number) => `${m / 60}h`
 const MODOS: { id: Modo; label: string; desc: string }[] = [
   { id: 'biblioteca', label: 'Só na Biblioteca', desc: 'Você posta quando quiser' },
   { id: 'aprovar', label: 'Eu aprovo antes', desc: 'Aprova ou recusa cada corte' },
@@ -96,7 +97,8 @@ export default function AutopilotPage() {
   const [modalCookies, setModalCookies] = useState(false)
   const [cookiesTexto, setCookiesTexto] = useState('')
   const [salvandoCookies, setSalvandoCookies] = useState(false)
-  const [raioX, setRaioX] = useState<string | null>(null)
+  const [modalOficial, setModalOficial] = useState(false)
+  const { status: oficial, recarregar: recarregarOficial } = useInstagramOficial()
 
   // aprovação
   const [pendentes, setPendentes] = useState<CorteAprov[]>([])
@@ -106,7 +108,8 @@ export default function AutopilotPage() {
   const [decidindo, setDecidindo] = useState<string | null>(null)
 
   const plataformaDigitada = useMemo(() => plataformaDoTexto(canal), [canal])
-  const precisaCookies = plataformaDigitada === 'instagram' && cookiesIg === false
+  // Instagram: o servidor lê o perfil pela API oficial da Meta (se conectada) ou pelos cookies
+  const precisaCookies = plataformaDigitada === 'instagram' && cookiesIg === false && !oficial?.configurado
 
   function avisar(tipo: 'ok' | 'erro', texto: string) {
     setAviso({ tipo, texto })
@@ -150,7 +153,7 @@ export default function AutopilotPage() {
     fetch('/api/social/instagram-cookies', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => setCookiesIg(!!d?.cookies_file_exists)).catch(() => setCookiesIg(null))
     // abre direto em "Aguardando aprovação" pelo link ?aba=aprovacao
     const a = new URLSearchParams(window.location.search).get('aba')
-    if (a === 'aprovacao' || a === 'historico') setAba(a)
+    if (a === 'aprovacao') setAba(a)
     // ?url=... (vindo do Assistente) já preenche o canal/perfil a monitorar
     const u = new URLSearchParams(window.location.search).get('url')
     if (u) setCanal(u)
@@ -241,7 +244,6 @@ export default function AutopilotPage() {
   const ABAS: { id: Aba; label: string; icone: typeof Radar; n?: number }[] = [
     { id: 'monitorados', label: 'Contas monitoradas', icone: Radar, n: watches.length },
     { id: 'aprovacao', label: 'Aguardando aprovação', icone: Inbox, n: pendentes.length },
-    { id: 'historico', label: 'Histórico', icone: History },
   ]
 
   return (
@@ -267,14 +269,25 @@ export default function AutopilotPage() {
         <>
           <Cartao>
             <div className="space-y-2.5">
-              <Rotulo direita={<Selo p={plataformaDigitada} />}>Canal ou perfil</Rotulo>
+              <Rotulo direita={
+                <span className="flex items-center gap-2">
+                  <select id="autopilot-intervalo" value={Math.max(60, intervalo)} onChange={e => salvarIntervalo(Number(e.target.value))} aria-label="Verificar a cada"
+                    className="text-[11px] font-mono font-bold text-indigo-300 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 outline-none">
+                    {INTERVALOS.map(m => <option key={m} value={m}>verificar a cada {nomeIntervalo(m)}</option>)}
+                  </select>
+                  <Selo p={plataformaDigitada} />
+                </span>
+              }>Canal ou perfil</Rotulo>
               <Campo icone={Link2} id="autopilot-canal" value={canal} onChange={e => setCanal(e.target.value)} onKeyDown={e => e.key === 'Enter' && !salvando && monitorar()}
                 placeholder="youtube.com/@canal, instagram.com/perfil, tiktok.com/@perfil" />
               {precisaCookies && (
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-100">
                   <Cookie className="w-4 h-4 shrink-0 text-amber-300" />
-                  <span className="flex-1">Para acompanhar perfis do Instagram, o servidor precisa de uma conta conectada. É só uma vez.</span>
-                  <button type="button" onClick={() => setModalCookies(true)} className="px-3 py-1.5 rounded-lg bg-amber-400 text-zinc-900 font-semibold">Conectar Instagram</button>
+                  <span className="flex-1">O Instagram só mostra os vídeos de um perfil para quem está conectado. Conecte uma vez (a API oficial da Meta é o jeito mais estável).</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setModalOficial(true)} className="px-3 py-1.5 rounded-lg bg-amber-400 text-zinc-900 font-semibold">API oficial</button>
+                    <button type="button" onClick={() => setModalCookies(true)} className="px-3 py-1.5 rounded-lg bg-white/10 font-semibold">Cookies</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -288,12 +301,7 @@ export default function AutopilotPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Rotulo direita={
-                  <select id="autopilot-intervalo" value={intervalo} onChange={e => salvarIntervalo(Number(e.target.value))} aria-label="Verificar a cada"
-                    className="text-[11px] font-mono font-bold text-indigo-300 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 outline-none">
-                    {INTERVALOS.map(m => <option key={m} value={m}>verificar a cada {nomeIntervalo(m)}</option>)}
-                  </select>
-                }><Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos cortes</Rotulo>
+                <Rotulo><Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos cortes</Rotulo>
                 <Opcoes valor={duracao} mudar={setDuracao} opcoes={[
                   { id: 'auto', label: '⚡ IA Dinâmico', desc: 'A IA decide' },
                   { id: '30', label: '30s', desc: 'Ultra-rápidos' },
@@ -338,7 +346,6 @@ export default function AutopilotPage() {
                           {MODOS.map(x => <option key={x.id} value={x.id}>{NOME_MODO[x.id]}</option>)}
                         </select>
                         <label className="flex items-center gap-2 text-xs text-zinc-300">Ativo <LiquidToggle checked={w.is_active} onChange={v => atualizar(w, { is_active: v })} /></label>
-                        {link && <button type="button" onClick={() => setRaioX(link)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08]">Raio-X</button>}
                         <button type="button" onClick={() => remover(w)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10" title="Parar de monitorar"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </article>
@@ -428,31 +435,7 @@ export default function AutopilotPage() {
         </Cartao>
       )}
 
-      {aba === 'historico' && (
-        <Cartao>
-          {historico.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">As decisões de aprovação aparecem aqui.</p>
-          ) : (
-            <div className="grid gap-2">
-              {historico.map(c => (
-                <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
-                  {c.decisao === 'aprovado' ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <Ban className="w-4 h-4 text-zinc-500 shrink-0" />}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm truncate">{c.hook || c.title || 'Corte'}</p>
-                    <p className="text-[11px] text-zinc-500 truncate">{c.canal}{c.decisao === 'aprovado' ? ` · ${c.post_status === 'published' ? 'publicado' : c.post_status === 'failed' ? 'falhou' : 'agendado'} para ${quando(c.agendado_para)}` : ' · recusado'}</p>
-                  </div>
-                  {c.decisao === 'recusado' && (
-                    <button type="button" onClick={() => decidir([c.id], 'aprovar')} disabled={!!decidindo} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white/[0.04] border border-white/[0.08] disabled:opacity-40">Aprovar mesmo assim</button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <Link href="/schedule" className="block text-center text-xs text-indigo-300 hover:underline">Ver tudo no Calendário →</Link>
-        </Cartao>
-      )}
-
-      {raioX && <ModalRaioX perfil={raioX} fechar={() => setRaioX(null)} />}
+      {modalOficial && <ModalInstagramOficial status={oficial} fechar={() => setModalOficial(false)} aoSalvar={recarregarOficial} />}
 
       {modalCookies && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal aria-label="Conectar Instagram">

@@ -14,14 +14,11 @@ import { Wrench, Sparkles, Activity, FileText, Clock, Type, WrapText, Gauge, Cop
 // Ferramentas avulsas que ajudam a publicar: cada uma também aparece dentro da tela onde é usada
 // (Calendário, Autopilot, Roteiros), mas aqui dá para usar sozinha.
 
-type Id = 'legenda' | 'raiox' | 'youtube' | 'horarios' | 'contador' | 'quebras' | 'limites'
+type Id = 'legenda' | 'horarios' | 'quebras' | 'limites'
 
 const FERRAMENTAS: { id: Id; nome: string; desc: string; icone: LucideIcon; cor: string }[] = [
   { id: 'legenda', nome: 'Legenda e hashtags com IA', desc: '3 opções prontas a partir de um corte ou de uma ideia', icone: Sparkles, cor: '129,140,248' },
-  { id: 'raiox', nome: 'Raio-X do perfil', desc: 'Nota de A a E com views, engajamento e frequência', icone: Activity, cor: '16,185,129' },
-  { id: 'youtube', nome: 'YouTube → texto', desc: 'Tudo o que é falado num vídeo, para copiar ou baixar', icone: FileText, cor: '239,68,68' },
   { id: 'horarios', nome: 'Melhores horários', desc: 'Dias e horas de pico de cada rede, no fuso do público', icone: Clock, cor: '245,158,11' },
-  { id: 'contador', nome: 'Contador e prévia', desc: 'Limite de cada rede e o corte do "...mais" do Instagram', icone: Type, cor: '59,130,246' },
   { id: 'quebras', nome: 'Quebra de linha segura', desc: 'Linhas em branco que não somem no Instagram', icone: WrapText, cor: '236,72,153' },
   { id: 'limites', nome: 'Limites das redes', desc: 'Quantos posts por dia cada API aceita e outros limites', icone: Gauge, cor: '161,161,170' },
 ]
@@ -211,7 +208,8 @@ function Limites() {
 function Conteudo() {
   const router = useRouter()
   const params = useSearchParams()
-  const inicial = (params.get('t') as Id) || 'legenda'
+  const pedida = params.get('t') as Id
+  const inicial: Id = ['legenda', 'horarios', 'quebras', 'limites'].includes(pedida) ? pedida : 'legenda'
   const [ativa, setAtiva] = useState<Id>(FERRAMENTAS.some(f => f.id === inicial) ? inicial : 'legenda')
   const f = FERRAMENTAS.find(x => x.id === ativa)!
 
@@ -243,10 +241,7 @@ function Conteudo() {
             <p className="text-xs text-zinc-500">{f.desc}</p>
           </div>
           {ativa === 'legenda' && <Legenda />}
-          {ativa === 'raiox' && <RaioXFerramenta />}
-          {ativa === 'youtube' && <YoutubeTexto mostrarTexto />}
           {ativa === 'horarios' && <Horarios />}
-          {ativa === 'contador' && <Contador />}
           {ativa === 'quebras' && <Quebras />}
           {ativa === 'limites' && <Limites />}
       </Cartao>

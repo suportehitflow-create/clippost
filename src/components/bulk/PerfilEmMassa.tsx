@@ -98,7 +98,7 @@ function readActiveTemplate() {
 }
 
 // Aba "Baixar de um perfil" da edição em massa: arquivos enviados ficam com o editor completo
-export default function PerfilEmMassa() {
+export default function PerfilEmMassa({ aoNovoLote }: { aoNovoLote?: () => void } = {}) {
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -150,6 +150,7 @@ export default function PerfilEmMassa() {
           setError(data.error || 'Não foi possível acompanhar o lote.')
           try { localStorage.removeItem(ACTIVE_BATCH_KEY) } catch {}
           setBatchId(null)
+          aoNovoLote?.()
           return
         }
         setBatch(data)
@@ -269,6 +270,7 @@ export default function PerfilEmMassa() {
     try { localStorage.removeItem(ACTIVE_BATCH_KEY) } catch {}
     setBatchId(null)
     setBatch(null)
+    aoNovoLote?.()
   }
 
   const doneCount = batch?.items.filter(i => i.status === 'done').length ?? 0

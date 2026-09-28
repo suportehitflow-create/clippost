@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Film, Link2 } from 'lucide-react'
 import PerfilEmMassa from '@/components/bulk/PerfilEmMassa'
+import Explorador from '@/components/explorar/Explorador'
 
 // O editor usa canvas, <video> e localStorage: só no navegador
 const EditorMassa = dynamic(() => import('@/components/editor-massa/EditorMassa'), {
@@ -19,8 +20,11 @@ export default function EdicaoEmMassaPage() {
   // O editor precisa do servidor com FFmpeg: no localhost é o próprio `next dev`; em produção,
   // o endereço vem de NEXT_PUBLIC_EDITOR_MASSA_URL (servidor no Fly)
   const [editorDisponivel, setEditorDisponivel] = useState(true)
+  // lote com template em andamento (vem do Explorador): mostra o progresso no lugar da busca
+  const [loteAtivo, setLoteAtivo] = useState(false)
 
   useEffect(() => {
+    try { setLoteAtivo(!!localStorage.getItem('clippost_bulk_batch')) } catch {}
     let salva: string | null = null
     try { salva = localStorage.getItem(CHAVE_ABA) } catch {}
     // ?aba=perfil (a extensão do Instagram abre assim) tem prioridade sobre a última aba usada
@@ -52,7 +56,7 @@ export default function EdicaoEmMassaPage() {
     <div className="flex p-1 bg-white/[0.04] border border-white/[0.08] rounded-xl gap-1 ml-2" role="tablist" aria-label="Modo">
       {([
         { id: 'editor', label: 'Editor de vídeos', icon: Film },
-        { id: 'perfil', label: 'Baixar de um perfil', icon: Link2 },
+        { id: 'perfil', label: 'Buscar de um perfil', icon: Link2 },
       ] as const).map(t => (
         <button
           key={t.id}
@@ -80,14 +84,14 @@ export default function EdicaoEmMassaPage() {
             <Film className="w-8 h-8 text-indigo-400 mx-auto" />
             <h2 className="text-sm font-semibold text-white">O editor de vídeos está sendo ativado</h2>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              O servidor que processa os vídeos ainda não foi publicado. Enquanto isso, use a aba “Baixar de um perfil”.
+              O servidor que processa os vídeos ainda não foi publicado. Enquanto isso, use a aba “Buscar de um perfil”.
             </p>
             <button
               type="button"
               onClick={() => trocar('perfil')}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white text-xs font-semibold"
             >
-              Ir para Baixar de um perfil
+              Ir para Buscar de um perfil
             </button>
           </div>
         </div>
@@ -104,7 +108,11 @@ export default function EdicaoEmMassaPage() {
             </div>
           </header>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <PerfilEmMassa />
+            {loteAtivo ? (
+              <PerfilEmMassa aoNovoLote={() => setLoteAtivo(false)} />
+            ) : (
+              <Explorador embutido aoIniciarLote={() => setLoteAtivo(true)} aoAbrirEditor={() => trocar('editor')} />
+            )}
           </div>
         </>
       )}
