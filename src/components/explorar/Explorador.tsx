@@ -269,15 +269,15 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
 
   async function agendarComTemplate() {
     const videos = paraLote(selecionados)
-    if (!videos.length) return avisar('erro', 'Selecione pelo menos um Reel.')
+    if (!videos.length) return avisar('erro', 'Selecione pelo menos um vídeo.')
     setAcao('template')
     try {
-      const d = await postarJson('/api/bulk/start', {
-        source: 'files', videos, template_config: lerTemplate(),
-        options: { replace_template: true, subtitles: true, subtitle_preset: null, remove_silence: false, speed: 1, hflip: false },
-      })
-      try { localStorage.setItem('clippost_bulk_batch', d.batch_id) } catch {}
-      if (aoIniciarLote) { aoIniciarLote(d.batch_id); setAcao(null) } else router.push('/bulk?aba=perfil')
+      // só baixa (o template é aplicado no Editor de vídeos, que abre já com um card carregando por vídeo)
+      const d = await postarJson('/api/bulk/start', { source: 'files', videos, options: { download_only: true } })
+      try {
+        localStorage.setItem('clipost:editor-importar-lote', JSON.stringify({ batch: d.batch_id, itens: videos.map(v => ({ titulo: v.title })) }))
+      } catch {}
+      if (aoAbrirEditor) { aoAbrirEditor(d.batch_id); setAcao(null) } else router.push('/bulk?aba=editor')
     } catch (e: any) {
       avisar('erro', e.message)
       setAcao(null)
@@ -302,11 +302,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
 
   return (
     <Moldura embutido={embutido}>
-        <Intro selo="Busca por @" titulo="Baixe e reposte de qualquer perfil"
-          descricao="Reels, posts e carrosséis do Instagram — e vídeos do TikTok e YouTube. Marque os que quiser e baixe, salve na Biblioteca ou edite com o seu template." />
+        {!res && <Intro selo="Busca por @" titulo="Baixe e reposte de qualquer perfil"
+          descricao="Reels, posts e carrosséis do Instagram — e vídeos do TikTok e YouTube. Marque os que quiser e edite com o seu template." />}
 
         {/* busca: um cartão, como no Criar cortes */}
-        <Cartao className="max-w-3xl w-full mx-auto">
+        {!res && <Cartao className="max-w-3xl w-full mx-auto">
           <div className="space-y-2.5">
             <Rotulo>Perfil</Rotulo>
             <Campo icone={AtSign} id="explorar-perfil" value={perfil} onChange={e => setPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && !buscando && buscar()}
@@ -348,7 +348,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
           <BotaoPrincipal icone={Search} onClick={buscar} disabled={!perfil.trim()} carregando={buscando} textoCarregando="Lendo os posts do perfil…">
             Buscar posts
           </BotaoPrincipal>
-        </Cartao>
+        </Cartao>}
 
         {buscando && (
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.08] px-4 py-3 text-xs text-zinc-400 flex items-center gap-2">
@@ -406,6 +406,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                   </p>
                 </div>
               </div>
+              <button type="button" onClick={() => { setRes(null); setSel(new Set()) }} className="md:order-last px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] self-start md:self-auto">Nova busca</button>
               <div className="grid grid-cols-4 gap-4 text-center">
                 {[
                   { i: Eye, v: num(res.totais.views), l: 'Views total' },
@@ -438,20 +439,8 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                 <button type="button" onClick={() => setSel(sel.size === visiveis.length ? new Set() : new Set(visiveis.map(i => i.id)))} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08]">
                   {sel.size && sel.size === visiveis.length ? 'Limpar seleção' : 'Selecionar todos'}
                 </button>
-                <button type="button" onClick={() => baixar(visiveis)} disabled={!!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 disabled:opacity-50">
-                  <Download className="w-3.5 h-3.5" /> Baixar todos ({visiveis.length})
-                </button>
-                <button type="button" onClick={() => baixar(selecionados)} disabled={!selecionados.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 disabled:opacity-40">
-                  <Download className="w-3.5 h-3.5" /> Baixar selecionados ({selecionados.length})
-                </button>
-                <button type="button" onClick={salvarBiblioteca} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 disabled:opacity-40">
-                  {acao === 'salvar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderPlus className="w-3.5 h-3.5" />} Salvar na Biblioteca ({videosSel.length})
-                </button>
                 <button type="button" onClick={agendarComTemplate} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-1.5 disabled:opacity-40">
                   {acao === 'template' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Editar com template ({videosSel.length})
-                </button>
-                <button type="button" onClick={abrirNoEditor} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] flex items-center gap-1.5 disabled:opacity-40">
-                  {acao === 'editor' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />} Editor ({videosSel.length})
                 </button>
               </div>
             </div>

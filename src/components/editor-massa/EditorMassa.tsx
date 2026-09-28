@@ -108,13 +108,20 @@ export default function EditorMassa({
   const [importarAberto, setImportarAberto] = useState(false);
   // Lote aberto pelo Explorador de perfis ("Editor"): os vídeos entram sozinhos na grade
   const [loteImportar, setLoteImportar] = useState<string | null>(null);
+  // Lote com a lista (busca de perfil → "Editar com template"): cards "carregando" já aparecem
+  const [loteComCards, setLoteComCards] = useState<{ batch: string; itens: { titulo: string }[] } | null>(null);
   useEffect(() => {
     try {
       const lote = localStorage.getItem('clipost:editor-importar-lote');
       if (lote) {
         localStorage.removeItem('clipost:editor-importar-lote');
-        setLoteImportar(lote);
-        setImportarAberto(true);
+        let dados: any = null;
+        try { dados = JSON.parse(lote); } catch { dados = null; }
+        if (dados && typeof dados === 'object' && dados.batch) setLoteComCards(dados);
+        else {
+          setLoteImportar(lote);
+          setImportarAberto(true);
+        }
       }
     } catch {
       // sem storage
@@ -347,7 +354,7 @@ export default function EditorMassa({
   }, [abas, abaAtiva, gatilhoAnalise, analisar]);
 
   const adicionarVideos = useCallback(
-    (arquivos: File[], opcoes?: { abaId?: string; extras?: (Partial<ConfigVideo> & { id?: string })[]; silencioso?: boolean }) => {
+    (arquivos: File[], opcoes?: { abaId?: string; extras?: (Partial<ConfigVideo> & { id?: string })[]; silencioso?: boolean; substituir?: boolean }) => {
       const novos: VideoCliente[] = arquivos.map((arquivo, i) => ({
         ...novoVideo({ id: opcoes?.extras?.[i]?.id ?? novoId(), nome: arquivo.name, largura: 0, altura: 0, duracao: 0 }),
         ...(opcoes?.extras?.[i] ?? {}),
@@ -364,7 +371,19 @@ export default function EditorMassa({
         saidaJob: null,
       }));
       const alvo = opcoes?.abaId ?? abaAtiva.id;
-      setAbas((as) => as.map((a) => (a.id === alvo ? { ...a, videos: [...a.videos, ...novos] } : a)));
+      setAbas((as) =>
+        as.map((a) => {
+          if (a.id !== alvo) return a;
+          // substituir: o vídeo entra no lugar do card "carregando" que tem o mesmo id
+          if (opcoes?.substituir) {
+            const porId = new Map(novos.map((n) => [n.id, n]));
+            const trocados = a.videos.map((v) => porId.get(v.id) ?? v);
+            const faltam = novos.filter((n) => !a.videos.some((v) => v.id === n.id));
+            return { ...a, videos: [...trocados, ...faltam] };
+          }
+          return { ...a, videos: [...a.videos, ...novos] };
+        }),
+      );
       novos.forEach((v) => {
         salvarArquivo(v.id, v.arquivo);
         enviarVideo(v).catch(() => {});
@@ -380,6 +399,71 @@ export default function EditorMassa({
   const clipsEmImportacao = useRef(new Set<string>());
   // cortes cujo vídeo já começou a carregar (os que ainda estavam sendo gerados entram quando ficam prontos)
   const clipsComVideo = useRef(new Set<string>());
+  // ---------- lote da busca de perfil: um card "carregando" por vídeo, trocado quando baixa ----------
+  useEffect(() => {
+    if (!loteComCards || !restaurado) return;
+    const { batch, itens } = loteComCards;
+    const idDe = (i: number) => `lote-${batch}-${i}`;
+    const cards: VideoCliente[] = itens.map((it, i) => ({
+      ...novoVideo({ id: idDe(i), nome: `${String(i + 1).padStart(2, '0')} - ${(it.titulo || 'video').slice(0, 40)}.mp4`, largura: 1080, altura: 1920, duracao: 30 }),
+      arquivo: new File([], 'carregando.mp4'),
+      url: '',
+      upload: 0,
+      uploadErro: null,
+      quadro: null,
+      carregado: false,
+      tocavel: false,
+      detectando: false,
+      statusJob: null,
+      progressoJob: 0,
+      saidaJob: null,
+    }));
+    setAbas((as) => as.map((a) => (a.id === abaAtiva.id ? { ...a, videos: [...a.videos, ...cards] } : a)));
+    if (!ativoId && cards[0]) setAtivoId(cards[0].id);
+    avisar(`Baixando ${itens.length} vídeo(s) — cada um aparece no seu card`);
+
+    let ativo = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const feitos = new Set<number>();
+    const consultar = async () => {
+      try {
+        const res = await fetch(`/api/bulk/${batch}`, { cache: 'no-store' });
+        const d = await res.json().catch(() => ({}));
+        if (!ativo) return;
+        const lista: { status: string; file_url?: string | null; title?: string }[] = d.items || [];
+        for (let i = 0; i < lista.length; i++) {
+          const it = lista[i];
+          if (feitos.has(i)) continue;
+          if (it.status === 'failed') {
+            feitos.add(i);
+            setAbas((as) => as.map((a) => ({ ...a, videos: a.videos.filter((v) => v.id !== idDe(i)) })));
+            continue;
+          }
+          if (it.status !== 'done' || !it.file_url) continue;
+          feitos.add(i);
+          try {
+            const blob = await (await fetch(it.file_url)).blob();
+            const nome = `${String(i + 1).padStart(2, '0')} - ${(itens[i]?.titulo || it.title || 'video').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').trim().slice(0, 50) || 'video'}.mp4`;
+            adicionarRef.current([new File([blob], nome, { type: 'video/mp4' })], { extras: [{ id: idDe(i) }], silencioso: true, substituir: true });
+          } catch {
+            feitos.delete(i);
+          }
+        }
+        if (d.status === 'done' || d.status === 'failed' || feitos.size >= itens.length) {
+          if (d.status === 'failed' && d.error) escreverLog(`[FALHA] busca do perfil: ${d.error}`);
+          return;
+        }
+      } catch {}
+      if (ativo) timer = setTimeout(consultar, 2500);
+    };
+    consultar();
+    return () => {
+      ativo = false;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loteComCards, restaurado]);
+
   useEffect(() => {
     if (!projeto || !restaurado) return;
     const abaId = 'projeto-' + projeto.id;
@@ -480,6 +564,8 @@ export default function EditorMassa({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projeto?.id, projeto?.clips.map((c) => c.id + (c.url ? '1' : '0')).join(','), restaurado]);
+  const adicionarRef = useRef(adicionarVideos);
+  adicionarRef.current = adicionarVideos;
   const removerVideos = useCallback(
     (ids: string[]) => {
       const set = new Set(ids);
