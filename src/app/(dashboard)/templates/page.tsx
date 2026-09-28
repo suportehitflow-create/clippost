@@ -195,7 +195,7 @@ export default function TemplatesPage() {
 
   // Marca d'água Anti-Furto
   const [showWatermark, setShowWatermark] = useState<boolean>(true)
-  const [watermarkText, setWatermarkText] = useState<string>('@nomedapagina')
+  const [watermarkText, setWatermarkText] = useState<string>('')
   const [watermarkOpacity, setWatermarkOpacity] = useState<number>(45)
   const [watermarkPosition, setWatermarkPosition] = useState<'center' | 'bottom_center' | 'top_right' | 'top_left'>('bottom_center')
   const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text')
@@ -264,7 +264,8 @@ export default function TemplatesPage() {
     if (c.videoPos) setVideoPos(c.videoPos)
     if (c.subtitlePos) setSubtitlePos(c.subtitlePos)
     if (c.showWatermark !== undefined) setShowWatermark(c.showWatermark)
-    if (c.watermarkText) setWatermarkText(c.watermarkText)
+    // "@nomedapagina" era só o texto de exemplo: vazio = usa o @ do perfil
+    if (c.watermarkText && c.watermarkText !== '@nomedapagina') setWatermarkText(c.watermarkText)
     if (c.watermarkOpacity !== undefined) setWatermarkOpacity(c.watermarkOpacity)
     if (c.watermarkPosition) setWatermarkPosition(c.watermarkPosition)
     if (c.watermarkType) setWatermarkType(c.watermarkType)
@@ -1307,6 +1308,24 @@ export default function TemplatesPage() {
                     </div>
                     <LiquidToggle checked={showVerifiedBadge} onChange={setShowVerifiedBadge} activeColor="indigo" />
                   </div>
+                </div>
+
+                {/* MARCA D'ÁGUA (liga/desliga + texto) */}
+                <div className="space-y-2 pt-2 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-zinc-400 font-medium text-xs">Marca d&apos;água no vídeo:</label>
+                    <LiquidToggle checked={showWatermark} onChange={setShowWatermark} activeColor="indigo" />
+                  </div>
+                  {showWatermark && (
+                    <input
+                      id="template-marca-texto"
+                      type="text"
+                      value={watermarkText}
+                      onChange={e => setWatermarkText(e.target.value)}
+                      placeholder={brandHandle || '@seuperfil'}
+                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.1] text-xs text-white placeholder-zinc-600 outline-none focus:border-indigo-500"
+                    />
+                  )}
                 </div>
 
                 {/* ESCALA E TAMANHO DO PERFIL (BENCHO SWEEP STEPPER + NÍVEL IGUAL DAS LETRAS) */}

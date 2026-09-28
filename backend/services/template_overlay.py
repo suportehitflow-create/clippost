@@ -341,7 +341,9 @@ def _draw_watermark(canvas: Image.Image, layout: dict, brand_kit: dict, s: float
             w = min(int(round(80 * s)), max(1, int(img.width * h / max(1, img.height))))
             content = img.resize((w, h), Image.LANCZOS)
     if content is None:
-        text = str(layout.get("watermarkText") or layout.get("brandHandle") or brand_kit.get("username") or "").strip()
+        # "@nomedapagina" é o texto de exemplo do editor de Templates: vale o @ do perfil
+        marca = layout.get("watermarkText") if layout.get("watermarkText") != "@nomedapagina" else ""
+        text = str(marca or layout.get("brandHandle") or brand_kit.get("username") or "").strip()
         if not text:
             return
         font = _font("sans_bold", 10 * s)

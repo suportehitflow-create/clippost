@@ -173,7 +173,9 @@ export function marcaDoTemplate(t: TemplateClipost): MarcaTemplate | null {
   if (c.showWatermark === false) return null;
   const op = Number(c.watermarkOpacity ?? 45);
   const imagem = c.watermarkType === 'image' && c.watermarkImage ? String(c.watermarkImage) : null;
-  const texto = String(c.watermarkText || c.brandHandle || t.username || '').trim();
+  // "@nomedapagina" é o texto de exemplo do editor de Templates: vale o @ do perfil
+  const marcaTexto = c.watermarkText && c.watermarkText !== '@nomedapagina' ? c.watermarkText : '';
+  const texto = String(marcaTexto || c.brandHandle || t.username || '').trim();
   if (!imagem && !texto) return null;
   return {
     texto,
