@@ -390,7 +390,7 @@ def _manual() -> str:
 
 def _montar_prompt(manual: str, transcricao: str, duration_desc: str, min_duration: int, max_duration: int,
                    video_end: float, chapters_ctx: str, quantos: tuple[int, int] | None = None) -> str:
-    duracao = ("TÍTULOS: termine cada título com 1 emoji que combine com o assunto (ex.: 😱 🔥 💰 🤯 😂).\n"
+    duracao = ("TÍTULOS: até 60 caracteres, com 1 ou 2 emojis que combinem com o assunto (ex.: 😱 🔥 💰 🤯 😂).\n"
                f"DURAÇÃO DE CADA CORTE: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s). "
                f"O vídeo tem {int(video_end)}s ({int(video_end // 60)} min).")
     if quantos:

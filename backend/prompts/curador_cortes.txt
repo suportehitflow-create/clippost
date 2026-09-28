@@ -6,23 +6,22 @@ Sua tarefa é analisar a transcrição completa que enviarei abaixo e extrair o 
 
 ### REGRAS OBRIGATÓRIAS DE EXECUÇÃO:
 
-1. **MAXIMIZAÇÃO:** Varra a transcrição de ponta a ponta. Não se limite a 3 ou 5 cortes; extraia TODOS os trechos que possuem potencial de retenção (histórias, lições, quebras de expectativa, revelações ou debates).
-2. **CONTEXTO E SENTIDO COMPLETO:** Cada corte deve ter início, meio e fim. O espectador PRECISA entender a história ou lição sem ficar perdido. Não faça cortes cortados pela metade ou dependentes de contextos passados.
-3. **TÍTULOS ULTRA MAGNÉTICOS:**
-   - Crie um título extremamente chamativo para cada corte em CAIXA ALTA.
-   - Use gatilhos mentais (curiosidade, choque, segredo, indignação, benefício claro ou números impactantes).
-   - O título deve ser impossível de ignorar no feed.
-4. **ESTRUTURA DAS FALAS (SEM GANCHO ISOLADO):**
-   - NÃO crie um campo "Gancho" separado.
-   - A PRIMEIRA linha da fala digitada no roteiro JÁ DEVE ser o gancho inicial do vídeo.
-   - Edite a transcrição para remover "gorduras" (pausas, gaguejos, repetições de palavras e tangents), mantendo a fidelidade à mensagem original.
+1. **MAXIMIZAÇÃO EXTREMA DE CORTES:** Varra a transcrição de ponta a ponta e extraia O MÁXIMO de cortes possíveis. Independentemente da duração do vídeo (seja ele de 20 ou de 50 minutos), não limite a quantidade e não seja preguiçoso. O objetivo é tirar todo e qualquer trecho que tenha potencial para virar conteúdo.
+2. **CONTEXTO E HISTÓRIA ISOLADA:** Todo corte gerado DEVE obrigatoriamente ter um contexto claro, ser legal e contar uma história por si só (com começo, meio e fim). O espectador precisa entender o vídeo perfeitamente, sem depender do que foi dito antes ou depois.
+3. **TÍTULOS APELATIVOS E MAGNÉTICOS (COM EMOJIS):**
+   - Crie um título extremamente chamativo e apelativo que sirva como o "gancho mestre" (algo que deixe a galera com muita vontade de assistir até o fim).
+   - O título deve ser em CAIXA ALTA e conter OBRIGATORIAMENTE, no máximo, 2 emojis que reforcem a emoção do corte.
+   - A linguagem do título deve ser 100% focada em redes sociais e conteúdo viralizável.
+4. **ESTRUTURA DAS FALAS (LINGUAGEM DE REDE SOCIAL):**
+   - NÃO crie um campo "Gancho" separado. A PRIMEIRA linha de fala extraída JÁ DEVE ser o gancho inicial do vídeo.
+   - Toda a estruturação do conteúdo deve respirar linguagem dinâmica. Edite o trecho para remover "gorduras" (pausas, gaguejos, enrolações), focando totalmente na retenção.
 5. **MINUTAGEM E TEMPO LINHA POR LINHA:**
    - No topo de cada corte, informe o intervalo de tempo original `[MM:SS - MM:SS]` e a DURAÇÃO TOTAL em segundos.
    - Na lista de falas, coloque o tempo EXATO `[MM:SS]` de cada frase para facilitar a sincronização de legendas e o trabalho do editor.
 6. **RANKING E SCORE DE VIRALIDADE:**
    - Ordene os cortes do MAIS VIRAL para o MENOS VIRAL.
-   - Atribua uma nota de potencial viral (ex: 🚀 10/10, 🔥 9.5/10).
-   - Adicione uma breve justificativa de 1 frase explicando por que o corte vai performar bem ("Por que vai viralizar").
+   - Atribua uma nota de potencial viral (ex: 10/10, 9.5/10).
+   - Adicione uma breve justificativa de 1 frase explicando por que o corte vai performar bem.
 
 ---
 
@@ -35,7 +34,7 @@ Cada corte é um objeto com os mesmos itens do roteiro, nesta ordem (do mais vir
   {
     "rank": 1,
     "nota": 9.5,
-    "titulo": "TÍTULO ULTRA CHAMATIVO EM CAIXA ALTA",
+    "titulo": "TÍTULO ULTRA CHAMATIVO EM CAIXA ALTA 🤯🔥",
     "tempo": "MM:SS - MM:SS",
     "inicio": <segundo exato de início, número, tirado dos tempos da transcrição>,
     "fim": <segundo exato do fim, número>,
