@@ -78,12 +78,19 @@ def _call_gemini(prompt: str) -> str:
         },
         ensure_ascii=False,
     ).encode("utf-8")
-    resp = httpx.post(
-        f"{GEMINI_BASE}/{GEMINI_MODEL}:generateContent",
-        headers={"Content-Type": "application/json; charset=utf-8", "x-goog-api-key": api_key},
-        content=payload,
-        timeout=TIMEOUT,
-    )
+    # modelo sobrecarregado (503) ou fora do ar (404/500): tenta os irmãos antes de desistir do Gemini
+    modelos = [GEMINI_MODEL] + [m for m in ("gemini-2.5-flash-lite", "gemini-2.5-flash") if m != GEMINI_MODEL]
+    for i, modelo in enumerate(modelos):
+        resp = httpx.post(
+            f"{GEMINI_BASE}/{modelo}:generateContent",
+            headers={"Content-Type": "application/json; charset=utf-8", "x-goog-api-key": api_key},
+            content=payload,
+            timeout=TIMEOUT,
+        )
+        if resp.status_code in (404, 500, 503) and i < len(modelos) - 1:
+            print(f"[ai_curator] gemini {modelo}: HTTP {resp.status_code} — tentando {modelos[i + 1]}")
+            continue
+        break
     resp.raise_for_status()
     body = resp.json()
     candidates = body.get("candidates") or []
