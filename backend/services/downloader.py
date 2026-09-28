@@ -290,6 +290,75 @@ def _ig_no(n: dict) -> dict | None:
     }
 
 
+def _ig_cookies() -> dict:
+    """Cookies do Instagram salvos no servidor (arquivo Netscape) → {nome: valor}."""
+    caminho = os.environ.get("INSTAGRAM_COOKIES_FILE") or ""
+    if not caminho or not os.path.exists(caminho):
+        return {}
+    cookies = {}
+    try:
+        for linha in open(caminho, encoding="utf-8", errors="replace"):
+            partes = linha.rstrip("\n").split("\t")
+            if len(partes) >= 7 and "instagram.com" in partes[0]:
+                cookies[partes[5]] = partes[6]
+    except OSError:
+        return {}
+    return cookies
+
+
+def _instagram_com_sessao(usuario: str, limit: int) -> list[dict] | None:
+    """Com a sessão do usuário (sessionid): perfil + feed completo, igual ao site logado.
+    None = sem sessão salva; [] = sessão existe mas o Instagram recusou."""
+    import time
+    import httpx
+    ck = _ig_cookies()
+    if not ck.get("sessionid"):
+        return None
+    cab = {**_IG_ROTAS[0][1], "x-csrftoken": ck.get("csrftoken", ""), "Cookie": "; ".join(f"{k}={v}" for k, v in ck.items())}
+    videos: list[dict] = []
+    try:
+        with httpx.Client(timeout=25, follow_redirects=False) as c:
+            r = c.get("https://www.instagram.com/api/v1/users/web_profile_info/", params={"username": usuario}, headers=cab)
+            if r.status_code != 200:
+                print(f"[profile] instagram com sessão: perfil HTTP {r.status_code}")
+                return []
+            uid = ((r.json().get("data") or {}).get("user") or {}).get("id")
+            if not uid:
+                return []
+            proximo = ""
+            for _ in range(120):
+                r = c.get(f"https://www.instagram.com/api/v1/feed/user/{uid}/", params={"count": 33, **({"max_id": proximo} if proximo else {})}, headers=cab)
+                if r.status_code != 200:
+                    print(f"[profile] instagram com sessão: feed HTTP {r.status_code} (fica com {len(videos)})")
+                    break
+                feed = r.json()
+                for m in feed.get("items") or []:
+                    midia = m if m.get("media_type") == 2 else next((x for x in m.get("carousel_media") or [] if x.get("media_type") == 2), None)
+                    if not midia:
+                        continue
+                    v = sorted(midia.get("video_versions") or [], key=lambda x: x.get("width") or 0, reverse=True)
+                    link = f"https://www.instagram.com/reel/{m.get('code')}/"
+                    videos.append({
+                        "url": (v[0]["url"] if v else link),  # link direto da CDN: baixa sem login
+                        "permalink": link,
+                        "title": ((m.get("caption") or {}).get("text") or "")[:120],
+                        "duration": midia.get("video_duration"),
+                        "thumbnail": (((m.get("image_versions2") or {}).get("candidates") or [{}])[0]).get("url"),
+                        "view_count": m.get("play_count") or m.get("ig_play_count") or m.get("view_count"),
+                        "like_count": m.get("like_count"),
+                        "comment_count": m.get("comment_count"),
+                        "timestamp": m.get("taken_at"),
+                    })
+                if (limit and len(videos) >= limit) or not feed.get("more_available") or not feed.get("next_max_id"):
+                    break
+                proximo = feed["next_max_id"]
+                time.sleep(0.8)
+    except Exception as e:
+        print(f"[profile] instagram com sessão: {type(e).__name__}")
+    print(f"[profile] instagram com sessão: {len(videos)} vídeos de @{usuario}")
+    return videos[:limit] if limit else videos
+
+
 def _instagram_web_profile(url: str, limit: int = 0) -> list[dict]:
     """Vídeos do perfil pela API web pública do Instagram, SEM login: primeiro os ~12 mais novos
     (web_profile_info), depois pagina pela consulta pública. Tenta o caminho do site e o do app,
@@ -300,6 +369,9 @@ def _instagram_web_profile(url: str, limit: int = 0) -> list[dict]:
     if not m or m.group(1) in ("reel", "reels", "p", "explore"):
         return []
     usuario = m.group(1)
+    com_sessao = _instagram_com_sessao(usuario, limit)
+    if com_sessao:
+        return com_sessao
     user = None
     rota_ok = None
     with httpx.Client(timeout=20, follow_redirects=True, **({"proxy": os.environ["YTDLP_PROXY"]} if os.environ.get("YTDLP_PROXY") else {})) as c:

@@ -983,6 +983,27 @@ async def _exigir_login(request: Request) -> str:
     return user.id
 
 
+def _cookies_para_netscape(raw: str) -> str:
+    """Aceita o arquivo cookies.txt, uma linha "sessionid=...; csrftoken=..." copiada do navegador ou
+    só o valor do sessionid — e devolve sempre no formato Netscape (o que o yt-dlp e a busca leem)."""
+    import time as _t
+    texto = raw.strip().strip('"').strip("'")
+    if "\t" in texto and ".instagram.com" in texto:
+        return texto if texto.endswith("\n") else texto + "\n"
+    pares = {}
+    if "=" in texto:
+        for parte in texto.replace("\n", ";").split(";"):
+            if "=" in parte:
+                k, v = parte.split("=", 1)
+                if k.strip():
+                    pares[k.strip()] = v.strip()
+    elif texto:
+        pares["sessionid"] = texto  # só o valor
+    validade = int(_t.time()) + 365 * 86400
+    linhas = ["# Netscape HTTP Cookie File"] + [f".instagram.com\tTRUE\t/\tTRUE\t{validade}\t{k}\t{v}" for k, v in pares.items()]
+    return "\n".join(linhas) + "\n"
+
+
 @app.post("/api/admin/set-instagram-cookies")
 async def set_instagram_cookies(request: Request):
     """Carrega cookies do Instagram via HTTP e persiste no Storage PRIVADO. Exige login."""
@@ -997,6 +1018,9 @@ async def set_instagram_cookies(request: Request):
             raw = base64.b64decode(cookies_raw).decode("utf-8", errors="replace")
         else:
             raw = cookies_raw
+        raw = _cookies_para_netscape(raw)
+        if "sessionid" not in raw:
+            raise HTTPException(status_code=400, detail="Não achei o sessionid. Cole o valor do cookie sessionid do Instagram.")
         cookies_path = "/tmp/instagram_cookies.txt"
         with open(cookies_path, "w", encoding="utf-8") as f:
             f.write(raw)
@@ -1015,9 +1039,11 @@ async def set_instagram_cookies(request: Request):
         except Exception as st_err:
             print(f"[admin] aviso ao persistir cookies no storage: {st_err}")
 
-        return {"ok": True, "bytes_written": len(raw), "path": cookies_path}
+        return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"falha ao salvar cookies do Instagram: {e}")
+        raise HTTPException(status_code=500, detail=f"falha ao salvar cookies do Instagram: {type(e).__name__}")
 
 
 @app.get("/api/instagram-oficial/status")

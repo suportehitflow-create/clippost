@@ -1,0 +1,41 @@
+PUBLICAR A EXTENSÃO NA CHROME WEB STORE — o que colar em cada campo
+====================================================================
+
+1) Conta de desenvolvedor (uma vez): https://chrome.google.com/webstore/devconsole
+   - Entre com a sua conta Google e pague a taxa única de registro (US$ 5).
+
+2) "Novo item" → envie o arquivo:
+   public/extensao/clipost-instagram.zip   (o mesmo que o site oferece para baixar)
+
+3) Aba "Detalhes da loja"
+   Nome: Clipost — Importar do Instagram
+   Resumo (até 132 caracteres):
+     Busque os reels, posts e carrosséis de qualquer perfil do Instagram direto no Clipost, com o seu login do navegador.
+   Descrição:
+     A extensão oficial do Clipost. Com ela instalada, é só digitar o @ de um perfil no Clipost e clicar em
+     "Buscar posts": a extensão lê o perfil com a sessão do Instagram que já está aberta no seu navegador e
+     entrega a lista ao Clipost — com visualizações, curtidas, comentários e data de cada post.
+     Depois é só escolher: baixar, salvar na Biblioteca ou editar em massa com o seu template.
+
+     • Tudo automático: nada de copiar links ou abrir o Instagram.
+     • Funciona com reels, posts e carrosséis.
+     • Não lê nem envia sua senha ou seus cookies.
+   Categoria: Ferramentas (Tools)   |   Idioma: Português (Brasil)
+   Ícone 128x128: extensao/icone.png
+   Capturas de tela (1280x800): tire 1 ou 2 prints da aba "Buscar de um perfil" do Clipost com resultados.
+
+4) Aba "Práticas de privacidade"
+   Finalidade única: Listar os posts de um perfil do Instagram para o site do Clipost, usando a sessão do navegador.
+   Justificativa das permissões:
+     - storage: guardar por pouco tempo a última lista montada até o Clipost recebê-la.
+     - scripting: quando o Instagram não responde ao pedido direto, ler o perfil numa aba do Instagram aberta em segundo plano.
+     - host www.instagram.com: ler as informações públicas do perfil buscado.
+     - host clippost-three.vercel.app: conversar com a página do Clipost.
+   Código remoto: Não.
+   Dados coletados: nenhum dado do usuário é coletado ou enviado a servidores pela extensão.
+   URL da política de privacidade: https://clippost-three.vercel.app/extensao/privacidade
+
+5) Enviar para revisão (costuma levar de alguns dias a 2 semanas).
+
+6) Quando aprovar, copie o link da página da extensão na loja e me mande: eu coloco em
+   NEXT_PUBLIC_EXTENSAO_URL e o site passa a mostrar só o botão "Adicionar ao Chrome".
