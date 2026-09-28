@@ -43,11 +43,12 @@ import s from './editor-massa.module.css';
 type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string } | null;
 
 const CHAVE_CONFIG = 'clipost:editor-massa:config';
-const ANALISES_SIMULTANEAS = 2;
+// um vídeo por vez, na ordem: o 1º aparece pronto rápido, depois o 2º... (sensação de menos espera)
+const ANALISES_SIMULTANEAS = 1;
 
 // O Storage (Supabase) recusa conexões quando muitos vídeos de 20 MB baixam juntos
 // (ERR_HTTP2_SERVER_REFUSED_STREAM) — e o vídeo parecia "formato que não toca". Fila: 3 por vez.
-const DOWNLOADS_SIMULTANEOS = 3;
+const DOWNLOADS_SIMULTANEOS = 1;
 let downloadsAtivos = 0;
 const filaDownloads: (() => void)[] = [];
 async function baixarNaFila(url: string): Promise<Blob> {

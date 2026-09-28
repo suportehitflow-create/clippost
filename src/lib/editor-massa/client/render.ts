@@ -214,7 +214,8 @@ export function marcasDoVideo(global: ConfigGlobal, v: ConfigVideo): MarcaDagua[
 
 export function temOverlay(global: ConfigGlobal, v: ConfigVideo) {
   return (
-    (global.textoAtivo && !!v.texto.trim()) ||
+    // corte do Criar cortes já vem com o título gravado: não desenha de novo (ficava duplicado)
+    (global.textoAtivo && !!v.texto.trim() && !v.marcaEmbutida) ||
     marcasDoVideo(global, v).length > 0 ||
     (!!global.marcaTemplate && !v.marcaEmbutida) ||
     (global.cantos > 0 && !global.moldura.ativo)
@@ -324,7 +325,7 @@ export function desenharOverlay(
   const k = alvo.w / L.canvas.w;
   if (global.cantos > 0 && !global.moldura.ativo && !v.marcaEmbutida) desenharCantos(ctx, L.destino, global.cantos, k, alvo, fundo, '#000');
   if (global.marcaTemplate && !v.marcaEmbutida) desenharMarcaTemplate(ctx, global.marcaTemplate, L.destino, k);
-  if (global.textoAtivo) desenharTexto(ctx, v.texto, global.estiloTexto, L.canvas, alvo);
+  if (global.textoAtivo && !v.marcaEmbutida) desenharTexto(ctx, v.texto, global.estiloTexto, L.canvas, alvo);
   marcasDoVideo(global, v).forEach((m) => desenharMarca(ctx, m, L.canvas, alvo));
 }
 
