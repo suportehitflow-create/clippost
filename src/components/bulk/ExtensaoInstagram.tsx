@@ -26,7 +26,7 @@ export interface ListaExtensao {
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
 /** Versão da pasta extensao/ (manifest.json): a extensão instalada mais velha se recarrega sozinha (1.3.1+) */
-export const VERSAO_EXTENSAO = '1.3.1'
+export const VERSAO_EXTENSAO = '1.3.2'
 
 /** Detecta a extensão e recebe a lista que ela montou no Instagram */
 export function useExtensaoClipost() {

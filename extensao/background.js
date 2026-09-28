@@ -67,12 +67,19 @@ async function coletarPerfil(limite) {
   }
 }
 
+async function abrirJanela(url, precisaRolar) {
+  // até 12 posts: o Instagram já manda na carga da página, então a janela fica minimizada (invisível)
+  if (!precisaRolar) return chrome.windows.create({ url, state: 'minimized', focused: false })
+  // mais que isso: precisa rolar, e janela escondida não carrega mais posts — abre quase toda FORA da
+  // tela, no canto inferior direito da janela atual, sem foco (o Chrome deixa no máximo uma beirada)
+  const base = await chrome.windows.getLastFocused().catch(() => null)
+  const left = base ? base.left + base.width - 12 : 4000
+  const top = base ? base.top + base.height - 12 : 4000
+  return chrome.windows.create({ url, type: 'popup', focused: false, width: 480, height: 820, left, top })
+}
+
 async function pelaJanela(usuario, limite) {
-  // janela pequena e sem foco: precisa estar visível para o Instagram carregar mais posts ao rolar
-  const janela = await chrome.windows.create({
-    url: `https://www.instagram.com/${encodeURIComponent(usuario)}/?clipost=1`,
-    type: 'popup', focused: false, width: 480, height: 820, left: 0, top: 0,
-  })
+  const janela = await abrirJanela(`https://www.instagram.com/${encodeURIComponent(usuario)}/?clipost=1`, !limite || limite > 12)
   const abaId = janela.tabs && janela.tabs[0] && janela.tabs[0].id
   try {
     await new Promise(res => {
