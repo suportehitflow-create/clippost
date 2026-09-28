@@ -247,10 +247,9 @@ export default function AutopilotPage() {
   ]
 
   return (
-    <Pagina icone={Zap} titulo="Autopilot" largura="max-w-4xl"
-      direita={<Link href="/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300">Biblioteca</Link>}>
-      <Intro selo="Funciona 24/7" titulo="Cortes no piloto automático"
-        descricao="Cole um canal do YouTube ou um perfil do Instagram, TikTok ou Facebook. Cada vídeo novo vira cortes no seu template — e você escolhe se eles esperam a sua aprovação ou já vão para a fila." />
+    <Pagina icone={Zap} titulo="Piloto automático" largura="max-w-3xl">
+      <Intro titulo="Cortes no piloto automático"
+        descricao="Cole um canal ou perfil. Cada vídeo novo vira cortes no seu template." />
 
       {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
 
@@ -270,16 +269,13 @@ export default function AutopilotPage() {
           <Cartao>
             <div className="space-y-2.5">
               <Rotulo direita={
-                <span className="flex items-center gap-2">
-                  <select id="autopilot-intervalo" value={Math.max(60, intervalo)} onChange={e => salvarIntervalo(Number(e.target.value))} aria-label="Verificar a cada"
-                    className="text-[11px] font-mono font-bold text-indigo-300 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 outline-none">
-                    {INTERVALOS.map(m => <option key={m} value={m}>verificar a cada {nomeIntervalo(m)}</option>)}
-                  </select>
-                  <Selo p={plataformaDigitada} />
-                </span>
+                <select id="autopilot-intervalo" value={Math.max(60, intervalo)} onChange={e => salvarIntervalo(Number(e.target.value))} aria-label="Verificar a cada"
+                  className="text-[11px] text-zinc-400 px-2 py-1 rounded-lg bg-white/[0.03] border border-white/[0.08] outline-none cursor-pointer">
+                  {INTERVALOS.map(m => <option key={m} value={m}>Verificar a cada {nomeIntervalo(m)}</option>)}
+                </select>
               }>Canal ou perfil</Rotulo>
               <Campo icone={Link2} id="autopilot-canal" value={canal} onChange={e => setCanal(e.target.value)} onKeyDown={e => e.key === 'Enter' && !salvando && monitorar()}
-                placeholder="youtube.com/@canal, instagram.com/perfil, tiktok.com/@perfil" />
+                placeholder="Link do canal ou perfil (YouTube, Instagram, TikTok ou Facebook)" />
               {precisaCookies && (
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-100">
                   <Cookie className="w-4 h-4 shrink-0 text-amber-300" />
@@ -294,18 +290,18 @@ export default function AutopilotPage() {
 
             <div className="space-y-4 pt-4 border-t border-white/[0.06]">
               <div className="space-y-2">
-                <Rotulo><Send className="w-3.5 h-3.5 text-indigo-400" /> O que fazer com os cortes</Rotulo>
+                <Rotulo>O que fazer com os cortes</Rotulo>
                 <Opcoes<Modo> valor={modo} mudar={setModo} opcoes={MODOS} />
                 {modo !== 'biblioteca' && contas.length === 0 && (
                   <p className="text-[11px] text-amber-200/90">Nenhuma conta conectada: conecte uma em <Link href="/settings" className="underline">Ajustes</Link> para os cortes irem para a fila.</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Rotulo><Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos cortes</Rotulo>
+                <Rotulo>Duração dos cortes</Rotulo>
                 <Opcoes valor={duracao} mudar={setDuracao} opcoes={[
-                  { id: 'auto', label: '⚡ IA Dinâmico', desc: 'A IA decide' },
-                  { id: '30', label: '30s', desc: 'Ultra-rápidos' },
-                  { id: '60', label: '60s', desc: 'Padrão' },
+                  { id: 'auto', label: 'Automático', desc: 'A IA decide' },
+                  { id: '30', label: 'Curtos', desc: 'Até 30s' },
+                  { id: '60', label: 'Longos', desc: 'Até 60s' },
                 ]} />
               </div>
             </div>

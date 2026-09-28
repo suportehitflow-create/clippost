@@ -294,18 +294,15 @@ export default function Inspetor({
 
         {/* Player Completo Apple com Linha do Tempo / Scrubber Interativo */}
         <div className={s.playerTimeline}>
-          <div className={s.playerBotoes}>
+          <div className={s.timelineScrubberLinha}>
             <button
               type="button"
               className={s.btnPlayerPlay}
               onClick={alternarPlay}
               title={tocando ? 'Pausar (Barra de espaço)' : 'Reproduzir (Barra de espaço)'}
             >
-              <Icone nome={tocando ? 'pausa' : 'play'} tamanho={18} />
+              <Icone nome={tocando ? 'pausa' : 'play'} tamanho={14} />
             </button>
-          </div>
-
-          <div className={s.timelineScrubberLinha}>
             <span className={s.tempoTexto}>{formatarTempo(tempo)}</span>
             <input
               type="range"

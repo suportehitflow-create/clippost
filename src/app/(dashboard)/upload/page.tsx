@@ -172,46 +172,19 @@ export default function CreateClipsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#07070a] text-white">
       {/* Header */}
-      <header className="h-16 border-b border-white/[0.06] grid grid-cols-[1fr_auto_1fr] items-center px-6 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-            <Scissors className="w-4 h-4" />
-          </div>
-          <h1 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-semibold">
-            Minerador de Cortes 9:16
-          </h1>
-        </div>
-
-        <div className="flex justify-center">
-          <ProfileSwitcher align="center" />
-        </div>
-
-        {/* Template Ativo Pill */}
-        <div className="flex justify-end">
-          <Link
-            href="/templates"
-            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-zinc-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer"
-            title="Ver ou trocar template visual de marca"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline text-zinc-400">Template Ativo:</span>
-            <span className="text-white font-bold">Oficial Clipost</span>
-          </Link>
-        </div>
+      <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
+        <h1 className="text-sm font-semibold text-zinc-200">Criar cortes</h1>
+        <ProfileSwitcher />
       </header>
 
       <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">
         {/* Intro */}
         <div className="text-center space-y-2.5 max-w-lg mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Ferramenta #1 • Vídeo Longo para Vídeos Curtos</span>
-          </div>
           <h2 className="text-3xl font-black tracking-tight text-white">
             Criar cortes a partir de vídeos longos
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-            Focado no YouTube e arquivos longos de vídeo. A IA encontra os momentos virais de maior retenção, recorta no formato 9:16 e gera os clipes prontos.
+            Cole o link de um vídeo longo. A IA acha os melhores momentos e entrega os cortes prontos no seu template.
           </p>
         </div>
 
@@ -255,7 +228,7 @@ export default function CreateClipsPage() {
           {activeTab === 'link' ? (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Link do Vídeo do YouTube</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">Link do vídeo</label>
                 
               </div>
               <div className="relative">
@@ -303,17 +276,14 @@ export default function CreateClipsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos Cortes:
+                  <Clock className="w-3.5 h-3.5 text-indigo-400" /> Duração dos cortes
                 </label>
-                <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-                  {clipDuration === 'auto' ? 'IA Automático' : `${clipDuration}s`}
-                </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {[
-                  { id: 'auto', label: '⚡ IA Dinâmico', desc: 'Até 1m30s (Ideal Reels/Shorts)' },
-                  { id: '30', label: '< 60s', desc: '20s - 50s (Ultra-rápidos)' },
-                  { id: '90', label: '> 60s', desc: '60s - 90s (Padrão e mais longos)' },
+                  { id: 'auto', label: 'Automático', desc: 'A IA decide, até 1m30s' },
+                  { id: '30', label: 'Curtos', desc: '20 a 50s' },
+                  { id: '90', label: 'Longos', desc: '60 a 90s' },
                 ].map(opt => (
                   <button
                     key={opt.id}
@@ -334,26 +304,6 @@ export default function CreateClipsPage() {
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-
-          {/* Pipeline Visual Preview */}
-          <div className="p-4 rounded-2xl bg-[#09090d] border border-white/[0.06] grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px] text-zinc-400 font-mono">
-            <div className="space-y-0.5">
-              <span className="text-indigo-400 font-bold block">1. Ingestão</span>
-              <span>Download & Limpeza</span>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-indigo-400 font-bold block">2. Whisper</span>
-              <span>Transcrição IA</span>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-indigo-400 font-bold block">3. Curador IA</span>
-              <span>Enquadramento 9:16</span>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-indigo-400 font-bold block">4. Render</span>
-              <span>Legendas & Enquadramento</span>
             </div>
           </div>
 

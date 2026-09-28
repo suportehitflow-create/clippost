@@ -7,7 +7,7 @@ import ProfileSwitcher from '@/components/ProfileSwitcher'
 // Peças do visual padrão do Clipost (tirado do "Criar cortes"): cabeçalho com ícone, intro centralizada,
 // UM cartão com o campo principal, poucas opções em cartões e um botão grande. Tudo novo usa isto.
 
-export function Pagina({ icone: Icone, titulo, direita, children, largura = 'max-w-3xl' }: {
+export function Pagina({ titulo, direita, children, largura = 'max-w-3xl' }: {
   icone: LucideIcon
   titulo: string
   direita?: ReactNode
@@ -16,27 +16,18 @@ export function Pagina({ icone: Icone, titulo, direita, children, largura = 'max
 }) {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#07070a] text-white">
-      <header className="h-16 border-b border-white/[0.06] grid grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-            <Icone className="w-4 h-4" />
-          </div>
-          <h1 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-semibold truncate">{titulo}</h1>
-        </div>
-        <div className="flex justify-center"><ProfileSwitcher align="center" /></div>
-        <div className="flex justify-end">{direita}</div>
+      <header className="h-16 border-b border-white/[0.06] flex items-center justify-between gap-3 px-4 sm:px-8 bg-[#0a0a0e]/80 backdrop-blur-xl sticky top-0 z-20">
+        <h1 className="text-sm font-semibold text-zinc-200 truncate">{titulo}</h1>
+        <div className="flex items-center gap-2 shrink-0">{direita}<ProfileSwitcher /></div>
       </header>
       <div className={`${largura} w-full mx-auto px-4 py-6 sm:p-6 md:p-10 space-y-8`}>{children}</div>
     </div>
   )
 }
 
-export function Intro({ selo, titulo, descricao }: { selo?: string; titulo: string; descricao?: ReactNode }) {
+export function Intro({ titulo, descricao }: { selo?: string; titulo: string; descricao?: ReactNode }) {
   return (
     <div className="text-center space-y-2.5 max-w-lg mx-auto">
-      {selo && (
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300">{selo}</div>
-      )}
       <h2 className="text-3xl font-black tracking-tight text-white text-balance">{titulo}</h2>
       {descricao && <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">{descricao}</p>}
     </div>

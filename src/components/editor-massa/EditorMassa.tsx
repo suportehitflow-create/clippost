@@ -1141,7 +1141,7 @@ export default function EditorMassa({
                   onClick={onAgendar}
                   title="Agendar todos os cortes nas redes sociais"
                 >
-                  <Icone nome="calendario" tamanho={13} /> Agendar
+                  Agendar
                 </button>
               )}
             </>
@@ -1245,18 +1245,6 @@ export default function EditorMassa({
           avisar={avisar}
         />
       </div>
-
-      {/* ================= rodapé ================= */}
-      <footer className={s.rodape}>
-        <span className={s.rodapeStatus} title={status}>
-          {status}
-        </span>
-        {enviando > 0 && <span>Enviando {enviando}…</span>}
-        {analisandoN > 0 && <span>Analisando {analisandoN}…</span>}
-        <button type="button" className={s.rodapeBtn} onClick={() => setLogAberto(!logAberto)}>
-          <Icone nome="log" tamanho={13} /> Log {temErroLog && <span style={{ color: '#f87171' }}>●</span>}
-        </button>
-      </footer>
 
       {logAberto && <GavetaLog log={log} limpar={() => setLog([])} fechar={() => setLogAberto(false)} />}
       {sobre?.tipo === 'resultados' && (
