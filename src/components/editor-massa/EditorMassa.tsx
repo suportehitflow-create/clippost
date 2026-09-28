@@ -506,6 +506,19 @@ export default function EditorMassa({
     }
     setAbaAtivaId(abaId);
 
+    // cortes que saíram do projeto (gerado de novo, ou nunca terminaram) saem também do lote dele
+    const doProjeto = new Set(projeto.clips.map((c) => 'clip-' + c.id));
+    setAbas((as) =>
+      as.map((a) =>
+        a.id === abaId && a.videos.some((v) => v.id.startsWith('clip-') && !doProjeto.has(v.id))
+          ? { ...a, videos: a.videos.filter((v) => !v.id.startsWith('clip-') || doProjeto.has(v.id)) }
+          : a,
+      ),
+    );
+    abasRef.current = abasRef.current.map((a) =>
+      a.id === abaId ? { ...a, videos: a.videos.filter((v) => !v.id.startsWith('clip-') || doProjeto.has(v.id)) } : a,
+    );
+
     const existentes = new Set(abasRef.current.flatMap((a) => a.videos.map((v) => v.id)));
     const novosParaInserir: VideoCliente[] = [];
 

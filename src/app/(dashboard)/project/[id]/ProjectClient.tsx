@@ -1113,8 +1113,9 @@ export default function ProjectClient({
       isYouTube: !!isYouTubeProject,
       // perfil baixado inteiro (Buscar de um perfil): vídeos crus, o estúdio aplica o template
       crus: String(project.source_url || '').startsWith('clipost:perfil'),
-      // projeto que falhou: cortes que nunca ficaram prontos não aparecem (ficariam "carregando" para sempre)
-      clips: clips.filter(c => status !== 'failed' || !!c.storage_url).map(c => ({
+      // projeto que já terminou (ou falhou): cortes que nunca ficaram prontos não aparecem
+      // (ficariam "carregando" para sempre) — a faixa de cima oferece gerar de novo
+      clips: clips.filter(c => status === 'processing' || !!c.storage_url).map(c => ({
         id: c.id,
         url: c.storage_url || '',
         titulo: c.hook || c.title || '',
@@ -1123,13 +1124,37 @@ export default function ProjectClient({
       })),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project.id, project.title, isYouTubeProject, clips.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')],
+    [project.id, project.title, isYouTubeProject, status, clips.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')],
   )
   // Projeto abre SEMPRE no estúdio (a tela antiga foi removida). Sem nenhum corte e com erro/fim,
   // só aparece uma faixa em cima com o motivo e o botão de tentar de novo.
   const semCortes = projetoEstudio.clips.length === 0 && status !== 'processing'
+  // cortes que o servidor começou mas não terminou (ex.: envio falhou antes das novas tentativas)
+  const faltando = status !== 'processing' ? clips.filter(c => !c.storage_url).length : 0
+  const gerarDeNovo = async () => {
+    if (!confirm(`Gerar os cortes deste vídeo de novo? Os ${cortesProntos.length} cortes prontos são refeitos junto.`)) return
+    // apaga os cortes antigos (senão o novo processamento duplica tudo)
+    await supabase.from('clips').delete().eq('project_id', project.id)
+    setClips([])
+    await reprocessProject()
+  }
   return (
     <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
+      {!semCortes && faltando > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.08] bg-[#0b0b0e] text-xs">
+          <span className="text-zinc-300">
+            {faltando === 1 ? '1 corte não terminou de gerar.' : `${faltando} cortes não terminaram de gerar.`}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={() => { void gerarDeNovo() }}
+            className="px-3 py-1.5 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
+          >
+            Gerar de novo
+          </button>
+        </div>
+      )}
       {semCortes && (
         <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.08] bg-[#0b0b0e] text-xs">
           <span className="text-zinc-300">
