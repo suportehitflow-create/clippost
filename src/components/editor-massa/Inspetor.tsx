@@ -73,9 +73,12 @@ export default function Inspetor({
       c.height = baseH * dpr;
     }
 
+    const el = videoRef.current;
+    const vidW = el?.videoWidth || v.largura;
+    const vidH = el?.videoHeight || v.altura;
     const fonte: FonteQuadro | null =
-      tocando && videoRef.current
-        ? { imagem: videoRef.current, largura: v.largura, altura: v.altura }
+      tocando && el
+        ? { imagem: el, largura: vidW, altura: vidH }
         : imgServidor
           ? { imagem: imgServidor, largura: v.largura, altura: v.altura }
           : v.quadro
@@ -263,6 +266,19 @@ export default function Inspetor({
           playsInline
           preload="auto"
           style={{ display: 'none' }}
+          onLoadedMetadata={() => {
+            if (videoRef.current && videoRef.current.videoWidth) {
+              const vw = videoRef.current.videoWidth;
+              const vh = videoRef.current.videoHeight;
+              if (v.largura !== vw || v.altura !== vh) {
+                atualizarAtivo(() => ({
+                  largura: vw,
+                  altura: vh,
+                  duracao: videoRef.current!.duration || v.duracao,
+                }));
+              }
+            }
+          }}
           onLoadedData={desenhar}
           onSeeked={desenhar}
           onPause={() => setTocando(false)}
@@ -273,29 +289,11 @@ export default function Inspetor({
           <div className={s.playerBotoes}>
             <button
               type="button"
-              className={s.btnPlayerSecundario}
-              onClick={() => pularSegundos(-5)}
-              title="Voltar 5 segundos"
-            >
-              <span>-5s</span>
-            </button>
-
-            <button
-              type="button"
               className={s.btnPlayerPlay}
               onClick={alternarPlay}
               title={tocando ? 'Pausar (Barra de espaço)' : 'Reproduzir (Barra de espaço)'}
             >
-              <Icone nome={tocando ? 'pausa' : 'play'} tamanho={16} />
-            </button>
-
-            <button
-              type="button"
-              className={s.btnPlayerSecundario}
-              onClick={() => pularSegundos(5)}
-              title="Avançar 5 segundos"
-            >
-              <span>+5s</span>
+              <Icone nome={tocando ? 'pausa' : 'play'} tamanho={18} />
             </button>
           </div>
 

@@ -30,6 +30,7 @@ export interface PropsLateral {
   abrirBibliotecaMusicas?: () => void;
   removerMusica: (id: string) => void;
   totalVideos: number;
+  onAgendar?: () => void;
   aplicarTextosEmMassa: (linhas: string[]) => void;
   redetectarTodos: () => void;
   isYouTube?: boolean;

@@ -322,7 +322,7 @@ export function desenharOverlay(
   fundo: CanvasImageSource | null = null,
 ) {
   const k = alvo.w / L.canvas.w;
-  if (global.cantos > 0 && !global.moldura.ativo) desenharCantos(ctx, L.destino, global.cantos, k, alvo, fundo, '#000');
+  if (global.cantos > 0 && !global.moldura.ativo && !v.marcaEmbutida) desenharCantos(ctx, L.destino, global.cantos, k, alvo, fundo, '#000');
   if (global.marcaTemplate && !v.marcaEmbutida) desenharMarcaTemplate(ctx, global.marcaTemplate, L.destino, k);
   if (global.textoAtivo) desenharTexto(ctx, v.texto, global.estiloTexto, L.canvas, alvo);
   marcasDoVideo(global, v).forEach((m) => desenharMarca(ctx, m, L.canvas, alvo));
@@ -346,19 +346,24 @@ export function desenharComposicao(
   if (global.moldura.ativo) {
     ctx.fillStyle = global.moldura.cor;
     ctx.fillRect(0, 0, alvo.w, alvo.h);
-  } else if (template) {
+  } else if (template && !v.marcaEmbutida) {
     ctx.drawImage(template, 0, 0, alvo.w, alvo.h);
   } else {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, alvo.w, alvo.h);
   }
-  if (L.preenchimento) {
+  if (L.preenchimento && !v.marcaEmbutida) {
     ctx.fillStyle = global.corBorda;
     ctx.fillRect(L.preenchimento.x * k, L.preenchimento.y * k, L.preenchimento.w * k, L.preenchimento.h * k);
   }
   if (quadro) {
-    const ex = quadro.largura / v.largura;
-    const ey = quadro.altura / v.altura;
+    const imgEl = quadro.imagem as any;
+    const natW = imgEl?.videoWidth || imgEl?.naturalWidth || imgEl?.width || quadro.largura || v.largura;
+    const natH = imgEl?.videoHeight || imgEl?.naturalHeight || imgEl?.height || quadro.altura || v.altura;
+    const baseW = v.largura || natW;
+    const baseH = v.altura || natH;
+    const ex = natW / baseW;
+    const ey = natH / baseH;
     const o = L.origem;
     const d = L.destino;
     ctx.imageSmoothingQuality = 'high';

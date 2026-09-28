@@ -230,8 +230,21 @@ export default function EditorMassa({
   );
 
   const enviarVideo = useCallback(
-    (v: VideoCliente) =>
-      enviar(v.id, v.arquivo, (f) => atualizarVideo(v.id, { upload: f }))
+    async (v: VideoCliente) => {
+      let arquivo = v.arquivo;
+      if (arquivo.size === 0 && v.url && v.url.startsWith('http')) {
+        escreverLog(`[DIAG] Baixando ${v.nome} antes do upload...`);
+        try {
+          const resp = await fetch(v.url);
+          const blob = await resp.blob();
+          arquivo = new File([blob], v.nome, { type: blob.type || 'video/mp4' });
+          atualizarVideo(v.id, { arquivo });
+        } catch (e: any) {
+          escreverLog(`[ERRO] Falha ao baixar ${v.nome}: ${e?.message ?? e}`);
+          throw e;
+        }
+      }
+      return enviar(v.id, arquivo, (f) => atualizarVideo(v.id, { upload: f }))
         .then((id) => {
           atualizarVideo(v.id, { arquivoId: id, upload: 1, uploadErro: null });
           return id;
@@ -240,7 +253,8 @@ export default function EditorMassa({
           atualizarVideo(v.id, { uploadErro: String(e.message ?? e) });
           escreverLog(`[ERRO] Upload ${v.nome}: ${e.message ?? e}`);
           throw e;
-        }),
+        });
+    },
     [enviar, atualizarVideo, escreverLog],
   );
 
@@ -396,31 +410,50 @@ export default function EditorMassa({
       novosParaInserir.push(vInicial);
 
       if (c.url) {
-        abrirVideo(c.url)
-          .then(async (vid) => {
-            const bmp = await capturarQuadro(vid, Math.min(1.5, vid.duration * 0.2));
-            vid.remove();
+        fetch(c.url)
+          .then((r) => r.blob())
+          .then(async (blob) => {
+            const realFile = new File([blob], nome, { type: blob.type || 'video/mp4' });
+            const localUrl = URL.createObjectURL(blob);
+            let bmp: ImageBitmap | null = null;
+            let vidW = 1080;
+            let vidH = 1920;
+            let vidDur = 45;
+            try {
+              const vid = await abrirVideo(localUrl);
+              bmp = await capturarQuadro(vid, Math.min(1.5, (vid.duration || 45) * 0.2));
+              vidW = vid.videoWidth || bmp.width;
+              vidH = vid.videoHeight || bmp.height;
+              vidDur = vid.duration || 45;
+              vid.remove();
+            } catch {
+              // fallback
+            }
             atualizarVideo(id, {
+              arquivo: realFile,
+              url: localUrl,
               quadro: bmp,
               carregado: true,
-              largura: bmp.width,
-              altura: bmp.height,
-              duracao: vid.duration || 45,
+              tocavel: true,
+              largura: vidW,
+              altura: vidH,
+              duracao: vidDur,
             });
           })
           .catch(() => {
-            fetch(c.url)
-              .then((r) => r.blob())
-              .then(async (blob) => {
-                const vid = await abrirVideo(URL.createObjectURL(blob));
-                const bmp = await capturarQuadro(vid, Math.min(1.5, vid.duration * 0.2));
+            abrirVideo(c.url)
+              .then(async (vid) => {
+                const bmp = await capturarQuadro(vid, Math.min(1.5, (vid.duration || 45) * 0.2));
+                const vidW = vid.videoWidth || bmp.width;
+                const vidH = vid.videoHeight || bmp.height;
+                const vidDur = vid.duration || 45;
                 vid.remove();
                 atualizarVideo(id, {
                   quadro: bmp,
                   carregado: true,
-                  largura: bmp.width,
-                  altura: bmp.height,
-                  duracao: vid.duration || 45,
+                  largura: vidW,
+                  altura: vidH,
+                  duracao: vidDur,
                 });
               })
               .catch(() => {
@@ -457,6 +490,53 @@ export default function EditorMassa({
   );
 
   // ---------- seleção ----------
+
+  const recarregarPrevias = useCallback(async () => {
+    avisar('Recarregando prévias dos vídeos...');
+    escreverLog('[PREVIA] Recarregando miniaturas e metadados...');
+    for (const v of abaAtiva.videos) {
+      if (!v.url) continue;
+      try {
+        const vid = await abrirVideo(v.url);
+        const bmp = await capturarQuadro(vid, Math.min(1.5, (vid.duration || 45) * 0.2));
+        const w = vid.videoWidth || bmp.width;
+        const h = vid.videoHeight || bmp.height;
+        vid.remove();
+        atualizarVideo(v.id, {
+          quadro: bmp,
+          carregado: true,
+          tocavel: true,
+          largura: w,
+          altura: h,
+        });
+      } catch {
+        try {
+          const r = await fetch(v.url);
+          const b = await r.blob();
+          const localUrl = URL.createObjectURL(b);
+          const vid = await abrirVideo(localUrl);
+          const bmp = await capturarQuadro(vid, Math.min(1.5, (vid.duration || 45) * 0.2));
+          const w = vid.videoWidth || bmp.width;
+          const h = vid.videoHeight || bmp.height;
+          vid.remove();
+          atualizarVideo(v.id, {
+            arquivo: new File([b], v.nome, { type: b.type || 'video/mp4' }),
+            url: localUrl,
+            quadro: bmp,
+            carregado: true,
+            tocavel: true,
+            largura: w,
+            altura: h,
+          });
+        } catch (e: any) {
+          escreverLog(`[PREVIA] Falha ao recarregar ${v.nome}: ${e?.message ?? e}`);
+        }
+      }
+    }
+    setGatilhoAnalise((n) => n + 1);
+    avisar('Prévias recarregadas com sucesso!');
+  }, [abaAtiva.videos, atualizarVideo, avisar, escreverLog]);
+
   const clicar = useCallback(
     (id: string, e: MouseEvent) => {
       const ids = abaAtiva.videos.map((v) => v.id);
@@ -943,6 +1023,7 @@ export default function EditorMassa({
 
         <Lateral
           aoProcessar={processar}
+          onAgendar={onAgendar}
           processando={abaAtiva.processando}
           ferramentaAtiva={ferramentaAtiva}
           setFerramentaAtiva={setFerramentaAtiva}
@@ -988,6 +1069,7 @@ export default function EditorMassa({
             clicar={clicar}
             alternarSelecao={alternarSelecao}
             acao={acaoCard}
+            recarregarPrevias={recarregarPrevias}
             remover={(id) => {
               const lista = alvos(id);
               if (lista.length > 1 && !window.confirm(`Remover ${lista.length} vídeos selecionados?`)) return;

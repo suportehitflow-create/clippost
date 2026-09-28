@@ -23,6 +23,7 @@ export interface PropsGrade {
   soltarArquivos: (arquivos: File[]) => void;
   adicionarVideos: () => void;
   escolherTemplate: () => void;
+  recarregarPrevias?: () => void;
 }
 
 const ehVideo = (f: File) => f.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(f.name);
@@ -75,6 +76,18 @@ export default function Grade(p: PropsGrade) {
           <span className={`${s.chip} ${s.chipAcento}`}>{nSel} selecionados · edições valem para todos</span>
         )}
         <span className={s.espaco} />
+        {p.recarregarPrevias && (
+          <button
+            type="button"
+            className={`${s.btn} ${s.btnFantasma} ${s.btnPequeno}`}
+            onClick={p.recarregarPrevias}
+            title="Recarregar prévias dos vídeos"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          >
+            <Icone nome="refresh" tamanho={13} />
+            <span>Recarregar</span>
+          </button>
+        )}
         {nSel > 0 ? (
           <button type="button" className={`${s.btn} ${s.btnFantasma} ${s.btnPequeno}`} onClick={p.limparSelecao}>
             Limpar seleção
@@ -146,12 +159,13 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
   if (ehPendente) {
     return (
       <div className={`${s.card} ${s.cardSkeleton}`}>
-        <div className={s.shimmerEffect} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+        <div className={s.shimmerMistio} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2, position: 'relative' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
             {v.nome.slice(0, 4)}
           </span>
-          <span style={{ fontSize: '9px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+          <span className={s.pilulaCarregando}>
+            <Icone nome="sparkles" tamanho={11} className={s.girando} />
             Carregando
           </span>
           <button
@@ -166,11 +180,13 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
             <Icone nome="x" tamanho={11} strokeWidth={2.5} />
           </button>
         </div>
-        <div className={s.skeletonCentro} style={{ zIndex: 2 }}>
-          <Icone nome="sparkles" tamanho={22} className={s.girando} style={{ color: '#818cf8' }} />
-          <span>{v.texto || 'Carregando corte…'}</span>
+        <div className={s.skeletonCentro} style={{ zIndex: 2, position: 'relative' }}>
+          <Icone nome="sparkles" tamanho={26} className={s.pulsando} style={{ color: '#a855f7' }} />
+          <span style={{ fontWeight: 600, color: '#e4e4e7', textAlign: 'center', padding: '0 8px', fontSize: 13, lineHeight: 1.35 }}>
+            {v.texto || 'Processando corte com IA…'}
+          </span>
         </div>
-        <div className={s.skeletonLinhas} style={{ zIndex: 2 }}>
+        <div className={s.skeletonLinhas} style={{ zIndex: 2, position: 'relative' }}>
           <div className={s.skeletonBarra} style={{ width: '85%' }} />
           <div className={s.skeletonBarra} style={{ width: '55%' }} />
         </div>

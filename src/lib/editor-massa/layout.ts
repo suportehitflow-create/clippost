@@ -71,7 +71,12 @@ export function calcularLayout(global: ConfigGlobal, v: ConfigVideo, template: C
   let area: Rect;
   let alinhamento: 'topo' | 'centro';
   let base: number;
-  if (quadro && global.encaixe === 'template') {
+  if (v.marcaEmbutida) {
+    // Vídeo já renderizado com template/marca embutida: preenche o canvas completo sem aninhar
+    area = { x: 0, y: 0, w: canvas.w, h: canvas.h };
+    alinhamento = 'centro';
+    base = Math.min(canvas.w / c.w, canvas.h / c.h);
+  } else if (quadro && global.encaixe === 'template') {
     // Dentro do quadro de vídeo do template (Sem bordas = preenche o quadro cortando o excesso)
     area = quadro;
     alinhamento = 'centro';

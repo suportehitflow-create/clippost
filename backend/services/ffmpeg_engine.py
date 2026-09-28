@@ -230,7 +230,9 @@ def create_vertical_clip(
         try:
             from services.smart_framing import detect_gameplay_split
             is_gameplay, fc_box, g_box = detect_gameplay_split(input_video, start, duration)
-            if is_gameplay and fc_box and g_box and (layout.get("splitScreen") in ("auto", "top_bottom", True) or layout.get("splitScreen") is None):
+            split_opt = layout.get("splitScreen")
+            is_gp_flag = layout.get("isGameplay")
+            if is_gameplay and fc_box and g_box and (split_opt in ("top_bottom", True) or (split_opt == "auto" and is_gp_flag is True)):
                 use_split = True
                 fc_crop_box, g_crop_box = fc_box, g_box
                 print(f"[ffmpeg_engine] Gameplay detectado! Aplicando tela dividida: webcam={fc_box}, game={g_box}")

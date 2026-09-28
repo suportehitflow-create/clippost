@@ -133,21 +133,33 @@ def _analyze_focal_point(video_path: str, start: float, duration: float, in_w: i
             )
 
             for (fx, fy, fw, fh) in faces:
-                # Centro normalizado do rosto [0.0, 1.0]
                 face_norm_x = (fx + fw / 2.0) / float(small_w)
                 face_pct = face_norm_x * 100.0
-
-                # Peso do rosto baseado na área relativa (falante principal em destaque)
                 area_ratio = (fw * fh) / float(small_w * small_h)
-
-                # Âncora no Centro: o centro é o principal por padrão.
-                # Faces próximas do centro recebem peso balanceado;
-                # Faces afastadas precisam de boa definição para deslocar o enquadramento.
-                dist_from_center = abs(face_norm_x - 0.5)  # 0.0 no meio, até 0.5 na borda
+                dist_from_center = abs(face_norm_x - 0.5)
                 center_bias = 1.0 / (1.0 + 1.2 * dist_from_center)
-
                 weight = area_ratio * center_bias
                 detected_centers.append((face_pct, weight))
+
+            # Se rosto frontal não foi detectado (pessoa de perfil / olhando janela / co-host),
+            # tenta detectar rosto de perfil com haarcascade_profileface e flip horizontal
+            if len(faces) == 0:
+                try:
+                    profile_path = cv2.data.haarcascades + 'haarcascade_profileface.xml'
+                    prof_cascade = cv2.CascadeClassifier(profile_path)
+                    p_faces = prof_cascade.detectMultiScale(small_gray, scaleFactor=1.18, minNeighbors=4, minSize=(30, 30))
+                    for (px, py, pw, ph) in p_faces:
+                        p_norm_x = (px + pw / 2.0) / float(small_w)
+                        detected_centers.append((p_norm_x * 100.0, (pw * ph) / float(small_w * small_h) * 1.2))
+                    if len(p_faces) == 0:
+                        flipped = cv2.flip(small_gray, 1)
+                        p_flip = prof_cascade.detectMultiScale(flipped, scaleFactor=1.18, minNeighbors=4, minSize=(30, 30))
+                        for (px, py, pw, ph) in p_flip:
+                            real_x = small_w - (px + pw)
+                            p_norm_x = (real_x + pw / 2.0) / float(small_w)
+                            detected_centers.append((p_norm_x * 100.0, (pw * ph) / float(small_w * small_h) * 1.2))
+                except Exception:
+                    pass
 
         cap.release()
 
@@ -221,10 +233,14 @@ def detect_gameplay_split(
                 norm_y = (fy + fh / 2.0) / float(small_h)
                 area_ratio = (fw * fh) / float(small_w * small_h)
 
-                # Webcam típica: tamanho entre 1% e 20% da tela, localizada nas laterais ou cantos
-                is_in_corner = (norm_x < 0.38 or norm_x > 0.62) or (norm_y < 0.40 or norm_y > 0.60)
-                if is_in_corner and 0.01 <= area_ratio <= 0.22:
-                    # Converte de volta para resolução real
+                # Se houver pessoa de destaque no centro/corpo do vídeo (vlog, podcast, entrevista), NÃO é gameplay
+                if 0.20 <= norm_x <= 0.80 and 0.15 <= norm_y <= 0.85 and area_ratio >= 0.025:
+                    cap.release()
+                    return False, None, None
+
+                # Webcam típica de streamer: estritamente no canto extremo (x < 0.22 ou x > 0.78) e pequena (0.5% a 7%)
+                is_in_corner = (norm_x < 0.22 or norm_x > 0.78) and (norm_y < 0.28 or norm_y > 0.72)
+                if is_in_corner and 0.005 <= area_ratio <= 0.075:
                     real_x = int(fx / scale)
                     real_y = int(fy / scale)
                     real_w = int(fw / scale)
@@ -234,7 +250,7 @@ def detect_gameplay_split(
         cap.release()
 
         # Se detectou webcam em pelo menos 2 amostras com posições próximas
-        if len(corner_faces) >= 2:
+        if len(corner_faces) >= 3:
             avg_x = sum(f[0] for f in corner_faces) // len(corner_faces)
             avg_y = sum(f[1] for f in corner_faces) // len(corner_faces)
             avg_w = sum(f[2] for f in corner_faces) // len(corner_faces)
