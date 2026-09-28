@@ -298,16 +298,17 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     video_end = float(segments[-1].get("end", 600)) if segments else 600.0
 
     # Meta de cortes proporcional ao tamanho real do vídeo (podcasts longos precisam de muitos cortes!)
+    # (o usuário quer o MÁXIMO de cortes: ~1 corte a cada 2-3 min de vídeo)
     if video_end <= 300:        # até 5 min
-        min_clips_target, max_clips_target = 3, 5
+        min_clips_target, max_clips_target = 3, 6
     elif video_end <= 900:      # 5 a 15 min
-        min_clips_target, max_clips_target = 5, 8
+        min_clips_target, max_clips_target = 6, 10
     elif video_end <= 1800:     # 15 a 30 min
-        min_clips_target, max_clips_target = 8, 12
+        min_clips_target, max_clips_target = 10, 15
     elif video_end <= 3600:     # 30 a 60 min (ex: podcast de 36 min)
-        min_clips_target, max_clips_target = 10, 16
+        min_clips_target, max_clips_target = 15, 22
     else:                       # mais de 1 hora
-        min_clips_target, max_clips_target = 12, 20
+        min_clips_target, max_clips_target = 20, 25
 
     manual = _manual()
     if manual:
