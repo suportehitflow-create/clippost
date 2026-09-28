@@ -61,6 +61,34 @@ export function useExtensaoClipost() {
   return { instalada, lista, consumir }
 }
 
+export interface ItemBusca extends ItemExtensao {
+  tipo: 'reel' | 'post' | 'carrossel'
+  video: boolean
+  duration: number | null
+}
+export interface ResultadoBusca {
+  perfil: { usuario: string; nome: string | null; foto: string | null; seguidores: number | null; total_posts: number | null }
+  itens: ItemBusca[]
+}
+
+/** Pede à extensão (1.2.0+) para buscar o perfil do Instagram com a sessão do navegador — sem clique */
+export function buscarPelaExtensao(usuario: string, limite: number, timeoutMs = 240000): Promise<ResultadoBusca> {
+  return new Promise((resolve, reject) => {
+    const origem = window.location.origin
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const t = setTimeout(() => { window.removeEventListener('message', aoMensagem); reject(new Error('A extensão não respondeu. Atualize-a para a versão 1.2 (baixe o .zip de novo).')) }, timeoutMs)
+    function aoMensagem(e: MessageEvent) {
+      if (e.source !== window || e.origin !== origem || e.data?.tipo !== 'CLIPOST_EXTENSAO_RESULTADO' || e.data.id !== id) return
+      clearTimeout(t)
+      window.removeEventListener('message', aoMensagem)
+      if (e.data.ok) resolve(e.data.dados)
+      else reject(new Error(`Instagram pela extensão: ${e.data.erro}`))
+    }
+    window.addEventListener('message', aoMensagem)
+    window.postMessage({ tipo: 'CLIPOST_EXTENSAO_BUSCAR', id, usuario: usuario.replace(/^@/, ''), limite }, origem)
+  })
+}
+
 export function ModalExtensao({ fechar, instalada }: { fechar: () => void; instalada: boolean | null }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal aria-label="Extensão do Instagram">
@@ -78,7 +106,7 @@ export function ModalExtensao({ fechar, instalada }: { fechar: () => void; insta
 
         {instalada ? (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-200">
-            <CheckCircle2 className="w-4 h-4" /> Extensão instalada. Abra um perfil no Instagram e clique em “Enviar para o Clipost”.
+            <CheckCircle2 className="w-4 h-4" /> Extensão instalada. É só digitar o @ e buscar aqui no Clipost — ela lê o perfil com o seu login do Instagram, sem você clicar em nada.
           </div>
         ) : (
           <ol className="space-y-3 text-xs text-zinc-300">
@@ -101,8 +129,8 @@ export function ModalExtensao({ fechar, instalada }: { fechar: () => void; insta
             <li className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-white/[0.08] text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
               <span>
-                Entre no Instagram (use uma conta secundária se preferir), abra o perfil que você quer e clique em <b>Enviar para o Clipost</b>,
-                no canto inferior direito. Escolha quantos vídeos e a ordem — o Clipost abre com a lista pronta.
+                Deixe o Instagram logado neste navegador (use uma conta secundária se preferir). Pronto: digite o @ aqui no Clipost e
+                clique em <b>Buscar posts</b> — a extensão lê o perfil sozinha, em segundo plano.
               </span>
             </li>
           </ol>

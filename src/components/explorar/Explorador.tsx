@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal } from '@/components/pagina/Base'
-import { useExtensaoClipost, ModalExtensao } from '@/components/bulk/ExtensaoInstagram'
+import { useExtensaoClipost, ModalExtensao, buscarPelaExtensao } from '@/components/bulk/ExtensaoInstagram'
 import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import {
   Search, Loader2, Download, Heart, Eye, MessageCircle, Calendar as CalendarIcon, Check, FolderPlus, Wand2, Layers, Film, Image as ImageIcon, Images, AlertCircle, CheckCircle2, ExternalLink, AtSign, ArrowDownWideNarrow,
@@ -138,14 +138,53 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     setTimeout(() => setAviso(null), 7000)
   }
 
+  /** Busca pelo navegador (extensão), com o mesmo filtro de período, ordem e quantidade do servidor */
+  async function pelaExtensao(usuario: string): Promise<Resultado> {
+    // período e ordem por views/curtidas pedem uma leitura maior que o limite
+    const leitura = ordem === 'recentes' && !periodo ? limite : Math.min(limite * 3, 3000)
+    const d = await buscarPelaExtensao(usuario, leitura)
+    let itens: Item[] = d.itens.filter(i => i.url).map(i => ({
+      id: i.permalink, tipo: i.tipo, url: i.url, thumbnail: i.thumbnail, permalink: i.permalink, legenda: i.title,
+      views: i.view_count, likes: i.like_count, comentarios: i.comment_count, timestamp: i.timestamp, duracao: i.duration,
+    }))
+    if (periodo) itens = itens.filter(i => (i.timestamp || 0) >= Date.now() / 1000 - periodo * 86400)
+    const chave: keyof Item = ordem === 'curtidos' ? 'likes' : ordem === 'visualizados' ? 'views' : 'timestamp'
+    itens = itens.sort((a, b) => ((b[chave] as number) || 0) - ((a[chave] as number) || 0)).slice(0, limite)
+    const soma = (k: keyof Item) => itens.reduce((t, i) => t + ((i[k] as number) || 0), 0)
+    return {
+      perfil: { ...d.perfil, usuario: d.perfil.usuario || usuario, url: `https://www.instagram.com/${usuario}/` },
+      plataforma: 'instagram',
+      fonte: 'extensao',
+      totais: {
+        views: soma('views') || null, likes: soma('likes'), comentarios: soma('comentarios'), posts: itens.length,
+        reels: itens.filter(i => i.tipo === 'reel').length, posts_imagem: itens.filter(i => i.tipo === 'post').length,
+        carrosseis: itens.filter(i => i.tipo === 'carrossel').length,
+      },
+      itens,
+    }
+  }
+
   async function buscar() {
     if (!perfil.trim()) return
     setBuscando(true)
     setErro('')
     setRes(null)
     setSel(new Set())
+    const ehInstagram = /instagram\.com/i.test(perfil) || !/[./]/.test(perfil.trim().replace(/^@/, ''))
+    const usuarioIg = (perfil.match(/instagram\.com\/([^/?#]+)/i)?.[1] ?? perfil.trim()).replace(/^@/, '')
+    // Instagram sem API oficial: a extensão busca com o login do navegador (sem clique); o servidor é bloqueado
+    const extensaoPrimeiro = ehInstagram && instalada && !oficial?.configurado
     try {
-      setRes(await postarJson('/api/tools/explorar', { perfil: perfil.trim(), limite, ordem, periodo_dias: periodo }))
+      if (extensaoPrimeiro) {
+        setRes(await pelaExtensao(usuarioIg))
+      } else {
+        try {
+          setRes(await postarJson('/api/tools/explorar', { perfil: perfil.trim(), limite, ordem, periodo_dias: periodo }))
+        } catch (e) {
+          if (!(ehInstagram && instalada)) throw e
+          setRes(await pelaExtensao(usuarioIg))
+        }
+      }
       setAba('todos')
     } catch (e: any) {
       setErro(e.message)

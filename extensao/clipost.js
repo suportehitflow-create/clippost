@@ -16,6 +16,16 @@
       window.postMessage({ tipo: 'CLIPOST_EXTENSAO_LISTA', dados: valida ? clipostImport : null }, ORIGEM)
     } else if (tipo === 'CLIPOST_EXTENSAO_RECEBIDO') {
       await chrome.storage.local.remove('clipostImport')
+    } else if (tipo === 'CLIPOST_EXTENSAO_BUSCAR') {
+      // busca direto do site: a extensão lê o perfil com a sessão do Instagram deste navegador
+      const { id, usuario, limite } = e.data
+      let resposta
+      try {
+        resposta = await chrome.runtime.sendMessage({ tipo: 'BUSCAR_INSTAGRAM', usuario, limite })
+      } catch (err) {
+        resposta = { ok: false, erro: err?.message || String(err) }
+      }
+      window.postMessage({ tipo: 'CLIPOST_EXTENSAO_RESULTADO', id, ...(resposta || { ok: false, erro: 'sem resposta da extensão' }) }, ORIGEM)
     }
   })
 })()
