@@ -43,7 +43,32 @@ import s from './editor-massa.module.css';
 type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string } | null;
 
 const CHAVE_CONFIG = 'clipost:editor-massa:config';
-const ANALISES_SIMULTANEAS = 3;
+const ANALISES_SIMULTANEAS = 2;
+
+// O Storage (Supabase) recusa conexões quando muitos vídeos de 20 MB baixam juntos
+// (ERR_HTTP2_SERVER_REFUSED_STREAM) — e o vídeo parecia "formato que não toca". Fila: 3 por vez.
+const DOWNLOADS_SIMULTANEOS = 3;
+let downloadsAtivos = 0;
+const filaDownloads: (() => void)[] = [];
+async function baixarNaFila(url: string): Promise<Blob> {
+  if (downloadsAtivos >= DOWNLOADS_SIMULTANEOS) await new Promise<void>((res) => filaDownloads.push(res));
+  downloadsAtivos++;
+  try {
+    for (let tentativa = 0; ; tentativa++) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.blob();
+      } catch (e) {
+        if (tentativa >= 2) throw e;
+        await new Promise((res) => setTimeout(res, 1500 * (tentativa + 1)));
+      }
+    }
+  } finally {
+    downloadsAtivos--;
+    filaDownloads.shift()?.();
+  }
+}
 const hora = () => new Date().toLocaleTimeString('pt-BR', { hour12: false });
 const emCampoDeTexto = (e: Event) => /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName ?? '');
 
@@ -246,8 +271,7 @@ export default function EditorMassa({
       if (arquivo.size === 0 && v.url && v.url.startsWith('http')) {
         escreverLog(`[DIAG] Baixando ${v.nome} antes do upload...`);
         try {
-          const resp = await fetch(v.url);
-          const blob = await resp.blob();
+          const blob = await baixarNaFila(v.url);
           arquivo = new File([blob], v.nome, { type: blob.type || 'video/mp4' });
           atualizarVideo(v.id, { arquivo });
         } catch (e: any) {
@@ -447,7 +471,7 @@ export default function EditorMassa({
           if (it.status !== 'done' || !it.file_url) continue;
           feitos.add(i);
           try {
-            const blob = await (await fetch(it.file_url)).blob();
+            const blob = await baixarNaFila(it.file_url);
             const nome = `${String(i + 1).padStart(2, '0')} - ${(itens[i]?.titulo || it.title || 'video').replace(/[\\/:*?"<>|#\n\r]+/g, ' ').trim().slice(0, 50) || 'video'}.mp4`;
             adicionarRef.current([new File([blob], nome, { type: 'video/mp4' })], { extras: [{ id: idDe(i) }], silencioso: true, substituir: true });
           } catch {
@@ -510,8 +534,7 @@ export default function EditorMassa({
 
       if (c.url) {
         clipsComVideo.current.add(id);
-        fetch(c.url)
-          .then((r) => r.blob())
+        baixarNaFila(c.url)
           .then(async (blob) => {
             const realFile = new File([blob], nome, { type: blob.type || 'video/mp4' });
             const localUrl = URL.createObjectURL(blob);

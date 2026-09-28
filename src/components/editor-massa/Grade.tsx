@@ -212,7 +212,8 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
       <div className={s.thumb} onClick={(e) => clicar(v.id, e)}>
         <canvas ref={ref} />
         {/* Fallback de vídeo caso o quadro do canvas ainda não esteja pronto */}
-        {!v.quadro && v.url && (
+        {/* só com o vídeo já baixado (blob): link do Storage aqui abria dezenas de conexões juntas */}
+        {!v.quadro && v.url && !/^https?:/.test(v.url) && (
           <video
             src={`${v.url}#t=1`}
             preload="metadata"

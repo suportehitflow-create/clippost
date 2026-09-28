@@ -132,9 +132,10 @@ export default function Inspetor({
 
   const alternarPlay = async () => {
     const el = videoRef.current;
-    // MP4 da internet (cortes no Storage) sempre tenta tocar; só arquivo local num formato estranho cai no quadro parado
     if (!el || !v) return;
-    if (!(v.tocavel || /^https?:/.test(v.url ?? ''))) return avisar('Este formato não toca no navegador — o preview mostra um quadro parado');
+    if (!v.url) return avisar('O vídeo ainda está chegando — espere o card carregar');
+    // garante a fonte (a análise pode ter falhado por rede e marcado como "não toca")
+    if (!el.src) el.src = v.url;
     if (tocando) {
       el.pause();
       audioRef.current?.pause();
@@ -154,8 +155,13 @@ export default function Inspetor({
       a.volume = Math.min(1, global.musica.volumeMusica / 100);
       a.play().catch(() => {});
     }
-    await el.play().catch(() => {});
-    setTocando(true);
+    try {
+      await el.play();
+      setTocando(true);
+    } catch {
+      audioRef.current?.pause();
+      avisar(el.error ? 'Este formato não toca no navegador — o preview mostra um quadro parado' : 'O vídeo ainda está carregando — tente de novo em instantes');
+    }
   };
 
   // Atalho de teclado: barra de espaço toca/pausa o preview
@@ -264,7 +270,7 @@ export default function Inspetor({
 
         <video
           ref={videoRef}
-          src={v.tocavel || /^https?:/.test(v.url) ? v.url : undefined}
+          src={v.url || undefined}
           playsInline
           preload="auto"
           style={{ display: 'none' }}
