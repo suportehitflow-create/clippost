@@ -1111,6 +1111,8 @@ export default function ProjectClient({
       id: project.id,
       titulo: project.title || 'Projeto',
       isYouTube: !!isYouTubeProject,
+      // perfil baixado inteiro (Buscar de um perfil): vídeos crus, o estúdio aplica o template
+      crus: String(project.source_url || '').startsWith('clipost:perfil'),
       clips: clips.map(c => ({
         id: c.id,
         url: c.storage_url || '',

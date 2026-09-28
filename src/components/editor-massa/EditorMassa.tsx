@@ -73,6 +73,8 @@ export interface ProjetoEstudio {
   id: string;
   titulo: string;
   isYouTube?: boolean;
+  /** vídeos crus (ex.: baixados de um perfil): o template é aplicado aqui, não veio embutido */
+  crus?: boolean;
   clips: { id: string; url: string; titulo: string; pronto?: boolean; status?: string }[];
 }
 
@@ -498,7 +500,7 @@ export default function EditorMassa({
         quadro: null,
         carregado: false,
         tocavel: !!c.url,
-        marcaEmbutida: true,
+        marcaEmbutida: !projeto.crus,
         detectando: false,
         statusJob: null,
         progressoJob: 0,

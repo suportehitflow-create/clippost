@@ -226,19 +226,8 @@ def _probe_duration(path: str) -> float:
     return float(out.stdout.strip() or 0)
 
 
-def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> dict:
-    """Baixa, (re)enquadra, legenda e renderiza um vídeo. Retorna campos do item."""
-    platform = detect_platform(item["url"])
-    source_type = "file" if "/storage/v1/object/" in item["url"] else "url"
-    project = supabase.table("projects").insert({
-        "user_id": user_id,
-        "title": (item.get("title") or "Vídeo").strip()[:200] or "Vídeo",
-        "source_url": item["url"],
-        "source_type": source_type,
-        "platform": platform if platform != "unknown" else source_type,
-        "status": "processing",
-    }).execute().data[0]
-    project_id = project["id"]
+def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict, project_id: str, idx: int = 0) -> dict:
+    """Baixa, (re)enquadra, legenda e renderiza um vídeo, como corte do projeto do lote. Retorna campos do item."""
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_bulk_"))
     try:
@@ -296,7 +285,7 @@ def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> d
         if not os.path.exists(out_path):
             raise RuntimeError("renderização não gerou o vídeo final")
 
-        clip_url = _upload_clip_to_storage(f"{user_id}/{project_id}/bulk_0.mp4", _recompress_if_needed(out_path))
+        clip_url = _upload_clip_to_storage(f"{user_id}/{project_id}/bulk_{idx}.mp4", _recompress_if_needed(out_path))
         supabase.table("clips").insert({
             "project_id": project_id,
             "user_id": user_id,
@@ -308,7 +297,6 @@ def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> d
             "storage_url": clip_url,
             "status": "ready",
         }).execute()
-        supabase.table("projects").update({"status": "done", "error_message": None}).eq("id", project_id).execute()
         try:
             increment_clips_used(user_id)
         except Exception as inc_err:
@@ -316,13 +304,13 @@ def _process_item(user_id: str, item: dict, brand_kit: dict, options: dict) -> d
         return {"status": "done", "project_id": project_id, "clip_url": clip_url,
                 "hook": hook, "template_replaced": replaced}
     except Exception as e:
-        supabase.table("projects").update({"status": "failed", "error_message": str(e)[:900]}).eq("id", project_id).execute()
         raise RuntimeError(str(e)) from e
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict, options: dict | None = None) -> dict:
+def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict, options: dict | None = None,
+                        project_id: str | None = None) -> dict:
     """Importação para o Editor em Massa: só baixa o vídeo e deixa no Storage (a edição é no editor).
     Com options.salvar_biblioteca, o vídeo também vira um corte pronto na Biblioteca (dá para agendar como está)."""
     tmp_dir = Path(tempfile.mkdtemp(prefix="clippost_import_"))
@@ -330,20 +318,60 @@ def _download_only_item(user_id: str, batch_id: str, idx: int, item: dict, optio
         video_path, _info = _download(item["url"], tmp_dir)
         url = _upload_clip_to_storage(f"{user_id}/imports/{batch_id}/{idx + 1}.mp4", _recompress_if_needed(video_path))
         extra = {}
-        if (options or {}).get("salvar_biblioteca"):
+        if (options or {}).get("salvar_biblioteca") and project_id:
             titulo = (item.get("title") or f"Vídeo {idx + 1}").strip()[:200]
-            projeto = supabase.table("projects").insert({
-                "user_id": user_id, "title": titulo, "source_url": item.get("permalink") or item["url"][:500],
-                "source_type": "url", "platform": detect_platform(item.get("permalink") or item["url"]), "status": "done",
-            }).execute().data[0]
             supabase.table("clips").insert({
-                "project_id": projeto["id"], "user_id": user_id, "title": titulo, "hook": titulo,
-                "start_time": 0, "end_time": 0, "score": 0, "storage_url": url, "status": "ready",
+                "project_id": project_id, "user_id": user_id, "title": titulo, "hook": titulo,
+                "start_time": 0, "end_time": 0, "score": max(0, 1000 - idx), "storage_url": url, "status": "ready",
             }).execute()
-            extra = {"project_id": projeto["id"]}
+            extra = {"project_id": project_id}
         return {"status": "done", "file_url": url, **extra}
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _nome_do_lote(req: dict, batch_id: str) -> str:
+    """"@perfil" (vem do site em options.nome_lote, ou do link do perfil do lote)."""
+    nome = str((req.get("options") or {}).get("nome_lote") or "").strip()
+    if not nome:
+        with _batches_lock:
+            link = str((_batches.get(batch_id) or {}).get("profile_url") or req.get("profile_url") or "")
+        m = re.search(r"\.com/(@?[\w.\-]+)", link)
+        nome = f"@{m.group(1).lstrip('@')}" if m else "Perfil"
+    return nome[:80]
+
+
+def _projeto_do_lote(user_id: str, batch_id: str, req: dict, total: int) -> str:
+    with _batches_lock:
+        existente = (_batches.get(batch_id) or {}).get("project_id_lote")
+    if existente:
+        return existente
+    projeto = supabase.table("projects").insert({
+        "user_id": user_id,
+        "title": f"{_nome_do_lote(req, batch_id)} · {total} vídeo{'s' if total != 1 else ''}",
+        "source_url": f"clipost:perfil:{batch_id}",  # o estúdio sabe que são vídeos crus (sem template embutido)
+        "source_type": "url",
+        "platform": "perfil",
+        "status": "processing",
+    }).execute().data[0]
+    _set_batch(batch_id, project_id_lote=projeto["id"])
+    return projeto["id"]
+
+
+def _fechar_projeto_do_lote(batch_id: str, project_id: str):
+    with _batches_lock:
+        itens = list((_batches.get(batch_id) or {}).get("items") or [])
+    feitos = sum(1 for i in itens if i.get("status") == "done")
+    try:
+        atual = maybe_one(supabase.table("projects").select("title").eq("id", project_id))
+        titulo = ((atual.data or {}).get("title") if atual else "") or "Perfil"
+        base = titulo.split(" · ")[0]
+        supabase.table("projects").update({
+            "status": "done" if feitos else "failed",
+            "title": f"{base} · {feitos} vídeo{'s' if feitos != 1 else ''}",
+        }).eq("id", project_id).execute()
+    except Exception as e:
+        print(f"[bulk] não fechou o projeto do lote {batch_id}: {type(e).__name__}")
 
 
 def run_batch(batch_id: str, req: dict):
@@ -393,13 +421,16 @@ def run_batch(batch_id: str, req: dict):
 
         download_only = bool(options.get("download_only"))
         brand_kit = {} if download_only else _load_brand_kit(user_id, req.get("template_config"))
+        # Biblioteca: o perfil inteiro vira UM projeto com todos os vídeos dentro (não um por vídeo)
+        salvar = (not download_only) or bool(options.get("salvar_biblioteca"))
+        project_id = _projeto_do_lote(user_id, batch_id, req, len(items)) if salvar else None
         for idx, item in enumerate(items):
             if item.get("status") in ("done", "failed"):
                 continue
             if download_only:
                 _set_item(batch_id, idx, status="processing")
                 try:
-                    _set_item(batch_id, idx, **_download_only_item(user_id, batch_id, idx, item, options))
+                    _set_item(batch_id, idx, **_download_only_item(user_id, batch_id, idx, item, options, project_id))
                 except Exception as e:
                     print(f"[bulk] importação {idx} falhou: {e}")
                     _set_item(batch_id, idx, status="failed", error=str(e)[:300])
@@ -412,11 +443,13 @@ def run_batch(batch_id: str, req: dict):
                 break
             _set_item(batch_id, idx, status="processing")
             try:
-                _set_item(batch_id, idx, **_process_item(user_id, item, brand_kit, options))
+                _set_item(batch_id, idx, **_process_item(user_id, item, brand_kit, options, project_id, idx))
             except Exception as e:
                 print(f"[bulk] item {idx} falhou: {e}")
                 _set_item(batch_id, idx, status="failed", error=str(e)[:300])
         _set_batch(batch_id, status="done")
+        if project_id:
+            _fechar_projeto_do_lote(batch_id, project_id)
     except Exception as e:
         print(f"[bulk] lote {batch_id} falhou: {e}")
         _set_batch(batch_id, status="failed", error=str(e)[:500])
