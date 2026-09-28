@@ -273,7 +273,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     setAcao('template')
     try {
       // só baixa (o template é aplicado no Editor de vídeos, que abre já com um card carregando por vídeo)
-      const d = await postarJson('/api/bulk/start', { source: 'files', videos, options: { download_only: true } })
+      // salvar_biblioteca + nome_lote: na Biblioteca o perfil vira UM item ("@perfil · N vídeos")
+      const d = await postarJson('/api/bulk/start', {
+        source: 'files', videos,
+        options: { download_only: true, salvar_biblioteca: true, nome_lote: res ? `@${res.perfil.usuario}` : undefined },
+      })
       try {
         localStorage.setItem('clipost:editor-importar-lote', JSON.stringify({ batch: d.batch_id, itens: videos.map(v => ({ titulo: v.title })) }))
       } catch {}
