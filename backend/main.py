@@ -1351,6 +1351,34 @@ async def assistente(request: Request):
     return await asyncio.to_thread(responder, texto, historico)
 
 
+@app.get("/api/admin/ia-status")
+async def ia_status(request: Request):
+    """Qual IA do curador responde agora (só "ok" ou o código do erro — nunca a chave). Exige login."""
+    await _exigir_login(request)
+    import httpx as _httpx
+    from services import ai_curator as ac
+
+    def testar(nome: str):
+        chamadas = {
+            "gemini": ("GEMINI_API_KEY", ac._call_gemini),
+            "groq": ("GROQ_API_KEY", lambda p: ac._call_openai_compat(ac.GROQ_BASE, os.environ.get("GROQ_API_KEY", ""), ac.GROQ_MODEL, p)),
+            "openrouter": ("OPENROUTER_API_KEY", lambda p: ac._call_openai_compat(ac.OPENROUTER_BASE, os.environ.get("OPENROUTER_API_KEY", ""), ac.OPENROUTER_MODEL, p)),
+        }
+        env, fn = chamadas[nome]
+        if not os.environ.get(env):
+            return "sem chave"
+        try:
+            return "ok" if fn("Responda apenas: ok") else "resposta vazia"
+        except _httpx.HTTPStatusError as e:
+            return f"HTTP {e.response.status_code}"
+        except Exception as e:
+            return type(e).__name__
+
+    nomes = ["gemini", "groq", "openrouter"]
+    resultados = await asyncio.gather(*[asyncio.to_thread(testar, n) for n in nomes])
+    return dict(zip(nomes, resultados))
+
+
 @app.post("/api/posts/criar")
 async def posts_criar(request: Request):
     """Posts em massa: cada grupo de mídias vira um post (foto, carrossel ou story) pronto para agendar.

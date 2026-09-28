@@ -1,4 +1,4 @@
-﻿"""
+"""
 AI Curator — Diretor de Criação e Roteirista de Cortes Virais para Reels, TikTok e Shorts.
 
 Suporte multi-provedor (em ordem de prioridade):
@@ -346,12 +346,54 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 ]"""
 
     raw = _try_providers(prompt)
+    clips = _extrair_clips(raw) if raw else []
 
-    if not raw:
-        print("[ai_curator] nenhum provedor disponível")
-        return []
+    # Transcrição grande demais para o provedor que respondeu (ex.: Gemini fora e o Groq recusa pelo
+    # tamanho): divide em blocos que cabem e pede os melhores cortes de cada um
+    if not clips and len(timeline) > _BLOCO_CHARS:
+        print("[ai_curator] sem cortes com a transcrição inteira — tentando em blocos menores")
+        clips = _curadoria_em_blocos(segments, duration_desc, min_duration, max_duration, video_end, max_clips_target)
 
-    # Parse robusto do JSON com fallback para markdown e colchetes externos
+    return _validar(clips, segments, min_duration, max_duration, video_end)
+
+
+_BLOCO_CHARS = 16000  # ~5 mil tokens: cabe no limite por minuto do Groq gratuito
+
+
+def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration: int, max_duration: int,
+                         video_end: float, max_total: int) -> list[dict]:
+    linhas = [f"[{round(float(s.get('start', 0)), 1)}s - {round(float(s.get('end', 0)), 1)}s] {str(s.get('text', '')).strip()}"
+              for s in segments if str(s.get("text", "")).strip()]
+    blocos, atual = [], []
+    for l in linhas:
+        if atual and sum(len(x) + 1 for x in atual) + len(l) > _BLOCO_CHARS:
+            blocos.append(atual)
+            atual = []
+        atual.append(l)
+    if atual:
+        blocos.append(atual)
+    por_bloco = max(1, min(4, round(max_total / max(1, len(blocos))) + 1))
+    todos = []
+    for i, b in enumerate(blocos[:24]):
+        prompt = (
+            "Você é um editor de cortes virais (Reels, TikTok, Shorts). Abaixo está UM TRECHO da transcrição de um vídeo "
+            f"longo (parte {i + 1} de {len(blocos)}). Escolha até {por_bloco} cortes autossuficientes, com gancho forte, "
+            "sem saudações nem pedidos de like, começando e terminando em frases completas.\n"
+            f"DURAÇÃO: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s)\n"
+            "hook_title: EM MAIÚSCULAS, até 60 caracteres, que gere curiosidade.\n\n"
+            "TRECHO:\n" + "\n".join(b) + "\n\n"
+            'Responda SÓ com um array JSON: [{"start_time": <s>, "end_time": <s>, "hook_title": "...", "ai_score": <0.70-0.99>}]'
+        )
+        raw = _try_providers(prompt)
+        achados = _extrair_clips(raw) if raw else []
+        print(f"[ai_curator] bloco {i + 1}/{len(blocos)}: {len(achados)} corte(s)")
+        todos.extend(achados)
+    todos.sort(key=lambda c: float(c.get("ai_score") or 0), reverse=True)
+    return todos[:max(max_total, 3)]
+
+
+def _extrair_clips(raw: str) -> list:
+    """Parse robusto do JSON (markdown, colchetes externos, JSON truncado)."""
     clips = []
     try:
         cleaned_raw = raw.strip()
@@ -403,8 +445,11 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 
     if not clips:
         print(f"[ai_curator] resposta bruta da IA sem JSON válido (primeiros 300 chars):\n{raw[:300]}")
+    return clips
 
-    # Validação e saneamento (incluindo filtro de intro/outro e limite de 90s)
+
+def _validar(clips: list, segments: list[dict], min_duration: int, max_duration: int, video_end: float) -> list[dict]:
+    """Saneamento: filtro de intro/outro nas bordas e limites de duração."""
     validated = []
     for c in clips[:60]:
         try:

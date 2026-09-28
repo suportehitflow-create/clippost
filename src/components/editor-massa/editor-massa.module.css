@@ -1294,12 +1294,12 @@
   font-size: 17px;
   font-weight: 700;
 }
+/* canto inferior direito: no centro ficava escondido atrás do dock do site */
 .toast {
-  position: absolute;
-  left: 50%;
-  bottom: 46px;
-  transform: translateX(-50%);
-  z-index: 30;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
   background: var(--sup3);
   border: 1px solid var(--linha2);
   padding: 9px 16px;
@@ -1307,7 +1307,14 @@
   box-shadow: 0 10px 30px #0009;
   font-weight: 500;
   animation: aparecer 0.15s;
-  max-width: calc(100% - 32px);
+  max-width: min(380px, calc(100vw - 40px));
+}
+/* celular: o dock ocupa a largura toda embaixo, então o aviso sobe acima dele */
+@media (max-width: 640px) {
+  .toast {
+    right: 12px;
+    bottom: 96px;
+  }
 }
 
 /* ================= responsivo ================= */

@@ -1111,6 +1111,17 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             clips_meta = detect_scenes(video_path, min_scene_len=30.0, max_clip_len=90.0, max_clips=10)
             if clips_meta:
                 print(f"[pipeline] PySceneDetect gerou {len(clips_meta)} clipes candidatos")
+                # título do que é falado no trecho ("Cena 192" não serve de gancho)
+                from services.ai_curator import generate_hook_title
+                for c in clips_meta:
+                    fala = " ".join(str(s.get("text", "")).strip() for s in segments
+                                    if float(s.get("end", 0)) > c["start_time"] and float(s.get("start", 0)) < c["end_time"])
+                    try:
+                        c["hook_title"] = generate_hook_title(fala, "") or c["hook_title"]
+                    except Exception:
+                        pass
+                    if c["hook_title"].lower().startswith("cena ") and fala:
+                        c["hook_title"] = fala[:57].upper().rsplit(" ", 1)[0] + "..."
 
         if not clips_meta:
             supabase.table("projects").update({
