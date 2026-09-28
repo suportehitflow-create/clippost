@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import ProfileSwitcher from '@/components/ProfileSwitcher'
+import { Pagina, Intro } from '@/components/pagina/Base'
 import EditorLegenda from '@/components/ferramentas/EditorLegenda'
 import { FUSOS, gerarLegendasIA, horarioLocal, juntarLegenda, LIMITE_DIARIO, MELHORES_HORARIOS, NOME_REDE } from '@/lib/publicacao'
 import {
@@ -308,21 +308,15 @@ function Conteudo() {
   const atividade = [...posts].reverse().filter(p => filtro === 'todos' || p.status === filtro)
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c] text-white">
-      <header className="h-16 border-b border-white/[0.08] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-8 bg-[#0c0c0f]/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-amber-400" />
-          <h1 className="text-sm font-semibold tracking-wide">Calendário & Publicações</h1>
-        </div>
-        <div className="flex justify-center"><ProfileSwitcher align="center" /></div>
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setNovoNoDia(new Date())} className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-xs font-semibold flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Agendar
-          </button>
-        </div>
-      </header>
+    <Pagina icone={Calendar} titulo="Calendário & Publicações" largura="max-w-6xl"
+      direita={
+        <button type="button" onClick={() => setNovoNoDia(new Date())} className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-xs font-semibold flex items-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> Agendar
+        </button>
+      }>
+        <Intro selo="Calendário" titulo="Suas publicações, no dia e hora certos"
+          descricao="Agende um corte por vez ou vários de uma vez, e acompanhe o que foi publicado." />
 
-      <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
         {/* resumo */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
@@ -354,14 +348,14 @@ function Conteudo() {
         )}
 
         {/* abas */}
-        <div className="flex gap-1 p-1 bg-white/[0.02] border border-white/[0.08] rounded-xl w-fit" role="tablist">
+        <div className="flex gap-1 p-1 bg-white/[0.02] border border-white/[0.08] rounded-2xl w-fit mx-auto" role="tablist">
           {([
             { id: 'calendario', l: 'Calendário', i: Calendar },
             { id: 'massa', l: 'Agendar em massa', i: Layers },
             { id: 'atividade', l: 'Atividade', i: Activity },
           ] as const).map(t => (
             <button key={t.id} type="button" role="tab" aria-selected={aba === t.id} onClick={() => setAba(t.id)}
-              className={`py-1.5 px-3 text-xs font-semibold rounded-lg flex items-center gap-1.5 ${aba === t.id ? 'bg-white text-zinc-900' : 'text-zinc-400 hover:text-white'}`}>
+              className={`py-2 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all ${aba === t.id ? 'bg-indigo-600/20 text-white ring-1 ring-indigo-500/40' : 'text-zinc-400 hover:text-white'}`}>
               <t.i className="w-3.5 h-3.5" /> {t.l}
             </button>
           ))}
@@ -583,7 +577,6 @@ function Conteudo() {
             )}
           </section>
         )}
-      </div>
 
       {detalhe && (
         <DetalhePost p={detalhe} conta={contaPorId.get(detalhe.social_account_id ?? '')} fechar={() => setDetalhe(null)} salvar={c => salvarDetalhe(detalhe, c)} excluir={() => excluir(detalhe)} />
@@ -603,7 +596,7 @@ function Conteudo() {
           }}
         />
       )}
-    </div>
+    </Pagina>
   )
 }
 
