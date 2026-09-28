@@ -12,6 +12,7 @@ Lógica de seleção inspirada no OpenMontage clip-factory:
   - Cobertura do vídeo: evitar clustering numa mesma seção
 """
 import json
+from pathlib import Path
 import os
 import re
 import time
@@ -74,7 +75,8 @@ def _call_gemini(prompt: str) -> str:
     payload = json.dumps(
         {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": MAX_TOKENS, "temperature": 0.2},
+            # o roteiro do manual (falas com tempo de cada corte) é longo: o Gemini aguenta bem mais que 8k
+            "generationConfig": {"maxOutputTokens": max(MAX_TOKENS, int(os.environ.get("GEMINI_MAX_TOKENS", "24000"))), "temperature": 0.2},
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -307,50 +309,54 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
     else:                       # mais de 1 hora
         min_clips_target, max_clips_target = 12, 20
 
-    prompt = f"""Você é um editor de vídeo sênior especializado em cortes virais (Shorts, Reels, TikTok) a partir de podcasts, entrevistas e vídeos longos.
+    manual = _manual()
+    if manual:
+        prompt = _montar_prompt(manual, timeline, duration_desc, min_duration, max_duration, video_end, chapters_ctx)
+    else:
+        prompt = f"""Você é um editor de vídeo sênior especializado em cortes virais (Shorts, Reels, TikTok) a partir de podcasts, entrevistas e vídeos longos.
 
-TAREFA OBRIGATÓRIA:
-Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético, humor ou ensinamentos profundos.
-Este vídeo possui {int(video_end // 60)} minutos de duração. Por ser um vídeo de {int(video_end // 60)} minutos, você DEVE gerar OBRIGATORIAMENTE entre {min_clips_target} e {max_clips_target} cortes virais de altíssimo nível, distribuídos proporcionalmente ao longo de TODO o vídeo (início, meio e fim)! NUNCA gere menos que {min_clips_target} cortes.
+    TAREFA OBRIGATÓRIA:
+    Identificar e extrair os melhores blocos de conteúdo de ALTO IMPACTO, curiosidade, choque, revelação, storytelling magnético, humor ou ensinamentos profundos.
+    Este vídeo possui {int(video_end // 60)} minutos de duração. Por ser um vídeo de {int(video_end // 60)} minutos, você DEVE gerar OBRIGATORIAMENTE entre {min_clips_target} e {max_clips_target} cortes virais de altíssimo nível, distribuídos proporcionalmente ao longo de TODO o vídeo (início, meio e fim)! NUNCA gere menos que {min_clips_target} cortes.
 
-⚠️ REGRAS RIGOROSAS DE EXCLUSÃO (FILTRO OBRIGATÓRIO):
-1. EXCLUA TOTALMENTE A INTRODUÇÃO / ABERTURA:
-   - NUNCA comece um clipe com saudações ("oi galera", "fala pessoal", "e aí galera", "sejam bem-vindos", "olá a todos").
-   - NUNCA inclua vinhetas, enrolações de início de vídeo, apresentações demoradas de convidados ou patrocinadores na abertura.
-   - O clipe DEVE começar direto na fala interessante, no gancho provocativo ou no assunto central daquele momento.
+    ⚠️ REGRAS RIGOROSAS DE EXCLUSÃO (FILTRO OBRIGATÓRIO):
+    1. EXCLUA TOTALMENTE A INTRODUÇÃO / ABERTURA:
+       - NUNCA comece um clipe com saudações ("oi galera", "fala pessoal", "e aí galera", "sejam bem-vindos", "olá a todos").
+       - NUNCA inclua vinhetas, enrolações de início de vídeo, apresentações demoradas de convidados ou patrocinadores na abertura.
+       - O clipe DEVE começar direto na fala interessante, no gancho provocativo ou no assunto central daquele momento.
 
-2. EXCLUA TOTALMENTE A FINALIZAÇÃO / ENCERRAMENTO:
-   - NUNCA inclua pedidos de like ("deixa o like", "se inscreva no canal", "ativa as notificações", "deixe nos comentários", "compartilha").
-   - NUNCA inclua despedidas de fim de vídeo ("até a próxima", "valeu fui", "um forte abraço", "fui tchau", "tchau tchau") ou chamadas para outros vídeos.
-   - O clipe DEVE terminar imediatamente após a conclusão da história, reflexão ou punchline, ANTES de qualquer encerramento de canal.
+    2. EXCLUA TOTALMENTE A FINALIZAÇÃO / ENCERRAMENTO:
+       - NUNCA inclua pedidos de like ("deixa o like", "se inscreva no canal", "ativa as notificações", "deixe nos comentários", "compartilha").
+       - NUNCA inclua despedidas de fim de vídeo ("até a próxima", "valeu fui", "um forte abraço", "fui tchau", "tchau tchau") ou chamadas para outros vídeos.
+       - O clipe DEVE terminar imediatamente após a conclusão da história, reflexão ou punchline, ANTES de qualquer encerramento de canal.
 
-3. FOCO EXCLUSIVO NAS PARTES MAIS INTERESSANTES:
-   - Não tente cobrir o vídeo inteiro. Ignore partes mornas, repetições, bate-papo sem propósito ou enrolação.
-   - Cada clipe selecionado deve ser autossuficiente (começo, meio e conclusão lógica compreensíveis sem precisar ver o resto do vídeo).
-   - NUNCA inicie ou termine cortando uma frase ao meio ou no meio de uma palavra.
+    3. FOCO EXCLUSIVO NAS PARTES MAIS INTERESSANTES:
+       - Não tente cobrir o vídeo inteiro. Ignore partes mornas, repetições, bate-papo sem propósito ou enrolação.
+       - Cada clipe selecionado deve ser autossuficiente (começo, meio e conclusão lógica compreensíveis sem precisar ver o resto do vídeo).
+       - NUNCA inicie ou termine cortando uma frase ao meio ou no meio de uma palavra.
 
-4. TÍTULO VIRAL (hook_title):
-   - Em MAIÚSCULAS, até 60 caracteres. Deve gerar curiosidade irresistível, urgência ou impacto emocional para parar a rolagem no feed.
-   - Exemplos: "EU GASTEI 3 MIL REAIS NISSO E ME ARREPENDI", "O SEGREDO DOS BILIONÁRIOS QUE NINGUÉM CONTA", "A VERDADE QUE VAI TE CHOCAR".
-   - NUNCA use títulos descritivos ou neutros tipo "FULANO EXPLICA SEU PONTO DE VISTA".
-   - O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
+    4. TÍTULO VIRAL (hook_title):
+       - Em MAIÚSCULAS, até 60 caracteres. Deve gerar curiosidade irresistível, urgência ou impacto emocional para parar a rolagem no feed.
+       - Exemplos: "EU GASTEI 3 MIL REAIS NISSO E ME ARREPENDI", "O SEGREDO DOS BILIONÁRIOS QUE NINGUÉM CONTA", "A VERDADE QUE VAI TE CHOCAR".
+       - NUNCA use títulos descritivos ou neutros tipo "FULANO EXPLICA SEU PONTO DE VISTA".
+       - O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
 
-DURAÇÃO: {duration_desc}
-(Mínimo: {min_duration}s | Máximo flexível: {max_duration}s [até 2 minutos para histórias ricas] | Duração do vídeo: {int(video_end)}s)
-{chapters_ctx}
-TRANSCRIÇÃO COM TIMESTAMPS:
-{timeline}
+    DURAÇÃO: {duration_desc}
+    (Mínimo: {min_duration}s | Máximo flexível: {max_duration}s [até 2 minutos para histórias ricas] | Duração do vídeo: {int(video_end)}s)
+    {chapters_ctx}
+    TRANSCRIÇÃO COM TIMESTAMPS:
+    {timeline}
 
-RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, contendo apenas os melhores cortes:
-[
-  {{
-    "start_time": <segundo exato de início>,
-    "end_time": <segundo exato do fim>,
-    "hook_title": "<GANCHO VIRAL EM MAIÚSCULAS, máx 60 chars — provoca curiosidade ou emoção>",
-    "ai_score": <float 0.70-0.99>,
-    "scores": {{"hook": <0-10>, "coherence": <0-10>, "value": <0-10>, "energy": <0-10>, "platform_fit": <0-10>}}
-  }}
-]"""
+    RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, contendo apenas os melhores cortes:
+    [
+      {{
+        "start_time": <segundo exato de início>,
+        "end_time": <segundo exato do fim>,
+        "hook_title": "<GANCHO VIRAL EM MAIÚSCULAS, máx 60 chars — provoca curiosidade ou emoção>",
+        "ai_score": <float 0.70-0.99>,
+        "scores": {{"hook": <0-10>, "coherence": <0-10>, "value": <0-10>, "energy": <0-10>, "platform_fit": <0-10>}}
+      }}
+    ]"""
 
     raw = _try_providers(prompt)
     clips = _extrair_clips(raw) if raw else []
@@ -365,6 +371,60 @@ RESPOSTA: Retorne APENAS um array JSON válido sem markdown, sem texto extra, co
 
 
 _BLOCO_CHARS = 16000  # ~5 mil tokens: cabe no limite por minuto do Groq gratuito
+_MAX_CORTES = int(os.environ.get("AI_CURATOR_MAX_CORTES", "25"))  # renderizar dezenas de cortes demora
+_MANUAL = Path(__file__).resolve().parent.parent / "prompts" / "curador_cortes.txt"
+
+
+def _manual() -> str:
+    """Manual do editor (prompt fixo do usuário) — relido a cada vídeo, então editar o arquivo já vale."""
+    try:
+        return _MANUAL.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _montar_prompt(manual: str, transcricao: str, duration_desc: str, min_duration: int, max_duration: int,
+                   video_end: float, chapters_ctx: str) -> str:
+    duracao = (f"DURAÇÃO DE CADA CORTE: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s). "
+               f"O vídeo tem {int(video_end)}s ({int(video_end // 60)} min).")
+    # replace (não format): o manual tem chaves do exemplo de JSON
+    return (manual.replace("{duracao}", duracao).replace("{capitulos}", chapters_ctx or "")
+            .replace("{transcricao}", transcricao))
+
+
+def _mmss(v) -> float | None:
+    """'12:34' ou '1:02:03' ou número → segundos."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    m = re.match(r"^\s*(?:(\d+):)?(\d{1,2}):(\d{2}(?:\.\d+)?)\s*$", str(v or ""))
+    if not m:
+        return None
+    h, mi, s = m.groups()
+    return int(h or 0) * 3600 + int(mi) * 60 + float(s)
+
+
+def _normalizar(c: dict) -> dict:
+    """Campos do manual (titulo, inicio, fim, nota, tempo "MM:SS - MM:SS"…) → formato interno."""
+    if not isinstance(c, dict):
+        return c
+    ini, fim = c.get("start_time", c.get("inicio")), c.get("end_time", c.get("fim"))
+    if (ini is None or fim is None) and c.get("tempo"):
+        partes = str(c["tempo"]).strip("[]` ").split("-")
+        if len(partes) == 2:
+            ini, fim = ini if ini is not None else _mmss(partes[0]), fim if fim is not None else _mmss(partes[1])
+    nota = c.get("ai_score")
+    if nota is None and c.get("nota") is not None:
+        try:
+            nota = float(str(c["nota"]).split("/")[0].replace(",", ".")) / 10
+        except ValueError:
+            nota = None
+    return {
+        **c,
+        "start_time": _mmss(ini) if isinstance(ini, str) else ini,
+        "end_time": _mmss(fim) if isinstance(fim, str) else fim,
+        "hook_title": c.get("hook_title") or c.get("titulo") or "CORTE VIRAL",
+        "ai_score": nota if nota is not None else 0.85,
+    }
 
 
 def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration: int, max_duration: int,
@@ -382,15 +442,21 @@ def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration:
     por_bloco = max(1, min(4, round(max_total / max(1, len(blocos))) + 1))
     todos = []
     for i, b in enumerate(blocos[:24]):
-        prompt = (
-            "Você é um editor de cortes virais (Reels, TikTok, Shorts). Abaixo está UM TRECHO da transcrição de um vídeo "
-            f"longo (parte {i + 1} de {len(blocos)}). Escolha até {por_bloco} cortes autossuficientes, com gancho forte, "
-            "sem saudações nem pedidos de like, começando e terminando em frases completas.\n"
-            f"DURAÇÃO: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s)\n"
-            "hook_title: EM MAIÚSCULAS, até 60 caracteres, que gere curiosidade.\n\n"
-            "TRECHO:\n" + "\n".join(b) + "\n\n"
-            'Responda SÓ com um array JSON: [{"start_time": <s>, "end_time": <s>, "hook_title": "...", "ai_score": <0.70-0.99>}]'
-        )
+        manual = _manual()
+        if manual:
+            trecho = (f"ATENÇÃO: este é só um TRECHO (parte {i + 1} de {len(blocos)}) de um vídeo longo; "
+                      "extraia os cortes deste trecho.\n" + "\n".join(b))
+            prompt = _montar_prompt(manual, trecho, duration_desc, min_duration, max_duration, video_end, "")
+        else:
+            prompt = (
+                "Você é um editor de cortes virais (Reels, TikTok, Shorts). Abaixo está UM TRECHO da transcrição de um vídeo "
+                f"longo (parte {i + 1} de {len(blocos)}). Escolha até {por_bloco} cortes autossuficientes, com gancho forte, "
+                "sem saudações nem pedidos de like, começando e terminando em frases completas.\n"
+                f"DURAÇÃO: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s)\n"
+                "hook_title: EM MAIÚSCULAS, até 60 caracteres, que gere curiosidade.\n\n"
+                "TRECHO:\n" + "\n".join(b) + "\n\n"
+                'Responda SÓ com um array JSON: [{"start_time": <s>, "end_time": <s>, "hook_title": "...", "ai_score": <0.70-0.99>}]'
+            )
         raw = _try_providers(prompt)
         achados = _extrair_clips(raw) if raw else []
         print(f"[ai_curator] bloco {i + 1}/{len(blocos)}: {len(achados)} corte(s)")
@@ -452,13 +518,14 @@ def _extrair_clips(raw: str) -> list:
 
     if not clips:
         print(f"[ai_curator] resposta bruta da IA sem JSON válido (primeiros 300 chars):\n{raw[:300]}")
-    return clips
+    return [_normalizar(c) for c in clips if isinstance(c, dict)]
 
 
 def _validar(clips: list, segments: list[dict], min_duration: int, max_duration: int, video_end: float) -> list[dict]:
     """Saneamento: filtro de intro/outro nas bordas e limites de duração."""
     validated = []
-    for c in clips[:60]:
+    clips = sorted(clips, key=lambda c: float(c.get("ai_score") or 0), reverse=True)[:_MAX_CORTES]
+    for c in clips:
         try:
             start = max(0.0, float(c.get("start_time", 0)))
             end = float(c.get("end_time", start + 60))
@@ -487,6 +554,10 @@ def _validar(clips: list, segments: list[dict], min_duration: int, max_duration:
                 "end_time": round(end, 2),
                 "hook_title": hook_title,
                 "ai_score": ai_score,
+                # roteiro do manual (contexto, falas com tempo, por que vai viralizar)
+                "contexto": c.get("contexto"),
+                "falas": c.get("falas"),
+                "por_que": c.get("por_que_vai_viralizar"),
             })
         except Exception as parse_err:
             print(f"[ai_curator] erro ao validar clipe: {parse_err}")
