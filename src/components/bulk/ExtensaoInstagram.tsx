@@ -26,7 +26,7 @@ export interface ListaExtensao {
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
 /** Versão da pasta extensao/ (manifest.json): a extensão instalada mais velha se recarrega sozinha (1.3.1+) */
-export const VERSAO_EXTENSAO = '1.3.2'
+export const VERSAO_EXTENSAO = '1.3.3'
 
 /** Detecta a extensão e recebe a lista que ela montou no Instagram */
 export function useExtensaoClipost() {
@@ -42,9 +42,11 @@ export function useExtensaoClipost() {
         // extensão carregada da pasta e mais velha que a do site: pede para ela se recarregar (1x por sessão)
         const numero = (v: string) => v.split('.').map(Number).reduce((a, n) => a * 1000 + (n || 0), 0)
         try {
-          if (numero(String(e.data.versao || '0')) < numero(VERSAO_EXTENSAO) && !sessionStorage.getItem('clipost:ext-recarregada')) {
-            sessionStorage.setItem('clipost:ext-recarregada', '1')
+          if (numero(String(e.data.versao || '0')) < numero(VERSAO_EXTENSAO) && sessionStorage.getItem('clipost:ext-recarregada') !== VERSAO_EXTENSAO) {
+            sessionStorage.setItem('clipost:ext-recarregada', VERSAO_EXTENSAO)
             window.postMessage({ tipo: 'CLIPOST_EXTENSAO_RECARREGAR' }, origem)
+            // a página fica ligada à versão velha ("Extension context invalidated"): recarrega sozinha
+            setTimeout(() => window.location.reload(), 1500)
           }
         } catch {}
         window.postMessage({ tipo: 'CLIPOST_EXTENSAO_PEGAR' }, origem)

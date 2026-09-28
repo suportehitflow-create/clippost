@@ -70,12 +70,18 @@ async function coletarPerfil(limite) {
 async function abrirJanela(url, precisaRolar) {
   // até 12 posts: o Instagram já manda na carga da página, então a janela fica minimizada (invisível)
   if (!precisaRolar) return chrome.windows.create({ url, state: 'minimized', focused: false })
-  // mais que isso: precisa rolar, e janela escondida não carrega mais posts — abre quase toda FORA da
-  // tela, no canto inferior direito da janela atual, sem foco (o Chrome deixa no máximo uma beirada)
+  // mais que isso: precisa rolar, e janela escondida não carrega mais posts. O Chrome exige a janela
+  // pelo menos 50% dentro da tela: janelinha mínima no canto inferior direito, metade para fora
   const base = await chrome.windows.getLastFocused().catch(() => null)
-  const left = base ? base.left + base.width - 12 : 4000
-  const top = base ? base.top + base.height - 12 : 4000
-  return chrome.windows.create({ url, type: 'popup', focused: false, width: 480, height: 820, left, top })
+  const lado = 200
+  const left = base ? base.left + base.width - lado / 2 : 0
+  const top = base ? base.top + base.height - lado / 2 : 0
+  try {
+    return await chrome.windows.create({ url, type: 'popup', focused: false, width: lado, height: lado, left, top })
+  } catch (e) {
+    // posição recusada (monitor diferente etc.): canto da janela atual, inteira
+    return chrome.windows.create({ url, type: 'popup', focused: false, width: lado, height: lado, left: base ? base.left + base.width - lado : 0, top: base ? base.top + base.height - lado : 0 })
+  }
 }
 
 async function pelaJanela(usuario, limite) {
