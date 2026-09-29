@@ -787,6 +787,10 @@ def transcribe_media(video_path: str, audio_path: str) -> dict:
 @celery.task(name="process_youtube_video")
 def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = False, template_config: dict | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
+    # métricas do vídeo (quanto demorou): guardadas junto da transcrição no fim
+    _t0 = time.time()
+    _t_primeiro = None
+    _t_ia = None
     if project_id:
         try:
             supabase.table("projects").update({"status": "processing", "error_message": None}).eq("id", project_id).execute()
@@ -1162,6 +1166,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
 
         # Pré-insere todos os cortes como "processing" com storage_url=None
         # Permite ao estúdio abrir com o 1º clipe pronto enquanto exibe os demais em processamento
+        _t_ia = time.time()
         # "Gerar de novo": tira os cortes da tentativa anterior só agora, com os novos já decididos
         # (assim o projeto não fica vazio enquanto baixa/transcreve, e nada duplica)
         try:
@@ -1272,6 +1277,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         pass
                 continue
 
+            if _t_primeiro is None:
+                _t_primeiro = time.time()
             if cid:
                 supabase.table("clips").update({
                     "storage_url": clip_url,
@@ -1302,6 +1309,20 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             }).eq("id", project_id).execute()
             return {"status": "failed", "reason": "no_ready_clips"}
         supabase.table("projects").update({"status": "done"}).eq("id", project_id).execute()
+        try:
+            _fim = time.time()
+            metricas = {
+                "duracao_video_s": round(float(video_duration), 1) if video_duration else None,
+                "ate_cortes_escolhidos_s": round(_t_ia - _t0, 1) if _t_ia else None,
+                "ate_primeiro_corte_s": round(_t_primeiro - _t0, 1) if _t_primeiro else None,
+                "total_s": round(_fim - _t0, 1),
+                "cortes_identificados": len(clips_meta),
+                "cortes_prontos": len(prontos),
+            }
+            print(f"[pipeline] métricas: {metricas}")
+            supabase.table("projects").update({"transcript": {**(transcript_data or {}), "metricas": metricas}}).eq("id", project_id).execute()
+        except Exception as met_err:
+            print(f"[pipeline] métricas não salvas (não crítico): {met_err}")
         try:
             increment_clips_used(user_id)
         except Exception as inc_err:
