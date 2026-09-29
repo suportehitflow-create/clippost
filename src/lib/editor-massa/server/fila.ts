@@ -217,7 +217,8 @@ async function processarItem(job: Job, indice: number) {
     // Legendas automáticas (cortes do Criar Cortes já vêm legendados → não duplica)
     let legendas: string | null = null;
     const lg = global.legendas;
-    if (lg?.ativo && info.temAudio && !v.marcaEmbutida) {
+    // cortes do Criar cortes saem sem legenda gravada: quando a pessoa liga, ela é gerada aqui (em português)
+    if (lg?.ativo && info.temAudio) {
       const token = tokenDoUsuario(job.usuarioId);
       if (!token) log(job, `[LEGENDA] ${v.nome}: sessão expirada, seguindo sem legenda`);
       else {

@@ -747,6 +747,7 @@ def transcribe_media(video_path: str, audio_path: str) -> dict:
                 headers={"Authorization": f"Bearer {groq_key}"},
                 files=[
                     ("model", (None, "whisper-large-v3-turbo")),
+                    ("language", (None, "pt")),
                     ("response_format", (None, "verbose_json")),
                     ("timestamp_granularities[]", (None, "word")),
                     ("timestamp_granularities[]", (None, "segment")),
@@ -774,7 +775,7 @@ def transcribe_media(video_path: str, audio_path: str) -> dict:
     from faster_whisper import WhisperModel
     print("[transcricao] iniciando Whisper tiny local...")
     model = WhisperModel("tiny", device="cpu", compute_type="int8")
-    fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+    fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1, language="pt")
     segments, words = [], []
     for seg in fw_segments_gen:
         segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
@@ -1257,14 +1258,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             layout_cfg = (brand_kit or {}).get("layout_config") or {}
             sub_font_family = layout_cfg.get("fontFamily")
             sub_font_size = layout_cfg.get("fontSize")
-            subtitle_file = generate_ass(
-                segments, str(tmp_dir / f"subtitles_{i}.ass"),
-                clip_start=start, clip_end=end, words=words,
-                margin_v=margin_v,
-                subtitle_preset=sub_preset,
-                font_family=sub_font_family,
-                font_size=sub_font_size,
-            )
+            subtitle_file = None
             try:
                 create_vertical_clip(
                     input_video=video_path,

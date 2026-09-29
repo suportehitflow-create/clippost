@@ -380,7 +380,7 @@ export function desenharComposicao(
   }
   desenharOverlay(ctx, global, v, L, alvo, global.moldura.ativo ? null : template);
   // Só no preview: amostra da legenda automática (a de verdade é gerada no servidor)
-  if (global.legendas?.ativo && !v.marcaEmbutida) desenharAmostraLegenda(ctx, global.legendas.preset, global.legendas.posicaoY, alvo, global.legendas);
+  if (global.legendas?.ativo) desenharAmostraLegenda(ctx, global.legendas.preset, global.legendas.posicaoY, alvo, global.legendas);
   ctx.restore();
   return L;
 }
