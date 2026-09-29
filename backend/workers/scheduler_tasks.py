@@ -64,6 +64,16 @@ def _quebras_seguras(caption: str) -> str:
     return "\n".join(l if l else "⠀" for l in linhas)
 
 
+def _usuario_up(post: dict) -> str:
+    """Usuário do Upload-Post do perfil dono da conta do post (perfil principal = user_id)."""
+    from services.perfis import perfil_da_conta, usuario_upload_post
+    conta = None
+    if post.get("social_account_id"):
+        r = maybe_one(supabase.table("social_accounts").select("account_id").eq("id", post["social_account_id"]))
+        conta = (r.data or {}).get("account_id") if r else None
+    return usuario_upload_post(post["user_id"], perfil_da_conta(conta))
+
+
 def _finish(post_id: str, status: str, detail: str) -> None:
     campos = {"status": status}
     # motivo da falha / data de publicação aparecem no Calendário & Publicações
@@ -104,7 +114,7 @@ def _publicar_manifesto(post: dict, manifesto_url: str, caption: str) -> str:
     if story and platform == "tiktok":
         raise UploadPostError("O TikTok não tem stories pela API.")
     if midias[0].get("tipo") == "video":
-        res = publish_video(user_id=post["user_id"], platform=platform, video_url=midias[0]["url"],
+        res = publish_video(user_id=_usuario_up(post), platform=platform, video_url=midias[0]["url"],
                             caption="" if story else caption, title="", post_id=post["id"], media_type=story)
         return res.get("url", "")
     tmp = Path(tempfile.mkdtemp(prefix="clippost_fotos_"))
@@ -118,7 +128,7 @@ def _publicar_manifesto(post: dict, manifesto_url: str, caption: str) -> str:
                 p = tmp / f"{i + 1}.{ext}"
                 p.write_bytes(r.content)
                 arquivos.append(p)
-        res = publish_photos(post["user_id"], platform, arquivos, "" if story else caption, post["id"], media_type=story)
+        res = publish_photos(_usuario_up(post), platform, arquivos, "" if story else caption, post["id"], media_type=story)
         return res.get("url", "")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -167,7 +177,7 @@ def check_and_publish_scheduled_posts():
             meta_account = _get_meta_token(post["user_id"], platform, post.get("social_account_id")) if platform in META_PLATFORMS else None
             if platform == "instagram" and not (meta_account and (meta_account.get("page_token") or meta_account.get("access_token"))):
                 result = publish_video(
-                    user_id=post["user_id"],
+                    user_id=_usuario_up(post),
                     platform="instagram",
                     video_url=video_url,
                     caption=caption,
@@ -205,7 +215,7 @@ def check_and_publish_scheduled_posts():
             elif platform in UPLOAD_POST_PLATFORMS:
                 up_platform = "youtube" if platform == "youtube_shorts" else platform
                 result = publish_video(
-                    user_id=post["user_id"],
+                    user_id=_usuario_up(post),
                     platform=up_platform,
                     video_url=video_url,
                     caption=caption,

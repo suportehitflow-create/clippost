@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Pagina, Intro } from '@/components/pagina/Base'
 import EditorLegenda from '@/components/ferramentas/EditorLegenda'
 import PostsEmMassa from '@/components/posts/PostsEmMassa'
+import { perfilAtivoSalvo, perfilDaConta } from '@/components/ProfileSwitcher'
 import { FUSOS, gerarLegendasIA, horarioLocal, juntarLegenda, LIMITE_DIARIO, MELHORES_HORARIOS, NOME_REDE } from '@/lib/publicacao'
 import {
   Calendar, ChevronLeft, ChevronRight, Plus, Loader2, X, Send, Trash2, Clock, CheckCircle2, AlertCircle, Layers, Activity, Film, ExternalLink, Sparkles,
@@ -153,12 +154,13 @@ function Conteudo() {
     // segundo plano e recarrega quando termina — a tela não espera por ela
     if (sincronizar) fetch('/api/social/sync', { method: 'POST' }).then(() => carregar(uid, false)).catch(() => null)
     const [c, k, p] = await Promise.all([
-      supabase.from('social_accounts').select('id, platform, username').eq('user_id', uid),
+      supabase.from('social_accounts').select('id, platform, username, account_id').eq('user_id', uid),
       supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('user_id', uid).not('storage_url', 'is', null).not('storage_url', 'like', '%.json').order('created_at', { ascending: false }).limit(120),
       supabase.from('scheduled_posts').select('id, clip_id, platform, caption, scheduled_at, status, social_account_id, clips(title, storage_url)').eq('user_id', uid).order('scheduled_at', { ascending: true }).limit(1000),
     ])
-    const ativa = contaAtivaSalva()
-    const cs = (((c.data as any[]) ?? []).map(x => ({ ...x, is_active: x.id === ativa })) as Conta[])
+    // todas as redes do perfil escolhido no topo já vêm marcadas
+    const perfil = perfilAtivoSalvo()
+    const cs = (((c.data as any[]) ?? []).map(x => ({ ...x, is_active: perfilDaConta(x.account_id) === perfil })) as Conta[])
     setContas(cs)
     setSelContas(s => (s.length ? s : cs.filter(x => x.is_active).map(x => x.id).concat(cs.some(x => x.is_active) ? [] : cs.map(x => x.id))))
     setCortes((k.data as Corte[]) ?? [])

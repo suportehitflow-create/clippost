@@ -598,16 +598,81 @@ async def social_connect_url(req: ConnectRequest):
 
 @app.get("/api/social/accounts/{user_id}")
 async def list_connected_social(user_id: str):
+    """Redes conectadas de TODOS os perfis (cada perfil é um grupo no Upload-Post)."""
     if not os.environ.get("UPLOAD_POST_API_KEY"):
         return {"configured": False, "accounts": []}
-    try:
-        accounts = upload_post.connected_accounts(user_id)
-    except upload_post.UploadPostError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    for a in accounts:
-        if a["platform"] == "youtube":
-            a["platform"] = "youtube_shorts"
+    from services import perfis as _perfis
+    lista, _ativo = _perfis.listar(user_id)
+    accounts = []
+    for pf in lista:
+        try:
+            contas = upload_post.connected_accounts(_perfis.usuario_upload_post(user_id, pf["id"]))
+        except upload_post.UploadPostError as e:
+            if pf["id"] == _perfis.PRINCIPAL:
+                raise HTTPException(status_code=502, detail=str(e))
+            continue
+        for a in contas:
+            if a["platform"] == "youtube":
+                a["platform"] = "youtube_shorts"
+            a["perfil"] = pf["id"]
+            accounts.append(a)
     return {"configured": True, "accounts": accounts}
+
+
+# ---------------- Perfis (marca): redes + template de cada um ----------------
+@app.get("/api/perfis")
+async def perfis_listar(request: Request):
+    user = await _usuario_logado(request)
+    from services import perfis as _perfis
+    lista, ativo = _perfis.listar(user.id)
+    return {"perfis": [{"id": p["id"], "nome": p.get("nome")} for p in lista], "ativo": ativo}
+
+
+@app.post("/api/perfis")
+async def perfis_criar(request: Request):
+    """Cria um perfil e devolve o link para conectar as redes dele. Corpo: { nome }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    from services import perfis as _perfis
+    novo = _perfis.criar(user.id, str(body.get("nome") or ""))
+    try:
+        url = upload_post.connect_url(_perfis.usuario_upload_post(user.id, novo["id"]))
+    except upload_post.UploadPostError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"perfil": novo, "access_url": url}
+
+
+@app.post("/api/perfis/conectar")
+async def perfis_conectar(request: Request):
+    """Link para conectar (ou reconectar) as redes de um perfil. Corpo: { id }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    from services import perfis as _perfis
+    try:
+        return {"access_url": upload_post.connect_url(_perfis.usuario_upload_post(user.id, str(body.get("id") or "")))}
+    except upload_post.UploadPostError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/perfis/ativar")
+async def perfis_ativar(request: Request):
+    """Troca o perfil ativo (e o template junto). Corpo: { id }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    from services import perfis as _perfis
+    try:
+        return await asyncio.to_thread(_perfis.ativar, user.id, str(body.get("id") or ""), supabase)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/perfis/renomear")
+async def perfis_renomear(request: Request):
+    user = await _usuario_logado(request)
+    body = await request.json()
+    from services import perfis as _perfis
+    _perfis.renomear(user.id, str(body.get("id") or ""), str(body.get("nome") or ""))
+    return {"ok": True}
 
 
 _PREFIXO_PERFIL = {"instagram": "ig", "tiktok": "tt", "facebook": "fb"}

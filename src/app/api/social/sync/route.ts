@@ -19,11 +19,13 @@ export async function POST(req: NextRequest) {
   let synced = 0
   for (const acc of accounts) {
     const platform = acc.platform === 'youtube' ? 'youtube_shorts' : acc.platform
+    // contas de outros perfis (grupos) ficam marcadas "<perfil>::<conta>"
+    const base = acc.account_id || acc.handle || platform
     try {
       await supabase.from('social_accounts').upsert({
         user_id: user.id,
         platform,
-        account_id: acc.account_id || acc.handle || platform,
+        account_id: acc.perfil && acc.perfil !== 'principal' ? `${acc.perfil}::${base}` : base,
         username: acc.handle,
       }, { onConflict: 'user_id,platform,account_id' })
       synced++
