@@ -1,6 +1,7 @@
 'use client'
 
 import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
+import YoutubeCookies from '@/components/settings/YoutubeCookies'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -228,6 +229,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <YoutubeCookies />
 
         {/* SEÇÃO: CONTAS SOCIAIS */}
         <section id="social" className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6 space-y-5">

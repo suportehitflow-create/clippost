@@ -1071,6 +1071,29 @@ def _cookies_para_netscape(raw: str) -> str:
     return "\n".join(linhas) + "\n"
 
 
+@app.post("/api/social/youtube-cookies")
+async def salvar_cookies_youtube(request: Request):
+    """Cookies do YouTube (arquivo cookies.txt exportado do navegador) para o servidor conseguir baixar
+    quando o YouTube pede "confirme que você não é um robô". Fica no Storage PRIVADO. Exige login."""
+    await _exigir_login(request)
+    body = await request.json()
+    raw = str(body.get("cookies") or "").strip()
+    if ".youtube.com" not in raw or "\t" not in raw:
+        raise HTTPException(status_code=400, detail="Cole o conteúdo do arquivo cookies.txt do YouTube (formato Netscape).")
+    raw = raw if raw.endswith("\n") else raw + "\n"
+    caminho = "/tmp/youtube_cookies.txt"
+    with open(caminho, "w", encoding="utf-8") as f:
+        f.write(raw)
+    os.environ["YOUTUBE_COOKIES_FILE"] = caminho
+    try:
+        privado = _storage_privado()
+        if privado:
+            privado.upload("youtube_cookies.txt", raw.encode("utf-8"), file_options={"content-type": "text/plain", "upsert": "true"})
+    except Exception as st_err:
+        print(f"[cookies] aviso ao guardar cookies do YouTube: {type(st_err).__name__}")
+    return {"ok": True}
+
+
 @app.post("/api/admin/set-instagram-cookies")
 async def set_instagram_cookies(request: Request):
     """Carrega cookies do Instagram via HTTP e persiste no Storage PRIVADO. Exige login."""
