@@ -98,9 +98,9 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
       const original = String(proximo.source_url || '')
       try {
         if (!user) throw new Error('sem login')
-        // YouTube: primeiro pelo navegador (o servidor é bloqueado); se o navegador não conseguir,
-        // a próxima tentativa vai pelo servidor, que tem os planos dele (outros clientes e serviços)
-        const peloNavegador = !!idYouTube(original) && instalada && n !== 2
+        // YouTube: as duas primeiras tentativas pelo navegador (o servidor é bloqueado); a última vai pelo
+        // servidor, que tem os planos dele (outros clientes e serviços)
+        const peloNavegador = !!idYouTube(original) && instalada && n < MAX_TENTATIVAS
         if (peloNavegador) {
           try {
             await mandarCortar(proximo.id, user.id, await baixarPeloNavegador(supabase, user.id, proximo.id, original))
