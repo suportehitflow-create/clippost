@@ -199,7 +199,8 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
       id: i.permalink, tipo: i.tipo, url: i.url, thumbnail: i.thumbnail, permalink: i.permalink, legenda: i.title,
       views: i.view_count, likes: i.like_count, comentarios: i.comment_count, timestamp: i.timestamp, duracao: i.duration,
     }))
-    if (periodo) itens = itens.filter(i => (i.timestamp || 0) >= Date.now() / 1000 - periodo * 86400)
+    // o Facebook não mostra a data no quadro do reel: sem nenhuma data, o período não zera a lista
+    if (periodo && itens.some(i => i.timestamp)) itens = itens.filter(i => (i.timestamp || 0) >= Date.now() / 1000 - periodo * 86400)
     const chave: keyof Item = ordem === 'curtidos' ? 'likes' : ordem === 'visualizados' ? 'views' : 'timestamp'
     itens = itens.sort((a, b) => ((b[chave] as number) || 0) - ((a[chave] as number) || 0)).slice(0, limite)
     const soma = (k: keyof Item) => itens.reduce((t, i) => t + ((i[k] as number) || 0), 0)
@@ -554,14 +555,15 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                         <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[10px] font-semibold flex items-center gap-1 capitalize"><Icone className="w-3 h-3" />{res.plataforma === 'instagram' ? i.tipo : 'vídeo'}</span>
                       </button>
                       <div className="p-2.5 space-y-1.5 flex-1 flex flex-col">
-                        <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2 min-h-[28px]">{i.legenda || '—'}</p>
+                        {i.legenda && <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2 min-h-[28px]">{i.legenda}</p>}
+                        {/* só o que a rede mostra (o Facebook dá só as views no quadro do reel) */}
                         <div className="flex items-center gap-2.5 text-[10px] text-zinc-400 tabular-nums">
-                          <span className="flex items-center gap-0.5"><Heart className="w-3 h-3" />{num(i.likes)}</span>
+                          {i.likes != null && <span className="flex items-center gap-0.5"><Heart className="w-3 h-3" />{num(i.likes)}</span>}
                           {i.views != null && <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" />{num(i.views)}</span>}
-                          <span className="flex items-center gap-0.5"><MessageCircle className="w-3 h-3" />{num(i.comentarios)}</span>
+                          {i.comentarios != null && <span className="flex items-center gap-0.5"><MessageCircle className="w-3 h-3" />{num(i.comentarios)}</span>}
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-zinc-500 mt-auto">
-                          <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" />{data(i.timestamp)}</span>
+                          <span className="flex items-center gap-1">{i.timestamp ? <><CalendarIcon className="w-3 h-3" />{data(i.timestamp)}</> : null}</span>
                           <span className="flex items-center gap-1.5">
                             {dur(i.duracao) && <span className="tabular-nums">{dur(i.duracao)}</span>}
                             <button type="button" onClick={() => baixar([i])} className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white" title="Baixar"><Download className="w-3.5 h-3.5" /></button>

@@ -71,17 +71,28 @@ async function coletarPerfil(limite) {
 async function coletarFacebook(limite) {
   const esperar = ms => new Promise(r => setTimeout(r, ms))
   const vistos = new Map()
+  // o quadro do reel mostra só as views ("101 mil", "1,2 mi", "3.4K"); o texto do link não é título
+  const numero = s => {
+    const m = String(s || '').replace(/\s+/g, ' ').match(/([\d.,]+)\s*(mil|mi|bi|k|m|b)?\b/i)
+    if (!m) return null
+    const mult = { mil: 1e3, k: 1e3, mi: 1e6, m: 1e6, bi: 1e9, b: 1e9 }[(m[2] || '').toLowerCase()] || 1
+    const n = mult > 1 ? parseFloat(m[1].replace(',', '.')) : parseFloat(m[1].replace(/[.,]/g, ''))
+    return isNaN(n) ? null : Math.round(n * mult)
+  }
   const juntar = () => {
     document.querySelectorAll('a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch/?v="]').forEach(a => {
       const href = a.href.split('&')[0]
       const id = (href.match(/\/reel\/(\d+)|\/videos\/(?:[^/]+\/)?(\d+)|[?&]v=(\d+)/) || []).slice(1).find(Boolean)
       if (!id || vistos.has(id)) return
       const img = a.querySelector('img')
+      const texto = (a.innerText || '').replace(/\s+/g, ' ').trim()
+      const soViews = /^[\d.,]+\s*(mil|mi|bi|k|m|b)?$/i.test(texto)
+      const aria = a.getAttribute('aria-label') || ''
       vistos.set(id, {
         tipo: 'reel', url: href, video: true,
         permalink: href.includes('/reel/') ? `https://www.facebook.com/reel/${id}` : href,
-        title: (a.getAttribute('aria-label') || a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200),
-        thumbnail: img ? img.src : null, view_count: null, like_count: null, comment_count: null, timestamp: null, duration: null,
+        title: soViews ? '' : (/^pr[eé]via|^preview/i.test(aria) ? texto : aria || texto).slice(0, 200),
+        thumbnail: img ? img.src : null, view_count: soViews ? numero(texto) : null, like_count: null, comment_count: null, timestamp: null, duration: null,
       })
     })
   }
@@ -97,7 +108,8 @@ async function coletarFacebook(limite) {
   }
   const itens = [...vistos.values()]
   return {
-    perfil: { usuario: location.pathname.split('/').filter(Boolean)[0], nome: document.title.split('|')[0].trim() || null, foto: null, seguidores: null, total_posts: null },
+    // título da aba: "(20+) Toguro Reels | Facebook" → "Toguro"
+    perfil: { usuario: location.pathname.split('/').filter(Boolean)[0], nome: document.title.split('|')[0].replace(/^\(\d+\+?\)\s*/, '').replace(/\s+(Reels|V[ií]deos|Videos)\s*$/i, '').trim() || null, foto: null, seguidores: null, total_posts: null },
     itens: limite ? itens.slice(0, limite) : itens,
     logado: document.cookie.includes('c_user'),
   }
@@ -121,25 +133,33 @@ async function pelaJanelaFacebook(pagina, limite) {
     }
     return dados
   } finally {
-    chrome.windows.remove(janela.id).catch(() => {})
+    fecharJanela(janela)
   }
 }
 
 async function abrirJanela(url, precisaRolar) {
   // até 12 posts: o Instagram já manda na carga da página, então a janela fica minimizada (invisível)
   if (!precisaRolar) return chrome.windows.create({ url, state: 'minimized', focused: false })
-  // mais que isso: precisa rolar, e janela escondida não carrega mais posts. O Chrome exige a janela
-  // pelo menos 50% dentro da tela: janelinha mínima no canto inferior direito, metade para fora
+  // mais que isso: precisa rolar, e página escondida não carrega mais posts (o Windows marca como
+  // escondida a janela que fica atrás de outra). Por isso a janelinha abre na frente, pequena no canto
+  // de baixo; quando termina, fecha e o foco volta para a janela do site (fecharJanela)
   const base = await chrome.windows.getLastFocused().catch(() => null)
-  const lado = 200
-  const left = base ? base.left + base.width - lado / 2 : 0
-  const top = base ? base.top + base.height - lado / 2 : 0
+  const lado = 240
+  const left = base ? base.left + base.width - lado : 0
+  const top = base ? base.top + base.height - lado : 0
+  let janela
   try {
-    return await chrome.windows.create({ url, type: 'popup', focused: false, width: lado, height: lado, left, top })
+    janela = await chrome.windows.create({ url, type: 'popup', focused: true, width: lado, height: lado, left, top })
   } catch (e) {
-    // posição recusada (monitor diferente etc.): canto da janela atual, inteira
-    return chrome.windows.create({ url, type: 'popup', focused: false, width: lado, height: lado, left: base ? base.left + base.width - lado : 0, top: base ? base.top + base.height - lado : 0 })
+    janela = await chrome.windows.create({ url, type: 'popup', focused: true, width: lado, height: lado })
   }
+  janela.volta = base && base.id
+  return janela
+}
+
+function fecharJanela(janela) {
+  chrome.windows.remove(janela.id).catch(() => {})
+  if (janela.volta) chrome.windows.update(janela.volta, { focused: true }).catch(() => {})
 }
 
 async function pelaJanela(usuario, limite) {
@@ -161,7 +181,7 @@ async function pelaJanela(usuario, limite) {
     }
     return dados
   } finally {
-    chrome.windows.remove(janela.id).catch(() => {})
+    fecharJanela(janela)
   }
 }
 
