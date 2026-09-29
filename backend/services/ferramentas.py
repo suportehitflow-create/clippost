@@ -83,7 +83,7 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     url = normalize_profile_url(perfil if ("." in perfil or perfil.startswith("http")) else f"instagram.com/{perfil.lstrip('@')}")
     plataforma = detect_platform(url)
     # período e ordem por curtidas/views pedem uma leitura maior que o limite
-    leitura = limite if (ordem == "recentes" and not periodo_dias) else min(limite * 3, 3000)
+    leitura = limite if (ordem == "recentes" and not periodo_dias) else min(max(limite * 3, (periodo_dias or 0) * 3), 600)
 
     dados = None
     fonte = "servidor"
@@ -99,7 +99,9 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     if dados is None:
         # ordem pedida direto na listagem; abrir vídeo a vídeo (lento) só se precisar de data ou curtidas
         lista = list_profile_videos(url, limit=leitura, user_id=user_id,
-                                    sort_by={"curtidos": "likes", "visualizados": "views"}.get(ordem, "date"),
+                                    # com período: pega os mais NOVOS e só depois ordena por views/curtidas aqui
+                                    # (antes vinham os mais vistos de todos os tempos, que são antigos → 0 no período)
+                                    sort_by="date" if periodo_dias else {"curtidos": "likes", "visualizados": "views"}.get(ordem, "date"),
                                     # YouTube já traz views e data aproximada na listagem; abrir vídeo a vídeo é bloqueado
                                     enriquecer=plataforma != "youtube" and (bool(periodo_dias) or ordem == "curtidos"))
         dados = {
