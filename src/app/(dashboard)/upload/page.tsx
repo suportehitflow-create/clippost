@@ -77,7 +77,17 @@ function Conteudo() {
     // pronto depois do primeiro clique, e o que a pessoa colava logo de cara se perdia
     const u = new URLSearchParams(window.location.search).get('url')
     if (u) { setUrl(decodeURIComponent(u)); setAba('link') }
+    // o que foi digitado/colado antes da página terminar de carregar fica no campo: não deixa sumir
+    // (anotado pelo script do layout; apagado ao ler e ao sair, para não voltar um link antigo)
+    const anotado = (window as any).__clipostDigitado as Record<string, string> | undefined
+    const esquecer = () => { if (anotado) delete anotado['criar-link'] }
+    if (!u) {
+      const digitado = anotado?.['criar-link'] || (document.getElementById('criar-link') as HTMLInputElement | null)?.value
+      if (digitado) setUrl(digitado)
+    }
+    esquecer()
     fetch('/api/autopilot/settings', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => d?.interval_minutes && setIntervalo(d.interval_minutes)).catch(() => {})
+    return esquecer
   }, [])
 
   /** Um vídeo (link ou arquivo) → projeto + processamento. Devolve o id do projeto. */

@@ -14,6 +14,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        {/* guarda o que a pessoa digita/cola antes da página terminar de carregar (senão o campo volta vazio) */}
+        <script dangerouslySetInnerHTML={{ __html: "window.__clipostDigitado={};document.addEventListener('input',function(e){var t=e.target;if(t&&t.id)window.__clipostDigitado[t.id]=t.value},true)" }} />
         {children}
       </body>
     </html>
