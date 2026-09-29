@@ -1132,8 +1132,17 @@ export default function ProjectClient({
   const semCortes = projetoEstudio.clips.length === 0 && status !== 'processing'
   // cortes que o servidor começou mas não terminou (ex.: envio falhou antes das novas tentativas)
   const faltando = status !== 'processing' ? clips.filter(c => !c.storage_url).length : 0
+  // nunca mostra detalhe técnico (nomes de ferramentas/serviços): só o que a pessoa entende
+  const motivo = (() => {
+    const m = String(errorMessage || '')
+    if (/download|YouTubeBlock|yt-dlp|cobalt|piped|invidious|baix/i.test(m)) return 'o YouTube não liberou o download agora. Tente de novo em alguns minutos.'
+    if (/transcri|whisper|áudio|audio/i.test(m)) return 'não foi possível entender o áudio do vídeo.'
+    if (/momento|curador|IA|gemini|groq/i.test(m)) return 'a IA não encontrou bons momentos neste vídeo.'
+    if (/clip|corte|render|ffmpeg/i.test(m)) return 'a criação dos cortes foi interrompida. Tente de novo.'
+    return 'algo deu errado no processamento. Tente de novo.'
+  })()
   const avisoErro = semCortes
-    ? (status === 'failed' ? `Não deu para gerar os cortes deste vídeo${errorMessage ? `: ${String(errorMessage).slice(0, 140)}` : '.'}` : 'Nenhum corte foi gerado para este vídeo.')
+    ? (status === 'failed' ? `Não deu para gerar os cortes: ${motivo}` : 'Nenhum corte foi gerado para este vídeo.')
     : faltando > 0
       ? (faltando === 1 ? '1 corte não terminou de gerar.' : `${faltando} cortes não terminaram de gerar.`)
       : ''
