@@ -8,7 +8,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ detail: 'Faça login para continuar.' }, { status: 401 })
   const { data, error } = await supabase
     .from('projects')
-    .select('id, title, status, created_at, transcript->metricas')
+    .select('id, title, status, created_at, transcript->metricas, transcript->segments->-1->end, clips(created_at, status)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(20)
