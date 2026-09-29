@@ -67,6 +67,64 @@ async function coletarPerfil(limite) {
   }
 }
 
+// Roda DENTRO da página de vídeos/reels do Facebook (com o login do navegador): rola e junta os links
+async function coletarFacebook(limite) {
+  const esperar = ms => new Promise(r => setTimeout(r, ms))
+  const vistos = new Map()
+  const juntar = () => {
+    document.querySelectorAll('a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch/?v="]').forEach(a => {
+      const href = a.href.split('&')[0]
+      const id = (href.match(/\/reel\/(\d+)|\/videos\/(?:[^/]+\/)?(\d+)|[?&]v=(\d+)/) || []).slice(1).find(Boolean)
+      if (!id || vistos.has(id)) return
+      const img = a.querySelector('img')
+      vistos.set(id, {
+        tipo: 'reel', url: href, video: true,
+        permalink: href.includes('/reel/') ? `https://www.facebook.com/reel/${id}` : href,
+        title: (a.getAttribute('aria-label') || a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+        thumbnail: img ? img.src : null, view_count: null, like_count: null, comment_count: null, timestamp: null, duration: null,
+      })
+    })
+  }
+  for (let i = 0; i < 40 && !document.querySelector('a[href*="/reel/"], a[href*="/videos/"]'); i++) await esperar(250)
+  let parado = 0, ultimo = 0
+  juntar()
+  while ((!limite || vistos.size < limite) && parado < 5) {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    await esperar(1500)
+    juntar()
+    if (vistos.size === ultimo) parado++
+    else { parado = 0; ultimo = vistos.size }
+  }
+  const itens = [...vistos.values()]
+  return {
+    perfil: { usuario: location.pathname.split('/').filter(Boolean)[0], nome: document.title.split('|')[0].trim() || null, foto: null, seguidores: null, total_posts: null },
+    itens: limite ? itens.slice(0, limite) : itens,
+    logado: document.cookie.includes('c_user'),
+  }
+}
+
+async function pelaJanelaFacebook(pagina, limite) {
+  const base = /^https?:/.test(pagina) ? pagina.replace(/[?#].*$/, '').replace(/\/$/, '') : `https://www.facebook.com/${pagina}`
+  const alvo = /\/(reels|videos)$/.test(base) ? base : `${base}/reels`
+  const janela = await abrirJanela(alvo, true)
+  const abaId = janela.tabs && janela.tabs[0] && janela.tabs[0].id
+  try {
+    await new Promise(res => {
+      const pronto = (id, info) => { if (id === abaId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(pronto); res() } }
+      chrome.tabs.onUpdated.addListener(pronto)
+      setTimeout(() => { chrome.tabs.onUpdated.removeListener(pronto); res() }, 25000)
+    })
+    const [r] = await chrome.scripting.executeScript({ target: { tabId: abaId }, world: 'MAIN', func: coletarFacebook, args: [limite] })
+    const dados = r && r.result
+    if (!dados || !dados.itens.length) {
+      throw new Error(dados && !dados.logado ? 'Entre no Facebook neste navegador e tente de novo.' : 'O Facebook não mostrou vídeos dessa página.')
+    }
+    return dados
+  } finally {
+    chrome.windows.remove(janela.id).catch(() => {})
+  }
+}
+
 async function abrirJanela(url, precisaRolar) {
   // até 12 posts: o Instagram já manda na carga da página, então a janela fica minimizada (invisível)
   if (!precisaRolar) return chrome.windows.create({ url, state: 'minimized', focused: false })
@@ -221,12 +279,12 @@ chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {
     })()
     return true
   }
-  if (msg?.tipo !== 'BUSCAR_INSTAGRAM') return
+  if (msg?.tipo !== 'BUSCAR_INSTAGRAM' && msg?.tipo !== 'BUSCAR_FACEBOOK') return
   const usuario = String(msg.usuario || '').replace(/^@/, '').trim()
   const limite = Math.max(0, Math.min(Number(msg.limite) || 0, 3000))
   ;(async () => {
     try {
-      responder({ ok: true, dados: await pelaJanela(usuario, limite) })
+      responder({ ok: true, dados: msg.tipo === 'BUSCAR_FACEBOOK' ? await pelaJanelaFacebook(usuario, limite) : await pelaJanela(usuario, limite) })
     } catch (e) {
       responder({ ok: false, erro: e?.message || String(e) })
     }

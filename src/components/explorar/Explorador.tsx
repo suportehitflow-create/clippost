@@ -190,11 +190,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
   }
 
   /** Busca pelo navegador (extensão), com o mesmo filtro de período, ordem e quantidade do servidor */
-  async function pelaExtensao(usuario: string, o = { limite, ordem, periodo }): Promise<Resultado> {
+  async function pelaExtensao(usuario: string, o = { limite, ordem, periodo }, rede: 'instagram' | 'facebook' = 'instagram'): Promise<Resultado> {
     const { limite, ordem, periodo } = o
     // período e ordem por views/curtidas pedem uma leitura maior que o limite
     const leitura = ordem === 'recentes' && !periodo ? limite : Math.min(limite * 3, 3000)
-    const d = await buscarPelaExtensao(usuario, leitura)
+    const d = await buscarPelaExtensao(usuario, leitura, 240000, rede)
     let itens: Item[] = d.itens.filter(i => i.url).map(i => ({
       id: i.permalink, tipo: i.tipo, url: i.url, thumbnail: i.thumbnail, permalink: i.permalink, legenda: i.title,
       views: i.view_count, likes: i.like_count, comentarios: i.comment_count, timestamp: i.timestamp, duracao: i.duration,
@@ -204,8 +204,8 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     itens = itens.sort((a, b) => ((b[chave] as number) || 0) - ((a[chave] as number) || 0)).slice(0, limite)
     const soma = (k: keyof Item) => itens.reduce((t, i) => t + ((i[k] as number) || 0), 0)
     return {
-      perfil: { ...d.perfil, usuario: d.perfil.usuario || usuario, url: `https://www.instagram.com/${usuario}/` },
-      plataforma: 'instagram',
+      perfil: { ...d.perfil, usuario: d.perfil.usuario || usuario, url: rede === 'facebook' ? `https://www.facebook.com/${usuario}` : `https://www.instagram.com/${usuario}/` },
+      plataforma: rede,
       fonte: 'extensao',
       totais: {
         views: soma('views') || null, likes: soma('likes'), comentarios: soma('comentarios'), posts: itens.length,
@@ -233,8 +233,12 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
       return
     }
     const extensaoPrimeiro = ehInstagram && instalada && !oficial?.configurado
+    // Facebook só mostra os vídeos para quem está logado: com a extensão, lê pelo navegador
+    const paginaFb = /facebook\.com|fb\.com/i.test(perfil) ? (perfil.match(/(?:facebook|fb)\.com\/([^/?#]+)/i)?.[1] ?? '') : ''
     try {
-      if (extensaoPrimeiro) {
+      if (paginaFb && instalada) {
+        setRes(await pelaExtensao(paginaFb, { limite, ordem, periodo }, 'facebook'))
+      } else if (extensaoPrimeiro) {
         setRes(await pelaExtensao(usuarioIg, { limite, ordem, periodo }))
       } else {
         try {

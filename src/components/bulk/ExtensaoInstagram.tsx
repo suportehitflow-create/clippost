@@ -26,7 +26,7 @@ export interface ListaExtensao {
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
 /** Versão da pasta extensao/ (manifest.json): a extensão instalada mais velha se recarrega sozinha (1.3.1+) */
-export const VERSAO_EXTENSAO = '1.4.1'
+export const VERSAO_EXTENSAO = '1.5.0'
 
 /** A extensão (1.4.0+) baixa o vídeo do YouTube pelo navegador (IP de quem usa) e sobe nos links dados */
 export function baixarYouTubePelaExtensao(
@@ -106,7 +106,7 @@ export interface ResultadoBusca {
 }
 
 /** Pede à extensão (1.2.0+) para buscar o perfil do Instagram com a sessão do navegador — sem clique */
-export function buscarPelaExtensao(usuario: string, limite: number, timeoutMs = 240000): Promise<ResultadoBusca> {
+export function buscarPelaExtensao(usuario: string, limite: number, timeoutMs = 240000, rede: 'instagram' | 'facebook' = 'instagram'): Promise<ResultadoBusca> {
   return new Promise((resolve, reject) => {
     const origem = window.location.origin
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -116,10 +116,10 @@ export function buscarPelaExtensao(usuario: string, limite: number, timeoutMs = 
       clearTimeout(t)
       window.removeEventListener('message', aoMensagem)
       if (e.data.ok) resolve(e.data.dados)
-      else reject(new Error(`Instagram pela extensão: ${e.data.erro}`))
+      else reject(new Error(e.data.erro || 'a extensão não conseguiu ler o perfil'))
     }
     window.addEventListener('message', aoMensagem)
-    window.postMessage({ tipo: 'CLIPOST_EXTENSAO_BUSCAR', id, usuario: usuario.replace(/^@/, ''), limite }, origem)
+    window.postMessage({ tipo: 'CLIPOST_EXTENSAO_BUSCAR', id, usuario: usuario.replace(/^@/, ''), limite, rede }, origem)
   })
 }
 
