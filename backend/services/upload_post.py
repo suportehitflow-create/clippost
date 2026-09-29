@@ -73,6 +73,27 @@ def connect_url(user_id: str) -> str:
     return url
 
 
+def authorize_url(user_id: str, platform: str) -> str:
+    """Link de login da própria rede (Instagram, Facebook, TikTok, Google) para conectar a conta,
+    sem passar pela página da Upload-Post: o Clipost mostra os botões e manda direto para a rede.
+    No fim a rede volta para /conectado?connect_status=success|cancelled|error&platform=..."""
+    if platform not in PLATFORMS:
+        raise UploadPostError("Rede não suportada.")
+    ensure_profile(user_id)
+    resp = httpx.post(
+        f"{API_BASE}/uploadposts/oauth/{platform}/start",
+        headers=_headers(),
+        json={"profile": user_id, "redirect_url": f"{FRONTEND_URL}/conectado"},
+        timeout=30,
+    )
+    if not resp.is_success:
+        raise UploadPostError(f"Erro ao abrir a conexão ({resp.status_code}): {_error_message(resp)}")
+    url = resp.json().get("authorize_url")
+    if not url:
+        raise UploadPostError("A conexão não devolveu o link da rede.")
+    return url
+
+
 def connected_accounts(user_id: str) -> list[dict]:
     """Redes conectadas e prontas para publicar."""
     resp = httpx.get(f"{API_BASE}/uploadposts/users/{user_id}", headers=_headers(), timeout=30)

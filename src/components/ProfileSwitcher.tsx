@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronDown, Plus, Settings, Check, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { conectarRedes } from '@/lib/conectarRedes'
+import ModalConectarRedes from '@/components/ModalConectarRedes'
 
 // Perfis (marca): cada perfil junta as redes onde aquela marca posta (Instagram, Facebook, TikTok,
 // YouTube) e tem o SEU template. Trocar de perfil aqui troca as redes e o template usados no site.
@@ -57,6 +57,7 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
   const [novoNome, setNovoNome] = useState('')
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [modalPerfil, setModalPerfil] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -113,10 +114,10 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
     window.location.reload()
   }
 
-  async function conectar(perfilId: string) {
-    setOcupado('conectar-' + perfilId)
-    setErro(await conectarRedes(perfilId, carregar))
-    setOcupado(null)
+  // abre a tela do Clipost com as redes; cada botão vai direto para o login da rede
+  function conectar(perfilId: string) {
+    setOpen(false)
+    setModalPerfil(perfilId)
   }
 
   async function criar() {
@@ -180,7 +181,7 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
                     {ocupado === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" /> : p.id === ativo && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
                   </button>
                   <button type="button" onClick={() => conectar(p.id)} className="ml-2.5 mb-1.5 text-[10px] font-semibold text-indigo-300 hover:text-indigo-200 cursor-pointer">
-                    {ocupado === 'conectar-' + p.id ? 'Abrindo…' : redes.length ? '+ Conectar outra rede' : '+ Conectar redes'}
+                    {redes.length ? '+ Conectar outra rede' : '+ Conectar redes'}
                   </button>
                 </div>
               )
@@ -215,6 +216,15 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
             </Link>
           </div>
         </div>
+      )}
+      {modalPerfil && (
+        <ModalConectarRedes
+          perfilId={modalPerfil}
+          perfilNome={perfis.length > 1 ? perfis.find(p => p.id === modalPerfil)?.nome : undefined}
+          contas={redesDe(modalPerfil)}
+          fechar={() => setModalPerfil(null)}
+          aoConectar={carregar}
+        />
       )}
     </div>
   )

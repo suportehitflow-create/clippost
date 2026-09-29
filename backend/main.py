@@ -644,12 +644,17 @@ async def perfis_criar(request: Request):
 
 @app.post("/api/perfis/conectar")
 async def perfis_conectar(request: Request):
-    """Link para conectar (ou reconectar) as redes de um perfil. Corpo: { id }"""
+    """Link para conectar (ou reconectar) as redes de um perfil. Corpo: { id, rede? }
+    Com `rede` (instagram|facebook|tiktok|youtube): devolve o login da própria rede (authorize_url)."""
     user = await _usuario_logado(request)
     body = await request.json()
     from services import perfis as _perfis
+    usuario = _perfis.usuario_upload_post(user.id, str(body.get("id") or ""))
     try:
-        return {"access_url": upload_post.connect_url(_perfis.usuario_upload_post(user.id, str(body.get("id") or "")))}
+        rede = str(body.get("rede") or "")
+        if rede:
+            return {"authorize_url": await asyncio.to_thread(upload_post.authorize_url, usuario, rede)}
+        return {"access_url": upload_post.connect_url(usuario)}
     except upload_post.UploadPostError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

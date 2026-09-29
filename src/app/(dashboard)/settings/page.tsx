@@ -1,7 +1,8 @@
 'use client'
 
-import { conectarRedes } from '@/lib/conectarRedes'
-import { perfilAtivoSalvo } from '@/components/ProfileSwitcher'
+import ModalConectarRedes from '@/components/ModalConectarRedes'
+import { perfilAtivoSalvo, perfilDaConta } from '@/components/ProfileSwitcher'
+import { mensagemDoErro } from '@/lib/conectarRedes'
 import YoutubeCookies from '@/components/settings/YoutubeCookies'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,6 +28,7 @@ interface SocialAccount {
   username: string | null
   display_name: string | null
   avatar_url: string | null
+  account_id?: string | null
   is_active: boolean
   created_at: string
 }
@@ -39,6 +41,10 @@ function SearchParamsReader({ onMetaConnected, onMetaError }: {
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('meta_connected') === '1') onMetaConnected()
     if (searchParams.get('meta_error')) onMetaError(searchParams.get('meta_error') || 'Erro ao conectar')
+    // volta de /conectado quando a janelinha foi bloqueada e a conexão abriu na mesma aba
+    const conexao = searchParams.get('conexao')
+    if (conexao === 'success') onMetaConnected()
+    else if (conexao === 'error') onMetaError(mensagemDoErro(searchParams.get('erro_conexao')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return null
@@ -88,7 +94,7 @@ export default function SettingsPage() {
       await fetch('/api/social/sync', { method: 'POST' }).catch(() => null)
       const { data } = await supabase
         .from('social_accounts')
-        .select('id, platform, username, created_at')
+        .select('id, platform, username, account_id, created_at')
         .eq('user_id', uid)
         .order('created_at', { ascending: true })
 
@@ -104,6 +110,7 @@ export default function SettingsPage() {
         username: acc.username,
         display_name: acc.username ? `@${acc.username}` : 'Conta',
         avatar_url: null,
+        account_id: acc.account_id,
         is_active: savedActiveId ? acc.id === savedActiveId : false,
         created_at: acc.created_at
       }))
@@ -137,12 +144,9 @@ export default function SettingsPage() {
   }
 
   async function connectViaUploadPost() {
-    // abre numa janelinha por cima do site; quando termina, a lista abaixo já mostra a rede nova
-    setConnectingUpload(true)
+    // tela do Clipost com as redes; cada botão abre direto o login da rede
     setMetaError('')
-    const erro = await conectarRedes(perfilAtivoSalvo(), () => userId && loadAccounts(userId))
-    if (erro) setMetaError(erro)
-    setConnectingUpload(false)
+    setConnectingUpload(true)
   }
 
   async function removeAccount(id: string) {
@@ -176,6 +180,15 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {connectingUpload && (
+        <ModalConectarRedes
+          perfilId={perfilAtivoSalvo()}
+          contas={accounts.filter(a => perfilDaConta(a.account_id) === perfilAtivoSalvo())}
+          fechar={() => setConnectingUpload(false)}
+          aoConectar={() => userId && loadAccounts(userId)}
+        />
+      )}
 
       <SearchParamsReader
         onMetaConnected={() => setMetaConnected(true)}
@@ -229,12 +242,12 @@ export default function SettingsPage() {
           {metaConnected && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Instagram e Facebook conectados com sucesso!</span>
+              <span>Rede conectada.</span>
             </div>
           )}
           {metaError && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-              Erro: {metaError}
+              {metaError}
             </div>
           )}
 
@@ -280,9 +293,7 @@ export default function SettingsPage() {
               className="w-full flex items-center gap-3 p-4 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/25 hover:border-indigo-500/50 transition-all cursor-pointer text-left disabled:opacity-50"
             >
               <div>
-                <span className="text-xs font-semibold text-white block">
-                  {connectingUpload ? 'Abrindo…' : 'Conectar redes'}
-                </span>
+                <span className="text-xs font-semibold text-white block">Conectar redes</span>
                 <span className="text-[10px] text-zinc-400">Instagram, Facebook, TikTok e YouTube</span>
               </div>
               <Plus className="w-4 h-4 text-zinc-500 ml-auto" />
