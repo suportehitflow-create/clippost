@@ -449,6 +449,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                 </button>
                 <button type="button" onClick={() => setModalExtensao(true)} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-300 hover:text-white">Como instalar</button>
                 <button type="button" onClick={() => setModalOficial(true)} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-500 hover:text-white">API oficial da Meta</button>
+                {aoNovaBusca && <button type="button" onClick={() => { setErro(''); aoNovaBusca() }} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-500 hover:text-white">Voltar</button>}
               </div>
               <details className="text-[11px] text-zinc-600">
                 <summary className="cursor-pointer select-none">Detalhes técnicos</summary>
@@ -457,7 +458,13 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
             </section>
           ) : (
             <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-4 text-xs text-rose-200 flex items-start gap-2.5 max-w-3xl w-full mx-auto">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span className="break-words">{erro}</span>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span className="break-words flex-1">{erro}</span>
+              {/* busca vinda do Criar cortes: sem isso a tela ficava presa no erro */}
+              {aoNovaBusca && (
+                <button type="button" onClick={() => { setErro(''); aoNovaBusca() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.08] text-white hover:bg-white/[0.12]">
+                  Voltar
+                </button>
+              )}
             </div>
           )
         )}
