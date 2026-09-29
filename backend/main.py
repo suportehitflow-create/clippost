@@ -128,7 +128,8 @@ async def _mark_stuck_projects(label: str = "recovery"):
 
 
 async def _cleanup_old_projects():
-    """Apaga projetos e clipes: failed sem clips imediatamente + done/others há mais de 24h.
+    """Limpa só projetos que FALHARAM sem nenhum corte e já têm mais de 24h (dá tempo de "Gerar de novo").
+    A Biblioteca (projetos prontos) nunca é apagada sozinha — antes tudo com mais de 24h sumia.
     Projetos failed COM clips prontos (storage_url) são resgatados como done."""
     try:
         if not supabase:
@@ -137,11 +138,10 @@ async def _cleanup_old_projects():
         now = datetime.now(timezone.utc)
         cutoff_24h = (now - timedelta(hours=24)).isoformat()
 
-        failed_res = supabase.table("projects").select("id").eq("status", "failed").execute()
-        old_res = supabase.table("projects").select("id").lt("created_at", cutoff_24h).execute()
+        failed_res = supabase.table("projects").select("id, created_at").eq("status", "failed").execute()
 
         failed_ids = {r["id"] for r in (failed_res.data or [])}
-        old_ids = {r["id"] for r in (old_res.data or [])}
+        antigos = {r["id"] for r in (failed_res.data or []) if str(r.get("created_at") or "") < cutoff_24h}
 
         # Salvar projetos failed que têm clips prontos
         saved = 0
@@ -154,7 +154,7 @@ async def _cleanup_old_projects():
                 saved += 1
                 print(f"[cleanup] projeto {pid[:8]} resgatado: {len(ready)} clips prontos → done")
 
-        ids_to_delete = list(failed_ids | old_ids)
+        ids_to_delete = list(failed_ids & antigos)
         if not ids_to_delete:
             if saved:
                 print(f"[cleanup] {saved} projeto(s) resgatados de failed para done")
