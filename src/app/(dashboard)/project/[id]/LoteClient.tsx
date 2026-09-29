@@ -232,7 +232,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
     <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
       <EstudioEditor
         projeto={projetoEstudio}
-        titulo={`${lote.title} · ${resumo}`}
+        titulo={`${lote.title} · ${resumo.replace(/^\d+ vídeos · /, '')}`}
         onAgendar={() => router.push(`/schedule?aba=massa&tipo=reels&projeto=${lote.id}`)}
         acoesExtras={null}
       />

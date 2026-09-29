@@ -1724,6 +1724,9 @@
 
 /* ================= SKELETON SHIMMER CARDS (CARREGAMENTO RÁPIDO) ================= */
 .cardSkeleton {
+  /* largura explícita: sem ela a grade calcula a altura da linha antes de saber a largura, a linha
+     fica baixa e o card "carregando" invade a linha de baixo */
+  width: 100%;
   aspect-ratio: 9 / 16;
   border-radius: 16px;
   background: #111116;
