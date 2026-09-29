@@ -520,6 +520,7 @@ function Conteudo() {
                           {c.storage_url && <video src={`${c.storage_url}#t=1`} preload="metadata" muted playsInline className="w-full h-full object-cover" />}
                         </div>
                         <span className="absolute bottom-0 inset-x-0 p-1.5 text-[10px] leading-tight bg-gradient-to-t from-black/90 to-transparent line-clamp-2">{c.hook || c.title || 'Corte'}</span>
+                        {typeof c.score === 'number' && <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] font-bold tabular-nums" title="Nota de viralidade">{(Math.round(c.score * 100) / 10).toFixed(1)}</span>}
                         {ordem >= 0 && <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-indigo-500 text-[10px] font-bold flex items-center justify-center tabular-nums">{ordem + 1}</span>}
                       </button>
                     )
