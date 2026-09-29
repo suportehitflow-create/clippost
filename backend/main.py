@@ -88,18 +88,19 @@ async def _mark_stuck_projects(label: str = "recovery"):
         if is_startup:
             # No startup (após deploy), todos os projetos processing foram interrompidos
             result = supabase.table("projects") \
-                .select("id, error_message, clips(id,storage_url)") \
+                .select("id, error_message, source_url, clips(id,storage_url)") \
                 .eq("status", "processing") \
                 .execute()
         else:
             cutoff = (datetime.now(timezone.utc) - timedelta(minutes=180)).isoformat()
             result = supabase.table("projects") \
-                .select("id, error_message") \
+                .select("id, error_message, source_url") \
                 .eq("status", "processing") \
                 .lt("created_at", cutoff) \
                 .execute()
 
-        rows = result.data or []
+        # lotes e perfis ("clipost:...") não são processados pelo servidor: nunca viram "interrompido"
+        rows = [r for r in (result.data or []) if not str(r.get("source_url") or "").startswith("clipost:")]
         done_count = 0
         failed_count = 0
         for row in rows:
@@ -138,10 +139,12 @@ async def _cleanup_old_projects():
         now = datetime.now(timezone.utc)
         cutoff_24h = (now - timedelta(hours=24)).isoformat()
 
-        failed_res = supabase.table("projects").select("id, created_at").eq("status", "failed").execute()
+        failed_res = supabase.table("projects").select("id, created_at, source_url").eq("status", "failed").execute()
+        # lote/perfil ("clipost:...") não tem cortes próprios (são dos vídeos dele): nunca é apagado aqui
+        falhos = [r for r in (failed_res.data or []) if not str(r.get("source_url") or "").startswith("clipost:")]
 
-        failed_ids = {r["id"] for r in (failed_res.data or [])}
-        antigos = {r["id"] for r in (failed_res.data or []) if str(r.get("created_at") or "") < cutoff_24h}
+        failed_ids = {r["id"] for r in falhos}
+        antigos = {r["id"] for r in falhos if str(r.get("created_at") or "") < cutoff_24h}
 
         # Salvar projetos failed que têm clips prontos
         saved = 0
@@ -191,8 +194,10 @@ def _sync_save_processing_projects():
     try:
         if not supabase:
             return
-        res = supabase.table("projects").select("id").eq("status", "processing").execute()
+        res = supabase.table("projects").select("id, source_url").eq("status", "processing").execute()
         for row in (res.data or []):
+            if str(row.get("source_url") or "").startswith("clipost:"):
+                continue  # lote/perfil: não é um processamento do servidor
             pid = row["id"]
             clips_res = supabase.table("clips").select("id, storage_url").eq("project_id", pid).execute()
             ready = [c for c in (clips_res.data or []) if c.get("storage_url")]

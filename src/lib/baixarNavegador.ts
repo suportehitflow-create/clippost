@@ -12,18 +12,29 @@ import { idYouTube } from '@/lib/lote'
 export async function baixarPeloNavegador(supabase: SupabaseClient, userId: string, projetoId: string, sourceUrl: string) {
   const vid = idYouTube(sourceUrl)
   if (!vid) throw new Error('não é um vídeo do YouTube')
-  const destino = async (nome: string) => {
-    const r = await fetch('/api/storage/signed-upload-url', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bucket: 'videos', path: `${userId}/${projetoId}/${nome}`, upsert: true }),
-    })
-    const d = await r.json()
-    if (!r.ok || !d.signedUrl) throw new Error(d.error || 'sem link de upload')
-    return { enviar: d.signedUrl as string, publico: supabase.storage.from('videos').getPublicUrl(d.path).data.publicUrl }
+  // o armazenamento aceita até 50 MB por arquivo: o vídeo sobe em partes de 45 MB (até 20 = 900 MB; se
+  // não couber, a extensão escolhe uma qualidade menor) e o servidor junta na ordem ("parte1|parte2|...")
+  const nomes = [
+    ...Array.from({ length: 20 }, (_, i) => `navegador/video_${String(i).padStart(2, '0')}.part`),
+    ...Array.from({ length: 4 }, (_, i) => `navegador/audio_${i}.part`),
+  ]
+  const r0 = await fetch('/api/storage/signed-upload-url', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bucket: 'videos', paths: nomes.map(n => `${userId}/${projetoId}/${n}`), upsert: true }),
+  })
+  const d = await r0.json()
+  if (!r0.ok || !Array.isArray(d.urls)) throw new Error(d.error || 'sem link de upload')
+  const lista = (d.urls as { signedUrl: string; path: string }[]).map(u => ({
+    enviar: u.signedUrl, publico: supabase.storage.from('videos').getPublicUrl(u.path).data.publicUrl,
+  }))
+  const video = lista.slice(0, 20)
+  const audio = lista.slice(20)
+  const r = await baixarYouTubePelaExtensao(vid, { video: video.map(x => x.enviar), audio: audio.map(x => x.enviar) })
+  const juntar = (xs: typeof lista, n: number) => xs.slice(0, Math.max(1, n)).map(x => x.publico).join('|')
+  return {
+    url: juntar(video, r.partesVideo ?? 1),
+    audio_url: r.audioSeparado ? juntar(audio, r.partesAudio ?? 1) : undefined,
   }
-  const [v, a] = await Promise.all([destino('youtube_video.mp4'), destino('youtube_audio.m4a')])
-  const r = await baixarYouTubePelaExtensao(vid, { video: v.enviar, audio: a.enviar })
-  return { url: v.publico, audio_url: r.audioSeparado ? a.publico : undefined }
 }
 
 /** Manda o servidor cortar (com o link original ou com o arquivo que o navegador baixou) */

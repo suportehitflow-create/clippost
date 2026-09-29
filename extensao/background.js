@@ -270,8 +270,50 @@ async function baixarStream(url, tamanho) {
 }
 
 async function subir(destino, blob, tipo) {
-  const r = await fetch(destino, { method: 'PUT', headers: { 'Content-Type': tipo, 'x-upsert': 'true' }, body: blob })
-  if (!r.ok) throw new Error(`upload ${r.status}`)
+  let r
+  for (let t = 0; t < 3; t++) {
+    r = await fetch(destino, { method: 'PUT', headers: { 'Content-Type': tipo, 'x-upsert': 'true' }, body: blob }).catch(() => null)
+    if (r && r.ok) return
+    await new Promise(res => setTimeout(res, 2000 * (t + 1)))
+  }
+  throw new Error(`upload ${r ? r.status : 'rede'}`)
+}
+
+// o armazenamento aceita até 50 MB por arquivo: sobe em partes de 45 MB (o servidor junta na ordem).
+// destinos = lista de links de upload; devolve quantas partes usou
+const PARTE = 45 * 1024 * 1024
+async function baixarESubirEmPartes(url, tamanho, destinos, tipo) {
+  if (!Array.isArray(destinos)) {
+    await subir(destinos, await baixarStream(url, tamanho), tipo)
+    return 1
+  }
+  if (!tamanho) {
+    const blob = await baixarStream(url, 0)
+    if (blob.size > PARTE * destinos.length) throw new Error('vídeo grande demais')
+    for (let i = 0; i * PARTE < blob.size; i++) await subir(destinos[i], blob.slice(i * PARTE, (i + 1) * PARTE), tipo)
+    return Math.ceil(blob.size / PARTE)
+  }
+  const partes = Math.ceil(tamanho / PARTE)
+  if (partes > destinos.length) throw new Error('vídeo grande demais')
+  for (let i = 0; i < partes; i++) {
+    const ini = i * PARTE
+    const fim = Math.min(tamanho, ini + PARTE) - 1
+    // cada parte é baixada em pedaços de 8 MB (o YouTube corta pedidos grandes) e sobe inteira
+    const pedacos = []
+    for (let a = ini; a <= fim; a += 8 * 1024 * 1024) {
+      const b = Math.min(fim, a + 8 * 1024 * 1024 - 1)
+      let r
+      for (let t = 0; t < 3; t++) {
+        r = await fetch(`${url}&range=${a}-${b}`).catch(() => null)
+        if (r && r.ok) break
+        await new Promise(res => setTimeout(res, 1500 * (t + 1)))
+      }
+      if (!r || !r.ok) throw new Error(`download ${r ? r.status : 'rede'}`)
+      pedacos.push(await r.blob())
+    }
+    await subir(destinos[i], new Blob(pedacos), tipo)
+  }
+  return partes
 }
 
 // tenta cliente por cliente: se um libera o vídeo mas recusa o download no meio, vai para o próximo
@@ -299,24 +341,24 @@ async function baixarComPlayer(j, destinos) {
   const sd = j.streamingData || {}
   const adapt = (sd.adaptiveFormats || []).filter(f => f.url)
   // vídeo MP4 (H.264) até 720p (arquivo menor para subir; o corte sai em 1080x1920 do mesmo jeito) e o melhor áudio M4A
-  const videos = adapt.filter(f => /^video\/mp4/.test(f.mimeType || '') && (f.height || 0) <= 720)
+  // cabe no espaço dado (partes de 45 MB): a maior qualidade até 720p que couber (vídeo longo cai para 480p/360p)
+  const cabe = (f, lista) => !Array.isArray(lista) || !Number(f.contentLength) || Number(f.contentLength) <= PARTE * lista.length
+  const videos = adapt.filter(f => /^video\/mp4/.test(f.mimeType || '') && (f.height || 0) <= 720 && cabe(f, destinos.video))
     .sort((a, b) => (/avc1/.test(b.mimeType) - /avc1/.test(a.mimeType)) || (b.height || 0) - (a.height || 0) || (b.bitrate || 0) - (a.bitrate || 0))
-  const audios = adapt.filter(f => /^audio\/mp4/.test(f.mimeType || '')).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))
+  const audios = adapt.filter(f => /^audio\/mp4/.test(f.mimeType || '') && cabe(f, destinos.audio)).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))
   const info = { titulo: j.videoDetails?.title || '', duracao: Number(j.videoDetails?.lengthSeconds) || null }
   if (videos[0] && audios[0]) {
-    const [v, a] = await Promise.all([
-      baixarStream(videos[0].url, Number(videos[0].contentLength) || 0),
-      baixarStream(audios[0].url, Number(audios[0].contentLength) || 0),
+    const [partesVideo, partesAudio] = await Promise.all([
+      baixarESubirEmPartes(videos[0].url, Number(videos[0].contentLength) || 0, destinos.video, 'video/mp4'),
+      baixarESubirEmPartes(audios[0].url, Number(audios[0].contentLength) || 0, destinos.audio, 'audio/mp4'),
     ])
-    await subir(destinos.video, v, 'video/mp4')
-    await subir(destinos.audio, a, 'audio/mp4')
-    return { ...info, audioSeparado: true, altura: videos[0].height }
+    return { ...info, audioSeparado: true, altura: videos[0].height, partesVideo, partesAudio }
   }
   // sem formatos separados: o arquivo único (vídeo + áudio juntos, qualidade menor)
-  const unico = (sd.formats || []).filter(f => f.url && /^video\/mp4/.test(f.mimeType || '')).sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+  const unico = (sd.formats || []).filter(f => f.url && /^video\/mp4/.test(f.mimeType || '') && cabe(f, destinos.video)).sort((a, b) => (b.height || 0) - (a.height || 0))[0]
   if (!unico) throw new Error('nenhum formato de vídeo disponível')
-  await subir(destinos.video, await baixarStream(unico.url, Number(unico.contentLength) || 0), 'video/mp4')
-  return { ...info, audioSeparado: false, altura: unico.height }
+  const partesVideo = await baixarESubirEmPartes(unico.url, Number(unico.contentLength) || 0, destinos.video, 'video/mp4')
+  return { ...info, audioSeparado: false, altura: unico.height, partesVideo, partesAudio: 0 }
 }
 
 chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {

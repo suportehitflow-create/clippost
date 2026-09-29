@@ -879,13 +879,19 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _cdn_direto = re.match(r"^https://[^/]*(cdninstagram\.com|fbcdn\.net)/", url or "")
         if "supabase.co/storage" in url or _cdn_direto or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
             print(f"[pipeline] arquivo já hospedado — baixando diretamente: {url[:80]}...")
-            try:
-                with httpx.Client(timeout=180, follow_redirects=True) as client:
-                    with client.stream("GET", url) as resp:
-                        resp.raise_for_status()
-                        with open(video_path, "wb") as f:
+
+            def _baixar_partes(links: str, destino: str) -> None:
+                # o armazenamento aceita até 50 MB por arquivo: o navegador sobe vídeos grandes em partes
+                # ("link1|link2|..."), baixadas aqui em ordem e juntadas byte a byte (o arquivo original)
+                with httpx.Client(timeout=180, follow_redirects=True) as client, open(destino, "wb") as f:
+                    for parte in [p for p in links.split("|") if p]:
+                        with client.stream("GET", parte) as resp:
+                            resp.raise_for_status()
                             for chunk in resp.iter_bytes(65536):
                                 f.write(chunk)
+
+            try:
+                _baixar_partes(url, video_path)
                 if os.path.exists(video_path) and os.path.getsize(video_path) > 1000:
                     _direct_downloaded = True
                     video_id = project_id or "direct_upload"
@@ -894,12 +900,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     if audio_url:
                         # vídeo e áudio vieram separados (baixados pelo navegador do usuário): junta os dois
                         audio_tmp = str(tmp_dir / "audio_sep.m4a")
-                        with httpx.Client(timeout=180, follow_redirects=True) as client:
-                            with client.stream("GET", audio_url) as resp:
-                                resp.raise_for_status()
-                                with open(audio_tmp, "wb") as f:
-                                    for chunk in resp.iter_bytes(65536):
-                                        f.write(chunk)
+                        _baixar_partes(audio_url, audio_tmp)
                         juntado = str(tmp_dir / "juntado.mp4")
                         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", video_path, "-i", audio_tmp,
                                         "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", juntado],
@@ -1145,7 +1146,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 5. Projeto: atualiza o que a tela de upload já criou ou cria um novo.
         # Criar sempre um novo deixava o projeto aberto pelo usuário em "pending" para sempre.
         project_data = {
-            "source_url": url,
             "platform": "youtube",
             "raw_video_url": raw_video_url,
             "transcript": transcript_data,
@@ -1158,7 +1158,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if project_id:
             supabase.table("projects").update(project_data).eq("id", project_id).execute()
         else:
-            project_data.update({"user_id": user_id, "source_type": "url"})
+            # projeto que já existe mantém o link original (ex.: o do YouTube, quando o vídeo veio baixado
+            # pelo navegador): a capa e o "Já cortado" dependem dele
+            project_data.update({"user_id": user_id, "source_type": "url", "source_url": url})
             try:
                 db_response = supabase.table("projects").insert(project_data).execute()
                 project_id = db_response.data[0]['id']

@@ -2,8 +2,8 @@
     "manifest_version":  3,
     "name":  "Clipost",
     "short_name":  "Clipost",
-    "version":  "1.6.0",
-    "description":  "Busca perfis do Instagram e baixa vÃ­deos do YouTube para o Clipost pelo seu navegador â€” direto do site, sem clique.",
+    "version":  "1.6.1",
+    "description":  "Busca perfis do Instagram e baixa vídeos do YouTube para o Clipost pelo seu navegador — direto do site, sem clique.",
     "permissions":  [
                         "storage",
                         "scripting",

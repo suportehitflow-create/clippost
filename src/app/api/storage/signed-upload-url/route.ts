@@ -19,7 +19,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const { bucket = 'videos', path, upsert = true } = await req.json()
+    const { bucket = 'videos', path, paths, upsert = true } = await req.json()
+    // vários de uma vez (vídeo grande subido em partes de até 45 MB: o limite é 50 MB por arquivo)
+    if (Array.isArray(paths)) {
+      const lista = paths.map((p: string) => String(p || '').replace(/^\/+/, '')).slice(0, 60)
+      if (!lista.length || lista.some(p => !p.startsWith(`${user.id}/`))) {
+        return NextResponse.json({ error: 'Acesso não autorizado a este caminho' }, { status: 403 })
+      }
+      const admin = getAdminClient()
+      const urls = await Promise.all(lista.map(async p => {
+        const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(p, { upsert })
+        if (error) throw new Error(error.message)
+        return { signedUrl: data.signedUrl, path: data.path }
+      }))
+      return NextResponse.json({ urls })
+    }
     if (!path) {
       return NextResponse.json({ error: 'Caminho (path) é obrigatório' }, { status: 400 })
     }
