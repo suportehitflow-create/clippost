@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { perfilAtivoSalvo, perfilDaConta } from '@/components/ProfileSwitcher'
 
 // Ritmo de publicação e resultados — SÓ dados reais das publicações do usuário.
 // Sem conta conectada não aparece nada (no Início) ou mostra o convite para conectar (/resultados).
@@ -25,12 +26,15 @@ export default function PainelResultados({ compacto = false }: { compacto?: bool
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return setTemConta(false)
+      // só o perfil em que a pessoa está (as contas dele e o que foi postado nelas)
       const [contas, ps] = await Promise.all([
-        supabase.from('social_accounts').select('id').eq('user_id', user.id).limit(1),
-        supabase.from('scheduled_posts').select('id, scheduled_at, status, platform').eq('user_id', user.id).order('scheduled_at', { ascending: false }).limit(1000),
+        supabase.from('social_accounts').select('id, account_id').eq('user_id', user.id),
+        supabase.from('scheduled_posts').select('id, scheduled_at, status, platform, social_account_id').eq('user_id', user.id).order('scheduled_at', { ascending: false }).limit(2000),
       ])
-      setTemConta(!!contas.data?.length)
-      setPosts((ps.data as PostData[]) ?? [])
+      const perfil = perfilAtivoSalvo()
+      const doPerfil = new Set(((contas.data as { id: string; account_id: string | null }[]) ?? []).filter(c => perfilDaConta(c.account_id) === perfil).map(c => c.id))
+      setTemConta(doPerfil.size > 0)
+      setPosts((((ps.data as (PostData & { social_account_id: string | null })[]) ?? []).filter(p => p.social_account_id && doPerfil.has(p.social_account_id))))
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -118,11 +122,6 @@ export default function PainelResultados({ compacto = false }: { compacto?: bool
           ))}
         </div>
       </div>
-      {!compacto && (
-        <p className="text-[11px] text-zinc-500">
-          Visualizações, alcance e seguidores de cada conta ficam no <Link href="/raio-x-pagina" className="text-indigo-400 hover:text-indigo-300">Raio-X da página</Link>.
-        </p>
-      )}
     </div>
   )
 }

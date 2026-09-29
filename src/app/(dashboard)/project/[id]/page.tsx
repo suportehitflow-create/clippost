@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import ProjectClient from './ProjectClient'
+import LoteClient from './LoteClient'
+import { idsDoLote } from '@/lib/lote'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://alntulecjshpbrhesaoo.supabase.co'
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -26,6 +28,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       .maybeSingle()
 
     if (userProj) {
+      // canal/perfil cortado de uma vez: um editor com os cortes de todos os vídeos
+      if (idsDoLote(userProj.source_url)) return <LoteClient lote={userProj} />
       const { data: clips } = await admin
         .from('clips')
         .select('*')

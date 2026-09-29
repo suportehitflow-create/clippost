@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { idsDoLote } from '@/lib/lote'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Pagina, Intro } from '@/components/pagina/Base'
@@ -194,14 +195,18 @@ function Conteudo() {
 
   useEffect(() => {
     if (!userId || !projetoId) return
-    const buscar = () =>
-      supabase.from('clips').select('id, title, hook, storage_url, score, created_at').eq('project_id', projetoId)
+    // lote (canal/perfil inteiro): os cortes de todos os vídeos dele
+    const buscar = async () => {
+      const { data: p } = await supabase.from('projects').select('source_url').eq('id', projetoId).maybeSingle()
+      const ids = idsDoLote(p?.source_url) ?? [projetoId]
+      return supabase.from('clips').select('id, title, hook, storage_url, score, created_at').in('project_id', ids)
         .not('storage_url', 'is', null).order('created_at', { ascending: true })
         .then(({ data }) => {
           const lista = ((data as Corte[]) ?? []).filter(c => !!c.storage_url)
           setCortesProjeto(lista)
           setSelCortes(lista.map(c => c.id))
         })
+    }
     buscar()
     const t = setInterval(buscar, 15000)
     return () => clearInterval(t)

@@ -10,6 +10,7 @@ import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal, Aviso, Divisoria } from '@/components/pagina/Base'
 import Explorador, { type PedidoBusca } from '@/components/explorar/Explorador'
 import { Scissors, Link2, UploadCloud, Search } from 'lucide-react'
+import { PREFIXO_LOTE, chaveVideo } from '@/lib/lote'
 
 // Criar cortes: UM campo de link que entende o que foi colado.
 //  - vídeo do YouTube (ou arquivo MP4) → a IA escolhe os melhores momentos e gera os cortes
@@ -181,9 +182,48 @@ function Conteudo() {
   }
 
   // canal do YouTube: cada vídeo marcado vira um projeto de cortes
-  async function cortesDoCanal(videos: { url: string; titulo: string }[]) {
-    for (const v of videos) await criarCortes({ url: v.url, titulo: v.titulo || undefined })
-    router.push('/dashboard')
+  // vídeos já cortados antes (o card do canal mostra "Já cortado" e pede confirmação antes de repetir)
+  const [jaCortados, setJaCortados] = useState<Map<string, number>>(new Map())
+  useEffect(() => {
+    if (!pedido) return
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data?.user) return
+      const { data: ps } = await supabase.from('projects').select('source_url').eq('user_id', data.user.id).not('source_url', 'is', null).limit(5000)
+      const m = new Map<string, number>()
+      for (const p of (ps as { source_url: string }[]) ?? []) {
+        if (p.source_url.startsWith('clipost:')) continue
+        const k = chaveVideo(p.source_url)
+        m.set(k, (m.get(k) ?? 0) + 1)
+      }
+      setJaCortados(m)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido?.n])
+
+  /** Canal/perfil: os vídeos escolhidos viram UM lote — um editor em massa com os cortes de todos */
+  async function cortesDoCanal(videos: { url: string; titulo: string }[], origem: { nome: string; foto: string | null }) {
+    const repetidos = videos.filter(v => jaCortados.get(chaveVideo(v.url)))
+    if (repetidos.length) {
+      const msg = repetidos.length === videos.length
+        ? `Você já gerou cortes ${videos.length === 1 ? 'desse vídeo' : `desses ${videos.length} vídeos`}. Gerar de novo?`
+        : `Você já gerou cortes de ${repetidos.length} desses ${videos.length} vídeos. Gerar de novo?`
+      if (!window.confirm(msg)) return
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+    // cria os vídeos de 5 em 5 (cada um já começa a processar no servidor)
+    const ids: string[] = []
+    for (let i = 0; i < videos.length; i += 5) {
+      const parte = await Promise.all(videos.slice(i, i + 5).map(v => criarCortes({ url: v.url, titulo: v.titulo || undefined }).catch(() => null)))
+      ids.push(...(parte.filter(Boolean) as string[]))
+    }
+    if (!ids.length) throw new Error('Não deu para começar os cortes agora. Tente de novo.')
+    const { data: lote, error } = await supabase.from('projects').insert({
+      user_id: user.id, title: `${origem.nome} · ${ids.length} vídeo${ids.length === 1 ? '' : 's'}`,
+      source_url: PREFIXO_LOTE + ids.join(','), source_type: 'url', status: 'processing',
+    }).select('id').single()
+    if (error || !lote) throw new Error(error?.message || 'Não deu para juntar os vídeos num lote.')
+    router.push(`/project/${lote.id}`)
   }
 
   const textoBotao = aba === 'file' ? 'Criar cortes'
@@ -206,7 +246,7 @@ function Conteudo() {
         </div>
       )}
       {pedido ? (
-        <Explorador embutido pedido={pedido} aoNovaBusca={() => { setPedido(null); setOk('') }} aoCriarCortes={cortesDoCanal} />
+        <Explorador embutido pedido={pedido} aoNovaBusca={() => { setPedido(null); setOk('') }} aoCriarCortes={cortesDoCanal} jaCortados={jaCortados} />
       ) : (
         <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">
           <Intro titulo="Criar cortes" descricao="Cole um link. Vídeo vira cortes; canal ou perfil traz os vídeos em massa." />

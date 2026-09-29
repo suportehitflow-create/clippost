@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Pagina, Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal } from '@/components/pagina/Base'
 import { useExtensaoClipost, ModalExtensao, buscarPelaExtensao, ZIP_EXTENSAO } from '@/components/bulk/ExtensaoInstagram'
 import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
+import { chaveVideo } from '@/lib/lote'
 import { createClient } from '@/lib/supabase/client'
 import { ModalInstagramOficial, useInstagramOficial } from '@/components/bulk/InstagramOficial'
 import {
@@ -84,13 +85,15 @@ function Moldura({ embutido, children }: { embutido: boolean; children: ReactNod
 
 export interface PedidoBusca { perfil: string; limite: number; ordem: string; periodo: number; n: number }
 
-export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEditor, pedido, aoNovaBusca, aoCriarCortes }: {
+export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEditor, pedido, aoNovaBusca, aoCriarCortes, jaCortados }: {
   embutido?: boolean
   /** busca pedida de fora (Criar cortes): sem o cartão de busca próprio */
   pedido?: PedidoBusca
   aoNovaBusca?: () => void
   /** canal do YouTube: vídeos longos marcados viram cortes */
-  aoCriarCortes?: (videos: { url: string; titulo: string }[]) => Promise<void>
+  aoCriarCortes?: (videos: { url: string; titulo: string }[], origem: { nome: string; foto: string | null }) => Promise<void>
+  /** vídeos que já viraram cortes antes (chaveVideo → quantas vezes): o card mostra "Já cortado" */
+  jaCortados?: Map<string, number>
   /** lote com template começou (a Edição em Massa mostra o andamento) */
   aoIniciarLote?: (batchId: string) => void
   /** vídeos baixados para abrir no Editor */
@@ -181,7 +184,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     if (!videos.length) return avisar('erro', 'Selecione pelo menos um vídeo.')
     setAcao('cortes')
     try {
-      await aoCriarCortes(videos)
+      await aoCriarCortes(videos, { nome: res.perfil.nome || `@${res.perfil.usuario}`, foto: res.perfil.foto || null })
     } catch (e: any) {
       avisar('erro', e.message)
     } finally {
@@ -553,6 +556,9 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                           {marcado && <Check className="w-3.5 h-3.5" />}
                         </span>
                         <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[10px] font-semibold flex items-center gap-1 capitalize"><Icone className="w-3 h-3" />{res.plataforma === 'instagram' ? i.tipo : 'vídeo'}</span>
+                        {jaCortados?.get(chaveVideo(i.permalink || i.url)) ? (
+                          <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] font-semibold text-amber-200">Já cortado</span>
+                        ) : null}
                       </button>
                       <div className="p-2.5 space-y-1.5 flex-1 flex flex-col">
                         {i.legenda && <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2 min-h-[28px]">{i.legenda}</p>}

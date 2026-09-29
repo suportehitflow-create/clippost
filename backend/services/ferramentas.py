@@ -84,6 +84,10 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     plataforma = detect_platform(url)
     # período e ordem por curtidas/views pedem uma leitura maior que o limite
     leitura = limite if (ordem == "recentes" and not periodo_dias) else min(max(limite * 3, (periodo_dias or 0) * 3), 600)
+    # YouTube "mais vistos" de todo o período: lê o canal inteiro (a listagem já traz as views de cada
+    # vídeo e é rápida); antes lia só os ~75 mais recentes e mostrava os mais vistos só entre eles
+    if plataforma == "youtube" and ordem != "recentes" and not periodo_dias:
+        leitura = 0
 
     dados = None
     fonte = "servidor"

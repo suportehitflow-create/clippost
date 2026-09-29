@@ -9,6 +9,7 @@ import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { urlArquivo } from '@/lib/editor-massa/client/api'
 import { carregarResultados } from '@/components/editor-massa/persistencia'
 import type { ResultadoJob } from '@/components/editor-massa/estado'
+import { idsDoLote } from '@/lib/lote'
 
 // Biblioteca: tudo o que foi criado no Clipost, com a função de origem de cada item
 //  - Criar Cortes / Autopilot → projetos com os cortes gerados pela IA
@@ -130,9 +131,17 @@ export default function Biblioteca() {
   // perfil baixado inteiro (Edição em Massa → Buscar de um perfil) aparece como Edição em Massa
   const doPerfil = new Set(projetos.filter(p => String(p.source_url || '').startsWith('clipost:perfil')).map(p => p.id))
   const origemProjeto = (id: string): Origem => (doAutopilot.has(id) ? 'autopilot' : doPerfil.has(id) ? 'editor' : 'cortes')
+  // lote (canal/perfil cortado de uma vez): UM card; os vídeos dele não aparecem soltos
+  const filhosDoLote = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const p of projetos) { const ids = idsDoLote(p.source_url); if (ids) m.set(p.id, ids) }
+    return m
+  }, [projetos])
+  const dentroDeLote = new Set([...filhosDoLote.values()].flat())
+  const statusPorId = new Map(projetos.map(p => [p.id, p.status]))
   const termo = busca.trim().toLowerCase()
   const projetosVisiveis = projetos.filter(
-    p => (filtro === 'tudo' || filtro === origemProjeto(p.id)) && (!termo || p.title?.toLowerCase().includes(termo)),
+    p => !dentroDeLote.has(p.id) && (filtro === 'tudo' || filtro === origemProjeto(p.id)) && (!termo || p.title?.toLowerCase().includes(termo)),
   )
   const exportadosVisiveis = exportados.filter(
     r => (filtro === 'tudo' || filtro === 'editor') && r.itens.some(i => i.saida) && (!termo || r.aba.toLowerCase().includes(termo)),
@@ -145,9 +154,12 @@ export default function Biblioteca() {
     editor: exportados.filter(r => r.itens.some(i => i.saida)).length + doPerfil.size,
   }
 
-  async function apagarProjeto(id: string) {
-    if (!window.confirm('Excluir este projeto e os cortes dele?')) return
+  async function apagarProjeto(id: string, dentro = false) {
+    const filhos = filhosDoLote.get(id)
+    if (!dentro && !window.confirm(filhos ? `Excluir este lote (${filhos.length} vídeos) e todos os cortes dele?` : 'Excluir este projeto e os cortes dele?')) return
     setApagando(id)
+    // lote: apaga cada vídeo dele também (senão eles voltariam a aparecer soltos)
+    if (filhos) for (const f of filhos) await apagarProjeto(f, true).catch(() => null)
     try {
       const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
       const d = await res.json().catch(() => ({}))
@@ -256,14 +268,18 @@ export default function Biblioteca() {
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Projetos · cortes com IA</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {projetosVisiveis.map(p => {
-                const cs = cortesPorProjeto.get(p.id) ?? []
+                const filhos = filhosDoLote.get(p.id)
+                const cs = filhos ? filhos.flatMap(id => cortesPorProjeto.get(id) ?? []) : (cortesPorProjeto.get(p.id) ?? [])
                 const prontos = cs.filter(c => c.storage_url)
-                const processando = p.status === 'processing' || p.status === 'pending'
-                const falhou = p.status === 'failed'
+                const processando = filhos
+                  ? filhos.some(id => ['processing', 'pending'].includes(statusPorId.get(id) || ''))
+                  : p.status === 'processing' || p.status === 'pending'
+                const falhou = filhos ? filhos.every(id => statusPorId.get(id) === 'failed') : p.status === 'failed'
+                const capa = filhos ? extrairCapaVideo(projetos.find(x => x.id === filhos[0])?.source_url) : extrairCapaVideo(p.source_url)
                 return (
                   <article key={p.id} className="group relative flex flex-col gap-2.5 bg-white/[0.02] hover:bg-white/[0.04] p-3 rounded-2xl border border-white/[0.06] hover:border-white/[0.12] transition-all">
                     <Link href={`/project/${p.id}`} className="block relative" title="Abrir no estúdio">
-                      <CapaVideo capaUrl={extrairCapaVideo(p.source_url)} videoUrl={prontos[0]?.storage_url ?? null} processando={processando} />
+                      <CapaVideo capaUrl={capa} videoUrl={prontos[0]?.storage_url ?? null} processando={processando} />
                       <span className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity px-3.5 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-semibold flex items-center gap-1.5 shadow-lg">
                           <Play className="w-3.5 h-3.5 fill-current" /> Abrir no estúdio

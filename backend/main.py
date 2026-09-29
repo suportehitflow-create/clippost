@@ -682,8 +682,8 @@ async def perfis_renomear(request: Request):
 
 @app.post("/api/perfis/preencher-template")
 async def perfis_preencher_template(request: Request):
-    """Template ainda com o texto de exemplo: preenche nome, @ e foto com a conta conectada do perfil
-    ativo (Instagram > TikTok > Facebook > YouTube). A foto é copiada para o Clipost (o link da rede expira)."""
+    """Template ainda com o texto de exemplo: preenche nome, @ e foto com a primeira rede conectada de
+    cada perfil. A foto é copiada para o Clipost (o link da rede expira)."""
     user = await _usuario_logado(request)
     return await asyncio.to_thread(_preencher_template, user.id)
 
@@ -692,51 +692,73 @@ _NOMES_EXEMPLO = {"", "test brand", "nome da página", "nome da pagina", "sua ma
 
 
 def _preencher_template(user_id: str) -> dict:
+    """Para CADA perfil: o template que ainda está com o exemplo recebe o nome, o @ e a foto da
+    PRIMEIRA rede conectada nele (a pessoa costuma usar o mesmo @ em tudo). Perfil ativo → brand kit;
+    os outros → o template guardado no perfil (vai para o brand kit quando ele for ativado)."""
     import time
     import httpx
     from services import perfis as _perfis
-    _lista, ativo = _perfis.listar(user_id)
-    try:
-        contas = upload_post.connected_accounts(_perfis.usuario_upload_post(user_id, ativo))
-    except upload_post.UploadPostError:
-        return {"preenchido": False}
-    ordem = {"instagram": 0, "tiktok": 1, "facebook": 2, "youtube": 3}
-    contas = sorted(contas, key=lambda c: ordem.get(c["platform"], 9))
-    if not contas:
-        return {"preenchido": False}
-    conta = contas[0]
-    arroba = "@" + str(conta.get("handle") or conta.get("account_id") or "").lstrip("@")
-    nome = conta.get("nome") or arroba.lstrip("@")
+    from services.user_settings import save_settings
+    lista, ativo = _perfis.listar(user_id)
+    # ordem em que as redes foram conectadas (a primeira manda no template)
+    linhas = (supabase.table("social_accounts").select("platform, account_id, created_at")
+              .eq("user_id", user_id).order("created_at").execute().data or [])
 
     bk = maybe_one(supabase.table("brand_kits").select("id, layout_config, avatar_url, username").eq("user_id", user_id))
-    atual = (bk.data if bk else None) or {}
-    lc = dict(atual.get("layout_config") or {})
-    exemplo = str(lc.get("brandName") or "").strip().lower() in _NOMES_EXEMPLO
-    if not exemplo and atual.get("avatar_url"):
-        return {"preenchido": False}  # template já personalizado: não mexe
-
-    patch: dict = {}
-    if exemplo:
-        lc["brandName"] = nome
-        lc["brandHandle"] = arroba
-        patch["layout_config"] = lc
-        patch["username"] = arroba
-    if conta.get("foto") and (exemplo or not atual.get("avatar_url")):
+    kit = (bk.data if bk else None) or {}
+    feitos, mudou_lista = [], False
+    for pf in lista:
+        primeira = next((l for l in linhas if _perfis.perfil_da_conta(l.get("account_id")) == pf["id"]), None)
+        if not primeira:
+            continue
+        rede = "youtube" if primeira["platform"] == "youtube_shorts" else primeira["platform"]
         try:
-            r = httpx.get(conta["foto"], timeout=20, follow_redirects=True)
-            r.raise_for_status()
-            chave = f"avatars/{user_id}-{ativo}.jpg"
-            supabase.storage.from_("videos").upload(chave, r.content, {"content-type": r.headers.get("content-type") or "image/jpeg", "upsert": "true"})
-            patch["avatar_url"] = supabase.storage.from_("videos").get_public_url(chave).rstrip("?") + f"?v={int(time.time())}"
-        except Exception as e:
-            print(f"[template] foto da conta não copiada: {type(e).__name__}")
-    if not patch:
-        return {"preenchido": False}
-    if atual.get("id"):
-        supabase.table("brand_kits").update(patch).eq("user_id", user_id).execute()
-    else:
-        supabase.table("brand_kits").insert({"user_id": user_id, **patch}).execute()
-    return {"preenchido": True, "nome": lc.get("brandName"), "arroba": lc.get("brandHandle"), "foto": bool(patch.get("avatar_url"))}
+            contas = upload_post.connected_accounts(_perfis.usuario_upload_post(user_id, pf["id"]))
+        except upload_post.UploadPostError:
+            continue
+        conta = next((c for c in contas if c["platform"] == rede), contas[0] if contas else None)
+        if not conta:
+            continue
+        arroba = "@" + str(conta.get("handle") or conta.get("account_id") or "").lstrip("@")
+        nome = conta.get("nome") or arroba.lstrip("@")
+
+        eh_ativo = pf["id"] == ativo
+        atual = kit if eh_ativo else (pf.get("template") or {k: kit.get(k) for k in ("layout_config", "avatar_url", "username")})
+        lc = dict(atual.get("layout_config") or {})
+        exemplo = str(lc.get("brandName") or "").strip().lower() in _NOMES_EXEMPLO
+        # perfil novo sem template próprio ainda: começa da cópia do atual, com a identidade dele
+        novo = not eh_ativo and not pf.get("template")
+        if not (exemplo or novo) and atual.get("avatar_url"):
+            continue  # template já personalizado: não mexe
+        patch: dict = {}
+        if exemplo or novo:
+            lc["brandName"] = nome
+            lc["brandHandle"] = arroba
+            patch["layout_config"] = lc
+            patch["username"] = arroba
+        if conta.get("foto"):
+            try:
+                r = httpx.get(conta["foto"], timeout=20, follow_redirects=True)
+                r.raise_for_status()
+                chave = f"avatars/{user_id}-{pf['id']}.jpg"
+                supabase.storage.from_("videos").upload(chave, r.content, {"content-type": r.headers.get("content-type") or "image/jpeg", "upsert": "true"})
+                patch["avatar_url"] = supabase.storage.from_("videos").get_public_url(chave).rstrip("?") + f"?v={int(time.time())}"
+            except Exception as e:
+                print(f"[template] foto da conta não copiada: {type(e).__name__}")
+        if not patch:
+            continue
+        if eh_ativo:
+            if kit.get("id"):
+                supabase.table("brand_kits").update(patch).eq("user_id", user_id).execute()
+            else:
+                supabase.table("brand_kits").insert({"user_id": user_id, **patch}).execute()
+        else:
+            pf["template"] = {**atual, **patch}
+            mudou_lista = True
+        feitos.append({"perfil": pf["id"], "rede": rede, "arroba": arroba, "foto": bool(patch.get("avatar_url"))})
+    if mudou_lista:
+        save_settings(user_id, perfis=lista, perfil_ativo=ativo)
+    return {"preenchido": bool(feitos), "perfis": feitos}
 
 
 _PREFIXO_PERFIL = {"instagram": "ig", "tiktok": "tt", "facebook": "fb"}

@@ -150,7 +150,10 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
           <span className="text-xs font-medium text-zinc-400">Conectar conta</span>
         ) : (
           <>
-            <span className="text-xs font-semibold text-white max-w-[140px] truncate">{perfilAtual?.nome || 'Perfil'}</span>
+            {/* o @ da primeira rede conectada do perfil (é a "conta" em que a pessoa está); sem rede, o nome do perfil */}
+            <span className="text-xs font-semibold text-white max-w-[160px] truncate">
+              {redesAtuais[0]?.username ? `@${redesAtuais[0].username.replace(/^@/, '')}` : perfilAtual?.nome || 'Perfil'}
+            </span>
             <span className="flex gap-0.5">
               {[...new Set(redesAtuais.map(c => SIGLA[c.platform] || c.platform.slice(0, 2).toUpperCase()))].map(s => (
                 <span key={s} className="text-[9px] font-bold px-1 py-px rounded bg-white/[0.08] text-zinc-300">{s}</span>
