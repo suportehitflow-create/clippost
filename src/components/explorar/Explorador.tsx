@@ -398,11 +398,36 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
           </BotaoPrincipal>
         </Cartao>}
 
-        {buscando && (
-          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.08] px-4 py-3 text-xs text-zinc-400 flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-indigo-300" /> Lendo os posts do perfil… (perfis grandes podem levar alguns minutos)
-          </div>
-        )}
+        {buscando && (() => {
+          const alvo = (pedido?.perfil || perfil).trim()
+          const rede = /youtube|youtu\.be/i.test(alvo) ? 'YouTube' : /tiktok/i.test(alvo) ? 'TikTok' : /facebook|fb\./i.test(alvo) ? 'Facebook' : 'Instagram'
+          const nome = (alvo.match(/(?:\.com\/)(@?[^/?#]+)/)?.[1] || alvo).replace(/^@/, '')
+          return (
+            <>
+              <section className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-4 flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-sm font-bold shrink-0">
+                  {nome.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate">@{nome}</p>
+                  <p className="text-[11px] text-zinc-500">{rede} · carregando vídeos…</p>
+                </div>
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-300 shrink-0" />
+              </section>
+              <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {Array.from({ length: 10 }, (_, k) => (
+                  <div key={k} className="rounded-2xl overflow-hidden border border-white/[0.06] bg-[#101014]">
+                    <div className={`${rede === 'YouTube' ? 'aspect-video' : 'aspect-[9/14]'} bg-white/[0.04] animate-pulse`} />
+                    <div className="p-2.5 space-y-1.5">
+                      <div className="h-2.5 rounded bg-white/[0.06] w-11/12" />
+                      <div className="h-2.5 rounded bg-white/[0.04] w-2/3" />
+                    </div>
+                  </div>
+                ))}
+              </section>
+            </>
+          )
+        })()}
         {erro && (
           instagram && !instalada ? (
             <section className="rounded-3xl bg-white/[0.02] border border-white/[0.08] p-5 sm:p-6 space-y-4 max-w-3xl w-full mx-auto">
