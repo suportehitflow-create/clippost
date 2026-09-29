@@ -43,9 +43,26 @@ jobs:
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Publicar reinicia a máquina e interrompe os cortes em andamento: só publica quando o código
+      # do backend muda (antes toda mudança só no site derrubava os cortes que estavam gerando)
+      - name: Precisa publicar?
+        id: mudou
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "publicar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          BASE="${{ github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then echo "publicar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^backend/'; then
+            echo "publicar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nada do backend mudou"; echo "publicar=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # Um deploy reinicia a única máquina do backend: espera os cortes em andamento terminarem
       - name: Esperar cortes em andamento
+        if: steps.mudou.outputs.publicar == 'true'
         run: |
           for i in $(seq 1 90); do
             ATIVOS=$(curl -s --max-time 15 https://clippost-backend.fly.dev/api/admin/active-jobs | jq -r '.active // 0' 2>/dev/null || echo 0)
@@ -56,6 +73,7 @@ jobs:
           echo "Ainda há cortes rodando após 30 min; publicando mesmo assim (kill_timeout dá mais 5 min)"
 
       - name: Deploy Backend (Fly.io)
+        if: steps.mudou.outputs.publicar == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
@@ -65,6 +83,7 @@ jobs:
           flyctl deploy --remote-only
 
       - name: Verify health
+        if: steps.mudou.outputs.publicar == 'true'
         run: |
           sleep 30
           FLY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://clippost-backend.fly.dev/health)
@@ -126,8 +145,22 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Precisa publicar?
+        id: mudou
+        run: |
+          BASE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null \
+            || git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^cobalt/'; then
+            echo "publicar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publicar=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Deploy Cobalt (Fly.io)
+        if: steps.mudou.outputs.publicar == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import PainelResultados from '@/components/dashboard/PainelResultados'
+import { idsDoLote } from '@/lib/lote'
 import {
   Scissors,
   Flame,
@@ -113,13 +114,24 @@ export default async function InicioPage() {
     { count: projectCount },
     { count: clipCount },
     { count: scheduledCount },
-    { data: processingProjects }
+    { data: gerandoAgora },
+    { data: lotes }
   ] = await Promise.all([
     supabase.from('projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('clips').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('scheduled_posts').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'scheduled'),
-    supabase.from('projects').select('id, title, status, created_at, error_message').eq('user_id', user.id).eq('status', 'processing').order('created_at', { ascending: false }).limit(3)
+    supabase.from('projects').select('id, title, status, created_at, source_url').eq('user_id', user.id).eq('status', 'processing').order('created_at', { ascending: false }).limit(300),
+    supabase.from('projects').select('id, title, created_at, source_url').eq('user_id', user.id).like('source_url', 'clipost:lote:%').order('created_at', { ascending: false }).limit(50),
   ])
+  // lote (canal/perfil cortado de uma vez) aparece como UM item, com quantos vídeos ainda estão gerando
+  const gerandoIds = new Set((gerandoAgora ?? []).filter(p => !idsDoLote(p.source_url)).map(p => p.id))
+  const emLote = new Set((lotes ?? []).flatMap(l => idsDoLote(l.source_url) ?? []))
+  const processingProjects = [
+    ...(lotes ?? [])
+      .map(l => ({ ...l, faltam: (idsDoLote(l.source_url) ?? []).filter(id => gerandoIds.has(id)).length, total: (idsDoLote(l.source_url) ?? []).length }))
+      .filter(l => l.faltam > 0),
+    ...(gerandoAgora ?? []).filter(p => !idsDoLote(p.source_url) && !emLote.has(p.id)).map(p => ({ ...p, faltam: 0, total: 0 })),
+  ].slice(0, 3)
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#07070a] text-white">
@@ -215,7 +227,9 @@ export default async function InicioPage() {
                         </span>
                       </div>
                       <p className="text-[11px] text-zinc-400 mt-0.5">
-                        A IA está analisando ganchos virais e renderizando seus cortes 9:16.
+                        {p.total
+                          ? `${p.total - p.faltam} de ${p.total} vídeos prontos. Os cortes de todos abrem juntos no editor.`
+                          : 'A IA está analisando ganchos virais e renderizando seus cortes 9:16.'}
                       </p>
                     </div>
                   </div>
