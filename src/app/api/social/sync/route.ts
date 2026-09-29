@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id).eq('platform', platform).eq('account_id', account_id).limit(1)
     const { error } = e1 ? { error: e1 } : existe?.length
       ? await supabase.from('social_accounts').update({ username: acc.handle }).eq('id', existe[0].id)
-      : await supabase.from('social_accounts').insert({ user_id: user.id, platform, account_id, username: acc.handle })
+      // access_token vazio: o token dessas contas fica no serviço de publicação (a coluna não aceita nulo;
+      // vazio também faz o agendador publicar pelo serviço, e não pela Meta)
+      : await supabase.from('social_accounts').insert({ user_id: user.id, platform, account_id, username: acc.handle, access_token: '' })
     if (error) erros.push(`${platform}: ${error.message}`)
     else synced++
   }
