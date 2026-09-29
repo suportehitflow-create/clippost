@@ -133,20 +133,28 @@ export function PainelResultados(p: { resultados: ResultadoJob[]; fechar: () => 
   );
 }
 
-export function ModalConcluido(p: { aba: string; ok: number; falhas: number; jobId: string; verResultados: () => void; limparLote: () => void; fechar: () => void }) {
+export function ModalConcluido(p: { aba: string; ok: number; falhas: number; jobId: string; erros?: string[]; verResultados: () => void; limparLote: () => void; fechar: () => void }) {
   useEsc(p.fechar);
+  const nenhum = p.ok === 0;
   return (
     <>
       <div className={s.cortina} onClick={p.fechar} />
       <div className={s.modal} role="dialog" aria-label="Processamento concluído">
-        <div className={s.modalIcone}>
-          <Icone nome="check" tamanho={26} strokeWidth={2.5} />
+        <div className={s.modalIcone} style={nenhum ? { background: 'rgba(239,68,68,0.15)', color: '#f87171' } : undefined}>
+          <Icone nome={nenhum ? 'x' : 'check'} tamanho={26} strokeWidth={2.5} />
         </div>
-        <div className={s.modalTitulo}>{p.ok} vídeos prontos!</div>
+        <div className={s.modalTitulo}>{nenhum ? 'Nenhum vídeo ficou pronto' : `${p.ok} ${p.ok === 1 ? 'vídeo pronto' : 'vídeos prontos'}!`}</div>
         <div className={s.dica}>
           {p.aba}
-          {p.falhas > 0 && ` · ${p.falhas} falharam (veja o log)`}
+          {p.falhas > 0 && ` · ${p.falhas} ${p.falhas === 1 ? 'falhou' : 'falharam'}`}
         </div>
+        {!!p.erros?.length && (
+          <div style={{ width: '100%', fontSize: 11, color: '#fca5a5', textAlign: 'left', lineHeight: 1.4 }}>
+            {p.erros.map((e, i) => (
+              <div key={i}>{e.replace(/^\[[^\]]*\]\s*/, '').slice(0, 180)}</div>
+            ))}
+          </div>
+        )}
         {p.ok > 0 && (
           <a className={`${s.btn} ${s.btnPrimario} ${s.btnLargo}`} href={urlArquivo(p.jobId, 'todos.zip')} download onClick={() => setTimeout(p.fechar, 300)}>
             <Icone nome="download" /> Baixar todos (.zip)

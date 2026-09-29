@@ -40,7 +40,7 @@ import BibliotecaMusicas from '@/components/musicas/BibliotecaMusicas';
 import { enviarMusicaNuvem, listarMusicas } from '@/lib/musicas';
 import s from './editor-massa.module.css';
 
-type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string } | null;
+type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string; erros?: string[] } | null;
 
 const CHAVE_CONFIG = 'clipost:editor-massa:config';
 // um vídeo por vez, na ordem: o 1º aparece pronto rápido, depois o 2º... (sensação de menos espera)
@@ -933,6 +933,7 @@ export default function EditorMassa({
   // ---------- processamento ----------
   const acompanhar = useCallback(async (abaId: string, nomeAba: string, jobId: string) => {
     let lidos = 0;
+    const erros: string[] = [];
     for (;;) {
       await new Promise((r) => setTimeout(r, 900));
       let st;
@@ -942,6 +943,7 @@ export default function EditorMassa({
         continue;
       }
       if (st.log.length) setLog((l) => [...l.slice(-1500), ...st.log]);
+      st.log.forEach((l: string) => /ERRO|FALHA|falhou/i.test(l) && erros.push(l));
       lidos = st.totalLog;
       const porId = new Map(st.itens.map((i) => [i.id, i]));
       setAbas((as) =>
@@ -966,7 +968,7 @@ export default function EditorMassa({
         if (st.status === 'cancelado') setStatus('Processamento cancelado');
         else {
           setStatus(falhas ? `${nomeAba}: ${ok} prontos, ${falhas} falharam` : `${nomeAba}: ${ok} vídeos prontos`);
-          setSobre({ tipo: 'concluido', aba: nomeAba, abaId, ok, falhas, jobId });
+          setSobre({ tipo: 'concluido', aba: nomeAba, abaId, ok, falhas, jobId, erros: erros.slice(-3) });
         }
         return;
       }
@@ -1279,6 +1281,7 @@ export default function EditorMassa({
           aba={sobre.aba}
           ok={sobre.ok}
           falhas={sobre.falhas}
+          erros={sobre.erros}
           jobId={sobre.jobId}
           verResultados={() => setSobre({ tipo: 'resultados' })}
           limparLote={() => {
