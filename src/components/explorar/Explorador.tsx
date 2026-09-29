@@ -82,8 +82,15 @@ function Moldura({ embutido, children }: { embutido: boolean; children: ReactNod
   return <Pagina icone={Search} titulo="Explorar perfis" largura="max-w-6xl">{children}</Pagina>
 }
 
-export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEditor }: {
+export interface PedidoBusca { perfil: string; limite: number; ordem: string; periodo: number; n: number }
+
+export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEditor, pedido, aoNovaBusca, aoCriarCortes }: {
   embutido?: boolean
+  /** busca pedida de fora (Criar cortes): sem o cartão de busca próprio */
+  pedido?: PedidoBusca
+  aoNovaBusca?: () => void
+  /** canal do YouTube: vídeos longos marcados viram cortes */
+  aoCriarCortes?: (videos: { url: string; titulo: string }[]) => Promise<void>
   /** lote com template começou (a Edição em Massa mostra o andamento) */
   aoIniciarLote?: (batchId: string) => void
   /** vídeos baixados para abrir no Editor */
@@ -94,6 +101,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
   const [limite, setLimite] = useState(50)
   const [ordem, setOrdem] = useState('recentes')
   const [periodo, setPeriodo] = useState(0)
+  const perfilAtual = perfil, limiteAtual = limite, ordemAtual = ordem, periodoAtual = periodo
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState('')
   const [res, setRes] = useState<Resultado | null>(null)
@@ -157,8 +165,33 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     setTimeout(() => setAviso(null), 7000)
   }
 
+  useEffect(() => {
+    if (!pedido || instalada === null) return
+    setPerfil(pedido.perfil)
+    setLimite(pedido.limite)
+    setOrdem(pedido.ordem)
+    setPeriodo(pedido.periodo)
+    void buscar(pedido)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido?.n, instalada === null])
+
+  async function criarCortesSelecionados() {
+    if (!aoCriarCortes || !res) return
+    const videos = selecionados.map(i => ({ url: i.permalink || i.url || '', titulo: i.legenda })).filter(v => v.url)
+    if (!videos.length) return avisar('erro', 'Selecione pelo menos um vídeo.')
+    setAcao('cortes')
+    try {
+      await aoCriarCortes(videos)
+    } catch (e: any) {
+      avisar('erro', e.message)
+    } finally {
+      setAcao(null)
+    }
+  }
+
   /** Busca pelo navegador (extensão), com o mesmo filtro de período, ordem e quantidade do servidor */
-  async function pelaExtensao(usuario: string): Promise<Resultado> {
+  async function pelaExtensao(usuario: string, o = { limite, ordem, periodo }): Promise<Resultado> {
+    const { limite, ordem, periodo } = o
     // período e ordem por views/curtidas pedem uma leitura maior que o limite
     const leitura = ordem === 'recentes' && !periodo ? limite : Math.min(limite * 3, 3000)
     const d = await buscarPelaExtensao(usuario, leitura)
@@ -183,7 +216,9 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     }
   }
 
-  async function buscar() {
+  async function buscar(o?: { perfil: string; limite: number; ordem: string; periodo: number }) {
+    const perfil = o?.perfil ?? perfilAtual
+    const { limite, ordem, periodo } = o ?? { limite: limiteAtual, ordem: ordemAtual, periodo: periodoAtual }
     if (!perfil.trim()) return
     setBuscando(true)
     setErro('')
@@ -200,13 +235,13 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
     const extensaoPrimeiro = ehInstagram && instalada && !oficial?.configurado
     try {
       if (extensaoPrimeiro) {
-        setRes(await pelaExtensao(usuarioIg))
+        setRes(await pelaExtensao(usuarioIg, { limite, ordem, periodo }))
       } else {
         try {
           setRes(await postarJson('/api/tools/explorar', { perfil: perfil.trim(), limite, ordem, periodo_dias: periodo }))
         } catch (e) {
           if (!(ehInstagram && instalada)) throw e
-          setRes(await pelaExtensao(usuarioIg))
+          setRes(await pelaExtensao(usuarioIg, { limite, ordem, periodo }))
         }
       }
       setAba('todos')
@@ -306,11 +341,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
 
   return (
     <Moldura embutido={embutido}>
-        {!res && <Intro selo="Busca por @" titulo="Baixe e reposte de qualquer perfil"
+        {!res && !pedido && <Intro selo="Busca por @" titulo="Baixe e reposte de qualquer perfil"
           descricao="Reels, posts e carrosséis do Instagram — e vídeos do TikTok e YouTube. Marque os que quiser e edite com o seu template." />}
 
         {/* busca: um cartão, como no Criar cortes */}
-        {!res && <Cartao className="max-w-3xl w-full mx-auto">
+        {!res && !pedido && <Cartao className="max-w-3xl w-full mx-auto">
           <div className="space-y-2.5">
             <Rotulo>Perfil</Rotulo>
             <Campo icone={AtSign} id="explorar-perfil" value={perfil} onChange={e => setPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && !buscando && buscar()}
@@ -349,7 +384,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
             </div>
           </div>
 
-          <BotaoPrincipal icone={Search} onClick={buscar} disabled={!perfil.trim()} carregando={buscando} textoCarregando="Lendo os posts do perfil…">
+          <BotaoPrincipal icone={Search} onClick={() => buscar()} disabled={!perfil.trim()} carregando={buscando} textoCarregando="Lendo os posts do perfil…">
             Buscar posts
           </BotaoPrincipal>
         </Cartao>}
@@ -371,7 +406,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
               </div>
               <div className="flex flex-wrap gap-2">
                 <a href={ZIP_EXTENSAO} download className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-2"><Download className="w-4 h-4" /> Baixar extensão</a>
-                <button type="button" onClick={buscar} disabled={buscando} className="px-4 py-2.5 rounded-2xl text-xs font-semibold bg-white/[0.06] border border-white/[0.08] flex items-center gap-2 disabled:opacity-50">
+                <button type="button" onClick={() => buscar(pedido)} disabled={buscando} className="px-4 py-2.5 rounded-2xl text-xs font-semibold bg-white/[0.06] border border-white/[0.08] flex items-center gap-2 disabled:opacity-50">
                   {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />} Tentar de novo
                 </button>
                 <button type="button" onClick={() => setModalExtensao(true)} className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-zinc-300 hover:text-white">Como instalar</button>
@@ -410,7 +445,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                   </p>
                 </div>
               </div>
-              <button type="button" onClick={() => { setRes(null); setSel(new Set()) }} className="md:order-last px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] self-start md:self-auto">Nova busca</button>
+              <button type="button" onClick={() => { setRes(null); setSel(new Set()); aoNovaBusca?.() }} className="md:order-last px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] self-start md:self-auto">Nova busca</button>
               <div className="grid grid-cols-4 gap-4 text-center">
                 {[
                   { i: Eye, v: num(res.totais.views), l: 'Views total' },
@@ -443,6 +478,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                 <button type="button" onClick={() => setSel(sel.size === visiveis.length ? new Set() : new Set(visiveis.map(i => i.id)))} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08]">
                   {sel.size && sel.size === visiveis.length ? 'Limpar seleção' : 'Selecionar todos'}
                 </button>
+                {aoCriarCortes && res.plataforma === 'youtube' && (
+                  <button type="button" onClick={criarCortesSelecionados} disabled={!selecionados.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-1.5 disabled:opacity-40">
+                    {acao === 'cortes' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Criar cortes ({selecionados.length})
+                  </button>
+                )}
                 <button type="button" onClick={agendarComTemplate} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-1.5 disabled:opacity-40">
                   {acao === 'template' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Editar com template ({videosSel.length})
                 </button>
@@ -489,7 +529,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
           </>
         )}
 
-        {!res && !buscando && !erro && (
+        {!res && !buscando && !erro && !pedido && (
           <div className="rounded-3xl border border-dashed border-white/[0.1] p-10 text-center text-sm text-zinc-500 space-y-1">
             <p>Digite um @ e clique em Buscar posts.</p>
             <p className="text-[11px]">Depois é só marcar os posts e escolher: baixar, salvar na <Link href="/dashboard" className="underline">Biblioteca</Link>, editar com o seu template ou abrir no Editor.</p>

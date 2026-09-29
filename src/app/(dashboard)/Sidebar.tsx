@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Scissors, Layers, Sparkles, Settings } from 'lucide-react'
+import { Home, Scissors, Calendar, Sparkles, Settings } from 'lucide-react'
 import { useHorizontalFisheyeDock } from '@/components/ui/FisheyeDock'
 import type { User } from '@supabase/supabase-js'
 
@@ -11,8 +11,8 @@ import type { User } from '@supabase/supabase-js'
 const NAV_ITEMS = [
   { label: 'Início', href: '/inicio', icon: Home },
   { label: 'Criar Cortes', href: '/upload', icon: Scissors },
-  { label: 'Edição em Massa', href: '/bulk', icon: Layers },
-  { label: 'Templates', href: '/templates', icon: Sparkles },
+  { label: 'Identidade Visual', href: '/templates', icon: Sparkles },
+  { label: 'Calendário', href: '/schedule', icon: Calendar },
 ]
 
 /**

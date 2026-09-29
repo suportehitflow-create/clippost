@@ -42,12 +42,12 @@ interface Feature {
 
 // Ordem = ranking das ferramentas (o número do card é a posição)
 const FEATURES: Feature[] = [
-  { capa: 'cortes', title: 'Criar cortes', description: 'Cole um vídeo longo e receba os melhores momentos em 9:16, com legenda e o seu template.', href: '/upload', icon: Scissors, cor: '99,102,241', wide: true },
-  { capa: 'massa', title: 'Edição em Massa', description: 'Busque os vídeos de qualquer perfil e edite dezenas no seu template de uma vez.', href: '/bulk', icon: Layers, cor: '147,51,234' },
-  { capa: 'autopilot', title: 'Autopilot', description: 'Monitora YouTube, Instagram e TikTok e deixa os cortes de cada vídeo novo prontos sozinho.', href: '/autopilot', icon: Zap, cor: '16,185,129', badge: '24/7' },
-  { capa: 'templates', title: 'Identidade Visual', description: 'Seu template: perfil, fontes, cores, marca d’água e posição do vídeo e das legendas.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
-  { capa: 'calendario', title: 'Calendário & Publicações', description: 'Reels, posts, carrosséis e stories: agende em massa e acompanhe tudo no calendário.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
+  // os 3 principais
+  { capa: 'cortes', title: 'Criar cortes', description: 'Vídeo vira cortes; canal ou perfil traz os vídeos em massa — e pode automatizar os próximos.', href: '/upload', icon: Scissors, cor: '99,102,241' },
+  { capa: 'templates', title: 'Identidade Visual', description: 'O template de cada perfil: nome, foto, fontes, cores, marca d’água e estilo da legenda.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
+  { capa: 'calendario', title: 'Calendário', description: 'Agende em massa nas redes do perfil e acompanhe o que foi publicado.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
+  { capa: 'autopilot', title: 'Automações', description: 'Perfis com cortes futuros automatizados e os cortes esperando a sua aprovação.', href: '/autopilot', icon: Zap, cor: '16,185,129' },
   { capa: 'frases', title: 'Vídeos com frases', description: 'Fotos, frases e música viram vídeos 9:16 em série — prontos na Biblioteca e já agendados.', href: '/frases', icon: Quote, cor: '168,85,247' },
   { capa: 'aovivo', title: 'Cortes Ao Vivo', description: 'Clipe lives da Twitch e do YouTube até 2 minutos para trás, em um clique.', href: '/live', icon: Radio, cor: '239,68,68', badge: 'Ao vivo' },
   { capa: 'assistente', title: 'Assistente IA', description: 'Diga o que quer criar — um link, um @ ou uma ideia — e ele abre a ferramenta certa já preenchida.', href: '/assistente', icon: Bot, cor: '99,102,241' },
