@@ -35,5 +35,16 @@ export async function POST(req: NextRequest) {
     else synced++
   }
 
-  return NextResponse.json({ synced, encontradas: accounts.map(a => a.platform), erros })
+  // template ainda com o texto de exemplo: nome, @ e foto vêm da conta conectada
+  let template: unknown = null
+  if (accounts.length) {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      template = await fetch(`${flyUrl}/api/perfis/preencher-template`, {
+        method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` }, signal: AbortSignal.timeout(30000),
+      }).then(r => r.json()).catch(() => null)
+    }
+  }
+
+  return NextResponse.json({ synced, encontradas: accounts.map(a => a.platform), erros, template })
 }

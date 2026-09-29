@@ -111,6 +111,8 @@ def connected_accounts(user_id: str) -> list[dict]:
             "platform": platform,
             "account_id": str(info.get("username") or ""),
             "handle": info.get("handle") or info.get("display_name") or platform,
+            "nome": info.get("display_name") or "",
+            "foto": info.get("social_images") or info.get("profile_picture") or "",
             "reauth_required": bool(info.get("reauth_required")),
         })
     return accounts
