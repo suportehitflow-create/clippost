@@ -161,9 +161,13 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
       <div className={`${s.card} ${s.cardSkeleton}`}>
         <div className={s.shimmerMistio} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2, position: 'relative' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
-            {v.nome.slice(0, 4)}
-          </span>
+          {v.nota != null ? (
+            <span className={s.notaCorte} title="Nota de viralidade dada pela IA">{v.nota.toFixed(1)}</span>
+          ) : (
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
+              {v.nome.slice(0, 4)}
+            </span>
+          )}
           <span className={s.pilulaCarregando}>
             <Icone nome="sparkles" tamanho={11} className={s.girando} />
             Carregando
@@ -245,6 +249,11 @@ const Card = memo(function Card({ v, selecionado, ativo, global, template, clica
         >
           <Icone nome="x" tamanho={11} strokeWidth={2.5} />
         </button>
+        {v.nota != null && (
+          <span className={`${s.notaCorte} ${s.notaCorteThumb}`} title="Nota de viralidade dada pela IA">
+            {v.nota.toFixed(1)}
+          </span>
+        )}
         {estado && <span className={`${s.estado} ${estado.classe ?? ''}`}>{estado.texto}</span>}
         <div className={s.indicadores}>
           {espelhado && (

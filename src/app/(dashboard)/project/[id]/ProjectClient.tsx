@@ -1122,6 +1122,8 @@ export default function ProjectClient({
         titulo: c.hook || c.title || '',
         pronto: !!c.storage_url,
         status: c.status || (c.storage_url ? 'completed' : 'processing'),
+        // nota de viralidade da IA (score 0–1 → 0–10)
+        nota: typeof c.score === 'number' ? Math.round(c.score * 100) / 10 : undefined,
       })),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

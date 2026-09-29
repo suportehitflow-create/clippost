@@ -101,7 +101,7 @@ export interface ProjetoEstudio {
   isYouTube?: boolean;
   /** vídeos crus (ex.: baixados de um perfil): o template é aplicado aqui, não veio embutido */
   crus?: boolean;
-  clips: { id: string; url: string; titulo: string; pronto?: boolean; status?: string }[];
+  clips: { id: string; url: string; titulo: string; pronto?: boolean; status?: string; nota?: number }[];
 }
 
 export default function EditorMassa({
@@ -508,10 +508,16 @@ export default function EditorMassa({
 
     // cortes que saíram do projeto (gerado de novo, ou nunca terminaram) saem também do lote dele
     const doProjeto = new Set(projeto.clips.map((c) => 'clip-' + c.id));
+    const notas = new Map(projeto.clips.map((c) => ['clip-' + c.id, c.nota]));
     setAbas((as) =>
       as.map((a) =>
-        a.id === abaId && a.videos.some((v) => v.id.startsWith('clip-') && !doProjeto.has(v.id))
-          ? { ...a, videos: a.videos.filter((v) => !v.id.startsWith('clip-') || doProjeto.has(v.id)) }
+        a.id === abaId && a.videos.some((v) => (v.id.startsWith('clip-') && !doProjeto.has(v.id)) || (notas.get(v.id) != null && v.nota == null))
+          ? {
+              ...a,
+              videos: a.videos
+                .filter((v) => !v.id.startsWith('clip-') || doProjeto.has(v.id))
+                .map((v) => (v.nota == null && notas.get(v.id) != null ? { ...v, nota: notas.get(v.id) } : v)),
+            }
           : a,
       ),
     );
@@ -533,6 +539,7 @@ export default function EditorMassa({
       const vInicial: VideoCliente = {
         ...novoVideo({ id, nome, largura: 1080, altura: 1920, duracao: 45 }),
         texto: c.titulo,
+        nota: c.nota,
         arquivo: new File([], nome),
         url: c.url || '',
         upload: 1,

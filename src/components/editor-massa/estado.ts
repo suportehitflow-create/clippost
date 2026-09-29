@@ -3,6 +3,8 @@ import type { ConfigVideo, StatusItem } from '@/lib/editor-massa/types';
 // Estado do lado do navegador (arquivos locais, uploads, miniaturas, progresso)
 
 export interface VideoCliente extends ConfigVideo {
+  /** nota de viralidade que a IA deu ao corte (0 a 10) */
+  nota?: number;
   arquivo: File;
   url: string; // object URL local
   upload: number; // 0-1
