@@ -1119,6 +1119,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             print(f"[pipeline] upload vídeo raw falhou (não crítico): {upload_err}")
 
         # 3. Transcrição: Sempre usa Groq Whisper com timestamps acústicos precisos por palavra
+        _t_baixou = time.time()
         _set_step(project_id, "transcricao")
         print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
         transcript_data = transcribe_media(video_path, audio_path)
@@ -1156,6 +1157,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     raise
 
         # 6. AI Curator — detectar momentos virais
+        _t_transcreveu = time.time()
         _set_step(project_id, "ia_curator")
         print(f"[pipeline] transcrição: {len(segments)} segmentos — enviando para IA Curator...")
         clips_meta = get_viral_clips(transcript_data, clip_duration=clip_duration, chapters=chapters)
@@ -1347,6 +1349,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             metricas = {
                 "duracao_video_s": round(float(video_duration), 1) if video_duration else None,
                 "ate_cortes_escolhidos_s": round(_t_ia - _t0, 1) if _t_ia else None,
+                "download_s": round(_t_baixou - _t0, 1),
+                "transcricao_s": round(_t_transcreveu - _t_baixou, 1),
+                "ia_s": round(_t_ia - _t_transcreveu, 1) if _t_ia else None,
                 "ate_primeiro_corte_s": round(_t_primeiro - _t0, 1) if _t_primeiro else None,
                 "total_s": round(_fim - _t0, 1),
                 "cortes_identificados": len(clips_meta),

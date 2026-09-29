@@ -477,7 +477,8 @@ def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration:
         blocos.append(atual)
     por_bloco = max(2, min(6, -(-max_total // max(1, len(blocos))) + 1))
     todos = []
-    for i, b in enumerate(blocos[:24]):
+
+    def _um_bloco(i: int, b: list[str]) -> list:
         manual = _manual()
         if manual:
             trecho = (f"ATENÇÃO: este é só um TRECHO (parte {i + 1} de {len(blocos)}) de um vídeo longo; "
@@ -497,7 +498,13 @@ def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration:
         raw = _try_providers(prompt)
         achados = _extrair_clips(raw) if raw else []
         print(f"[ai_curator] bloco {i + 1}/{len(blocos)}: {len(achados)} corte(s)")
-        todos.extend(achados)
+        return achados
+
+    # 3 trechos ao mesmo tempo (antes era um de cada vez: vídeo longo demorava minutos só nesta etapa)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        for achados in ex.map(lambda ib: _um_bloco(*ib), list(enumerate(blocos[:24]))):
+            todos.extend(achados)
     todos.sort(key=lambda c: float(c.get("ai_score") or 0), reverse=True)
     return todos[:max(max_total, 3)]
 

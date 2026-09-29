@@ -527,13 +527,14 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", us
             info = json.loads(result.stdout)
             videos = [v for v in (_entry_to_video(e) for e in (info.get("entries") or []) if e) if v]
     if not videos:
-        erro = (result.stderr.strip().split("\n") or [""])[-1]
+        # detalhe técnico só no log; a pessoa vê uma frase simples
+        print(f"[perfil] listagem falhou em {url}: {(result.stderr.strip().split(chr(10)) or [''])[-1][:300]}")
         hint = ""
         if platform in ("instagram", "facebook"):
-            hint = f" O {platform.capitalize()} costuma exigir login para listar perfis; configure {platform.upper()}_COOKIES_FILE no servidor."
+            hint = f" O {platform.capitalize()} só mostra os vídeos para quem está conectado."
         if aviso_oficial:
             hint = f" {aviso_oficial}{hint}"
-        raise ValueError(f"Não encontrei vídeos em {url}.{hint} {erro}".strip())
+        raise ValueError(f"Não encontrei vídeos nesse perfil.{hint}".strip())
 
     metric = {"views": "view_count", "likes": "like_count", "engagement": "like_count", "date": "timestamp"}[sort_by]
     missing = [v for v in videos[:_MAX_ENRICH] if v.get(metric) is None] if enriquecer else []
