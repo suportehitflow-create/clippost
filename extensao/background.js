@@ -107,12 +107,106 @@ async function pelaJanela(usuario, limite) {
   }
 }
 
+// ---------------- YouTube pelo IP de quem usa (plano quando o servidor é bloqueado) ----------------
+// Pede os links do vídeo ao próprio YouTube como um app de celular/óculos VR (links diretos, sem
+// assinatura), baixa vídeo e áudio daqui do navegador e sobe cada um no link de upload que o site deu.
+const CLIENTES_YT = [
+  { nome: 'ANDROID_VR', num: 28, versao: '1.60.19', extra: { androidSdkVersion: 32, deviceMake: 'Oculus', deviceModel: 'Quest 3', osName: 'Android', osVersion: '12L' } },
+  { nome: 'IOS', num: 5, versao: '20.10.4', extra: { deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82' } },
+  { nome: 'ANDROID', num: 3, versao: '20.10.38', extra: { androidSdkVersion: 34, osName: 'Android', osVersion: '14' } },
+]
+
+async function playerYouTube(videoId) {
+  let motivo = 'o YouTube não liberou este vídeo'
+  for (const c of CLIENTES_YT) {
+    try {
+      const r = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': String(c.num), 'X-YouTube-Client-Version': c.versao },
+        body: JSON.stringify({
+          videoId, contentCheckOk: true, racyCheckOk: true,
+          context: { client: { clientName: c.nome, clientVersion: c.versao, hl: 'pt', gl: 'BR', ...c.extra } },
+        }),
+      })
+      const j = await r.json()
+      const ok = j?.playabilityStatus?.status === 'OK'
+      const temLinks = (j?.streamingData?.adaptiveFormats || []).some(f => f.url) || (j?.streamingData?.formats || []).some(f => f.url)
+      if (ok && temLinks) return j
+      motivo = j?.playabilityStatus?.reason || motivo
+    } catch (e) {}
+  }
+  throw new Error(motivo)
+}
+
+// baixa em pedaços de 8 MB (o YouTube corta downloads grandes de uma vez só)
+async function baixarStream(url, tamanho) {
+  const partes = []
+  const PASSO = 8 * 1024 * 1024
+  if (!tamanho) {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`download ${r.status}`)
+    return await r.blob()
+  }
+  for (let ini = 0; ini < tamanho; ini += PASSO) {
+    const fim = Math.min(tamanho, ini + PASSO) - 1
+    let r
+    for (let t = 0; t < 3; t++) {
+      r = await fetch(`${url}&range=${ini}-${fim}`).catch(() => null)
+      if (r && r.ok) break
+      await new Promise(res => setTimeout(res, 1500 * (t + 1)))
+    }
+    if (!r || !r.ok) throw new Error(`download ${r ? r.status : 'rede'}`)
+    partes.push(await r.blob())
+  }
+  return new Blob(partes)
+}
+
+async function subir(destino, blob, tipo) {
+  const r = await fetch(destino, { method: 'PUT', headers: { 'Content-Type': tipo, 'x-upsert': 'true' }, body: blob })
+  if (!r.ok) throw new Error(`upload ${r.status}`)
+}
+
+async function baixarYouTube(videoId, destinos) {
+  const j = await playerYouTube(videoId)
+  const sd = j.streamingData || {}
+  const adapt = (sd.adaptiveFormats || []).filter(f => f.url)
+  // vídeo MP4 (H.264) até 720p (arquivo menor para subir; o corte sai em 1080x1920 do mesmo jeito) e o melhor áudio M4A
+  const videos = adapt.filter(f => /^video\/mp4/.test(f.mimeType || '') && (f.height || 0) <= 720)
+    .sort((a, b) => (/avc1/.test(b.mimeType) - /avc1/.test(a.mimeType)) || (b.height || 0) - (a.height || 0) || (b.bitrate || 0) - (a.bitrate || 0))
+  const audios = adapt.filter(f => /^audio\/mp4/.test(f.mimeType || '')).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))
+  const info = { titulo: j.videoDetails?.title || '', duracao: Number(j.videoDetails?.lengthSeconds) || null }
+  if (videos[0] && audios[0]) {
+    const [v, a] = await Promise.all([
+      baixarStream(videos[0].url, Number(videos[0].contentLength) || 0),
+      baixarStream(audios[0].url, Number(audios[0].contentLength) || 0),
+    ])
+    await subir(destinos.video, v, 'video/mp4')
+    await subir(destinos.audio, a, 'audio/mp4')
+    return { ...info, audioSeparado: true, altura: videos[0].height }
+  }
+  // sem formatos separados: o arquivo único (vídeo + áudio juntos, qualidade menor)
+  const unico = (sd.formats || []).filter(f => f.url && /^video\/mp4/.test(f.mimeType || '')).sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+  if (!unico) throw new Error('nenhum formato de vídeo disponível')
+  await subir(destinos.video, await baixarStream(unico.url, Number(unico.contentLength) || 0), 'video/mp4')
+  return { ...info, audioSeparado: false, altura: unico.height }
+}
+
 chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {
   // extensão carregada da pasta: o Clipost pede para ela se recarregar quando houver versão nova
   if (msg?.tipo === 'RECARREGAR') {
     responder({ ok: true })
     setTimeout(() => chrome.runtime.reload(), 200)
     return
+  }
+  if (msg?.tipo === 'BAIXAR_YOUTUBE') {
+    ;(async () => {
+      try {
+        responder({ ok: true, ...(await baixarYouTube(String(msg.videoId || ''), msg.destinos || {})) })
+      } catch (e) {
+        responder({ ok: false, erro: e?.message || String(e) })
+      }
+    })()
+    return true
   }
   if (msg?.tipo !== 'BUSCAR_INSTAGRAM') return
   const usuario = String(msg.usuario || '').replace(/^@/, '').trim()

@@ -26,7 +26,29 @@ export interface ListaExtensao {
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
 /** Versão da pasta extensao/ (manifest.json): a extensão instalada mais velha se recarrega sozinha (1.3.1+) */
-export const VERSAO_EXTENSAO = '1.3.3'
+export const VERSAO_EXTENSAO = '1.4.0'
+
+/** A extensão (1.4.0+) baixa o vídeo do YouTube pelo navegador (IP de quem usa) e sobe nos links dados */
+export function baixarYouTubePelaExtensao(
+  videoId: string,
+  destinos: { video: string; audio: string },
+  timeoutMs = 20 * 60 * 1000,
+): Promise<{ titulo: string; duracao: number | null; audioSeparado: boolean }> {
+  return new Promise((resolve, reject) => {
+    const origem = window.location.origin
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const t = setTimeout(() => { window.removeEventListener('message', aoMensagem); reject(new Error('a extensão não respondeu')) }, timeoutMs)
+    function aoMensagem(e: MessageEvent) {
+      if (e.source !== window || e.origin !== origem || e.data?.tipo !== 'CLIPOST_EXTENSAO_YOUTUBE_OK' || e.data.id !== id) return
+      clearTimeout(t)
+      window.removeEventListener('message', aoMensagem)
+      if (e.data.ok) resolve(e.data)
+      else reject(new Error(e.data.erro || 'falhou'))
+    }
+    window.addEventListener('message', aoMensagem)
+    window.postMessage({ tipo: 'CLIPOST_EXTENSAO_YOUTUBE', id, videoId, destinos }, origem)
+  })
+}
 
 /** Detecta a extensão e recebe a lista que ela montou no Instagram */
 export function useExtensaoClipost() {

@@ -51,6 +51,7 @@ import { formatSubtitleWord, getSmartEmojiForWord } from '@/lib/emojis'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { generateMagneticClips, extractCoreSubject, type MagneticClipData } from '@/lib/titles'
 import dynamic from 'next/dynamic'
+import { baixarYouTubePelaExtensao, useExtensaoClipost } from '@/components/bulk/ExtensaoInstagram'
 
 // O estúdio usa canvas, <video> e IndexedDB: só no navegador
 const EstudioEditor = dynamic(() => import('@/components/editor-massa/EditorMassa'), {
@@ -864,7 +865,7 @@ export default function ProjectClient({
     }
   }, [project.id, pollKey])
 
-  async function reprocessProject() {
+  async function reprocessProject(fonte?: { url: string; audio_url?: string }) {
     const { data: { user } } = await supabase.auth.getUser()
     setProcessingSince(Date.now())
     setStatus('processing')
@@ -877,7 +878,7 @@ export default function ProjectClient({
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: project.source_url, project_id: project.id, user_id: user?.id }),
+      body: JSON.stringify({ url: fonte?.url || project.source_url, audio_url: fonte?.audio_url, project_id: project.id, user_id: user?.id }),
     }).catch(() => null)
     if (!res || !res.ok) {
       const detail = res ? await res.json().catch(() => ({})) : {}
@@ -893,6 +894,46 @@ export default function ProjectClient({
     }
     setPollKey(k => k + 1)
   }
+
+  // ---------- Plano "IP de quem usa": o YouTube bloqueou o servidor → o navegador baixa ----------
+  // Sem clique: se a extensão está instalada, ela baixa vídeo e áudio pelo seu navegador, sobe no
+  // armazenamento e o servidor corta a partir desse arquivo. Tenta 1x por projeto aberto.
+  const { instalada: extensaoInstalada } = useExtensaoClipost()
+  const planoNavegadorTentado = useRef(false)
+  useEffect(() => {
+    if (status !== 'failed' || planoNavegadorTentado.current || !extensaoInstalada) return
+    if (!/download|YouTubeBlock|yt-dlp|cobalt|baix/i.test(String(errorMessage || ''))) return
+    const vid = String(project.source_url || '').match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1]
+    if (!vid) return
+    planoNavegadorTentado.current = true
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setStatus('processing')
+      setErrorMessage('step:download')
+      setProcessingSince(Date.now())
+      try {
+        const destino = async (nome: string) => {
+          const r = await fetch('/api/storage/signed-upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bucket: 'videos', path: `${user.id}/${project.id}/${nome}`, upsert: true }),
+          })
+          const d = await r.json()
+          if (!r.ok || !d.signedUrl) throw new Error(d.error || 'sem link de upload')
+          return { enviar: d.signedUrl as string, publico: supabase.storage.from('videos').getPublicUrl(d.path).data.publicUrl }
+        }
+        const [v, a] = await Promise.all([destino('youtube_video.mp4'), destino('youtube_audio.m4a')])
+        const r = await baixarYouTubePelaExtensao(vid, { video: v.enviar, audio: a.enviar })
+        await reprocessProject({ url: v.publico, audio_url: r.audioSeparado ? a.publico : undefined })
+      } catch (e: any) {
+        console.warn('[plano navegador] falhou:', e?.message)
+        setStatus('failed')
+        setErrorMessage('YouTubeBlockError')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, errorMessage, extensaoInstalada])
 
   const readyClips = clips.filter(c => c.status === 'ready' || c.storage_url)
   // activeClip sempre aponta para um clip pronto; se o índice selecionado for "rendering", usa o primeiro pronto

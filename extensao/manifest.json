@@ -1,15 +1,18 @@
 {
     "manifest_version":  3,
-    "name":  "Clipost — Importar do Instagram",
+    "name":  "Clipost",
     "short_name":  "Clipost",
-    "version":  "1.3.3",
-    "description":  "Busca os posts de um perfil do Instagram para o Clipost usando a sua sessão do navegador — direto do site, sem clique.",
+    "version":  "1.4.0",
+    "description":  "Busca perfis do Instagram e baixa vídeos do YouTube para o Clipost pelo seu navegador — direto do site, sem clique.",
     "permissions":  [
                         "storage",
                         "scripting"
                     ],
     "host_permissions":  [
                              "https://www.instagram.com/*",
+                             "https://www.youtube.com/*",
+                             "https://*.googlevideo.com/*",
+                             "https://*.supabase.co/*",
                              "https://clippost-three.vercel.app/*",
                              "http://localhost:3000/*"
                          ],

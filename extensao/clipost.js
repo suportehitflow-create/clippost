@@ -19,6 +19,16 @@
     } else if (tipo === 'CLIPOST_EXTENSAO_RECARREGAR') {
       // versão nova na pasta: recarrega sozinha (sem abrir chrome://extensions)
       try { await chrome.runtime.sendMessage({ tipo: 'RECARREGAR' }) } catch (err) {}
+    } else if (tipo === 'CLIPOST_EXTENSAO_YOUTUBE') {
+      // servidor bloqueado pelo YouTube: baixa pelo navegador (IP de quem usa) e sobe para o Clipost
+      const { id, videoId, destinos } = e.data
+      let resposta
+      try {
+        resposta = await chrome.runtime.sendMessage({ tipo: 'BAIXAR_YOUTUBE', videoId, destinos })
+      } catch (err) {
+        resposta = { ok: false, erro: err?.message || String(err) }
+      }
+      window.postMessage({ tipo: 'CLIPOST_EXTENSAO_YOUTUBE_OK', id, ...(resposta || { ok: false, erro: 'sem resposta da extensão' }) }, ORIGEM)
     } else if (tipo === 'CLIPOST_EXTENSAO_BUSCAR') {
       // busca direto do site: a extensão lê o perfil com a sessão do Instagram deste navegador
       const { id, usuario, limite } = e.data
