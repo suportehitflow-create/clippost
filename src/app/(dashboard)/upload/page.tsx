@@ -2,9 +2,9 @@
 
 import ProfileSwitcher from '@/components/ProfileSwitcher'
 import { LiquidToggle } from '@/components/ui/LiquidToggle'
-import { Suspense, useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal, Aviso, Divisoria } from '@/components/pagina/Base'
@@ -69,15 +69,16 @@ function Conteudo() {
   const [pedido, setPedido] = useState<PedidoBusca | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
   const { tipo, nome } = tipoDoLink(url)
 
   useEffect(() => {
-    const u = searchParams.get('url')
+    // lido aqui (e não com useSearchParams + Suspense): com o Suspense o formulário só ficava
+    // pronto depois do primeiro clique, e o que a pessoa colava logo de cara se perdia
+    const u = new URLSearchParams(window.location.search).get('url')
     if (u) { setUrl(decodeURIComponent(u)); setAba('link') }
     fetch('/api/autopilot/settings', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => d?.interval_minutes && setIntervalo(d.interval_minutes)).catch(() => {})
-  }, [searchParams])
+  }, [])
 
   /** Um vídeo (link ou arquivo) → projeto + processamento. Devolve o id do projeto. */
   async function criarCortes(fonte: { url?: string; file?: File; titulo?: string }): Promise<string> {
@@ -290,9 +291,5 @@ function Conteudo() {
 }
 
 export default function CreateClipsPage() {
-  return (
-    <Suspense fallback={<div className="flex-1 min-h-screen bg-[#07070a]" />}>
-      <Conteudo />
-    </Suspense>
-  )
+  return <Conteudo />
 }
