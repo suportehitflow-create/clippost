@@ -43,7 +43,7 @@ interface Feature {
 // Ordem = ranking das ferramentas (o número do card é a posição)
 const FEATURES: Feature[] = [
   // os 3 principais
-  { capa: 'cortes', title: 'Criar cortes', description: 'Vídeo vira cortes; canal ou perfil traz os vídeos em massa — e pode automatizar os próximos.', href: '/upload', icon: Scissors, cor: '99,102,241' },
+  { capa: 'cortes', title: 'Criar cortes', description: 'Vídeo vira cortes; canal ou perfil traz os vídeos em massa — e pode automatizar os próximos.', href: '/upload', icon: Scissors, cor: '99,102,241', inteiro: true },
   { capa: 'templates', title: 'Identidade Visual', description: 'O template de cada perfil: nome, foto, fontes, cores, marca d’água e estilo da legenda.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
   { capa: 'calendario', title: 'Calendário', description: 'Agende em massa nas redes do perfil e acompanhe o que foi publicado.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },
