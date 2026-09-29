@@ -110,9 +110,22 @@ async function pelaJanela(usuario, limite) {
 // ---------------- YouTube pelo IP de quem usa (plano quando o servidor é bloqueado) ----------------
 // Pede os links do vídeo ao próprio YouTube como um app de celular/óculos VR (links diretos, sem
 // assinatura), baixa vídeo e áudio daqui do navegador e sobe cada um no link de upload que o site deu.
+// O YouTube recusa (403) pedidos com a "origem" da extensão: esta regra tira a origem só dos pedidos
+// que a própria extensão faz ao YouTube (as abas do usuário não são afetadas)
+chrome.declarativeNetRequest.updateSessionRules({
+  removeRuleIds: [1],
+  addRules: [{
+    id: 1,
+    priority: 1,
+    action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] },
+    condition: { requestDomains: ['youtube.com', 'googlevideo.com'], tabIds: [chrome.tabs.TAB_ID_NONE] },
+  }],
+}).catch(() => {})
+
+// ordem = o que o YouTube aceitou em teste (iPhone primeiro; o de óculos VR pede login hoje)
 const CLIENTES_YT = [
-  { nome: 'ANDROID_VR', num: 28, versao: '1.60.19', extra: { androidSdkVersion: 32, deviceMake: 'Oculus', deviceModel: 'Quest 3', osName: 'Android', osVersion: '12L' } },
   { nome: 'IOS', num: 5, versao: '20.10.4', extra: { deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82' } },
+  { nome: 'ANDROID_VR', num: 28, versao: '1.60.19', extra: { androidSdkVersion: 32, deviceMake: 'Oculus', deviceModel: 'Quest 3', osName: 'Android', osVersion: '12L' } },
   { nome: 'ANDROID', num: 3, versao: '20.10.38', extra: { androidSdkVersion: 34, osName: 'Android', osVersion: '14' } },
 ]
 

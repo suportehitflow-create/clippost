@@ -6,7 +6,8 @@
     "description":  "Busca perfis do Instagram e baixa vídeos do YouTube para o Clipost pelo seu navegador — direto do site, sem clique.",
     "permissions":  [
                         "storage",
-                        "scripting"
+                        "scripting",
+                        "declarativeNetRequestWithHostAccess"
                     ],
     "host_permissions":  [
                              "https://www.instagram.com/*",
