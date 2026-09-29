@@ -26,12 +26,14 @@ function tipoDoLink(t: string): { tipo: Tipo; nome: string } {
   const u = s.toLowerCase()
   if (/^@?[a-z0-9._]{2,30}$/.test(u)) return { tipo: 'perfil', nome: 'Perfil do Instagram' }
   if (/youtube\.com|youtu\.be/.test(u)) {
-    if (/youtu\.be\/|[?&]v=|\/shorts\/|\/live\//.test(u)) return { tipo: 'video', nome: 'Vídeo do YouTube' }
+    // Short já é vídeo curto: vai para o editor (não tem o que cortar)
+    if (/\/shorts\/[a-z0-9_-]{6,}/.test(u)) return { tipo: 'post', nome: 'Short do YouTube' }
+    if (/youtu\.be\/|[?&]v=|\/live\/[a-z0-9_-]{6,}/.test(u)) return { tipo: 'video', nome: 'Vídeo do YouTube' }
     return { tipo: 'perfil', nome: 'Canal do YouTube' }
   }
   if (/instagram\.com/.test(u)) return /\/(p|reel|reels|tv)\//.test(u) ? { tipo: 'post', nome: 'Post do Instagram' } : { tipo: 'perfil', nome: 'Perfil do Instagram' }
   if (/tiktok\.com/.test(u)) return /\/video\/|vm\.tiktok|vt\.tiktok/.test(u) ? { tipo: 'post', nome: 'Vídeo do TikTok' } : { tipo: 'perfil', nome: 'Perfil do TikTok' }
-  if (/facebook\.com|fb\.watch/.test(u)) return /\/(watch|reel|videos)\b|fb\.watch/.test(u) ? { tipo: 'post', nome: 'Vídeo do Facebook' } : { tipo: 'perfil', nome: 'Página do Facebook' }
+  if (/facebook\.com|fb\.watch/.test(u)) return /\/(watch|reel|videos\/\d|share\/[vr]\/)|fb\.watch/.test(u) ? { tipo: 'post', nome: 'Vídeo do Facebook' } : { tipo: 'perfil', nome: 'Página do Facebook' }
   return { tipo: 'video', nome: 'Vídeo' }
 }
 
@@ -221,7 +223,7 @@ function Conteudo() {
                   <p className="text-xs font-bold text-white">{file ? file.name : 'Clique para escolher um vídeo do computador'}</p>
                   <p className="text-[11px] text-zinc-500">MP4 ou MOV, até 500 MB</p>
                 </button>
-                <input ref={fileRef} type="file" accept="video/*" onChange={e => setFile(e.target.files?.[0] || null)} className="hidden" />
+                <input ref={fileRef} type="file" accept="video/*" onChange={e => setFile(e.target.files?.[0] || null)} className="sr-only" aria-label="Arquivo de vídeo" id="criar-arquivo" />
                 <p className="text-[11px] text-zinc-500">Vários vídeos curtos para editar de uma vez? <Link href="/bulk?aba=editor" className="underline hover:text-zinc-300">Abra o editor em massa</Link></p>
               </div>
             )}
