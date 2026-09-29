@@ -340,6 +340,8 @@ class ProcessRequest(BaseModel):
     project_id: str | None = None
     remove_silence: bool = False  # default False para evitar drift acústico de PTS
     template_config: dict | None = None
+    # plano "IP do usuário": a extensão baixa vídeo e áudio separados do YouTube e sobe os dois
+    audio_url: str | None = None
 
 
 class BrandKitRequest(BaseModel):
@@ -884,7 +886,7 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     if CELERY_ENABLED:
         try:
             task = process_youtube_video.apply_async(
-                args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config],
+                args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config, req.audio_url],
             )
             print(f"[jobs] Tarefa enfileirada no Celery: {task.id}")
             return {"task_id": task.id, "status": "processing"}
@@ -894,7 +896,7 @@ async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(
         _run_tracked, "process", process_youtube_video,
         req.url, req.user_id, req.clip_duration,
-        req.project_id, req.remove_silence, req.template_config,
+        req.project_id, req.remove_silence, req.template_config, req.audio_url,
     )
     print(f"[jobs] BackgroundTask iniciada para projeto {req.project_id}")
     return {"task_id": f"bg_{req.project_id or 'local'}", "status": "processing"}

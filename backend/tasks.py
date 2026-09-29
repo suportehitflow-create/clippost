@@ -785,7 +785,7 @@ def transcribe_media(video_path: str, audio_path: str) -> dict:
 
 
 @celery.task(name="process_youtube_video")
-def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = False, template_config: dict | None = None):
+def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", project_id: str | None = None, remove_silence: bool = False, template_config: dict | None = None, audio_url: str | None = None):
     print(f"[pipeline] INICIANDO processamento | projeto={project_id} | url={url[:80]}")
     # métricas do vídeo (quanto demorou): guardadas junto da transcrição no fim
     _t0 = time.time()
@@ -889,6 +889,21 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     video_id = project_id or "direct_upload"
                     title = "Upload de Vídeo"
                     print(f"[pipeline] download direto Supabase OK ({os.path.getsize(video_path) // 1024} KB)")
+                    if audio_url:
+                        # vídeo e áudio vieram separados (baixados pelo navegador do usuário): junta os dois
+                        audio_tmp = str(tmp_dir / "audio_sep.m4a")
+                        with httpx.Client(timeout=180, follow_redirects=True) as client:
+                            with client.stream("GET", audio_url) as resp:
+                                resp.raise_for_status()
+                                with open(audio_tmp, "wb") as f:
+                                    for chunk in resp.iter_bytes(65536):
+                                        f.write(chunk)
+                        juntado = str(tmp_dir / "juntado.mp4")
+                        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", video_path, "-i", audio_tmp,
+                                        "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", juntado],
+                                       check=True, timeout=600)
+                        os.replace(juntado, video_path)
+                        print("[pipeline] vídeo + áudio do navegador juntados")
             except Exception as dl_direct_err:
                 print(f"[pipeline] download direto falhou ({dl_direct_err}), tentando yt-dlp...")
 
@@ -924,34 +939,58 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
                 _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
 
+                # Plano B: yt-dlp sem cookies, fingindo outros aparelhos (óculos VR, TV, celular)
+                for _clientes in (["android_vr"], ["tv", "tv_simply"], ["mweb"], ["ios"]):
+                    if fallback_ok:
+                        break
+                    print(f"[pipeline] plano B: yt-dlp sem cookies ({'+'.join(_clientes)})...")
+                    try:
+                        _ydl_b = {k: v for k, v in _ydl_base.items() if k != "cookiefile"}
+                        _ydl_b["extractor_args"] = {"youtube": {"player_client": _clientes}}
+                        with yt_dlp.YoutubeDL(_ydl_b) as ydl:
+                            _b_info = ydl.extract_info(url, download=True) or {}
+                        _b_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
+                        if _b_info.get("id") and _b_files:
+                            video_path = str(_b_files[0])
+                            video_id = _b_info.get("id", _vid_id)
+                            title = _b_info.get("title", _vid_id)
+                            video_duration = _b_info.get("duration")
+                            info = _b_info
+                            fallback_ok = True
+                            print(f"[pipeline] plano B OK ({'+'.join(_clientes)})")
+                    except Exception as b_err:
+                        print(f"[pipeline] plano B ({'+'.join(_clientes)}) falhou: {str(b_err)[:160]}")
+
                 # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
-                print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
-                try:
-                    _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
-                    with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
-                        _f18_info = ydl.extract_info(url, download=True) or {}
-                    _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
-                    if _f18_info.get("id") and _f18_files:
-                        video_path = str(_f18_files[0])
-                        video_id = _f18_info.get("id", _vid_id)
-                        title = _f18_info.get("title", _vid_id)
-                        video_duration = _f18_info.get("duration")
-                        fallback_ok = True
-                        print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
-                except Exception as f18_err:
-                    print(f"[pipeline] format 18 falhou: {f18_err}")
+                if not fallback_ok:
+                    print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
+                    try:
+                        _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
+                        with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
+                            _f18_info = ydl.extract_info(url, download=True) or {}
+                        _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
+                        if _f18_info.get("id") and _f18_files:
+                            video_path = str(_f18_files[0])
+                            video_id = _f18_info.get("id", _vid_id)
+                            title = _f18_info.get("title", _vid_id)
+                            video_duration = _f18_info.get("duration")
+                            fallback_ok = True
+                            print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
+                    except Exception as f18_err:
+                        print(f"[pipeline] format 18 falhou: {f18_err}")
 
                 # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
-                print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
-                try:
-                    video_path, _ = _download_via_cobalt_public(url, tmp_dir)
-                    video_id = _vid_id
-                    title = _vid_id
-                    video_duration = None
-                    fallback_ok = True
-                    print(f"[pipeline] cobalt público OK")
-                except Exception as cobalt_pub_err:
-                    print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
+                if not fallback_ok:
+                    print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
+                    try:
+                        video_path, _ = _download_via_cobalt_public(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] cobalt público OK")
+                    except Exception as cobalt_pub_err:
+                        print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
 
                 # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
                 if not fallback_ok:
