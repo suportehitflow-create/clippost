@@ -140,7 +140,10 @@ function Conteudo() {
       }
       if (tipo === 'perfil') {
         if (automatizar) setOk(`Cortes futuros automatizados: ${await automatizarPerfil()}. Cada vídeo novo vira corte sozinho.`)
-        setPedido({ perfil: url.trim(), limite: quantos, ordem, periodo, n: Date.now() })
+        // canal do YouTube: os vídeos longos (aba Vídeos), que são os que viram cortes
+        let perfil = url.trim()
+        if (/youtube\.com\/(@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)\/?$/i.test(perfil)) perfil = perfil.replace(/\/?$/, '/videos')
+        setPedido({ perfil, limite: quantos, ordem, periodo, n: Date.now() })
         setLoading(false)
         return
       }
