@@ -77,13 +77,14 @@ export function calcularLayout(global: ConfigGlobal, v: ConfigVideo, template: C
     area = { x: 0, y: 0, w: canvas.w, h: canvas.h };
     alinhamento = 'centro';
     base = Math.min(canvas.w / c.w, canvas.h / c.h);
-  } else if (quadro && global.encaixe === 'template') {
+  } else if (quadro && global.encaixe === 'template' && !(c.h > c.w * 1.2 && !semBordas)) {
     // Dentro do quadro de vídeo do template (Sem bordas = preenche o quadro cortando o excesso)
     area = quadro;
     alinhamento = 'centro';
     base = semBordas ? Math.max(area.w / c.w, area.h / c.h) : Math.min(area.w / c.w, area.h / c.h);
   } else if (quadro) {
-    // Solto: no formato do próprio vídeo, começando no topo do quadro (Sem bordas = de ponta a ponta)
+    // Solto: no formato do próprio vídeo, começando no topo do quadro (Sem bordas = de ponta a ponta).
+    // Vídeo em pé (reel) no quadro Fixo também cai aqui: no quadro deitado ele ficava fininho no meio
     area = semBordas
       ? { x: 0, y: quadro.y, w: canvas.w, h: canvas.h - quadro.y }
       : { x: quadro.x, y: quadro.y, w: quadro.w, h: canvas.h - quadro.y };

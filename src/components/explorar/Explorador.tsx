@@ -486,19 +486,19 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                 <div className="min-w-0">
                   <a href={res.perfil.url} target="_blank" rel="noreferrer" className="text-sm font-semibold hover:underline flex items-center gap-1">@{res.perfil.usuario} <ExternalLink className="w-3 h-3 text-zinc-500" /></a>
                   <p className="text-[11px] text-zinc-500">
-                    {res.perfil.seguidores != null ? `${num(res.perfil.seguidores)} seguidores · ` : ''}
-                    {res.fonte === 'api_oficial' ? 'API oficial da Meta' : res.fonte === 'extensao' ? 'via extensão' : 'leitura do servidor'}
+                    {[res.perfil.nome, res.perfil.seguidores != null ? `${num(res.perfil.seguidores)} seguidores` : ''].filter(Boolean).join(' · ')}
                   </p>
                 </div>
               </div>
               <button type="button" onClick={() => { setRes(null); setSel(new Set()); aoNovaBusca?.() }} className="md:order-last px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] self-start md:self-auto">Nova busca</button>
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="flex gap-6 text-center">
+                {/* só os totais que a rede informa (o Facebook não mostra curtidas nem comentários na grade) */}
                 {[
-                  { i: Eye, v: num(res.totais.views), l: 'Views total' },
-                  { i: Heart, v: num(res.totais.likes), l: 'Likes total' },
-                  { i: MessageCircle, v: num(res.totais.comentarios), l: 'Comentários' },
-                  { i: Film, v: res.totais.posts.toLocaleString('pt-BR'), l: res.perfil.total_posts ? `de ${num(res.perfil.total_posts)} posts` : 'posts' },
-                ].map(x => (
+                  { i: Eye, v: num(res.totais.views), l: 'Views total', tem: res.itens.some(i => i.views != null) },
+                  { i: Heart, v: num(res.totais.likes), l: 'Likes total', tem: res.itens.some(i => i.likes != null) },
+                  { i: MessageCircle, v: num(res.totais.comentarios), l: 'Comentários', tem: res.itens.some(i => i.comentarios != null) },
+                  { i: Film, v: res.totais.posts.toLocaleString('pt-BR'), l: res.perfil.total_posts ? `de ${num(res.perfil.total_posts)} posts` : 'vídeos', tem: true },
+                ].filter(x => x.tem).map(x => (
                   <div key={x.l}>
                     <p className="text-sm font-bold tabular-nums flex items-center justify-center gap-1"><x.i className="w-3.5 h-3.5 text-zinc-500" />{x.v}</p>
                     <p className="text-[10px] uppercase tracking-wider text-zinc-500">{x.l}</p>
