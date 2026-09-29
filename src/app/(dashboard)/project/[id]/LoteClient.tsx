@@ -67,13 +67,23 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
   const [baixando, setBaixando] = useState<string | null>(null)
 
   const ordem = useMemo(() => new Map(ids.map((id, i) => [id, i])), [ids])
+  // vídeo "processando" que não anda (servidor reiniciou no meio, por exemplo): a mesma etapa e o mesmo
+  // número de cortes prontos por 15 min → conta como falha e a fila manda de novo
+  const andamento = useRef<Record<string, { marca: string; desde: number }>>({})
+  const parado = (f: Filho) => {
+    if (f.status !== 'processing') return false
+    const marca = `${f.error_message || ''}|${cortes.filter(c => c.project_id === f.id && c.storage_url).length}|${cortes.filter(c => c.project_id === f.id).length}`
+    const a = andamento.current[f.id]
+    if (!a || a.marca !== marca) { andamento.current[f.id] = { marca, desde: Date.now() }; return false }
+    return Date.now() - a.desde > 15 * 60 * 1000
+  }
   const precisa = (f: Filho) =>
     (f.status === 'pending' && f.error_message === AGUARDANDO_NAVEGADOR) ||
-    (f.status === 'failed' && (tentativas.current[f.id] ?? 0) < MAX_TENTATIVAS)
+    ((f.status === 'failed' || parado(f)) && (tentativas.current[f.id] ?? 0) < MAX_TENTATIVAS)
 
   useEffect(() => {
     if (!carregou || trabalhando.current || instalada === null) return
-    const cortando = filhos.filter(f => f.status === 'processing').length
+    const cortando = filhos.filter(f => f.status === 'processing' && !parado(f)).length
     if (cortando >= CORTANDO_JUNTOS) return
     const proximo = [...filhos].sort((a, b) => ordem.get(a.id)! - ordem.get(b.id)!).find(precisa)
     if (!proximo) return
