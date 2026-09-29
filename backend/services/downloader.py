@@ -518,15 +518,27 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", us
 
     result = subprocess.CompletedProcess([], 0, "", "")
     if not videos:
-        # títulos no idioma original/português (sem isso o YouTube devolve traduzidos para inglês)
-        # + data aproximada de cada vídeo já na listagem (sem abrir vídeo por vídeo, que o YouTube bloqueia)
-        idioma = ["--extractor-args", "youtube:lang=pt", "--extractor-args", "youtubetab:approximate_date"] if platform == "youtube" else []
-        cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
-               "--playlist-end", str(scan), *idioma, *cookies, *_proxy_args(), url]
+        # YouTube: data aproximada já na listagem (sem abrir vídeo por vídeo, que o YouTube bloqueia).
+        # A listagem em português lê "30 mil visualizações" como 30, então as views vêm da listagem normal
+        # e só os títulos (que viriam traduzidos para inglês) vêm de uma segunda listagem em português.
+        yt = platform == "youtube"
+        base = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors", "--playlist-end", str(scan)]
+        cmd = [*base, *(["--extractor-args", "youtubetab:approximate_date=1"] if yt else []), *cookies, *_proxy_args(), url]
+        pt = subprocess.Popen([*base, "--extractor-args", "youtube:lang=pt", *cookies, *_proxy_args(), url],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True) if yt else None
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if result.returncode == 0 and result.stdout.strip():
             info = json.loads(result.stdout)
             videos = [v for v in (_entry_to_video(e) for e in (info.get("entries") or []) if e) if v]
+        if pt:
+            try:
+                saida, _ = pt.communicate(timeout=120)
+                titulos = {(_entry_to_video(e) or {}).get("url"): e.get("title") for e in (json.loads(saida).get("entries") or []) if e}
+                for v in videos:
+                    if titulos.get(v["url"]):
+                        v["title"] = titulos[v["url"]]
+            except Exception:
+                pt.kill()
     if not videos:
         # detalhe técnico só no log; a pessoa vê uma frase simples
         print(f"[perfil] listagem falhou em {url}: {(result.stderr.strip().split(chr(10)) or [''])[-1][:300]}")
