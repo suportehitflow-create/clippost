@@ -45,6 +45,10 @@ const DURACOES: { id: Duracao; label: string; desc: string }[] = [
 ]
 const QUANTOS = [{ id: 10, label: '10' }, { id: 25, label: '25' }, { id: 50, label: '50' }, { id: 500, label: 'Todos' }]
 const ORDENS = [{ id: 'recentes', label: 'Mais recentes' }, { id: 'visualizados', label: 'Mais vistos' }, { id: 'curtidos', label: 'Mais curtidos' }]
+// canal do YouTube: cada vídeo é longo e vira vários cortes, então vai de até 50 por vez; "Mais antigos"
+// pega os vídeos do começo do canal (para repostar). YouTube não mostra curtidas na lista do canal.
+const QUANTOS_YT = [{ id: 10, label: '10' }, { id: 25, label: '25' }, { id: 50, label: '50' }]
+const ORDENS_YT = [{ id: 'recentes', label: 'Mais recentes' }, { id: 'visualizados', label: 'Mais vistos' }, { id: 'antigos', label: 'Mais antigos' }]
 const PERIODOS = [{ id: 0, label: 'Tudo' }, { id: 7, label: '7 dias' }, { id: 30, label: '30 dias' }, { id: 90, label: '90 dias' }]
 const INTERVALOS = [60, 180, 300, 420, 720, 1440]
 const MODOS: { id: Modo; label: string; desc: string }[] = [
@@ -72,6 +76,15 @@ function Conteudo() {
   const router = useRouter()
   const supabase = createClient()
   const { tipo, nome } = tipoDoLink(url)
+  const ehYouTube = tipo === 'perfil' && /youtube\.com|youtu\.be/i.test(url)
+  // troca de rede: a escolha que não existe nela volta para a mais próxima
+  useEffect(() => {
+    if (ehYouTube) {
+      if (quantos > 50) setQuantos(50)
+      if (ordem === 'curtidos') setOrdem('visualizados')
+    } else if (ordem === 'antigos') setOrdem('recentes')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ehYouTube])
 
   useEffect(() => {
     // lido aqui (e não com useSearchParams + Suspense): com o Suspense o formulário só ficava
@@ -291,11 +304,11 @@ function Conteudo() {
                 <Divisoria />
                 <div className="space-y-2">
                   <Rotulo>Quantos vídeos</Rotulo>
-                  <Opcoes<number> colunas={4} valor={quantos} mudar={setQuantos} opcoes={QUANTOS} />
+                  <Opcoes<number> colunas={ehYouTube ? 3 : 4} valor={quantos} mudar={setQuantos} opcoes={ehYouTube ? QUANTOS_YT : QUANTOS} />
                 </div>
                 <div className="space-y-2">
                   <Rotulo>Ordem</Rotulo>
-                  <Opcoes valor={ordem} mudar={setOrdem} opcoes={ORDENS} />
+                  <Opcoes valor={ordem} mudar={setOrdem} opcoes={ehYouTube ? ORDENS_YT : ORDENS} />
                 </div>
                 <div className="space-y-2">
                   <Rotulo>Período</Rotulo>

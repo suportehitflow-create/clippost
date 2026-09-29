@@ -88,6 +88,9 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     # vídeo e é rápida); antes lia só os ~75 mais recentes e mostrava os mais vistos só entre eles
     if plataforma == "youtube" and ordem != "recentes" and not periodo_dias:
         leitura = 0
+    # YouTube: até 50 por vez (cada vídeo longo já vira vários cortes)
+    if plataforma == "youtube":
+        limite = min(limite, 50)
 
     dados = None
     fonte = "servidor"
@@ -127,7 +130,15 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
     # sem views (API oficial não informa de terceiros): "mais visualizados" usa curtidas
     if chave == "views" and not any(i.get("views") for i in itens):
         chave = "likes"
-    itens = sorted(itens, key=lambda i: i.get(chave) or 0, reverse=True)[:limite]
+    if ordem == "antigos":
+        # do mais antigo para o mais novo (para repostar os vídeos do começo do canal); sem data, a
+        # listagem do canal já vem do mais novo para o mais antigo, então é só inverter
+        if any(i.get("timestamp") for i in itens):
+            itens = sorted(itens, key=lambda i: i.get("timestamp") or float("inf"))[:limite]
+        else:
+            itens = list(reversed(itens))[:limite]
+    else:
+        itens = sorted(itens, key=lambda i: i.get(chave) or 0, reverse=True)[:limite]
 
     soma = lambda k: sum(i.get(k) or 0 for i in itens)  # noqa: E731
     return {
