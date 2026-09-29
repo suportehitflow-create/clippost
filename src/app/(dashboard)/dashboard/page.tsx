@@ -147,10 +147,11 @@ export default function Biblioteca() {
     r => (filtro === 'tudo' || filtro === 'editor') && r.itens.some(i => i.saida) && (!termo || r.aba.toLowerCase().includes(termo)),
   )
 
+  const soltos = projetos.filter(p => !dentroDeLote.has(p.id))
   const contagem: Record<Filtro, number> = {
-    tudo: projetos.length + exportados.filter(r => r.itens.some(i => i.saida)).length,
-    cortes: projetos.filter(p => origemProjeto(p.id) === 'cortes').length,
-    autopilot: projetos.filter(p => origemProjeto(p.id) === 'autopilot').length,
+    tudo: soltos.length + exportados.filter(r => r.itens.some(i => i.saida)).length,
+    cortes: soltos.filter(p => origemProjeto(p.id) === 'cortes').length,
+    autopilot: soltos.filter(p => origemProjeto(p.id) === 'autopilot').length,
     editor: exportados.filter(r => r.itens.some(i => i.saida)).length + doPerfil.size,
   }
 
