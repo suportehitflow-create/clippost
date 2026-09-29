@@ -1,8 +1,8 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Pagina, Intro, Cartao } from '@/components/pagina/Base'
 import EditorLegenda, { ContadorLegenda } from '@/components/ferramentas/EditorLegenda'
@@ -207,11 +207,14 @@ function Limites() {
 
 function Conteudo() {
   const router = useRouter()
-  const params = useSearchParams()
-  const pedida = params.get('t') as Id
-  const inicial: Id = ['legenda', 'horarios', 'quebras', 'limites'].includes(pedida) ? pedida : 'legenda'
-  const [ativa, setAtiva] = useState<Id>(FERRAMENTAS.some(f => f.id === inicial) ? inicial : 'legenda')
+  const [ativa, setAtiva] = useState<Id>('legenda')
   const f = FERRAMENTAS.find(x => x.id === ativa)!
+
+  // ?t= lido aqui (sem useSearchParams + Suspense, que só ligava a tela no primeiro clique)
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get('t') as Id
+    if (FERRAMENTAS.some(x => x.id === pedida)) setAtiva(pedida)
+  }, [])
 
   function abrir(id: Id) {
     setAtiva(id)
@@ -250,9 +253,5 @@ function Conteudo() {
 }
 
 export default function FerramentasPage() {
-  return (
-    <Suspense fallback={<div className="flex-1 flex items-center justify-center text-xs text-zinc-500 min-h-screen">Carregando…</div>}>
-      <Conteudo />
-    </Suspense>
-  )
+  return <Conteudo />
 }

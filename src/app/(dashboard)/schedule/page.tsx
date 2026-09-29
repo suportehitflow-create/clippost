@@ -1,8 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Pagina, Intro } from '@/components/pagina/Base'
 import EditorLegenda from '@/components/ferramentas/EditorLegenda'
@@ -107,7 +106,6 @@ const pilula = (on: boolean) =>
 
 function Conteudo() {
   const supabase = createClient()
-  const params = useSearchParams()
   const [userId, setUserId] = useState<string | null>(null)
   const [aba, setAba] = useState<Aba>('calendario')
   const [tipoMassa, setTipoMassa] = useState<TipoMassa>('reels')
@@ -175,6 +173,8 @@ function Conteudo() {
       carregar(data.user.id)
     })
     // ?aba=massa&tipo=carrossel (Assistente, links antigos de Posts em massa)
+    // lido aqui (sem useSearchParams + Suspense, que só ligava a tela no primeiro clique)
+    const params = new URLSearchParams(window.location.search)
     if (params.get('aba') === 'massa') setAba('massa')
     const tipo = params.get('tipo')
     if (tipo && TIPOS_MASSA.some(x => x.id === tipo)) setTipoMassa(tipo as TipoMassa)
@@ -831,9 +831,5 @@ function NovoPost({ dia, cortes, contas, fechar, agendar }: {
 }
 
 export default function CalendarioPage() {
-  return (
-    <Suspense fallback={<div className="flex-1 flex items-center justify-center text-xs text-zinc-500 min-h-screen">Carregando…</div>}>
-      <Conteudo />
-    </Suspense>
-  )
+  return <Conteudo />
 }

@@ -2,8 +2,8 @@
 
 import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
 import YoutubeCookies from '@/components/settings/YoutubeCookies'
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   User, Shield, Cpu, LogOut, Check, Zap,
@@ -34,11 +34,12 @@ function SearchParamsReader({ onMetaConnected, onMetaError }: {
   onMetaConnected: () => void
   onMetaError: (e: string) => void
 }) {
-  const searchParams = useSearchParams()
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('meta_connected') === '1') onMetaConnected()
     if (searchParams.get('meta_error')) onMetaError(searchParams.get('meta_error') || 'Erro ao conectar')
-  }, [searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return null
 }
 export default function SettingsPage() {
@@ -196,12 +197,10 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <Suspense fallback={null}>
-        <SearchParamsReader
-          onMetaConnected={() => setMetaConnected(true)}
-          onMetaError={(e) => setMetaError(e)}
-        />
-      </Suspense>
+      <SearchParamsReader
+        onMetaConnected={() => setMetaConnected(true)}
+        onMetaError={(e) => setMetaError(e)}
+      />
 
       <div className="space-y-6">
         {/* SEÇÃO: CONTA */}
