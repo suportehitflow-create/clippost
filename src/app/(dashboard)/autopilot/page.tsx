@@ -332,7 +332,7 @@ export default function AutopilotPage() {
                             <span className="text-sm font-semibold truncate">{w.channel_name || w.channel_handle || w.channel_id}</span>
                             {link && <a href={link} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-white" title="Abrir"><ExternalLink className="w-3.5 h-3.5" /></a>}
                           </div>
-                          <p className="text-[11px] text-zinc-500">{PLATAFORMAS[p].nome} · cortes {w.clip_duration === 'auto' ? 'automáticos' : `de ${w.clip_duration}s`} · verificado {quando(w.last_checked_at)}</p>
+                          <p className="text-[11px] text-zinc-500">{PLATAFORMAS[p].nome} · cortes {w.clip_duration === 'auto' ? 'automáticos' : `de ${w.clip_duration}s`} · {w.last_checked_at ? `verificado ${quando(w.last_checked_at)}` : 'primeira verificação em breve'}</p>
                           {w.last_error && <p className="text-[11px] text-red-300/90 mt-0.5 line-clamp-1" title={w.last_error}>Última verificação falhou: {w.last_error}</p>}
                         </div>
                       </div>
