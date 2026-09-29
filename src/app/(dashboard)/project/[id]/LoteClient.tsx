@@ -73,6 +73,35 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lote.id, lote.title, ids.join(','), filhos.map(f => f.id + f.status).join('|'), cortes.map(c => c.id + (c.storage_url ?? '') + (c.status ?? '')).join('|')])
 
+  // os que falharam (ex.: o YouTube bloqueou o download) começam de novo com um clique
+  const [refazendo, setRefazendo] = useState(false)
+  async function gerarDeNovo() {
+    setRefazendo(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    for (const f of falharam) {
+      await fetch(`/api/projects/${f.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'processing', error_message: null }),
+      }).catch(() => null)
+      await fetch('/api/jobs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: f.source_url, project_id: f.id, user_id: user?.id }),
+      }).catch(() => null)
+    }
+    setFilhos(fs => fs.map(f => (f.status === 'failed' ? { ...f, status: 'processing' } : f)))
+    setRefazendo(false)
+    setTimeout(() => window.location.reload(), 1500)
+  }
+  const aviso = falharam.length > 0 && !gerando.length ? (
+    <div role="alert" className="fixed z-50 right-4 bottom-24 sm:bottom-6 max-w-[340px] rounded-xl border border-red-500/25 bg-[#161013] px-3.5 py-3 text-xs text-zinc-200">
+      <p>{falharam.length === ids.length ? 'Nenhum vídeo deste lote virou corte.' : `${falharam.length} de ${ids.length} vídeos não viraram corte.`}
+        {falharam.some(f => /youtube/i.test(f.source_url || '')) ? ' O YouTube não liberou o download.' : ''}</p>
+      <button type="button" onClick={gerarDeNovo} disabled={refazendo} className="mt-2 font-semibold text-indigo-300 hover:text-indigo-200 disabled:opacity-50">
+        {refazendo ? 'Começando…' : 'Gerar de novo os que falharam'}
+      </button>
+    </div>
+  ) : null
+
   const resumo = `${ids.length} vídeos · ${prontos.length} cortes prontos` +
     (gerando.length ? ` · gerando ${gerando.length}` : '') + (falharam.length ? ` · ${falharam.length} não deram certo` : '')
 
@@ -92,6 +121,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
               style={{ width: `${Math.round(((ids.length - gerando.length) / Math.max(1, ids.length)) * 100)}%` }} />
           </div>
         )}
+        {aviso}
       </div>
     )
   }
@@ -104,6 +134,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
         onAgendar={() => router.push(`/schedule?aba=massa&tipo=reels&projeto=${lote.id}`)}
         acoesExtras={null}
       />
+      {aviso}
     </div>
   )
 }
