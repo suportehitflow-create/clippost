@@ -238,7 +238,16 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
         setRes(await pelaExtensao(usuarioIg, { limite, ordem, periodo }))
       } else {
         try {
-          setRes(await postarJson('/api/tools/explorar', { perfil: perfil.trim(), limite, ordem, periodo_dias: periodo }))
+          const r: Resultado = await postarJson('/api/tools/explorar', { perfil: perfil.trim(), limite, ordem, periodo_dias: periodo })
+          if (r.plataforma === 'youtube') {
+            r.itens = r.itens.map(i => {
+              const id = (i.url || i.permalink || '').match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/)?.[1]
+              return { ...i, thumbnail: i.thumbnail || (id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null) }
+            })
+            setRes(r)
+            // canal do YouTube: a ideia é cortar todos → já vem tudo marcado
+            if (aoCriarCortes) setSel(new Set(r.itens.map(i => i.id)))
+          } else setRes(r)
         } catch (e) {
           if (!(ehInstagram && instalada)) throw e
           setRes(await pelaExtensao(usuarioIg, { limite, ordem, periodo }))
@@ -463,7 +472,7 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
 
             {/* filtros + ações */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-              <div className="flex gap-1.5">
+              <div className={`flex gap-1.5 ${res.plataforma === 'instagram' ? '' : 'hidden'}`}>
                 {ABAS.map(a => {
                   const n = a.v === 'todos' ? res.itens.length : res.itens.filter(i => i.tipo === a.v).length
                   return (
@@ -483,9 +492,11 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                     {acao === 'cortes' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Criar cortes ({selecionados.length})
                   </button>
                 )}
-                <button type="button" onClick={agendarComTemplate} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-1.5 disabled:opacity-40">
-                  {acao === 'template' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Editar com template ({videosSel.length})
-                </button>
+                {!(aoCriarCortes && res.plataforma === 'youtube') && (
+                  <button type="button" onClick={agendarComTemplate} disabled={!videosSel.length || !!acao} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 flex items-center gap-1.5 disabled:opacity-40">
+                    {acao === 'template' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Editar com template ({videosSel.length})
+                  </button>
+                )}
               </div>
             </div>
 
@@ -499,12 +510,12 @@ export default function Explorador({ embutido = false, aoIniciarLote, aoAbrirEdi
                   const Icone = i.tipo === 'reel' ? Film : i.tipo === 'carrossel' ? Images : ImageIcon
                   return (
                     <article key={i.id} className={`rounded-2xl overflow-hidden border bg-[#101014] flex flex-col ${marcado ? 'border-indigo-400 ring-2 ring-indigo-500/40' : 'border-white/[0.07]'}`}>
-                      <button type="button" onClick={() => alternar(i.id)} className="relative aspect-[9/14] bg-black block" aria-pressed={marcado} aria-label="Selecionar">
+                      <button type="button" onClick={() => alternar(i.id)} className={`relative ${res.plataforma === 'youtube' ? 'aspect-video' : 'aspect-[9/14]'} bg-black block`} aria-pressed={marcado} aria-label="Selecionar">
                         {i.thumbnail && <img src={i.thumbnail} alt="" referrerPolicy="no-referrer" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
                         <span className={`absolute top-2 left-2 w-5 h-5 rounded-md border flex items-center justify-center ${marcado ? 'bg-indigo-500 border-indigo-400' : 'bg-black/50 border-white/40'}`}>
                           {marcado && <Check className="w-3.5 h-3.5" />}
                         </span>
-                        <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[10px] font-semibold flex items-center gap-1 capitalize"><Icone className="w-3 h-3" />{i.tipo}</span>
+                        <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[10px] font-semibold flex items-center gap-1 capitalize"><Icone className="w-3 h-3" />{res.plataforma === 'instagram' ? i.tipo : 'vídeo'}</span>
                       </button>
                       <div className="p-2.5 space-y-1.5 flex-1 flex flex-col">
                         <p className="text-[11px] text-zinc-300 leading-snug line-clamp-2 min-h-[28px]">{i.legenda || '—'}</p>
