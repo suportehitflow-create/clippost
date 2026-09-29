@@ -1,6 +1,7 @@
 'use client'
 
-import { META_APP_ID, urlConectarMeta } from '@/lib/meta'
+import { conectarRedes } from '@/lib/conectarRedes'
+import { perfilAtivoSalvo } from '@/components/ProfileSwitcher'
 import YoutubeCookies from '@/components/settings/YoutubeCookies'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -12,8 +13,8 @@ import {
 import LiquidToggle from '@/components/ui/LiquidToggle'
 
 const PLATFORM_ICONS: Record<string, string> = {
-  instagram: '📸', facebook: '📘', tiktok: '🎵',
-  youtube: '▶️', youtube_shorts: '▶️',
+  instagram: 'IG', facebook: 'FB', tiktok: 'TT',
+  youtube: 'YT', youtube_shorts: 'YT',
 }
 const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
@@ -136,33 +137,12 @@ export default function SettingsPage() {
   }
 
   async function connectViaUploadPost() {
+    // abre numa janelinha por cima do site; quando termina, a lista abaixo já mostra a rede nova
     setConnectingUpload(true)
-    try {
-      const res = await fetch('/api/social/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (data.access_url) {
-        window.location.href = data.access_url
-        return
-      }
-      setMetaError(data.detail || data.error || 'Não foi possível abrir a conexão agora. Tente de novo em instantes.')
-    } catch {
-      setMetaError('Sem conexão com o servidor. Tente de novo.')
-    }
+    setMetaError('')
+    const erro = await conectarRedes(perfilAtivoSalvo(), () => userId && loadAccounts(userId))
+    if (erro) setMetaError(erro)
     setConnectingUpload(false)
-  }
-
-  async function connectViaMeta() {
-    setConnectingMeta(true)
-    if (!META_APP_ID) {
-      setMetaError('META_APP_ID não configurado. Configure NEXT_PUBLIC_META_APP_ID no Vercel.')
-      setConnectingMeta(false)
-      return
-    }
-    window.location.href = urlConectarMeta(userId || '', '/settings')
   }
 
   async function removeAccount(id: string) {
@@ -293,40 +273,19 @@ export default function SettingsPage() {
           )}
 
           {/* Botões de conexão */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            {/* Upload-Post: conecta Instagram, TikTok e YouTube numa tela só (é o que publica hoje) */}
+          <div className="pt-2">
             <button
               onClick={connectViaUploadPost}
               disabled={connectingUpload}
-              className="flex items-center gap-3 p-4 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/25 hover:border-indigo-500/50 transition-all cursor-pointer text-left disabled:opacity-50"
+              className="w-full flex items-center gap-3 p-4 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/25 hover:border-indigo-500/50 transition-all cursor-pointer text-left disabled:opacity-50"
             >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                <span>📲</span>
-              </div>
               <div>
                 <span className="text-xs font-semibold text-white block">
-                  {connectingUpload ? 'Redirecionando...' : 'Instagram, TikTok e YouTube'}
+                  {connectingUpload ? 'Abrindo…' : 'Conectar redes'}
                 </span>
-                <span className="text-[10px] text-indigo-300/80">Recomendado · conecta tudo de uma vez</span>
+                <span className="text-[10px] text-zinc-400">Instagram, Facebook, TikTok e YouTube</span>
               </div>
               <Plus className="w-4 h-4 text-zinc-500 ml-auto" />
-            </button>
-
-            <button
-              onClick={connectViaMeta}
-              disabled={connectingMeta}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-purple-500/30 hover:bg-purple-500/[0.03] transition-all cursor-pointer text-left disabled:opacity-50"
-            >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                <span>📘</span>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-white block">
-                  {connectingMeta ? 'Redirecionando...' : 'Página do Facebook (Meta)'}
-                </span>
-                <span className="text-[10px] text-zinc-500">Precisa do app da Meta configurado</span>
-              </div>
-              <Plus className="w-4 h-4 text-zinc-600 ml-auto" />
             </button>
           </div>
         </section>

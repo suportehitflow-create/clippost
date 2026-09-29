@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronDown, Plus, Settings, Check, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { conectarRedes } from '@/lib/conectarRedes'
 
 // Perfis (marca): cada perfil junta as redes onde aquela marca posta (Instagram, Facebook, TikTok,
 // YouTube) e tem o SEU template. Trocar de perfil aqui troca as redes e o template usados no site.
@@ -55,6 +56,7 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [novoNome, setNovoNome] = useState('')
   const [criando, setCriando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -113,10 +115,8 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
 
   async function conectar(perfilId: string) {
     setOcupado('conectar-' + perfilId)
-    const r = await fetch('/api/perfis/conectar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: perfilId }) }).catch(() => null)
-    const d = r ? await r.json().catch(() => ({})) : {}
+    setErro(await conectarRedes(perfilId, carregar))
     setOcupado(null)
-    if (d.access_url) window.location.href = d.access_url
   }
 
   async function criar() {
@@ -126,8 +126,11 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
     const r = await fetch('/api/perfis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) }).catch(() => null)
     const d = r ? await r.json().catch(() => ({})) : {}
     setOcupado(null)
-    if (d.access_url) window.location.href = d.access_url
-    else if (d.perfil) { setCriando(false); setNovoNome(''); carregar() }
+    if (d.perfil) {
+      setCriando(false); setNovoNome(''); carregar()
+      // perfil novo já abre a conexão das redes dele, sem sair do site
+      conectar(d.perfil.id)
+    } else setErro(d.detail || d.error || 'Não foi possível criar o perfil agora.')
   }
 
   const perfilAtual = perfis.find(p => p.id === ativo)
@@ -184,6 +187,7 @@ export default function ProfileSwitcher({ userId: userIdProp, align = 'right' }:
             })}
           </div>
           <div className="border-t border-white/[0.06] p-2 space-y-1">
+            {erro && <p role="alert" className="px-2.5 py-1.5 text-[11px] text-red-300">{erro}</p>}
             {criando ? (
               <div className="flex gap-1.5 p-1">
                 <input

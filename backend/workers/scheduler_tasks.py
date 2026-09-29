@@ -173,12 +173,12 @@ def check_and_publish_scheduled_posts():
             continue
 
         try:
-            # Instagram conectado pelo Upload-Post (sem token da Meta na tabela) publica pelo Upload-Post
+            # Instagram/Facebook conectados pelo Clipost (sem token da Meta na tabela) publicam pelo Upload-Post
             meta_account = _get_meta_token(post["user_id"], platform, post.get("social_account_id")) if platform in META_PLATFORMS else None
-            if platform == "instagram" and not (meta_account and (meta_account.get("page_token") or meta_account.get("access_token"))):
+            if platform in META_PLATFORMS and not (meta_account and (meta_account.get("page_token") or meta_account.get("access_token"))):
                 result = publish_video(
                     user_id=_usuario_up(post),
-                    platform="instagram",
+                    platform=platform,
                     video_url=video_url,
                     caption=caption,
                     title=clip_data.get("title") or "",

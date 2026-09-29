@@ -198,8 +198,15 @@ function Conteudo() {
         <ProfileSwitcher />
       </header>
 
+      {/* com a busca aberta o formulário some: a confirmação da automação vira um aviso no canto */}
+      {pedido && ok && (
+        <div role="status" className="fixed bottom-24 right-4 z-50 max-w-sm flex items-start gap-3 px-4 py-3 rounded-2xl bg-[#111114] border border-white/[0.1] text-xs text-zinc-200">
+          <span className="flex-1">{ok}</span>
+          <button type="button" onClick={() => setOk('')} className="text-zinc-500 hover:text-white" aria-label="Fechar">×</button>
+        </div>
+      )}
       {pedido ? (
-        <Explorador embutido pedido={pedido} aoNovaBusca={() => setPedido(null)} aoCriarCortes={cortesDoCanal} />
+        <Explorador embutido pedido={pedido} aoNovaBusca={() => { setPedido(null); setOk('') }} aoCriarCortes={cortesDoCanal} />
       ) : (
         <div className="max-w-3xl w-full mx-auto p-6 md:p-10 space-y-8">
           <Intro titulo="Criar cortes" descricao="Cole um link. Vídeo vira cortes; canal ou perfil traz os vídeos em massa." />

@@ -12,7 +12,7 @@ import httpx
 
 API_BASE = "https://api.upload-post.com/api"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://clippost-three.vercel.app")
-PLATFORMS = ["tiktok", "instagram", "youtube"]
+PLATFORMS = ["tiktok", "instagram", "facebook", "youtube"]
 
 
 class UploadPostError(Exception):
@@ -49,12 +49,16 @@ def connect_url(user_id: str) -> str:
     resp = httpx.post(
         f"{API_BASE}/uploadposts/users/generate-jwt",
         headers=_headers(),
+        # abre numa janelinha por cima do Clipost, com a marca do Clipost; ao terminar volta para
+        # /conectado, que avisa o site e fecha a janelinha sozinha
         json={
             "username": user_id,
-            "redirect_url": f"{FRONTEND_URL}/schedule?connected=1",
-            "redirect_button_text": "Voltar para o clipost",
-            "connect_title": "Conecte suas redes ao clipost",
-            "connect_description": "Autorize as contas onde seus clipes serão publicados.",
+            "redirect_url": f"{FRONTEND_URL}/conectado",
+            "redirect_button_text": "Concluir",
+            "connect_title": "Conectar redes ao Clipost",
+            "connect_description": "Escolha a rede e autorize. Quando terminar, clique em Concluir.",
+            "logo_image": f"{FRONTEND_URL}/clipost-logo.png",
+            "connect_theme": "dark",
             "platforms": PLATFORMS,
             "show_calendar": False,
             "language": "pt",
@@ -91,6 +95,17 @@ def connected_accounts(user_id: str) -> list[dict]:
     return accounts
 
 
+def facebook_page_id(user_id: str) -> str | None:
+    """Página do Facebook conectada no perfil (a API pede facebook_page_id em toda publicação)."""
+    try:
+        resp = httpx.get(f"{API_BASE}/uploadposts/facebook/pages", headers=_headers(),
+                         params={"profile": user_id}, timeout=30)
+        paginas = [p for p in (resp.json().get("pages") or []) if p.get("profile") in (None, user_id)]
+        return str(paginas[0]["page_id"]) if paginas else None
+    except Exception:
+        return None
+
+
 def publish_video(user_id: str, platform: str, video_url: str, caption: str,
                   title: str, post_id: str, timeout: int = 300, media_type: str | None = None) -> dict:
     """Publica agora e espera o resultado. Retorna {"url": ...} ou levanta UploadPostError.
@@ -107,6 +122,11 @@ def publish_video(user_id: str, platform: str, video_url: str, caption: str,
     }
     if media_type:
         dados["facebook_media_type" if platform == "facebook" else "media_type"] = media_type
+    if platform == "facebook":
+        dados["facebook_description"] = caption
+        pagina = facebook_page_id(user_id)
+        if pagina:
+            dados["facebook_page_id"] = pagina
     resp = httpx.post(f"{API_BASE}/upload", headers={**_headers(), "Idempotency-Key": post_id}, data=dados, timeout=60)
     if not resp.is_success:
         raise UploadPostError(f"Upload recusado ({resp.status_code}): {_error_message(resp)}")
@@ -128,6 +148,10 @@ def publish_photos(user_id: str, platform: str, arquivos: list, caption: str, po
     }
     if media_type and platform == "instagram":
         dados["media_type"] = media_type
+    if platform == "facebook":
+        pagina = facebook_page_id(user_id)
+        if pagina:
+            dados["facebook_page_id"] = pagina
     abertos = [open(a, "rb") for a in arquivos]
     try:
         files = [("photos[]", (os.path.basename(str(a)), f, "image/jpeg")) for a, f in zip(arquivos, abertos)]
