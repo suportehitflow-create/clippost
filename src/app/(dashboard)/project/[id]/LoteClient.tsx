@@ -81,6 +81,20 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
     (f.status === 'pending' && f.error_message === AGUARDANDO_NAVEGADOR) ||
     ((f.status === 'failed' || parado(f)) && (tentativas.current[f.id] ?? 0) < MAX_TENTATIVAS)
 
+  // parado e sem tentativas sobrando: marca como falha, senão fica "processando" para sempre e o lote nunca termina
+  const desistidos = useRef(new Set<string>())
+  useEffect(() => {
+    for (const f of filhos) {
+      if (!parado(f) || (tentativas.current[f.id] ?? 0) < MAX_TENTATIVAS || desistidos.current.has(f.id)) continue
+      desistidos.current.add(f.id)
+      fetch(`/api/projects/${f.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'failed', error_message: 'parou no meio do processamento' }),
+      }).catch(() => null).finally(() => setTique(t => t + 1))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filhos, cortes])
+
   useEffect(() => {
     if (!carregou || trabalhando.current || instalada === null) return
     const cortando = filhos.filter(f => f.status === 'processing' && !parado(f)).length
@@ -126,7 +140,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
   }, [carregou, filhos, instalada])
 
   const aguardando = filhos.filter(precisa)
-  const gerando = filhos.filter(f => f.status === 'processing' || (f.status === 'pending' && !precisa(f)))
+  const gerando = filhos.filter(f => (f.status === 'processing' || f.status === 'pending') && !precisa(f))
   const falharam = filhos.filter(f => f.status === 'failed' && !precisa(f))
   const prontos = cortes.filter(c => !!c.storage_url)
   const trabalhoAberto = gerando.length + aguardando.length > 0
@@ -155,7 +169,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
 
   // "Gerar de novo": zera as tentativas e a fila recomeça pelos que falharam
   function gerarDeNovo() {
-    for (const f of falharam) delete tentativas.current[f.id]
+    for (const f of falharam) { delete tentativas.current[f.id]; desistidos.current.delete(f.id) }
     guardarTentativas()
     setTique(t => t + 1)
   }
