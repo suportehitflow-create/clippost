@@ -519,7 +519,8 @@ def list_profile_videos(profile: str, limit: int = 0, sort_by: str = "views", us
     result = subprocess.CompletedProcess([], 0, "", "")
     if not videos:
         # títulos no idioma original/português (sem isso o YouTube devolve traduzidos para inglês)
-        idioma = ["--extractor-args", "youtube:lang=pt"] if platform == "youtube" else []
+        # + data aproximada de cada vídeo já na listagem (sem abrir vídeo por vídeo, que o YouTube bloqueia)
+        idioma = ["--extractor-args", "youtube:lang=pt", "--extractor-args", "youtubetab:approximate_date"] if platform == "youtube" else []
         cmd = ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", "--ignore-errors",
                "--playlist-end", str(scan), *idioma, *cookies, *_proxy_args(), url]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
