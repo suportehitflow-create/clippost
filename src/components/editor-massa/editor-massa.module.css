@@ -1724,14 +1724,14 @@
 
 /* ================= SKELETON SHIMMER CARDS (CARREGAMENTO RÁPIDO) ================= */
 .cardSkeleton {
-  /* largura explícita: sem ela a grade calcula a altura da linha antes de saber a largura, a linha
-     fica baixa e o card "carregando" invade a linha de baixo */
+  /* com overflow:hidden a grade ignora o 9:16 ao medir a linha (ficava com ~65px) e o card "carregando"
+     invadia a linha de baixo: o recorte do brilho fica no clip-path, que não mexe na medida */
   width: 100%;
   aspect-ratio: 9 / 16;
   border-radius: 16px;
   background: #111116;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  overflow: hidden;
+  clip-path: inset(0 round 16px);
   position: relative;
   display: flex;
   flex-direction: column;
