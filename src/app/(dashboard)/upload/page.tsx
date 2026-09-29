@@ -10,7 +10,8 @@ import { uploadFileViaSignedUrl } from '@/lib/storage-upload'
 import { Intro, Cartao, Rotulo, Campo, Opcoes, BotaoPrincipal, Aviso, Divisoria } from '@/components/pagina/Base'
 import Explorador, { type PedidoBusca } from '@/components/explorar/Explorador'
 import { Scissors, Link2, UploadCloud, Search } from 'lucide-react'
-import { PREFIXO_LOTE, chaveVideo } from '@/lib/lote'
+import { PREFIXO_LOTE, chaveVideo, idYouTube, AGUARDANDO_NAVEGADOR } from '@/lib/lote'
+import { useExtensaoClipost } from '@/components/bulk/ExtensaoInstagram'
 
 // Criar cortes: UM campo de link que entende o que foi colado.
 //  - vídeo do YouTube (ou arquivo MP4) → a IA escolhe os melhores momentos e gera os cortes
@@ -197,6 +198,7 @@ function Conteudo() {
   // canal do YouTube: cada vídeo marcado vira um projeto de cortes
   // vídeos já cortados antes (o card do canal mostra "Já cortado" e pede confirmação antes de repetir)
   const [jaCortados, setJaCortados] = useState<Map<string, number>>(new Map())
+  const { instalada: extensaoInstalada } = useExtensaoClipost()
   useEffect(() => {
     if (!pedido) return
     supabase.auth.getUser().then(async ({ data }) => {
@@ -224,10 +226,19 @@ function Conteudo() {
     }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    // cria os vídeos de 5 em 5 (cada um já começa a processar no servidor)
+    // YouTube com a extensão: o servidor é bloqueado pelo YouTube, então os vídeos entram na fila do lote
+    // para serem baixados pelo navegador, um por um. Sem a extensão (ou outra rede): o servidor começa já.
+    const pelaFila = extensaoInstalada === true
     const ids: string[] = []
     for (let i = 0; i < videos.length; i += 5) {
-      const parte = await Promise.all(videos.slice(i, i + 5).map(v => criarCortes({ url: v.url, titulo: v.titulo || undefined }).catch(() => null)))
+      const parte = await Promise.all(videos.slice(i, i + 5).map(v =>
+        Promise.resolve(pelaFila && idYouTube(v.url)
+          ? supabase.from('projects').insert({
+              user_id: user.id, title: v.titulo || 'Vídeo do YouTube', source_url: v.url, source_type: 'url',
+              status: 'pending', error_message: AGUARDANDO_NAVEGADOR,
+            }).select('id').single().then(({ data }) => (data?.id as string | undefined) ?? null)
+          : criarCortes({ url: v.url, titulo: v.titulo || undefined })
+        ).catch(() => null)))
       ids.push(...(parte.filter(Boolean) as string[]))
     }
     if (!ids.length) throw new Error('Não deu para começar os cortes agora. Tente de novo.')

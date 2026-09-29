@@ -945,8 +945,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 _m = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
                 _vid_id = _m.group(1) if _m else (url.split("v=")[-1].split("&")[0] or "video")
 
-                # Plano B: yt-dlp sem cookies, fingindo outros aparelhos (óculos VR, TV, celular)
-                for _clientes in (["android_vr"], ["tv", "tv_simply"], ["mweb"], ["ios"]):
+                # Plano B: yt-dlp sem cookies, fingindo outros aparelhos (Vision Pro, óculos VR, TV, celular).
+                # O Vision Pro baixa sem login nem token de prova de IP residencial (testado); de datacenter
+                # o YouTube costuma barrar, e aí o navegador de quem usa baixa (fila do lote / estúdio)
+                for _clientes in (["visionos"], ["android_vr"], ["tv", "tv_simply"], ["mweb"], ["ios"]):
                     if fallback_ok:
                         break
                     print(f"[pipeline] plano B: yt-dlp sem cookies ({'+'.join(_clientes)})...")

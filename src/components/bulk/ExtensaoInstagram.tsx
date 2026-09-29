@@ -26,7 +26,7 @@ export interface ListaExtensao {
 
 export const ZIP_EXTENSAO = '/extensao/clipost-instagram.zip'
 /** VersÃ£o da pasta extensao/ (manifest.json): a extensÃ£o instalada mais velha se recarrega sozinha (1.3.1+) */
-export const VERSAO_EXTENSAO = '1.5.1'
+export const VERSAO_EXTENSAO = '1.6.0'
 
 /** A extensÃ£o (1.4.0+) baixa o vÃ­deo do YouTube pelo navegador (IP de quem usa) e sobe nos links dados */
 export function baixarYouTubePelaExtensao(

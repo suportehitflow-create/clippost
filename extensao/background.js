@@ -200,29 +200,46 @@ chrome.declarativeNetRequest.updateSessionRules({
   }],
 }).catch(() => {})
 
-// ordem = o que o YouTube aceitou em teste (iPhone primeiro; o de óculos VR pede login hoje)
+// ordem = o que o YouTube aceitou em teste. O Vision Pro (visionos) baixa o vídeo INTEIRO sem login e sem
+// token de prova, desde que leve o "visitante" da página do vídeo; iPhone/Android abrem mas o download
+// é recusado logo no começo (pedem o token de prova), ficam só como última tentativa
 const CLIENTES_YT = [
+  { nome: 'VISIONOS', num: 101, versao: '1.02', extra: { deviceMake: 'Apple', deviceModel: 'RealityDevice17,1', osName: 'visionOS', osVersion: '26.5.23O471' } },
   { nome: 'IOS', num: 5, versao: '20.10.4', extra: { deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82' } },
   { nome: 'ANDROID_VR', num: 28, versao: '1.60.19', extra: { androidSdkVersion: 32, deviceMake: 'Oculus', deviceModel: 'Quest 3', osName: 'Android', osVersion: '12L' } },
   { nome: 'ANDROID', num: 3, versao: '20.10.38', extra: { androidSdkVersion: 34, osName: 'Android', osVersion: '14' } },
 ]
 
-async function playerYouTube(videoId) {
+// "visitante" da página do vídeo: sem ele o YouTube pede login ("confirme que não é um robô")
+async function visitanteYouTube(videoId) {
+  try {
+    const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1`)).text()
+    return (html.match(/"VISITOR_DATA":"([^"]+)"/) || [])[1] || ''
+  } catch (e) {
+    return ''
+  }
+}
+
+async function playerYouTube(videoId, pular = []) {
   let motivo = 'o YouTube não liberou este vídeo'
-  for (const c of CLIENTES_YT) {
+  const visitorData = await visitanteYouTube(videoId)
+  for (const c of CLIENTES_YT.filter(x => !pular.includes(x.nome))) {
     try {
       const r = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-YouTube-Client-Name': String(c.num), 'X-YouTube-Client-Version': c.versao },
+        headers: {
+          'Content-Type': 'application/json', 'X-YouTube-Client-Name': String(c.num), 'X-YouTube-Client-Version': c.versao,
+          ...(visitorData ? { 'X-Goog-Visitor-Id': visitorData } : {}),
+        },
         body: JSON.stringify({
           videoId, contentCheckOk: true, racyCheckOk: true,
-          context: { client: { clientName: c.nome, clientVersion: c.versao, hl: 'pt', gl: 'BR', ...c.extra } },
+          context: { client: { clientName: c.nome, clientVersion: c.versao, hl: 'pt', gl: 'BR', ...(visitorData ? { visitorData } : {}), ...c.extra } },
         }),
       })
       const j = await r.json()
       const ok = j?.playabilityStatus?.status === 'OK'
       const temLinks = (j?.streamingData?.adaptiveFormats || []).some(f => f.url) || (j?.streamingData?.formats || []).some(f => f.url)
-      if (ok && temLinks) return j
+      if (ok && temLinks) return { ...j, _cliente: c.nome }
       motivo = j?.playabilityStatus?.reason || motivo
     } catch (e) {}
   }
@@ -257,8 +274,28 @@ async function subir(destino, blob, tipo) {
   if (!r.ok) throw new Error(`upload ${r.status}`)
 }
 
+// tenta cliente por cliente: se um libera o vídeo mas recusa o download no meio, vai para o próximo
 async function baixarYouTube(videoId, destinos) {
-  const j = await playerYouTube(videoId)
+  const pular = []
+  let ultimoErro = null
+  for (let t = 0; t < CLIENTES_YT.length; t++) {
+    let j
+    try {
+      j = await playerYouTube(videoId, pular)
+    } catch (e) {
+      throw ultimoErro || e
+    }
+    try {
+      return await baixarComPlayer(j, destinos)
+    } catch (e) {
+      ultimoErro = e
+      pular.push(j._cliente)
+    }
+  }
+  throw ultimoErro || new Error('o YouTube não liberou este vídeo')
+}
+
+async function baixarComPlayer(j, destinos) {
   const sd = j.streamingData || {}
   const adapt = (sd.adaptiveFormats || []).filter(f => f.url)
   // vídeo MP4 (H.264) até 720p (arquivo menor para subir; o corte sai em 1080x1920 do mesmo jeito) e o melhor áudio M4A

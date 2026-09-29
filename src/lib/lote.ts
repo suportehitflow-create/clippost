@@ -3,6 +3,8 @@
 // "clipost:lote:<id1>,<id2>,..." (os ids dos projetos de cada vídeo), no mesmo padrão de "clipost:perfil".
 
 export const PREFIXO_LOTE = 'clipost:lote:'
+/** vídeo do lote que vai ser baixado pelo navegador (o YouTube bloqueia o servidor): a fila do lote cuida */
+export const AGUARDANDO_NAVEGADOR = 'aguardando:navegador'
 
 export function idsDoLote(sourceUrl?: string | null): string[] | null {
   const s = String(sourceUrl || '')
