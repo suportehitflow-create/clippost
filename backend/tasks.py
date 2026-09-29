@@ -912,6 +912,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if not _direct_downloaded:
             print(f"[pipeline] baixando vídeo via extratores: {url[:80]}")
             _ytdlp_blocked = False
+            _motivos: list[str] = []  # por que cada caminho falhou (vai no erro do projeto para diagnóstico)
             try:
                 with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                     info = ydl.extract_info(url, download=True) or {}
@@ -922,8 +923,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 mp4_early = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.mkv")) + list(tmp_dir.glob("*.webm"))
                 if not info.get('id') or not mp4_early:
                     _ytdlp_blocked = True
+                    _motivos.append("principal: sem arquivo")
             except yt_dlp.utils.DownloadError as de:
                 err = str(de).lower()
+                _motivos.append("principal: " + str(de)[-140:])
                 if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
                     _ytdlp_blocked = True
                 else:
@@ -931,6 +934,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             except Exception as ge:
                 # ignoreerrors=True pode suprimir DownloadError e lançar Exception genérica
                 _ge = str(ge).lower()
+                _motivos.append("principal: " + str(ge)[-140:])
                 if any(k in _ge for k in ("sign in", "bot", "403", "429", "não retornou", "url inválida")):
                     _ytdlp_blocked = True
                 else:
@@ -962,6 +966,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                             print(f"[pipeline] plano B OK ({'+'.join(_clientes)})")
                     except Exception as b_err:
                         print(f"[pipeline] plano B ({'+'.join(_clientes)}) falhou: {str(b_err)[:160]}")
+                        _motivos.append(f"{'+'.join(_clientes)}: {str(b_err)[-120:]}")
 
                 # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
                 if not fallback_ok:
@@ -980,6 +985,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                             print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
                     except Exception as f18_err:
                         print(f"[pipeline] format 18 falhou: {f18_err}")
+                        _motivos.append("f18: " + str(f18_err)[-100:])
 
                 # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
                 if not fallback_ok:
@@ -993,6 +999,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] cobalt público OK")
                     except Exception as cobalt_pub_err:
                         print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
+                        _motivos.append("cobalt pub: " + str(cobalt_pub_err)[-100:])
 
                 # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
                 if not fallback_ok:
@@ -1006,6 +1013,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] cobalt privado OK")
                     except Exception as cobalt_err:
                         print(f"[pipeline] cobalt privado falhou: {cobalt_err}")
+                        _motivos.append("cobalt fra: " + str(cobalt_err)[-100:])
 
                 # Fallback 3: Piped (streams proxiados, IP não-Fly.io chega ao CDN)
                 if not fallback_ok:
@@ -1019,6 +1027,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] piped OK")
                     except Exception as piped_err:
                         print(f"[pipeline] piped falhou: {piped_err}")
+                        _motivos.append("piped: " + str(piped_err)[-100:])
 
                 # Fallback 4: Invidious (API pública, IP diferente)
                 if not fallback_ok:
@@ -1032,12 +1041,13 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] invidious OK")
                     except Exception as inv_err:
                         print(f"[pipeline] invidious falhou: {inv_err}")
+                        _motivos.append("invidious: " + str(inv_err)[-100:])
 
                 if not fallback_ok:
                     raise Exception(
                         "YouTubeBlockError: todos os métodos de download falharam "
                         "(yt-dlp, cobalt privado, cobalt público, piped, invidious). "
-                        "Verifique os logs para detalhes."
+                        + " | ".join(m.replace("\n", " ") for m in _motivos)[:1500]
                     )
 
         # Detecta duração via ffprobe se não disponível (download via cobalt)
