@@ -1,4 +1,5 @@
-# Servidor do Editor em Massa. Deploy: fly deploy -c fly.editor.toml
+# Servidor do Editor em Massa. Deploy: fly deploy --ha=false -c fly.editor.toml (sempre 1 máquina:
+# os arquivos enviados e a fila ficam no disco/memória dela)
 app = "clippost-editor"
 primary_region = "gru"
 # Espera os vídeos em processamento terminarem antes de reiniciar num deploy (máx. do Fly)
