@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     wget \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Anton = opção "Anton / Impact" do editor de template (camada do título nos cortes)
@@ -30,6 +32,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --upgrade yt-dlp
+
+# PO token do YouTube (bgutil): sem ele o YouTube corta o download depois dos primeiros MB e pede
+# "confirme que não é um robô". O yt-dlp acha o gerador sozinho neste caminho. Se falhar, o resto segue.
+RUN (pip install --no-cache-dir bgutil-ytdlp-pot-provider \
+    && git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /root/bgutil-ytdlp-pot-provider \
+    && cd /root/bgutil-ytdlp-pot-provider/server && npm ci --no-audit --no-fund && npx tsc \
+    && ls /root/bgutil-ytdlp-pot-provider/server/build/generate_once.js) \
+    || echo "[aviso] gerador de PO token nao instalado"
 
 COPY . .
 

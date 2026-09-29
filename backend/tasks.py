@@ -850,7 +850,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['tv_embedded', 'ios', 'android', 'web'],
+                    # com o gerador de PO token (bgutil) os clientes web/mweb baixam o vídeo inteiro
+                    'player_client': ['default', 'mweb', 'web_safari', 'tv'],
                     **({"po_token": [f"web+{po_token}"]} if po_token else {}),
                 },
             },
