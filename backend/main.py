@@ -128,6 +128,34 @@ async def _mark_stuck_projects(label: str = "recovery"):
         print(f"[{label}] erro ao limpar projetos travados: {e}")
 
 
+def _apagar_partes_do_navegador() -> None:
+    """Partes de vídeo que o navegador subiu (<usuario>/<projeto>/navegador/*.part) são só transporte para o
+    servidor baixar. Projeto que já não está processando não precisa mais delas: apaga (ocupavam ~250 MB
+    por vídeo para sempre e estouraram a cota do armazenamento)."""
+    try:
+        res = supabase.table("projects").select("id, user_id, status").neq("status", "processing") \
+            .order("created_at", desc=True).limit(300).execute()
+        nomes = [f"navegador/video_{i:02d}.part" for i in range(20)] + [f"navegador/audio_{i}.part" for i in range(4)]
+        apagados = 0
+        for p in (res.data or []):
+            pasta = f"{p['user_id']}/{p['id']}/navegador"
+            try:
+                existentes = supabase.storage.from_("videos").list(pasta) or []
+            except Exception:
+                continue
+            if not existentes:
+                continue
+            caminhos = [f"{pasta}/{e['name']}" for e in existentes if e.get("name")]
+            caminhos = [c for c in caminhos if c.split(f"{p['user_id']}/{p['id']}/", 1)[1] in nomes]
+            if caminhos:
+                supabase.storage.from_("videos").remove(caminhos)
+                apagados += len(caminhos)
+        if apagados:
+            print(f"[cleanup] {apagados} parte(s) de vídeo do navegador apagadas")
+    except Exception as e:
+        print(f"[cleanup] partes do navegador: {type(e).__name__}")
+
+
 async def _cleanup_old_projects():
     """Limpa só projetos que FALHARAM sem nenhum corte e já têm mais de 24h (dá tempo de "Gerar de novo").
     A Biblioteca (projetos prontos) nunca é apagada sozinha — antes tudo com mais de 24h sumia.
@@ -156,6 +184,8 @@ async def _cleanup_old_projects():
                 failed_ids.discard(pid)
                 saved += 1
                 print(f"[cleanup] projeto {pid[:8]} resgatado: {len(ready)} clips prontos → done")
+
+        _apagar_partes_do_navegador()
 
         ids_to_delete = list(failed_ids & antigos)
         if not ids_to_delete:

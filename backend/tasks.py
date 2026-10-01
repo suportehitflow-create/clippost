@@ -883,12 +883,23 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             def _baixar_partes(links: str, destino: str) -> None:
                 # o armazenamento aceita até 50 MB por arquivo: o navegador sobe vídeos grandes em partes
                 # ("link1|link2|..."), baixadas aqui em ordem e juntadas byte a byte (o arquivo original)
+                partes = [p for p in links.split("|") if p]
                 with httpx.Client(timeout=180, follow_redirects=True) as client, open(destino, "wb") as f:
-                    for parte in [p for p in links.split("|") if p]:
+                    for parte in partes:
                         with client.stream("GET", parte) as resp:
                             resp.raise_for_status()
                             for chunk in resp.iter_bytes(65536):
                                 f.write(chunk)
+                # as partes que o navegador subiu são só transporte: apaga já (cada vídeo ocupava ~250 MB
+                # para sempre e estourou a cota do armazenamento)
+                caminhos = [p.split("/storage/v1/object/public/videos/", 1)[1].split("?")[0]
+                            for p in partes if "/storage/v1/object/public/videos/" in p and "/navegador/" in p]
+                if caminhos:
+                    try:
+                        supabase.storage.from_("videos").remove(caminhos)
+                        print(f"[pipeline] {len(caminhos)} parte(s) do navegador apagadas do armazenamento")
+                    except Exception as rm_err:
+                        print(f"[pipeline] não apagou as partes do navegador: {type(rm_err).__name__}")
 
             try:
                 _baixar_partes(url, video_path)

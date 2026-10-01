@@ -23,7 +23,7 @@ interface Corte { id: string; project_id: string; storage_url: string | null; ho
 
 const MAX_TENTATIVAS = 3
 /** quantos vídeos o servidor corta ao mesmo tempo (a fila espera antes de mandar mais) */
-const CORTANDO_JUNTOS = 3
+const CORTANDO_JUNTOS = 2
 
 export default function LoteClient({ lote }: { lote: { id: string; title: string; source_url: string } }) {
   const router = useRouter()
