@@ -120,9 +120,20 @@ def _recompress_if_needed(file_path: str) -> bytes:
 
 
 def _upload_clip_to_storage(clip_key: str, data: bytes) -> str:
-    """Upload via httpx direto com timeout de 5 minutos — evita ReadTimeout do SDK."""
+    """Upload via httpx direto com timeout de 5 minutos — evita ReadTimeout do SDK.
+    Com o R2 configurado, o corte vai para lá (o Supabase grátis tem só 1 GB)."""
     size_mb = len(data) / (1024 * 1024)
     print(f"[upload] {clip_key} — {size_mb:.1f} MB")
+    from services import armazenamento
+    if armazenamento.usa_r2():
+        ultimo_r2 = ""
+        for tentativa in range(4):
+            try:
+                return armazenamento.enviar(clip_key, data, "video/mp4")
+            except Exception as e:
+                ultimo_r2 = type(e).__name__
+                time.sleep(5 * (tentativa + 1))
+        raise RuntimeError(f"Upload falhou para {clip_key} depois de 4 tentativas ({ultimo_r2}).")
     endpoint = f"{SUPABASE_URL}/storage/v1/object/videos/{clip_key}"
     headers = {
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -877,7 +888,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # Download direto ultrarrápido para arquivos já hospedados (ex: upload manual via Supabase Storage)
         # (link direto da CDN do Instagram/Facebook — API oficial ou extensão — também baixa direto)
         _cdn_direto = re.match(r"^https://[^/]*(cdninstagram\.com|fbcdn\.net)/", url or "")
-        if "supabase.co/storage" in url or _cdn_direto or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
+        from services import armazenamento as _arm
+        # arquivo no nosso armazenamento (R2 ou Supabase); vídeo grande vem em partes "link1|link2|..."
+        _nosso = "supabase.co/storage" in url or _arm.eh_nosso(url.split("|")[0])
+        if _nosso or _cdn_direto or (url.startswith("http") and url.split("?")[0].endswith((".mp4", ".mov", ".mkv", ".webm")) and not any(k in url for k in ("youtube.com", "youtu.be", "tiktok.com", "instagram.com"))):
             print(f"[pipeline] arquivo já hospedado — baixando diretamente: {url[:80]}...")
 
             def _baixar_partes(links: str, destino: str) -> None:
@@ -892,11 +906,10 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                                 f.write(chunk)
                 # as partes que o navegador subiu são só transporte: apaga já (cada vídeo ocupava ~250 MB
                 # para sempre e estourou a cota do armazenamento)
-                caminhos = [p.split("/storage/v1/object/public/videos/", 1)[1].split("?")[0]
-                            for p in partes if "/storage/v1/object/public/videos/" in p and "/navegador/" in p]
+                caminhos = [p for p in partes if "/navegador/" in p and _arm.eh_nosso(p)]
                 if caminhos:
                     try:
-                        supabase.storage.from_("videos").remove(caminhos)
+                        _arm.apagar(caminhos)
                         print(f"[pipeline] {len(caminhos)} parte(s) do navegador apagadas do armazenamento")
                     except Exception as rm_err:
                         print(f"[pipeline] não apagou as partes do navegador: {type(rm_err).__name__}")
@@ -1126,18 +1139,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 def _bg_upload_raw(vpath, spath):
                     try:
                         with open(vpath, 'rb') as f:
-                            supabase.storage.from_("videos").upload(
-                                path=spath,
-                                file=f.read(),
-                                file_options={"content-type": "video/mp4", "upsert": "true"},
-                            )
+                            _arm.enviar(spath, f.read(), "video/mp4")
                         print(f"[pipeline] raw video upload concluído em background: {spath}")
                     except Exception as e:
                         print(f"[pipeline] raw upload background ignorado: {e}")
 
                 import threading
                 threading.Thread(target=_bg_upload_raw, args=(video_path, storage_path), daemon=True).start()
-                raw_video_url = supabase.storage.from_("videos").get_public_url(storage_path)
+                raw_video_url = _arm.url_publica(storage_path)
             else:
                 print(f"[pipeline] vídeo original {raw_size_mb:.1f}MB > 45MB — pulando upload raw para economizar storage e acelerar processamento")
         except Exception as upload_err:
@@ -1164,7 +1173,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             "status": "processing",
         }
         # Arquivo enviado: o nome gravado pela tela vale mais que o "original" que o yt-dlp devolve
-        if project_id and "/storage/v1/object/" in url:
+        if project_id and ("/storage/v1/object/" in url or _arm.eh_nosso(url.split("|")[0])):
             project_data.pop("title")
         if project_id:
             supabase.table("projects").update(project_data).eq("id", project_id).execute()

@@ -224,9 +224,10 @@ export default function PerfilEmMassa({ aoNovoLote }: { aoNovoLote?: () => void 
           setUploadProgress(`Enviando ${i + 1} de ${files.length}: ${f.name}`)
           const ext = (f.name.split('.').pop() || 'mp4').toLowerCase()
           const path = `${user.id}/bulk/${Date.now()}-${i}.${ext}`
-          const { error: upErr } = await supabase.storage.from('videos').upload(path, f, { contentType: f.type })
-          if (upErr) throw new Error(`Falha ao enviar ${f.name}: ${upErr.message}`)
-          videos.push({ url: supabase.storage.from('videos').getPublicUrl(path).data.publicUrl, title: f.name.replace(/\.[^.]+$/, '') })
+          // pelo link de envio (vai para onde o servidor guarda os vídeos: Cloudflare R2 ou Supabase)
+          const up = await uploadFileViaSignedUrl(supabase, 'videos', path, f, { contentType: f.type })
+            .catch((e: Error) => { throw new Error(`Falha ao enviar ${f.name}: ${e.message}`) })
+          videos.push({ url: up.publicUrl, title: f.name.replace(/\.[^.]+$/, '') })
         }
         setUploadProgress(null)
       }

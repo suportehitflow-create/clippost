@@ -225,8 +225,8 @@ def _rodar(job_id: str, user_id: str, req: dict, supabase):
                 inicio = float(req.get("musica_inicio") or 0) + (idx * duracao if req.get("variar_trecho") else 0)
                 montar_video(png, musica, inicio, duracao, mp4, zoom=estilo.get("zoom", True) is not False)
                 chave = f"{user_id}/frases/{job_id}/{idx + 1}.mp4"
-                supabase.storage.from_("videos").upload(chave, mp4.read_bytes(), {"content-type": "video/mp4", "upsert": "true"})
-                url = supabase.storage.from_("videos").get_public_url(chave).rstrip("?")
+                from services import armazenamento
+                url = armazenamento.enviar(chave, mp4.read_bytes(), "video/mp4")
                 titulo = item["frase"].replace("\n", " ")[:200]
                 clip = supabase.table("clips").insert({
                     "project_id": projeto["id"], "user_id": user_id, "title": titulo, "hook": titulo,

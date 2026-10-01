@@ -26,21 +26,26 @@ export async function uploadFileViaSignedUrl(
           .uploadToSignedUrl(data.path, data.token, file, options);
 
         if (!upErr) {
-          const publicUrl = supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
+          const publicUrl = data.publicUrl || supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
           return { path: data.path, publicUrl };
         }
       }
 
+      // link de envio direto (Cloudflare R2 ou Supabase): o servidor diz o link público do arquivo
       if (data?.signedUrl) {
         const putRes = await fetch(data.signedUrl, {
           method: 'PUT',
-          headers: options?.contentType ? { 'Content-Type': options.contentType } : undefined,
+          headers: { 'Content-Type': options?.contentType || (file as File).type || 'application/octet-stream' },
           body: file,
         });
 
         if (putRes.ok) {
-          const publicUrl = supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
+          const publicUrl = data.publicUrl || supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
           return { path: data.path, publicUrl };
+        }
+        // R2 recusou: não adianta tentar o Supabase com o mesmo caminho se ele estiver cheio — mostra o erro
+        if (data.publicUrl && !String(data.publicUrl).includes('supabase.co')) {
+          throw new Error(`Falha no envio do arquivo (${putRes.status}).`);
         }
       }
     }

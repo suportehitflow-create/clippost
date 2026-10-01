@@ -24,8 +24,8 @@ export async function baixarPeloNavegador(supabase: SupabaseClient, userId: stri
   })
   const d = await r0.json()
   if (!r0.ok || !Array.isArray(d.urls)) throw new Error(d.error || 'sem link de upload')
-  const lista = (d.urls as { signedUrl: string; path: string }[]).map(u => ({
-    enviar: u.signedUrl, publico: supabase.storage.from('videos').getPublicUrl(u.path).data.publicUrl,
+  const lista = (d.urls as { signedUrl: string; path: string; publicUrl?: string }[]).map(u => ({
+    enviar: u.signedUrl, publico: u.publicUrl || supabase.storage.from('videos').getPublicUrl(u.path).data.publicUrl,
   }))
   const video = lista.slice(0, 20)
   const audio = lista.slice(20)

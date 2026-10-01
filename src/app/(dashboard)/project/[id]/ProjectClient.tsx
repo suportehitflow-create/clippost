@@ -921,7 +921,7 @@ export default function ProjectClient({
           })
           const d = await r.json()
           if (!r.ok || !d.signedUrl) throw new Error(d.error || 'sem link de upload')
-          return { enviar: d.signedUrl as string, publico: supabase.storage.from('videos').getPublicUrl(d.path).data.publicUrl }
+          return { enviar: d.signedUrl as string, publico: (d.publicUrl as string) || supabase.storage.from('videos').getPublicUrl(d.path).data.publicUrl }
         }
         const [v, a] = await Promise.all([destino('youtube_video.mp4'), destino('youtube_audio.m4a')])
         const r = await baixarYouTubePelaExtensao(vid, { video: v.enviar, audio: a.enviar })

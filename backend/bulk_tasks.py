@@ -161,7 +161,8 @@ def _download(url: str, tmp_dir: Path) -> tuple[str, dict]:
             raise RuntimeError("o link do vídeo expirou ou não devolveu um arquivo de vídeo")
         return str(dest), {}
 
-    if "/storage/v1/object/" in url:
+    from services import armazenamento as _arm
+    if "/storage/v1/object/" in url or _arm.eh_nosso(url):
         dest = tmp_dir / "source.mp4"
         with httpx.stream("GET", url, timeout=600.0, follow_redirects=True) as resp:
             resp.raise_for_status()

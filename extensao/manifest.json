@@ -2,7 +2,7 @@
     "manifest_version":  3,
     "name":  "Clipost",
     "short_name":  "Clipost",
-    "version":  "1.6.1",
+    "version":  "1.6.2",
     "description":  "Busca perfis do Instagram e baixa vídeos do YouTube para o Clipost pelo seu navegador — direto do site, sem clique.",
     "permissions":  [
                         "storage",
@@ -15,6 +15,7 @@
                              "https://www.facebook.com/*",
                              "https://*.googlevideo.com/*",
                              "https://*.supabase.co/*",
+                             "https://*.r2.cloudflarestorage.com/*",
                              "https://clippost-three.vercel.app/*",
                              "http://localhost:3000/*"
                          ],

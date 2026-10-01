@@ -134,7 +134,7 @@ def _apagar_partes_do_navegador() -> None:
     por vídeo para sempre e estouraram a cota do armazenamento)."""
     try:
         res = supabase.table("projects").select("id, user_id, status").neq("status", "processing") \
-            .order("created_at", desc=True).limit(300).execute()
+            .order("created_at", desc=True).limit(60).execute()
         nomes = [f"navegador/video_{i:02d}.part" for i in range(20)] + [f"navegador/audio_{i}.part" for i in range(4)]
         apagados = 0
         for p in (res.data or []):
@@ -150,10 +150,54 @@ def _apagar_partes_do_navegador() -> None:
             if caminhos:
                 supabase.storage.from_("videos").remove(caminhos)
                 apagados += len(caminhos)
+        # no R2 (partes novas): tudo em <usuario>/<projeto>/navegador/ de projeto que não está processando
+        from services import armazenamento as _arm
+        if _arm.usa_r2():
+            for p in (res.data or []):
+                try:
+                    chaves = _arm.listar(f"{p['user_id']}/{p['id']}/navegador/")
+                    if chaves:
+                        apagados += _arm.apagar(chaves)
+                except Exception:
+                    continue
         if apagados:
             print(f"[cleanup] {apagados} parte(s) de vídeo do navegador apagadas")
     except Exception as e:
         print(f"[cleanup] partes do navegador: {type(e).__name__}")
+
+
+_ULTIMA_LIMPEZA_CORTES = 0.0
+DIAS_GUARDAR_CORTES = int(os.environ.get("DIAS_GUARDAR_CORTES", "15"))
+
+
+def _apagar_cortes_antigos() -> None:
+    """Cortes com mais de 15 dias que não estão agendados: apaga o arquivo (o armazenamento grátis é pequeno
+    e um lote de 25 vídeos gera centenas de cortes). Agendados ficam até serem publicados. Roda 1x por hora."""
+    global _ULTIMA_LIMPEZA_CORTES
+    import time as _t
+    from datetime import timedelta
+    if _t.time() - _ULTIMA_LIMPEZA_CORTES < 3600:
+        return
+    _ULTIMA_LIMPEZA_CORTES = _t.time()
+    try:
+        from services import armazenamento as _arm
+        limite = (datetime.now(timezone.utc) - timedelta(days=DIAS_GUARDAR_CORTES)).isoformat()
+        velhos = (supabase.table("clips").select("id, storage_url").lt("created_at", limite)
+                  .not_.is_("storage_url", "null").limit(500).execute().data or [])
+        velhos = [c for c in velhos if c.get("storage_url") and not str(c["storage_url"]).split("?")[0].endswith(".json")]
+        if not velhos:
+            return
+        agendados = {r["clip_id"] for r in (supabase.table("scheduled_posts").select("clip_id")
+                     .eq("status", "scheduled").in_("clip_id", [c["id"] for c in velhos]).execute().data or [])}
+        apagar = [c for c in velhos if c["id"] not in agendados and _arm.eh_nosso(c["storage_url"])]
+        if not apagar:
+            return
+        _arm.apagar([c["storage_url"] for c in apagar])
+        for c in apagar:
+            supabase.table("clips").update({"storage_url": None}).eq("id", c["id"]).execute()
+        print(f"[cleanup] {len(apagar)} corte(s) com mais de {DIAS_GUARDAR_CORTES} dias apagados (não estavam agendados)")
+    except Exception as e:
+        print(f"[cleanup] cortes antigos: {type(e).__name__}: {e}")
 
 
 async def _cleanup_old_projects():
@@ -186,6 +230,7 @@ async def _cleanup_old_projects():
                 print(f"[cleanup] projeto {pid[:8]} resgatado: {len(ready)} clips prontos → done")
 
         _apagar_partes_do_navegador()
+        _apagar_cortes_antigos()
 
         ids_to_delete = list(failed_ids & antigos)
         if not ids_to_delete:
@@ -281,6 +326,14 @@ async def recover_stuck_projects():
     _setup_youtube_cookies()
     _setup_platform_cookies()
     _restore_cookies_from_storage()
+    # R2: deixa o site e a extensão enviarem arquivos direto para o bucket (sem configurar nada à mão)
+    try:
+        from services import armazenamento as _arm
+        _arm.configurar_cors([os.environ.get("FRONTEND_URL", "https://clippost-three.vercel.app"), "http://localhost:3000"])
+        if _arm.usa_r2():
+            print("[armazenamento] usando Cloudflare R2 para os vídeos")
+    except Exception as e:
+        print(f"[armazenamento] não configurou o acesso do navegador ao R2: {type(e).__name__}: {e}")
     await _mark_stuck_projects("startup")
     await _cleanup_old_projects()
     asyncio.create_task(_periodic_recovery_loop())
@@ -776,8 +829,8 @@ def _preencher_template(user_id: str) -> dict:
                 r = httpx.get(conta["foto"], timeout=20, follow_redirects=True)
                 r.raise_for_status()
                 chave = f"avatars/{user_id}-{pf['id']}.jpg"
-                supabase.storage.from_("videos").upload(chave, r.content, {"content-type": r.headers.get("content-type") or "image/jpeg", "upsert": "true"})
-                patch["avatar_url"] = supabase.storage.from_("videos").get_public_url(chave).rstrip("?") + f"?v={int(time.time())}"
+                from services import armazenamento as _arm
+                patch["avatar_url"] = _arm.enviar(chave, r.content, r.headers.get("content-type") or "image/jpeg") + f"?v={int(time.time())}"
             except Exception as e:
                 print(f"[template] foto da conta não copiada: {type(e).__name__}")
         if not patch:
@@ -1160,6 +1213,24 @@ async def _usuario_logado(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
     return user
+
+
+@app.post("/api/armazenamento/links-de-envio")
+async def links_de_envio(request: Request):
+    """Links para o navegador/extensão enviar arquivos direto ao armazenamento (R2 ou Supabase).
+    Corpo: { paths: ["<usuario>/..."], tipo? }. Só dentro da pasta do próprio usuário."""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    from services import armazenamento as _arm
+    caminhos = [str(p or "").lstrip("/") for p in (body.get("paths") or [])][:60]
+    if not caminhos or any(not c.startswith(f"{user.id}/") or ".." in c for c in caminhos):
+        raise HTTPException(status_code=403, detail="Acesso não autorizado a este caminho")
+    tipo = body.get("tipo") or None
+
+    def gerar():
+        return [{"path": c, "signedUrl": _arm.link_de_envio(c, tipo), "publicUrl": _arm.url_publica(c)} for c in caminhos]
+
+    return {"urls": await asyncio.to_thread(gerar), "r2": _arm.usa_r2()}
 
 
 async def _exigir_login(request: Request) -> str:
@@ -1625,11 +1696,12 @@ async def posts_criar(request: Request):
     user = await _usuario_logado(request)
     body = await request.json()
     tipo = body.get("tipo") if body.get("tipo") in ("post", "carrossel", "story") else "post"
-    base = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/videos/"
+    from services import armazenamento as _arm
     grupos = []
     for g in (body.get("grupos") or [])[:100]:
+        # só mídias do nosso armazenamento (R2 ou Supabase)
         midias = [{"url": m["url"], "tipo": "video" if m.get("tipo") == "video" else "imagem"}
-                  for m in (g or []) if isinstance(m, dict) and str(m.get("url") or "").startswith(base)][:10]
+                  for m in (g or []) if isinstance(m, dict) and _arm.eh_nosso(str(m.get("url") or ""))][:10]
         if midias:
             grupos.append(midias)
     if not grupos:
@@ -1645,13 +1717,12 @@ async def posts_criar(request: Request):
         itens = []
         for i, midias in enumerate(grupos):
             chave = f"{user.id}/posts/{projeto['id']}/{i + 1}.json"
-            supabase.storage.from_("videos").upload(chave, _json.dumps({"tipo": tipo, "midias": midias}).encode(),
-                                                    {"content-type": "application/json", "upsert": "true"})
+            url_manifesto = _arm.enviar(chave, _json.dumps({"tipo": tipo, "midias": midias}).encode(), "application/json")
             texto = (textos[i % len(textos)] if textos else "").strip()
             titulo = (texto.split("\n")[0] if texto else f"{ {'post': 'Post', 'carrossel': 'Carrossel', 'story': 'Story'}[tipo]} {i + 1}")[:200]
             clip = supabase.table("clips").insert({
                 "project_id": projeto["id"], "user_id": user.id, "title": titulo, "hook": titulo,
-                "start_time": 0, "end_time": 0, "score": 0, "storage_url": base + chave, "status": "ready",
+                "start_time": 0, "end_time": 0, "score": 0, "storage_url": url_manifesto, "status": "ready",
             }).execute().data[0]
             itens.append({"clip_id": clip["id"], "texto": texto, "capa": midias[0]["url"], "midias": len(midias)})
         return {"project_id": projeto["id"], "itens": itens}
