@@ -1549,17 +1549,23 @@ def _chave_download() -> bytes:
 
 @app.post("/api/tools/baixar-link")
 async def ferramenta_baixar_link(request: Request):
-    """Gera um link de download assinado (15 min). Corpo: { itens: [{url, nome}] } — 1 item baixa o vídeo, vários viram .zip"""
+    """Gera um link de download assinado (15 min). Corpo: { itens: [{url, nome}], formato?: mp4|mp3, altura?: 720 }
+    — 1 item baixa o arquivo, vários viram .zip"""
+    from services.baixador import SITES
     await _usuario_logado(request)
     body = await request.json()
-    itens = [
-        {"url": str(i.get("url") or ""), "nome": re.sub(r"[^\w\- ]+", "", str(i.get("nome") or "video"))[:60] or "video"}
-        for i in (body.get("itens") or [])[:100]
-    ]
-    itens = [i for i in itens if _URL_PERMITIDA.match(i["url"])]
+    itens, vistos = [], set()
+    for i in (body.get("itens") or [])[:100]:
+        url = str(i.get("url") or "").strip()
+        if url in vistos or not (_URL_PERMITIDA.match(url) or SITES.match(url)):
+            continue  # link repetido ou de site não aceito
+        vistos.add(url)
+        itens.append({"url": url, "nome": re.sub(r"[^\w\- ]+", "", str(i.get("nome") or "video"))[:60] or "video"})
     if not itens:
         raise HTTPException(status_code=400, detail="Nenhum link de vídeo válido.")
-    carga = _b64.urlsafe_b64encode(_json.dumps({"i": itens, "e": int(_time.time()) + 900}).encode()).decode()
+    formato = "mp3" if body.get("formato") == "mp3" else "mp4"
+    altura = int(body["altura"]) if str(body.get("altura") or "").isdigit() else None
+    carga = _b64.urlsafe_b64encode(_json.dumps({"i": itens, "e": int(_time.time()) + 900, "f": formato, "a": altura}).encode()).decode()
     assinatura = _hmac.new(_chave_download(), carga.encode(), _hashlib.sha256).hexdigest()[:32]
     base = os.environ.get("PUBLIC_BACKEND_URL", "https://clippost-backend.fly.dev").rstrip("/")
     return {"url": f"{base}/api/tools/baixar/{carga}.{assinatura}"}
@@ -1582,17 +1588,23 @@ async def ferramenta_baixar(token: str):
     if dados.get("e", 0) < _time.time():
         raise HTTPException(status_code=410, detail="Link expirado. Gere de novo no Clipost.")
     itens = dados.get("i") or []
+    formato, altura = dados.get("f") or "mp4", dados.get("a")
 
     tmp = Path(tempfile.mkdtemp(prefix="clippost_baixar_"))
 
     def _baixar_um(i: int, item: dict) -> Path | None:
-        from bulk_tasks import _download
         pasta = tmp / f"item{i}"
         pasta.mkdir()
         try:
-            caminho, _ = _download(item["url"], pasta)
-            destino = tmp / f"{i + 1:02d} - {item['nome']}.mp4"
-            shutil.move(caminho, destino)
+            if formato == "mp3" or altura:
+                from services.baixador import baixar
+                caminho = baixar(item["url"], pasta, formato, altura)
+            else:
+                from bulk_tasks import _download
+                caminho, _ = _download(item["url"], pasta)
+            ext = ".mp3" if formato == "mp3" else ".mp4"
+            destino = tmp / f"{i + 1:02d} - {item['nome']}{ext}"
+            shutil.move(str(caminho), destino)
             return destino
         except Exception as e:
             print(f"[baixar] item {i} falhou: {type(e).__name__}")
@@ -1604,7 +1616,8 @@ async def ferramenta_baixar(token: str):
         raise HTTPException(status_code=502, detail="Não consegui baixar os vídeos (os links podem ter expirado).")
     limpar = BackgroundTask(shutil.rmtree, tmp, True)
     if len(arquivos) == 1:
-        return FileResponse(arquivos[0], media_type="video/mp4", filename=arquivos[0].name, background=limpar)
+        tipo = "audio/mpeg" if arquivos[0].suffix == ".mp3" else "video/mp4"
+        return FileResponse(arquivos[0], media_type=tipo, filename=arquivos[0].name, background=limpar)
     zip_path = tmp / "clipost-videos.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
         for a in arquivos:

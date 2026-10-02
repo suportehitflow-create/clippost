@@ -1119,10 +1119,28 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] gallery-dl falhou: {gd_err}")
                         _motivos.append("gallery-dl: " + str(gd_err)[-100:])
 
+                # Fallback 6: baixador interno (estilo reclip/yoinks): escolhe o formato pela lista do
+                # próprio site (até 720p, vídeo+áudio juntos) em vez da seleção padrão do yt-dlp
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 6: baixador (formato escolhido)...")
+                    try:
+                        from services.baixador import baixar as _baixar_formato
+                        _bx = _baixar_formato(url, tmp_dir / "baixador", "mp4", 720)
+                        video_path = str(tmp_dir / f"original_baixador{_bx.suffix}")
+                        shutil.move(str(_bx), video_path)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] baixador OK")
+                    except Exception as bx_err:
+                        print(f"[pipeline] baixador falhou: {bx_err}")
+                        _motivos.append("baixador: " + str(bx_err)[-100:])
+
                 if not fallback_ok:
                     raise Exception(
                         "YouTubeBlockError: todos os métodos de download falharam "
-                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious, gallery-dl). "
+                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious, gallery-dl, baixador). "
                         + " | ".join(m.replace("\n", " ") for m in _motivos)[:1500]
                     )
 
