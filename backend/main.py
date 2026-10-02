@@ -744,6 +744,7 @@ async def perfis_conectar(request: Request):
             return {"authorize_url": await asyncio.to_thread(upload_post.authorize_url, usuario, rede)}
         return {"access_url": upload_post.connect_url(usuario)}
     except upload_post.UploadPostError as e:
+        print(f"[conectar] rede={body.get('rede')!r}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 

@@ -40,6 +40,10 @@ def ensure_profile(user_id: str) -> None:
     if resp.status_code in (200, 201, 409):
         return
     if resp.status_code == 403:
+        # com o plano no limite a criação recusa até perfil que já existe: se ele existe, segue
+        existe = httpx.get(f"{API_BASE}/uploadposts/users/{user_id}", headers=_headers(), timeout=30)
+        if existe.is_success:
+            return
         raise UploadPostError("Limite de perfis do plano Upload-Post atingido.")
     raise UploadPostError(f"Erro ao criar perfil ({resp.status_code}): {_error_message(resp)}")
 
