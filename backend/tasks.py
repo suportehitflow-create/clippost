@@ -866,6 +866,21 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         video_path = str(tmp_dir / "original.mp4")
         audio_path = str(tmp_dir / "audio.mp3")
 
+        # 0. Legenda do próprio YouTube PRIMEIRO (segundos, sem baixar nada): vira a transcrição do corte
+        # e poupa a transcrição pelo áudio. Vídeo que veio baixado pelo navegador chega com o link do
+        # armazenamento; o link do YouTube fica no projeto
+        legenda_youtube = None
+        _link_yt = url if ("youtube.com" in url or "youtu.be" in url) else None
+        if not _link_yt and project_id and supabase:
+            try:
+                _src = (supabase.table("projects").select("source_url").eq("id", project_id).limit(1).execute().data or [{}])[0].get("source_url") or ""
+                _link_yt = _src if ("youtube.com" in _src or "youtu.be" in _src) else None
+            except Exception:
+                _link_yt = None
+        if _link_yt:
+            from services.transcricao_youtube import transcricao as _transcricao_yt
+            legenda_youtube = _transcricao_yt(_link_yt)
+
         # Cookies de login da plataforma do link (YouTube reduz bot-detection; Instagram/TikTok/
         # Facebook exigem login para vários vídeos — ex.: Autopilot monitorando perfis)
         _fallback_cookies = "/tmp/yt_cookies.txt"
@@ -971,6 +986,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         if not _direct_downloaded:
             print(f"[pipeline] baixando vídeo via extratores: {url[:80]}")
             _ytdlp_blocked = False
+            _erro_principal = ""
             _motivos: list[str] = []  # por que cada caminho falhou (vai no erro do projeto para diagnóstico)
             try:
                 with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
@@ -985,6 +1001,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     _motivos.append("principal: sem arquivo")
             except yt_dlp.utils.DownloadError as de:
                 err = str(de).lower()
+                _erro_principal = err
                 _motivos.append("principal: " + str(de)[-140:])
                 if any(k in err for k in ("sign in", "bot", "confirm your age", "429", "403", "nsig", "http error")):
                     _ytdlp_blocked = True
@@ -993,6 +1010,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             except Exception as ge:
                 # ignoreerrors=True pode suprimir DownloadError e lançar Exception genérica
                 _ge = str(ge).lower()
+                _erro_principal = _ge
                 _motivos.append("principal: " + str(ge)[-140:])
                 if any(k in _ge for k in ("sign in", "bot", "403", "429", "não retornou", "url inválida")):
                     _ytdlp_blocked = True
@@ -1007,6 +1025,8 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 # Plano B: yt-dlp sem cookies, fingindo outros aparelhos (Vision Pro, óculos VR, TV, celular).
                 # O Vision Pro baixa sem login nem token de prova de IP residencial (testado); de datacenter
                 # o YouTube costuma barrar, e aí o navegador de quem usa baixa (fila do lote / estúdio)
+                # "Sign in to confirm you're not a bot" = este IP está marcado (a frase vem no começo do erro)
+                _ip_marcado = any(k in _erro_principal for k in ("sign in", "not a bot"))
                 for _clientes in (["visionos"], ["android_vr"], ["tv", "tv_simply"], ["mweb"], ["ios"]):
                     if fallback_ok:
                         break
@@ -1027,120 +1047,64 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                             print(f"[pipeline] plano B OK ({'+'.join(_clientes)})")
                     except Exception as b_err:
                         print(f"[pipeline] plano B ({'+'.join(_clientes)}) falhou: {str(b_err)[:160]}")
+                        if any(k in str(b_err).lower() for k in ("sign in", "not a bot")):
+                            _ip_marcado = True
                         _motivos.append(f"{'+'.join(_clientes)}: {str(b_err)[-120:]}")
 
-                # Fallback 0: yt-dlp forçando format 18 (360p+audio, sem autenticação, sempre disponível)
-                if not fallback_ok:
-                    print(f"[pipeline] yt-dlp bloqueado — fallback 0: format 18 forçado...")
-                    try:
-                        _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
-                        with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
-                            _f18_info = ydl.extract_info(url, download=True) or {}
-                        _f18_files = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
-                        if _f18_info.get("id") and _f18_files:
-                            video_path = str(_f18_files[0])
-                            video_id = _f18_info.get("id", _vid_id)
-                            title = _f18_info.get("title", _vid_id)
-                            video_duration = _f18_info.get("duration")
-                            fallback_ok = True
-                            print(f"[pipeline] format 18 OK — {_f18_files[0].stat().st_size // 1024}KB")
-                    except Exception as f18_err:
-                        print(f"[pipeline] format 18 falhou: {f18_err}")
-                        _motivos.append("f18: " + str(f18_err)[-100:])
+                # Reservas em ordem de quem funciona mais e é menos bloqueado:
+                # 1º os que saem por OUTRO IP (o bloqueio do YouTube é por IP), depois os que usam o mesmo
+                # motor do yt-dlp por este IP com outro jeito de pedir, e por último os serviços públicos,
+                # que vivem fora do ar. Se o YouTube já pediu "não sou robô", este IP está marcado e os do
+                # mesmo IP são pulados (só gastariam tempo).
+                def _f18():
+                    _ydl_f18 = {**_ydl_base, 'format': '18', 'extractor_args': {'youtube': {'player_client': ['web']}}}
+                    with yt_dlp.YoutubeDL(_ydl_f18) as ydl:
+                        _i = ydl.extract_info(url, download=True) or {}
+                    _fs = list(tmp_dir.glob("*.mp4")) + list(tmp_dir.glob("*.webm"))
+                    if not (_i.get("id") and _fs):
+                        raise Exception("format 18 sem arquivo")
+                    return str(_fs[0]), _i
 
-                # Fallback 1: cobalt.tools público (infra externa, não Fly.io)
-                if not fallback_ok:
-                    print(f"[pipeline] yt-dlp bloqueado — fallback 1: cobalt público...")
-                    try:
-                        video_path, _ = _download_via_cobalt_public(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] cobalt público OK")
-                    except Exception as cobalt_pub_err:
-                        print(f"[pipeline] cobalt público falhou: {cobalt_pub_err}")
-                        _motivos.append("cobalt pub: " + str(cobalt_pub_err)[-100:])
+                def _baixador():
+                    from services.baixador import baixar as _baixar_formato
+                    _bx = _baixar_formato(url, tmp_dir / "baixador", "mp4", 720)
+                    destino = str(tmp_dir / f"original_baixador{_bx.suffix}")
+                    shutil.move(str(_bx), destino)
+                    return destino, {}
 
-                # Fallback 2: cobalt privado Frankfurt (Fly.io — tenta mesmo assim)
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 2: cobalt privado (fra)...")
+                _reservas = [
+                    # (nome, função, sai pelo mesmo IP deste servidor?)
+                    ("cobalt do Clipost", lambda: _download_via_cobalt(url, tmp_dir), False),
+                    ("format 18", _f18, True),
+                    ("baixador (formato escolhido)", _baixador, True),
+                    ("gallery-dl", lambda: (_download_via_gallery_dl(url, tmp_dir), {}), True),
+                    ("invidious", lambda: _download_via_invidious(url, tmp_dir), False),
+                    ("piped", lambda: _download_via_piped(url, tmp_dir), False),
+                    ("cobalt público", lambda: _download_via_cobalt_public(url, tmp_dir), False),
+                ]
+                for _n, (_nome, _fn, _mesmo_ip) in enumerate(_reservas, 1):
+                    if fallback_ok:
+                        break
+                    if _mesmo_ip and _ip_marcado:
+                        print(f"[pipeline] reserva {_n}: {_nome} pulada (este IP está marcado pelo YouTube)")
+                        continue
+                    print(f"[pipeline] reserva {_n}: {_nome}...")
                     try:
-                        video_path, _ = _download_via_cobalt(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
+                        _caminho, _r_info = _fn()
+                        video_path = str(_caminho)
+                        video_id = (_r_info or {}).get("id", _vid_id)
+                        title = (_r_info or {}).get("title", _vid_id)
+                        video_duration = (_r_info or {}).get("duration")
                         fallback_ok = True
-                        print(f"[pipeline] cobalt privado OK")
-                    except Exception as cobalt_err:
-                        print(f"[pipeline] cobalt privado falhou: {cobalt_err}")
-                        _motivos.append("cobalt fra: " + str(cobalt_err)[-100:])
-
-                # Fallback 3: Piped (streams proxiados, IP não-Fly.io chega ao CDN)
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 3: piped...")
-                    try:
-                        video_path, _ = _download_via_piped(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] piped OK")
-                    except Exception as piped_err:
-                        print(f"[pipeline] piped falhou: {piped_err}")
-                        _motivos.append("piped: " + str(piped_err)[-100:])
-
-                # Fallback 4: Invidious (API pública, IP diferente)
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 4: invidious...")
-                    try:
-                        video_path, _ = _download_via_invidious(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] invidious OK")
-                    except Exception as inv_err:
-                        print(f"[pipeline] invidious falhou: {inv_err}")
-                        _motivos.append("invidious: " + str(inv_err)[-100:])
-
-                # Fallback 5: gallery-dl (outro baixador; para o YouTube ele usa o mesmo motor do
-                # yt-dlp por dentro, então só ajuda quando o bloqueio é do jeito de pedir, não do IP)
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 5: gallery-dl...")
-                    try:
-                        video_path = _download_via_gallery_dl(url, tmp_dir)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] gallery-dl OK")
-                    except Exception as gd_err:
-                        print(f"[pipeline] gallery-dl falhou: {gd_err}")
-                        _motivos.append("gallery-dl: " + str(gd_err)[-100:])
-
-                # Fallback 6: baixador interno (estilo reclip/yoinks): escolhe o formato pela lista do
-                # próprio site (até 720p, vídeo+áudio juntos) em vez da seleção padrão do yt-dlp
-                if not fallback_ok:
-                    print(f"[pipeline] fallback 6: baixador (formato escolhido)...")
-                    try:
-                        from services.baixador import baixar as _baixar_formato
-                        _bx = _baixar_formato(url, tmp_dir / "baixador", "mp4", 720)
-                        video_path = str(tmp_dir / f"original_baixador{_bx.suffix}")
-                        shutil.move(str(_bx), video_path)
-                        video_id = _vid_id
-                        title = _vid_id
-                        video_duration = None
-                        fallback_ok = True
-                        print(f"[pipeline] baixador OK")
-                    except Exception as bx_err:
-                        print(f"[pipeline] baixador falhou: {bx_err}")
-                        _motivos.append("baixador: " + str(bx_err)[-100:])
+                        print(f"[pipeline] {_nome} OK")
+                    except Exception as _r_err:
+                        print(f"[pipeline] {_nome} falhou: {str(_r_err)[:200]}")
+                        _motivos.append(f"{_nome}: " + str(_r_err)[-100:])
 
                 if not fallback_ok:
                     raise Exception(
                         "YouTubeBlockError: todos os métodos de download falharam "
-                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious, gallery-dl, baixador). "
+                        "(yt-dlp, cobalt do Clipost, format 18, baixador, gallery-dl, invidious, piped, cobalt público). "
                         + " | ".join(m.replace("\n", " ") for m in _motivos)[:1500]
                     )
 
@@ -1173,13 +1137,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             )
         print(f"[pipeline] vídeo baixado OK — duração: {int((video_duration or 0) // 60)}min {int((video_duration or 0) % 60)}s")
 
-        # 1b. Legenda que o próprio YouTube já tem (reserva da transcrição pelo áudio). Antes vinha pelo
-        # yt-dlp, que abria a página de novo e levava minutos; a youtube-transcript-api pega em segundos
-        legenda_youtube = None
-        if "youtube.com" in url or "youtu.be" in url:
-            from services.transcricao_youtube import transcricao as _transcricao_yt
-            legenda_youtube = _transcricao_yt(url)
-
         # Localiza o arquivo de vídeo final mesclado (pode ser .mkv ou .webm se merge falhou)
         mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4")) or list(tmp_dir.glob("*.mkv")) or list(tmp_dir.glob("*.webm"))
         if mp4_candidates:
@@ -1210,17 +1167,14 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 3. Transcrição: Sempre usa Groq Whisper com timestamps acústicos precisos por palavra
         _t_baixou = time.time()
         _set_step(project_id, "transcricao")
-        print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
-        try:
+        if legenda_youtube:
+            # legenda do próprio YouTube pega no começo: não precisa transcrever o áudio
+            print(f"[pipeline] transcrição: legenda do YouTube ({legenda_youtube['idioma']}, "
+                  f"{'automática' if legenda_youtube['automatica'] else 'manual'}) — pulando a transcrição pelo áudio")
+            transcript_data = {"segments": legenda_youtube["segments"], "words": legenda_youtube["words"], "fonte": "youtube"}
+        else:
+            print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
             transcript_data = transcribe_media(video_path, audio_path)
-        except Exception as tr_err:
-            if not legenda_youtube:
-                raise
-            print(f"[pipeline] transcrição pelo áudio falhou ({tr_err}); usando a legenda do YouTube")
-            transcript_data = {"segments": [], "words": []}
-        if not transcript_data.get("segments") and legenda_youtube:
-            print("[pipeline] sem fala reconhecida no áudio; usando a legenda do próprio YouTube")
-            transcript_data = {"segments": legenda_youtube["segments"], "words": legenda_youtube["words"]}
 
         chapters = info.get("chapters") or []
         transcript_data["chapters"] = chapters
