@@ -337,10 +337,17 @@ def get_viral_clips(transcript_data: dict, clip_duration: str = "auto", chapters
        - Cada clipe selecionado deve ser autossuficiente (começo, meio e conclusão lógica compreensíveis sem precisar ver o resto do vídeo).
        - NUNCA inicie ou termine cortando uma frase ao meio ou no meio de uma palavra.
 
-    4. TÍTULO VIRAL (hook_title):
-       - Em MAIÚSCULAS, até 60 caracteres. Deve gerar curiosidade irresistível, urgência ou impacto emocional para parar a rolagem no feed.
-       - Exemplos: "EU GASTEI 3 MIL REAIS NISSO E ME ARREPENDI", "O SEGREDO DOS BILIONÁRIOS QUE NINGUÉM CONTA", "A VERDADE QUE VAI TE CHOCAR".
-       - NUNCA use títulos descritivos ou neutros tipo "FULANO EXPLICA SEU PONTO DE VISTA".
+    4. TÍTULO VIRAL (hook_title) — é o que segura a pessoa no vídeo:
+       - Em MAIÚSCULAS, até 60 caracteres, em português correto (revise a ortografia; corrija nomes e
+         palavras que a transcrição escreveu errado). No máximo 2 emojis, só no fim.
+       - FIEL AO CORTE: diga o que acontece NESTE trecho, com o detalhe concreto dele (nome, número,
+         objeto, situação). O corte tem que cumprir a promessa do título — nunca prometa o que não aparece.
+       - APELATIVO: abra uma curiosidade que só se fecha assistindo (o que aconteceu, quem, quanto,
+         por quê), use conflito, número forte, revelação ou a frase mais forte dita no trecho.
+       - PROIBIDO título genérico que serviria para qualquer vídeo ("O SEGREDO QUE NINGUÉM CONTA",
+         "A VERDADE QUE VAI TE CHOCAR", "FULANO EXPLICA SEU PONTO DE VISTA", "VOCÊ PRECISA VER ISSO").
+       - Ruim: "A IMPORTÂNCIA DE TER UMA EQUIPE ALINHADA". Bom: "ATÉ O PORTEIRO SABE A META DE 137 MILHÕES".
+         Ruim: "MUDAR O RUMO DA EMPRESA". Bom: "ELE LARGOU O QUE DAVA CERTO E FATUROU BILHÕES".
        - O ai_score representa quão autossuficiente e coeso é o clipe (0.70 = aceitável, 0.99 = excelente).
 
     DURAÇÃO: {duration_desc}
@@ -491,7 +498,9 @@ def _curadoria_em_blocos(segments: list[dict], duration_desc: str, min_duration:
                 f"longo (parte {i + 1} de {len(blocos)}). Escolha até {por_bloco} cortes autossuficientes, com gancho forte, "
                 "sem saudações nem pedidos de like, começando e terminando em frases completas.\n"
                 f"DURAÇÃO: {duration_desc} (mínimo {min_duration}s, máximo {max_duration}s)\n"
-                "hook_title: EM MAIÚSCULAS, até 60 caracteres, que gere curiosidade.\n\n"
+                "hook_title: EM MAIÚSCULAS, até 60 caracteres, português correto, fiel ao que acontece no corte "
+                "(com o detalhe concreto: nome, número, situação) e que abra uma curiosidade que só se fecha "
+                "assistindo. Nada genérico tipo 'O SEGREDO QUE NINGUÉM CONTA'. No máximo 2 emojis, no fim.\n\n"
                 "TRECHO:\n" + "\n".join(b) + "\n\n"
                 'Responda SÓ com um array JSON: [{"start_time": <s>, "end_time": <s>, "hook_title": "...", "ai_score": <0.70-0.99>}]'
             )
@@ -587,7 +596,7 @@ def _validar(clips: list, segments: list[dict], min_duration: int, max_duration:
                 end = min(video_end, start + min_duration)
             end = min(end, video_end)
 
-            hook_title = str(c.get("hook_title", "CORTE VIRAL")).strip().replace('"', '').replace("'", "")
+            hook_title = str(c.get("hook_title", "CORTE VIRAL")).strip().replace('"', '').replace("'", "").upper()
             if len(hook_title) > 60:
                 hook_title = hook_title[:57] + "..."
 

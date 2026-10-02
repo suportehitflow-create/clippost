@@ -162,7 +162,10 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
 
   // o que deu errado, em palavras da pessoa, e o que dá para fazer
   const bloqueio = falharam.some(f => /YouTubeBlock|download|yt-dlp|cobalt|baix|YouTube/i.test(String(f.error_message || '')))
-  const explicacao = bloqueio
+  const warp = falharam.some(f => /WARP_LIGADO/.test(String(f.error_message || '')))
+  const explicacao = warp
+    ? 'O Cloudflare WARP está ligado neste computador, e o YouTube bloqueia os downloads que saem por ele. Desligue o WARP (ícone da nuvem laranja perto do relógio) e clique em Gerar de novo.'
+    : bloqueio
     ? instalada
       ? 'O YouTube não liberou esses vídeos nem pelo servidor nem pelo seu navegador, mesmo tentando de outros jeitos. Pode tentar de novo daqui a pouco.'
       : 'O YouTube bloqueia downloads vindos de servidores. Com a extensão do Clipost, o download é feito pelo seu navegador e passa.'

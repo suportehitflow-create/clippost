@@ -12,6 +12,11 @@ Sua tarefa é analisar a transcrição completa que enviarei abaixo e extrair o 
    - Crie um título extremamente chamativo e apelativo que sirva como o "gancho mestre" (algo que deixe a galera com muita vontade de assistir até o fim).
    - O título deve ser em CAIXA ALTA e conter OBRIGATORIAMENTE, no máximo, 2 emojis que reforcem a emoção do corte.
    - A linguagem do título deve ser 100% focada em redes sociais e conteúdo viralizável.
+   - FIEL AO CORTE: o título diz o que acontece NESTE trecho, com o detalhe concreto dele (nome, número, objeto, situação). O corte tem que cumprir a promessa do título — nunca prometa o que não aparece.
+   - CURIOSIDADE QUE SÓ SE FECHA ASSISTINDO: o que aconteceu, quem, quanto, por quê. Use conflito, número forte, revelação ou a frase mais forte dita no trecho.
+   - PROIBIDO título genérico que serviria para qualquer vídeo ("O SEGREDO QUE NINGUÉM CONTA", "A VERDADE QUE VAI TE CHOCAR", "VOCÊ PRECISA VER ISSO", "A IMPORTÂNCIA DE...").
+   - Exemplos — ruim: "A IMPORTÂNCIA DE TER UMA EQUIPE ALINHADA" / bom: "ATÉ O PORTEIRO SABE A META DE 137 MILHÕES 🎯". Ruim: "MUDAR O RUMO DA EMPRESA" / bom: "ELE LARGOU O QUE DAVA CERTO E FATUROU BILHÕES 💰".
+   - Português correto: revise a ortografia e corrija nomes e palavras que a transcrição escreveu errado (ela vem de reconhecimento de fala).
 4. **ESTRUTURA DAS FALAS (LINGUAGEM DE REDE SOCIAL):**
    - NÃO crie um campo "Gancho" separado. A PRIMEIRA linha de fala extraída JÁ DEVE ser o gancho inicial do vídeo.
    - Toda a estruturação do conteúdo deve respirar linguagem dinâmica. Edite o trecho para remover "gorduras" (pausas, gaguejos, enrolações), focando totalmente na retenção.
@@ -49,7 +54,7 @@ Cada corte é um objeto com os mesmos itens do roteiro, nesta ordem (do mais vir
 ]
 
 - "inicio" e "fim" em SEGUNDOS, exatamente como aparecem na transcrição (ex.: [754.3s - 760.1s]); o vídeo é cortado por eles.
-- O corte começa no início de uma frase e termina no fim de uma frase.
+- O corte começa no início de uma frase e termina no fim de uma frase: nunca comece com a resposta sem a pergunta, nem termine antes da conclusão ou da punchline.
 - "nota" de 0 a 10.
 
 ---

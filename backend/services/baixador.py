@@ -92,7 +92,7 @@ def baixar(url: str, pasta: Path, formato: str = "mp4", altura: int | None = Non
                 "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]}
     else:
         limite = f"[height<={int(altura)}]" if altura else ""
-        opts = {**base, "format": f"bv*{limite}[ext=mp4]+ba[ext=m4a]/bv*{limite}+ba/b{limite}/b",
+        opts = {**base, "format": f"bv*{limite}[vcodec^=avc1]+ba[ext=m4a]/bv*{limite}[ext=mp4]+ba[ext=m4a]/bv*{limite}+ba/b{limite}/b",
                 "merge_output_format": "mp4"}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:

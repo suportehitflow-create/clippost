@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 
 from services.ai_curator import get_viral_clips
 from services.clip_check import validate_clip
-from services.cut_rules import snap_to_words
+from services.cut_rules import snap_to_words, limites_do_corte
 from services.ffmpeg_engine import create_vertical_clip
 from services.subtitle_generator import generate_ass
 from services.stripe_service import check_clip_limit, increment_clips_used, get_plan_status
@@ -456,6 +456,15 @@ def _set_step(pid: str | None, step: str):
         supabase.table("projects").update({"error_message": f"step:{step}"}).eq("id", pid).execute()
     except Exception:
         pass
+
+
+def _warp_ligado() -> bool:
+    """O computador está saindo para a internet pelo Cloudflare WARP? (o YouTube marca esses IPs como robô)"""
+    try:
+        r = httpx.get("https://www.cloudflare.com/cdn-cgi/trace", timeout=8)
+        return "warp=on" in r.text or "warp=plus" in r.text
+    except Exception:
+        return False
 
 
 def _download_via_gallery_dl(url: str, tmp_dir: Path) -> str:
@@ -893,7 +902,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         po_token = os.environ.get("YOUTUBE_PO_TOKEN")          # Proof-of-Origin token se disponível
 
         _ydl_base = {
-            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best/18',
+            # H.264 primeiro: o YouTube costuma entregar AV1, que é muito lento de abrir quadro a quadro
+            # (achar o rosto levava ~1 min por corte); AV1/VP9 só se não houver H.264
+            'format': 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best/18',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
@@ -1101,6 +1112,12 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] {_nome} falhou: {str(_r_err)[:200]}")
                         _motivos.append(f"{_nome}: " + str(_r_err)[-100:])
 
+                if not fallback_ok and _warp_ligado():
+                    # causa mais comum quando roda no PC: o YouTube barra os endereços da Cloudflare
+                    raise Exception(
+                        "YouTubeBlockError: WARP_LIGADO — o Cloudflare WARP está ligado neste computador e o YouTube "
+                        "bloqueia os downloads que saem por ele. Desligue o WARP e gere de novo."
+                    )
                 if not fallback_ok:
                     raise Exception(
                         "YouTubeBlockError: todos os métodos de download falharam "
@@ -1156,7 +1173,6 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     except Exception as e:
                         print(f"[pipeline] raw upload background ignorado: {e}")
 
-                import threading
                 threading.Thread(target=_bg_upload_raw, args=(video_path, storage_path), daemon=True).start()
                 raw_video_url = _arm.url_publica(storage_path)
             else:
@@ -1286,7 +1302,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         pre_inserted_ids = []
         for i, clip in enumerate(clips_meta):
             try:
-                c_start, c_end = snap_to_words(clip["start_time"], clip["end_time"], words)
+                c_start, c_end = limites_do_corte(clip["start_time"], clip["end_time"], words)
                 if video_duration:
                     c_end = min(c_end, float(video_duration))
                 c_end = min(c_end, c_start + _MAX_CLIP_DURATION)
@@ -1306,9 +1322,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                 print(f"[pipeline] aviso ao pre-inserir corte {i}: {pre_err}")
                 pre_inserted_ids.append(None)
 
-        for i, clip in enumerate(clips_meta):
+        # Vários cortes ao mesmo tempo (antes era um por vez: ~1 min por corte, 20 cortes = 20 min).
+        # Cada corte usa o próprio ffmpeg e o próprio detector de rosto, então rodam em paralelo.
+        # CORTES_PARALELOS ajusta; o padrão usa metade dos núcleos, entre 2 e 4.
+        _paralelos = int(os.environ.get("CORTES_PARALELOS") or max(2, min(4, (os.cpu_count() or 2) // 2)))
+        _trava_primeiro = threading.Lock()
+
+        def _fazer_corte(i: int, clip: dict) -> None:
+            nonlocal _t_primeiro
             cid = pre_inserted_ids[i] if i < len(pre_inserted_ids) else None
-            start, end = snap_to_words(clip["start_time"], clip["end_time"], words)
+            start, end = limites_do_corte(clip["start_time"], clip["end_time"], words)
             if video_duration:
                 end = min(end, float(video_duration))
             end = min(end, start + _MAX_CLIP_DURATION)
@@ -1318,7 +1341,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         supabase.table("clips").delete().eq("id", cid).execute()
                     except Exception:
                         pass
-                continue
+                return
 
             clip_out = str(tmp_dir / f"clip_{i}.mp4")
             sub_y = ((brand_kit or {}).get("layout_config") or {}).get("subtitlePos", {}).get("y", 78)
@@ -1346,7 +1369,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         supabase.table("clips").delete().eq("id", cid).execute()
                     except Exception:
                         pass
-                continue
+                return
 
             if not os.path.exists(clip_out):
                 if cid:
@@ -1354,7 +1377,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         supabase.table("clips").delete().eq("id", cid).execute()
                     except Exception:
                         pass
-                continue
+                return
 
             check = validate_clip(clip_out, expected_duration=end - start)
             if not check["ok"]:
@@ -1364,7 +1387,7 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         supabase.table("clips").delete().eq("id", cid).execute()
                     except Exception:
                         pass
-                continue
+                return
 
             clip_key = f"{user_id}/{project_id}/clip_{i}.mp4"
             clip_data = _recompress_if_needed(clip_out)
@@ -1377,10 +1400,11 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         supabase.table("clips").update({"status": "failed"}).eq("id", cid).execute()
                     except Exception:
                         pass
-                continue
+                return
 
-            if _t_primeiro is None:
-                _t_primeiro = time.time()
+            with _trava_primeiro:
+                if _t_primeiro is None:
+                    _t_primeiro = time.time()
             if cid:
                 supabase.table("clips").update({
                     "storage_url": clip_url,
@@ -1399,8 +1423,17 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                     "status": "ready",
                 }).execute()
             print(f"[pipeline] clip {i+1} pronto — '{clip['hook_title'][:40]}'")
-            import gc
-            gc.collect()
+
+        from concurrent.futures import ThreadPoolExecutor
+        print(f"[pipeline] gerando {len(clips_meta)} cortes, {_paralelos} ao mesmo tempo")
+        with ThreadPoolExecutor(max_workers=_paralelos) as _pool:
+            for _fut in [_pool.submit(_fazer_corte, i, c) for i, c in enumerate(clips_meta)]:
+                try:
+                    _fut.result()
+                except Exception as _c_err:
+                    print(f"[pipeline] um corte falhou e os outros seguem: {_c_err}")
+        import gc
+        gc.collect()
 
         # Atualizar status final ("Falhou" só se nenhum corte ficou pronto)
         prontos = supabase.table("clips").select("id").eq("project_id", project_id).eq("status", "ready").execute().data or []
@@ -1557,7 +1590,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
                 _fallback_cookies if os.path.exists(_fallback_cookies) else None
             )
             ydl_opts = {
-                "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+                "format": "bestvideo[height<=720][vcodec^=avc1]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
                 "outtmpl": str(tmp_dir / "raw.%(ext)s"),
                 "merge_output_format": "mp4",
                 "quiet": True,

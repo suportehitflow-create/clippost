@@ -1178,6 +1178,7 @@ export default function ProjectClient({
   // nunca mostra detalhe técnico (nomes de ferramentas/serviços): só o que a pessoa entende
   const motivo = (() => {
     const m = String(errorMessage || '')
+    if (/WARP_LIGADO/.test(m)) return 'o Cloudflare WARP está ligado neste computador e o YouTube bloqueia os downloads que saem por ele. Desligue o WARP (nuvem laranja perto do relógio) e gere de novo.'
     if (/download|YouTubeBlock|yt-dlp|cobalt|piped|invidious|baix/i.test(m)) return 'o YouTube não liberou o download agora. Tente de novo em alguns minutos.'
     if (/transcri|whisper|áudio|audio/i.test(m)) return 'não foi possível entender o áudio do vídeo.'
     if (/momento|curador|IA|gemini|groq/i.test(m)) return 'a IA não encontrou bons momentos neste vídeo.'

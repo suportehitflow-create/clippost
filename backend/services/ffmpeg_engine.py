@@ -228,14 +228,19 @@ def create_vertical_clip(
 
         # Verifica se o vídeo possui webcam em canto (gameplay/react) para dividir a tela: pessoa em cima, jogo embaixo
         try:
-            from services.smart_framing import detect_gameplay_split
-            is_gameplay, fc_box, g_box = detect_gameplay_split(input_video, start, duration)
             split_opt = layout.get("splitScreen")
             is_gp_flag = layout.get("isGameplay")
+            # só procura webcam/jogo quando o template pede tela dividida (era ~1 min por corte à toa)
+            if not (split_opt in ("top_bottom", True) or (split_opt == "auto" and is_gp_flag is True)):
+                raise LookupError("template sem tela dividida")
+            from services.smart_framing import detect_gameplay_split
+            is_gameplay, fc_box, g_box = detect_gameplay_split(input_video, start, duration)
             if is_gameplay and fc_box and g_box and (split_opt in ("top_bottom", True) or (split_opt == "auto" and is_gp_flag is True)):
                 use_split = True
                 fc_crop_box, g_crop_box = fc_box, g_box
                 print(f"[ffmpeg_engine] Gameplay detectado! Aplicando tela dividida: webcam={fc_box}, game={g_box}")
+        except LookupError:
+            use_split = False
         except Exception as split_err:
             print(f"[ffmpeg_engine] split detection aviso: {split_err}")
             use_split = False

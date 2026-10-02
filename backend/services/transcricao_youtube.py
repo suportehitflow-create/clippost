@@ -37,12 +37,18 @@ def transcricao(url: str, idiomas: list[str] | None = None) -> dict | None:
         return None
 
     segments, words = [], []
-    for t in trechos:
+    for n, t in enumerate(trechos):
         texto = re.sub(r"\s+", " ", str(getattr(t, "text", "") or "")).strip()
         if not texto or texto.startswith("[") and texto.endswith("]"):  # [Música], [Aplausos]
             continue
         ini = float(getattr(t, "start", 0) or 0)
         fim = ini + float(getattr(t, "duration", 0) or 0)
+        # na legenda automática cada trecho continua na tela até o próximo terminar (sobrepõe);
+        # a fala dele acaba quando o próximo começa — senão o tempo das palavras fica embaralhado
+        if n + 1 < len(trechos):
+            prox = float(getattr(trechos[n + 1], "start", 0) or 0)
+            if ini < prox < fim:
+                fim = prox
         segments.append({"start": round(ini, 2), "end": round(fim, 2), "text": texto})
         # o YouTube não dá o tempo de cada palavra: divide o trecho por igual (como nas legendas .vtt)
         palavras = texto.split()
