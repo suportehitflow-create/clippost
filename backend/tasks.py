@@ -1106,24 +1106,12 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             )
         print(f"[pipeline] vídeo baixado OK — duração: {int((video_duration or 0) // 60)}min {int((video_duration or 0) % 60)}s")
 
-        # 1b. Busca legendas nativas em fallback apenas se nenhuma tiver sido baixada junto ao vídeo
-        if not list(tmp_dir.glob("*.vtt")):
-            print(f"[pipeline] buscando legendas nativas em fallback (best-effort)...")
-            try:
-                ydl_opts_subs = {
-                    'skip_download': True,
-                    'writesubtitles': True,
-                    'writeautomaticsub': True,
-                    'subtitlesformat': 'vtt',
-                    'subtitleslangs': ['pt', 'pt-BR', 'en'],
-                    'ignoreerrors': True,
-                    'socket_timeout': 10,
-                    'outtmpl': str(tmp_dir / "original.%(ext)s"),
-                }
-                with yt_dlp.YoutubeDL(ydl_opts_subs) as ydl:
-                    ydl.extract_info(url, download=True)
-            except Exception as sub_err:
-                print(f"[pipeline] legendas nativas indisponíveis ({sub_err}), usando Whisper")
+        # 1b. Legenda que o próprio YouTube já tem (reserva da transcrição pelo áudio). Antes vinha pelo
+        # yt-dlp, que abria a página de novo e levava minutos; a youtube-transcript-api pega em segundos
+        legenda_youtube = None
+        if "youtube.com" in url or "youtu.be" in url:
+            from services.transcricao_youtube import transcricao as _transcricao_yt
+            legenda_youtube = _transcricao_yt(url)
 
         # Localiza o arquivo de vídeo final mesclado (pode ser .mkv ou .webm se merge falhou)
         mp4_candidates = list(tmp_dir.glob("original*.mp4")) or list(tmp_dir.glob("*.mp4")) or list(tmp_dir.glob("*.mkv")) or list(tmp_dir.glob("*.webm"))
@@ -1156,7 +1144,16 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _t_baixou = time.time()
         _set_step(project_id, "transcricao")
         print(f"[pipeline] extraindo áudio para transcrição acústica palavra-por-palavra...")
-        transcript_data = transcribe_media(video_path, audio_path)
+        try:
+            transcript_data = transcribe_media(video_path, audio_path)
+        except Exception as tr_err:
+            if not legenda_youtube:
+                raise
+            print(f"[pipeline] transcrição pelo áudio falhou ({tr_err}); usando a legenda do YouTube")
+            transcript_data = {"segments": [], "words": []}
+        if not transcript_data.get("segments") and legenda_youtube:
+            print("[pipeline] sem fala reconhecida no áudio; usando a legenda do próprio YouTube")
+            transcript_data = {"segments": legenda_youtube["segments"], "words": legenda_youtube["words"]}
 
         chapters = info.get("chapters") or []
         transcript_data["chapters"] = chapters

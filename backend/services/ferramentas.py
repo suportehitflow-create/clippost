@@ -18,7 +18,12 @@ def youtube_para_texto(url: str) -> dict:
 
     if not re.search(r"(youtube\.com|youtu\.be)", url or ""):
         raise ValueError("Cole um link de vídeo do YouTube.")
-    cookies = os.environ.get("YOUTUBE_COOKIES_FILE") or ("/tmp/yt_cookies.txt" if os.path.exists("/tmp/yt_cookies.txt") else None)
+    # primeiro a legenda direto do YouTube (rápido, sem abrir o vídeo); só depois o caminho do yt-dlp
+    from services.transcricao_youtube import transcricao
+    nativa = transcricao(url)
+    if nativa:
+        return _texto_do_youtube(url, nativa["segments"], {})
+    cookies =os.environ.get("YOUTUBE_COOKIES_FILE") or ("/tmp/yt_cookies.txt" if os.path.exists("/tmp/yt_cookies.txt") else None)
     with tempfile.TemporaryDirectory(prefix="clippost_yt_txt_") as tmp:
         opts = {
             "skip_download": True,
@@ -39,7 +44,18 @@ def youtube_para_texto(url: str) -> dict:
         if not arquivos:
             raise ValueError("Esse vídeo não tem legenda (nem automática) disponível.")
         segs = parse_vtt_subtitles(arquivos[0]).get("segments") or []
+    return _texto_do_youtube(url, segs, info)
 
+
+def _texto_do_youtube(url: str, segs: list[dict], info: dict) -> dict:
+    if not info.get("title"):
+        # veio da legenda direto do YouTube: título e canal pelo oEmbed (público, não abre o vídeo)
+        try:
+            import httpx
+            oe = httpx.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=10).json()
+            info = {**info, "title": oe.get("title"), "uploader": oe.get("author_name")}
+        except Exception:
+            pass
     # legendas automáticas repetem a linha anterior: junta sem duplicar
     partes: list[str] = []
     for s in segs:
@@ -53,6 +69,8 @@ def youtube_para_texto(url: str) -> dict:
             continue
         partes.append(t)
     texto = " ".join(partes).strip()
+    if not info.get("duration") and segs:
+        info = {**info, "duration": int(segs[-1].get("end") or 0)}
     titulo = info.get("title") or "Vídeo do YouTube"
     canal = info.get("uploader") or info.get("channel") or ""
     markdown = (
@@ -103,6 +121,16 @@ def explorar_perfil(perfil: str, limite: int = 50, ordem: str = "recentes", peri
                 fonte = "api_oficial"
         except ValueError:
             dados = None  # perfil não profissional: tenta o caminho comum
+    if plataforma == "youtube":
+        # API oficial do YouTube (com YOUTUBE_API_KEY): não é bloqueada e já traz views, curtidas e data
+        from services import youtube_oficial
+        if youtube_oficial.chave():
+            try:
+                dados = youtube_oficial.listar_canal(url, leitura)
+                fonte = "api_oficial"
+            except Exception as e:
+                print(f"[explorar] API do YouTube falhou ({e}); indo pelo caminho comum")
+                dados = None
     if dados is None:
         # ordem pedida direto na listagem; abrir vídeo a vídeo (lento) só se precisar de data ou curtidas
         lista = list_profile_videos(url, limit=leitura, user_id=user_id,
