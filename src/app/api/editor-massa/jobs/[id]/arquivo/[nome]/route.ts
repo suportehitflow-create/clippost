@@ -71,6 +71,12 @@ export async function GET(req: Request, { params }: Ctx) {
     });
   }
   const lido = Readable.toWeb(createReadStream(caminho)) as unknown as ReadableStream;
-  const corpo = baixar && nome.endsWith('.mp4') ? apagarAoTerminar(lido, () => fs.rm(caminho, { force: true })) : lido;
+  const apagarEste = async () => {
+    await fs.rm(caminho, { force: true });
+    // foi o último vídeo da pasta: some a pasta do job também (nada fica guardado)
+    const sobrou = (await fs.readdir(pasta).catch(() => [] as string[])).some((n) => n.endsWith('.mp4'));
+    if (!sobrou) await fs.rm(pasta, { recursive: true, force: true });
+  };
+  const corpo = baixar && nome.endsWith('.mp4') ? apagarAoTerminar(lido, apagarEste) : lido;
   return new Response(corpo, { headers: { ...base, 'Content-Length': String(st.size) } });
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import * as api from '@/lib/editor-massa/client/api';
+import { urlArquivo } from '@/lib/editor-massa/client/api';
 import { abrirVideo, capturarQuadro, carregarImagem, detectarNoNavegador, duracaoAudio, lerMeta } from '@/lib/editor-massa/client/midia';
 import { gerarOverlayPng, temOverlay } from '@/lib/editor-massa/client/render';
 import { finalizarArea } from '@/lib/editor-massa/deteccao-core';
@@ -19,28 +20,27 @@ import {
   type TemplateClipost,
 } from '@/lib/editor-massa/client/templateClipost';
 import type { ConfigGlobal, ConfigVideo, VideoJob } from '@/lib/editor-massa/types';
-import { novaAba, novoId, type Aba, type MusicaCliente, type ResultadoJob, type TemplateCliente, type VideoCliente } from './estado';
+import { novaAba, novoId, type Aba, type MusicaCliente, type TemplateCliente, type VideoCliente } from './estado';
 import EditarTemplate from './EditarTemplate';
 import {
   apagarArquivo,
   carregarEstado,
-  carregarResultados,
+  limparResultadosAntigos,
   pedirArmazenamentoPersistente,
   salvarArquivo,
   salvarEstado,
-  salvarResultados,
 } from './persistencia';
 import Grade from './Grade';
 import { Icone } from './icones';
 import Inspetor from './Inspetor';
 import Lateral from './Lateral';
-import { GavetaLog, ModalConcluido, PainelResultados } from './Paineis';
+import { GavetaLog, ModalFormaExportar, type FormaExportar } from './Paineis';
 import ImportarPerfil from './ImportarPerfil';
 import BibliotecaMusicas from '@/components/musicas/BibliotecaMusicas';
 import { enviarMusicaNuvem, listarMusicas } from '@/lib/musicas';
 import s from './editor-massa.module.css';
 
-type Sobreposicao = { tipo: 'resultados' } | { tipo: 'concluido'; aba: string; abaId: string; ok: number; falhas: number; jobId: string; erros?: string[] } | null;
+type Sobreposicao = { tipo: 'forma' } | null;
 
 const CHAVE_CONFIG = 'clipost:editor-massa:config';
 // um vídeo por vez, na ordem: o 1º aparece pronto rápido, depois o 2º... (sensação de menos espera)
@@ -131,7 +131,6 @@ export default function EditorMassa({
   const [bibliotecaMusicas, setBibliotecaMusicas] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [status, setStatus] = useState('Pronto');
-  const [resultados, setResultados] = useState<ResultadoJob[]>([]);
   const [sobre, setSobre] = useState<Sobreposicao>(null);
   const [importarAberto, setImportarAberto] = useState(false);
   // Lote aberto pelo Explorador de perfis ("Editor"): os vídeos entram sozinhos na grade
@@ -850,7 +849,7 @@ export default function EditorMassa({
   const abasGuardadas = useRef<typeof abas>([]);
   useEffect(() => {
     pedirArmazenamentoPersistente();
-    setResultados(carregarResultados());
+    limparResultadosAntigos();
     carregarEstado()
       .then((e) => {
         const salvas = e?.musicas ?? [];
@@ -894,10 +893,6 @@ export default function EditorMassa({
     return () => clearTimeout(t);
   }, [abas, abaAtivaId, musicas]);
 
-  useEffect(() => {
-    if (restaurou.current) salvarResultados(resultados);
-  }, [resultados]);
-
   // ---------- músicas ----------
   const enviarMusica = (m: MusicaCliente) =>
     enviar('musica:' + m.id, m.arquivo, (f) => setMusicas((ms) => ms.map((x) => (x.id === m.id ? { ...x, upload: f } : x))))
@@ -931,7 +926,25 @@ export default function EditorMassa({
   };
 
   // ---------- processamento ----------
-  const acompanhar = useCallback(async (abaId: string, nomeAba: string, jobId: string) => {
+  // Baixa os vídeos prontos sozinho, do jeito escolhido: um .zip, ou um arquivo por vez (para quem não
+  // consegue subir .zip). O servidor apaga cada arquivo assim que o download dele termina.
+  const baixarProntos = useCallback(async (jobId: string, forma: FormaExportar, saidas: string[]) => {
+    const clicar = (href: string) => {
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
+    if (forma === 'zip') return clicar(urlArquivo(jobId, 'todos.zip'));
+    for (const saida of saidas) {
+      clicar(urlArquivo(jobId, saida, true));
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+  }, []);
+
+  const acompanhar = useCallback(async (abaId: string, nomeAba: string, jobId: string, forma: FormaExportar) => {
     let lidos = 0;
     const erros: string[] = [];
     for (;;) {
@@ -960,22 +973,32 @@ export default function EditorMassa({
               },
         ),
       );
-      setResultados((rs) => rs.map((r) => (r.jobId === jobId ? { ...r, itens: st.itens.map((i) => ({ ...i })) } : r)));
       if (st.status === 'concluido' || st.status === 'cancelado' || st.status === 'erro') {
         const ok = st.itens.filter((i) => i.status === 'ok').length;
         const falhas = st.itens.filter((i) => i.status === 'erro').length;
         setAbas((as) => as.map((a) => (a.id === abaId ? { ...a, processando: false, pausado: false } : a)));
         if (st.status === 'cancelado') setStatus('Processamento cancelado');
-        else {
-          setStatus(falhas ? `${nomeAba}: ${ok} prontos, ${falhas} falharam` : `${nomeAba}: ${ok} vídeos prontos`);
-          setSobre({ tipo: 'concluido', aba: nomeAba, abaId, ok, falhas, jobId, erros: erros.slice(-3) });
+        else if (ok === 0) {
+          setStatus(`${nomeAba}: nenhum vídeo ficou pronto`);
+          avisar(erros.length ? erros[erros.length - 1].replace(/^\[[^\]]*\]\s*/, '').slice(0, 160) : 'Nenhum vídeo ficou pronto. Veja o registro (log) para saber o motivo.');
+        } else {
+          setStatus(falhas ? `${nomeAba}: ${ok} prontos, ${falhas} falharam. Baixando…` : `${nomeAba}: ${ok} vídeos prontos. Baixando…`);
+          // nada fica guardado: o servidor apaga cada arquivo assim que o download dele termina
+          baixarProntos(jobId, forma, st.itens.filter((i) => i.status === 'ok' && i.saida).map((i) => i.saida as string));
         }
         return;
       }
     }
-  }, []);
+  }, [baixarProntos]);
 
-  const processar = async () => {
+  const pedirExportar = () => {
+    const aba = abaAtiva;
+    if (aba.processando || !aba.videos.length) return;
+    if (!templateRef.current) return avisar(carregandoTpl ? 'Espere o seu template carregar' : 'Não foi possível carregar o seu template — recarregue a página');
+    setSobre({ tipo: 'forma' });
+  };
+
+  const processar = async (forma: FormaExportar) => {
     const aba = abaAtiva;
     if (aba.processando || !aba.videos.length) return;
     const g = globalRef.current;
@@ -1016,9 +1039,8 @@ export default function EditorMassa({
       const job = await api.criarJob({ global: g, templateArquivoId, musicas: musicasMapa, videos, nomeAba: aba.nome });
       escreverLog(`[PROC] ${aba.nome}: ${videos.length} vídeo(s) enviados para processamento`);
       setAbas((as) => as.map((a) => (a.id === aba.id ? { ...a, jobId: job.id } : a)));
-      setResultados((rs) => [{ jobId: job.id, aba: aba.nome, criadoEm: job.criadoEm, itens: job.itens.map((i) => ({ ...i })) }, ...rs]);
       setStatus(`Processando ${aba.nome}…`);
-      acompanhar(aba.id, aba.nome, job.id);
+      acompanhar(aba.id, aba.nome, job.id, forma);
     } catch (e: any) {
       setAbas((as) => as.map((a) => (a.id === aba.id ? { ...a, processando: false, videos: a.videos.map((v) => ({ ...v, statusJob: null })) } : a)));
       avisar(`Erro: ${e?.message ?? e}`);
@@ -1036,10 +1058,7 @@ export default function EditorMassa({
     const jobId = abaAtiva.jobId;
     if (!jobId || !window.confirm('Cancelar o processamento?')) return;
     await api.controlarJob(jobId, 'cancelar').catch(() => {});
-    if (window.confirm('Apagar também os vídeos que já ficaram prontos?')) {
-      await api.apagarProcessados(jobId).catch(() => {});
-      setResultados((rs) => rs.filter((r) => r.jobId !== jobId));
-    }
+    await api.apagarProcessados(jobId).catch(() => {});
   };
 
   // ---------- lotes (abas) ----------
@@ -1093,7 +1112,6 @@ export default function EditorMassa({
   const progressoLote = total ? abaAtiva.videos.reduce((acc, v) => acc + (v.statusJob === 'ok' || v.statusJob === 'erro' ? 1 : v.statusJob === 'processando' ? v.progressoJob : 0), 0) / total : 0;
   const enviando = abas.flatMap((a) => a.videos).filter((v) => v.upload < 1 && !v.uploadErro).length;
   const analisandoN = abas.flatMap((a) => a.videos).filter((v) => !v.carregado || v.detectando).length;
-  const prontos = resultados.reduce((n, r) => n + r.itens.filter((i) => i.saida).length, 0);
   const temErroLog = log.some((l) => /ERRO|FALHA/.test(l));
 
   return (
@@ -1188,7 +1206,7 @@ export default function EditorMassa({
         )}
 
         <Lateral
-          aoProcessar={processar}
+          aoProcessar={pedirExportar}
           onAgendar={onAgendar}
           processando={abaAtiva.processando}
           ferramentaAtiva={ferramentaAtiva}
@@ -1265,31 +1283,15 @@ export default function EditorMassa({
       </div>
 
       {logAberto && <GavetaLog log={log} limpar={() => setLog([])} fechar={() => setLogAberto(false)} />}
-      {sobre?.tipo === 'resultados' && (
-        <PainelResultados
-          resultados={resultados}
+      {sobre?.tipo === 'forma' && (
+        <ModalFormaExportar
+          total={abaAtiva.videos.length}
           fechar={() => setSobre(null)}
-          apagar={async (jobId) => {
-            if (!window.confirm('Apagar estes vídeos do servidor?')) return;
-            await api.apagarProcessados(jobId).catch(() => {});
-            setResultados((rs) => rs.filter((r) => r.jobId !== jobId));
-          }}
-        />
-      )}
-      {sobre?.tipo === 'concluido' && (
-        <ModalConcluido
-          aba={sobre.aba}
-          ok={sobre.ok}
-          falhas={sobre.falhas}
-          erros={sobre.erros}
-          jobId={sobre.jobId}
-          verResultados={() => setSobre({ tipo: 'resultados' })}
-          limparLote={() => {
-            const a = abasRef.current.find((x) => x.id === sobre.abaId);
-            if (a) removerVideos(a.videos.filter((v) => v.statusJob === 'ok').map((v) => v.id));
+          escolher={(forma) => {
+            try { localStorage.setItem('clipost:exportar-forma', forma); } catch {}
             setSobre(null);
+            processar(forma);
           }}
-          fechar={() => setSobre(null)}
         />
       )}
       {toast && <div className={s.toast}>{toast}</div>}

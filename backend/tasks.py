@@ -1299,6 +1299,28 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         except Exception as del_err:
             print(f"[pipeline] aviso ao limpar cortes antigos: {del_err}")
 
+        # Título depois do corte pronto: a IA escolhe o título olhando o trecho original, mas o começo e o
+        # fim mudam ao encaixar nas frases e o título deixava de combinar. Aqui ele é reescrito em cima
+        # do que é falado no corte FINAL (um pedido só para todos os cortes; se falhar, fica o título de antes).
+        try:
+            from services.ai_curator import retitular_cortes
+            _itens = []
+            for i, clip in enumerate(clips_meta):
+                _s, _e = limites_do_corte(clip["start_time"], clip["end_time"], words)
+                _fala = " ".join(str(w.get("word") or "") for w in words if w["end"] > _s + 0.05 and w["start"] < _e - 0.05).strip()
+                if not _fala:
+                    _fala = " ".join(str(sg.get("text") or "") for sg in segments if sg["end"] > _s and sg["start"] < _e).strip()
+                if len(_fala) > 1800:
+                    _fala = _fala[:1100] + " [...] " + _fala[-600:]
+                if _fala:
+                    _itens.append({"i": i, "texto": _fala, "titulo_atual": clip["hook_title"]})
+            for _i, _t in retitular_cortes(_itens).items():
+                if 0 <= _i < len(clips_meta):
+                    clips_meta[_i]["hook_title"] = _t
+            print(f"[pipeline] títulos reescritos a partir do que é falado em cada corte ({len(_itens)} cortes)")
+        except Exception as _rt_err:
+            print(f"[pipeline] não consegui reescrever os títulos ({_rt_err}); ficam os da escolha dos cortes")
+
         pre_inserted_ids = []
         for i, clip in enumerate(clips_meta):
             try:

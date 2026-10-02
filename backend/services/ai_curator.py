@@ -619,6 +619,46 @@ def _validar(clips: list, segments: list[dict], min_duration: int, max_duration:
     return validated
 
 
+def retitular_cortes(itens: list[dict], tamanho_lote: int = 8) -> dict[int, str]:
+    """Reescreve o título de cada corte a partir do que é FALADO nele (o corte já com começo e fim finais).
+    itens: [{"i": 0, "texto": "...", "titulo_atual": "..."}]. Devolve {i: título}; o que a IA não devolver
+    fica de fora (quem chama mantém o título que já tinha)."""
+    novos: dict[int, str] = {}
+    for ini in range(0, len(itens), tamanho_lote):
+        lote = itens[ini:ini + tamanho_lote]
+        blocos = "\n\n".join(
+            f'CORTE {c["i"]} (título atual: {c.get("titulo_atual", "")}):\n{c["texto"]}' for c in lote
+        )
+        prompt = (
+            "Você escreve títulos para cortes verticais (Reels, TikTok, Shorts). Abaixo estão cortes já prontos, "
+            "cada um com a transcrição EXATA do que é dito nele. Escreva o título de cada corte.\n\n"
+            "REGRAS (o título é a promessa do vídeo — o corte tem que cumpri-la):\n"
+            "- Use SÓ fatos, nomes e números que aparecem na transcrição daquele corte. Não invente nem exagere "
+            "(nada de 'a verdade', 'o segredo', 'o que ninguém contou' se o corte não revela isso).\n"
+            "- Diga o assunto principal e a parte mais forte do corte, com o detalhe concreto dele.\n"
+            "- Se o título atual não bate com a transcrição, descarte-o e escreva outro.\n"
+            "- EM MAIÚSCULAS, no máximo 60 caracteres, português correto (corrija palavras que o reconhecimento "
+            "de fala escreveu errado), terminando com 1 ou 2 emojis que combinem. Sem aspas nem hashtags.\n"
+            "- Deve dar curiosidade de ver o corte, mas só com o que o corte realmente tem.\n\n"
+            + blocos
+            + '\n\nResponda SÓ com um array JSON: [{"i": <número do corte>, "titulo": "..."}]'
+        )
+        raw = _try_providers(prompt)
+        achados = []
+        try:
+            achados = json.loads(re.search(r"\[.*\]", raw or "", re.S).group(0))
+        except Exception:
+            print("[ai_curator] retitular: resposta fora do formato; mantendo os títulos atuais deste lote")
+        for a in achados:
+            try:
+                t = re.sub(r"[\"'*#`]", "", str(a["titulo"])).strip().upper()
+                if t:
+                    novos[int(a["i"])] = (t if len(t) <= 60 else t[:58].rsplit(" ", 1)[0].rstrip(",:;-–") + "…")
+            except Exception:
+                continue
+    return novos
+
+
 def generate_hook_title(transcript_text: str, original_title: str = "") -> str:
     """Título-gancho em MAIÚSCULAS para um vídeo curto inteiro (edição em massa)."""
     fallback = re.sub(r"[#@]\S+", "", original_title or "").strip().upper()[:60]

@@ -4,11 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, Loader2, Trash2, Play, Zap, Layers, Search, Download, AlertCircle, Film, FolderOpen } from 'lucide-react'
+import { Scissors, Loader2, Trash2, Play, Zap, Layers, Search, AlertCircle, Film, FolderOpen } from 'lucide-react'
 import ProfileSwitcher from '@/components/ProfileSwitcher'
-import { urlArquivo } from '@/lib/editor-massa/client/api'
-import { carregarResultados } from '@/components/editor-massa/persistencia'
-import type { ResultadoJob } from '@/components/editor-massa/estado'
 import { idsDoLote } from '@/lib/lote'
 
 // Biblioteca: tudo o que foi criado no Clipost, com a função de origem de cada item
@@ -90,7 +87,6 @@ export default function Biblioteca() {
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [cortes, setCortes] = useState<Corte[]>([])
   const [doAutopilot, setDoAutopilot] = useState<Set<string>>(new Set())
-  const [exportados, setExportados] = useState<ResultadoJob[]>([])
   const [carregando, setCarregando] = useState(true)
   const [apagando, setApagando] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('tudo')
@@ -98,8 +94,6 @@ export default function Biblioteca() {
   const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    // o servidor do editor guarda os exportados por 24h: os mais antigos não abrem mais
-    setExportados(carregarResultados().filter(r => Date.now() - r.criadoEm < 24 * 3600 * 1000))
     ;(async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -143,16 +137,12 @@ export default function Biblioteca() {
   const projetosVisiveis = projetos.filter(
     p => !dentroDeLote.has(p.id) && (filtro === 'tudo' || filtro === origemProjeto(p.id)) && (!termo || p.title?.toLowerCase().includes(termo)),
   )
-  const exportadosVisiveis = exportados.filter(
-    r => (filtro === 'tudo' || filtro === 'editor') && r.itens.some(i => i.saida) && (!termo || r.aba.toLowerCase().includes(termo)),
-  )
-
   const soltos = projetos.filter(p => !dentroDeLote.has(p.id))
   const contagem: Record<Filtro, number> = {
-    tudo: soltos.length + exportados.filter(r => r.itens.some(i => i.saida)).length,
+    tudo: soltos.length,
     cortes: soltos.filter(p => origemProjeto(p.id) === 'cortes').length,
     autopilot: soltos.filter(p => origemProjeto(p.id) === 'autopilot').length,
-    editor: exportados.filter(r => r.itens.some(i => i.saida)).length + doPerfil.size,
+    editor: doPerfil.size,
   }
 
   async function apagarProjeto(id: string, dentro = false) {
@@ -178,13 +168,7 @@ export default function Biblioteca() {
     }
   }
 
-  function esquecerExportado(jobId: string) {
-    const resto = exportados.filter(r => r.jobId !== jobId)
-    setExportados(resto)
-    try { localStorage.setItem('clipost:editor-massa:resultados', JSON.stringify(resto)) } catch {}
-  }
-
-  const vazio = !carregando && projetosVisiveis.length === 0 && exportadosVisiveis.length === 0
+  const vazio = !carregando && projetosVisiveis.length === 0
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#0a0a0c]">
@@ -323,54 +307,6 @@ export default function Biblioteca() {
           </section>
         )}
 
-        {/* exportados no editor (Edição em Massa / estúdio) */}
-        {exportadosVisiveis.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Exportados no editor</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {exportadosVisiveis.map(r => {
-                const prontos = r.itens.filter(i => i.saida)
-                return (
-                  <article key={r.jobId} className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <Selo origem="editor" />
-                        <h3 className="text-sm font-semibold text-white truncate mt-1.5" title={r.aba}>{r.aba}</h3>
-                        <p className="text-[10px] text-zinc-500 tabular-nums">{data(r.criadoEm)} · {prontos.length} vídeo{prontos.length === 1 ? '' : 's'}</p>
-                      </div>
-                      <a
-                        href={urlArquivo(r.jobId, 'todos.zip')}
-                        download
-                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white text-[11px] font-semibold flex items-center gap-1 shrink-0"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Baixar .zip
-                      </a>
-                      <button type="button" onClick={() => esquecerExportado(r.jobId)} className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10" title="Tirar da biblioteca">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <ul className="divide-y divide-white/[0.05]">
-                      {prontos.slice(0, 6).map((i, idx) => (
-                        <li key={idx} className="flex items-center gap-2 py-1.5">
-                          <Film className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
-                          <span className="text-xs text-zinc-300 truncate flex-1" title={i.nome}>{i.nome}</span>
-                          <a href={urlArquivo(r.jobId, i.saida!)} target="_blank" rel="noreferrer" className="p-1 rounded text-zinc-500 hover:text-white" title="Assistir">
-                            <Play className="w-3.5 h-3.5" />
-                          </a>
-                          <a href={urlArquivo(r.jobId, i.saida!, true)} download className="p-1 rounded text-zinc-500 hover:text-white" title="Baixar">
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        </li>
-                      ))}
-                      {prontos.length > 6 && <li className="py-1.5 text-[11px] text-zinc-500">+ {prontos.length - 6} no .zip</li>}
-                    </ul>
-                  </article>
-                )
-              })}
-            </div>
-            <p className="text-[11px] text-zinc-600">Os vídeos exportados ficam disponíveis por 24 horas. Baixe os que quiser guardar.</p>
-          </section>
-        )}
       </div>
     </div>
   )

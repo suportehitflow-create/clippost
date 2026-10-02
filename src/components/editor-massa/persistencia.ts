@@ -1,5 +1,5 @@
 import type { ConfigVideo } from '@/lib/editor-massa/types';
-import type { Aba, MusicaCliente, ResultadoJob, VideoCliente } from './estado';
+import type { Aba, MusicaCliente, VideoCliente } from './estado';
 
 // Os vídeos enviados ficam no navegador (IndexedDB) até a pessoa remover: sair da página,
 // recarregar ou fechar o navegador não perde nada. Os arquivos ficam no store "arquivos";
@@ -130,19 +130,11 @@ export async function carregarEstado(): Promise<{ abas: Aba[]; abaAtivaId: strin
   return { abas, abaAtivaId: e.abaAtivaId, musicas };
 }
 
-export function salvarResultados(r: ResultadoJob[]) {
+/** Os vídeos exportados não ficam guardados em lugar nenhum: tira o que versões antigas deixaram no navegador. */
+export function limparResultadosAntigos() {
   try {
-    localStorage.setItem(CHAVE_RESULTADOS, JSON.stringify(r.slice(0, 50)));
+    localStorage.removeItem(CHAVE_RESULTADOS);
   } catch {
     // sem storage
-  }
-}
-
-export function carregarResultados(): ResultadoJob[] {
-  try {
-    const r = JSON.parse(localStorage.getItem(CHAVE_RESULTADOS) || '[]');
-    return Array.isArray(r) ? r : [];
-  } catch {
-    return [];
   }
 }
