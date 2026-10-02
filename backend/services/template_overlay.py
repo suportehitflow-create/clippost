@@ -40,8 +40,11 @@ _FONT_FALLBACK = {
 
 @lru_cache(maxsize=None)
 def _font_path(kind: str) -> str | None:
-    for name in _FONT_PATTERNS.get(kind, []) + [_FONT_FALLBACK.get(kind, "DejaVuSans-Bold.ttf")]:
-        for root in ("/usr/share/fonts", "/usr/local/share/fonts"):
+    # no Windows (rodando no PC) as fontes ficam em C:\Windows\Fonts e têm outros nomes
+    windows = {"anton": ["impact.ttf"], "montserrat_black": ["ariblk.ttf"], "sans_black": ["ariblk.ttf", "arialbd.ttf"],
+               "sans_bold": ["arialbd.ttf"], "sans_medium": ["arial.ttf"]}
+    for name in _FONT_PATTERNS.get(kind, []) + [_FONT_FALLBACK.get(kind, "DejaVuSans-Bold.ttf")] + windows.get(kind, []):
+        for root in ("/usr/share/fonts", "/usr/local/share/fonts", "C:/Windows/Fonts"):
             hits = glob.glob(f"{root}/**/{name}", recursive=True)
             if hits:
                 return hits[0]
