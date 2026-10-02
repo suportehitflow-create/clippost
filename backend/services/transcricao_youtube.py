@@ -38,7 +38,10 @@ def transcricao(url: str, idiomas: list[str] | None = None) -> dict | None:
 
     segments, words = [], []
     for n, t in enumerate(trechos):
-        texto = re.sub(r"\s+", " ", str(getattr(t, "text", "") or "")).strip()
+        texto = str(getattr(t, "text", "") or "")
+        # tira marcações da legenda automática: ">>" (troca de quem fala) e [ruídos] no meio da fala
+        texto = re.sub(r"\[[^\]]*\]|>>", " ", texto)
+        texto = re.sub(r"\s+", " ", texto).strip()
         if not texto or texto.startswith("[") and texto.endswith("]"):  # [Música], [Aplausos]
             continue
         ini = float(getattr(t, "start", 0) or 0)

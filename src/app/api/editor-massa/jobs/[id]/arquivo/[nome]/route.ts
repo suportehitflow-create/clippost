@@ -11,6 +11,14 @@ export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ id: string; nome: string }> };
 
+// Depois que o download termina, o arquivo sai do servidor: a pessoa já tem o vídeo e ele não precisa
+// ficar guardado (antes ficava 24 h). Só no download de verdade (?baixar / .zip), não no player.
+function apagarAoTerminar(corpo: ReadableStream, apagar: () => Promise<unknown>): ReadableStream {
+  let feito = false;
+  const fim = () => { if (!feito) { feito = true; apagar().catch(() => {}); } };
+  return corpo.pipeThrough(new TransformStream({ flush: fim }));
+}
+
 // GET /api/editor-massa/jobs/:id/arquivo/1.mp4  → um vídeo (com suporte a Range para tocar no player)
 // GET /api/editor-massa/jobs/:id/arquivo/todos.zip → todos os vídeos prontos
 export async function GET(req: Request, { params }: Ctx) {
@@ -29,7 +37,7 @@ export async function GET(req: Request, { params }: Ctx) {
       : (await fs.readdir(pasta).catch(() => [] as string[])).filter((n) => n.endsWith('.mp4'));
     if (!nomes.length) return new Response('Nenhum vídeo pronto', { status: 404 });
     const arquivos = nomes.map((n) => ({ nome: n, caminho: path.join(pasta, n) }));
-    return new Response(zipEmStream(arquivos), {
+    return new Response(apagarAoTerminar(zipEmStream(arquivos), () => fs.rm(pasta, { recursive: true, force: true })), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="videos_${id.slice(0, 8)}.zip"`,
@@ -62,6 +70,7 @@ export async function GET(req: Request, { params }: Ctx) {
       headers: { ...base, 'Content-Range': `bytes ${ini}-${fim}/${st.size}`, 'Content-Length': String(fim - ini + 1) },
     });
   }
-  const corpo = Readable.toWeb(createReadStream(caminho)) as unknown as ReadableStream;
+  const lido = Readable.toWeb(createReadStream(caminho)) as unknown as ReadableStream;
+  const corpo = baixar && nome.endsWith('.mp4') ? apagarAoTerminar(lido, () => fs.rm(caminho, { force: true })) : lido;
   return new Response(corpo, { headers: { ...base, 'Content-Length': String(st.size) } });
 }

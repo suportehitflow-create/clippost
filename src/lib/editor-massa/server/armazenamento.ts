@@ -63,8 +63,9 @@ export function pastaJob(jobId: string) {
   return path.join(PASTA_JOBS, jobId);
 }
 
-/** Apaga uploads e jobs mais velhos que `horas` (chamado de tempos em tempos pela fila) */
-export async function limparAntigos(horas = Number(process.env.EDITOR_MASSA_RETENCAO_HORAS || 24)) {
+/** Apaga uploads e jobs mais velhos que `horas` (chamado de tempos em tempos pela fila). O download já
+ * apaga o vídeo baixado; isto é a rede de segurança para o que não foi baixado (antes 24 h, agora 2 h). */
+export async function limparAntigos(horas = Number(process.env.EDITOR_MASSA_RETENCAO_HORAS || 2)) {
   const limite = Date.now() - horas * 3600_000;
   for (const pasta of [PASTA_UPLOADS, PASTA_JOBS]) {
     let itens: string[] = [];

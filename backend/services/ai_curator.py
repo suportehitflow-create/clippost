@@ -598,7 +598,8 @@ def _validar(clips: list, segments: list[dict], min_duration: int, max_duration:
 
             hook_title = str(c.get("hook_title", "CORTE VIRAL")).strip().replace('"', '').replace("'", "").upper()
             if len(hook_title) > 60:
-                hook_title = hook_title[:57] + "..."
+                # corta na última palavra inteira (antes cortava no meio: "SOBREVIV...")
+                hook_title = hook_title[:58].rsplit(" ", 1)[0].rstrip(",:;-–") + "…"
 
             ai_score = round(min(0.99, max(0.60, float(c.get("ai_score", 0.85)))), 2)
 
