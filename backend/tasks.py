@@ -1167,7 +1167,21 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         # 3. Transcrição: Sempre usa Groq Whisper com timestamps acústicos precisos por palavra
         _t_baixou = time.time()
         _set_step(project_id, "transcricao")
-        if legenda_youtube:
+        # legenda do YouTube manual vale mais que a transcrição do áudio; a automática não tem pontuação
+        # nem o tempo exato de cada palavra (cortes começavam/terminavam no meio da frase), então com o
+        # Groq (transcrição boa pelo áudio) a automática fica só de reserva
+        transcript_data = None
+        if legenda_youtube and legenda_youtube["automatica"] and os.environ.get("GROQ_API_KEY"):
+            try:
+                print(f"[pipeline] legenda do YouTube é automática: transcrevendo o áudio (mais preciso)...")
+                _pelo_audio = transcribe_media(video_path, audio_path)
+                if _pelo_audio.get("segments"):
+                    transcript_data = _pelo_audio
+            except Exception as tr_err:
+                print(f"[pipeline] transcrição pelo áudio falhou ({tr_err}); usando a legenda do YouTube")
+        if transcript_data is not None:
+            pass
+        elif legenda_youtube:
             # legenda do próprio YouTube pega no começo: não precisa transcrever o áudio
             print(f"[pipeline] transcrição: legenda do YouTube ({legenda_youtube['idioma']}, "
                   f"{'automática' if legenda_youtube['automatica'] else 'manual'}) — pulando a transcrição pelo áudio")
