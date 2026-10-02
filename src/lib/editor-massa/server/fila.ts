@@ -250,7 +250,7 @@ async function processarItem(job: Job, indice: number) {
             arquivo, inicio: t.inicio, duracao: t.duracao, manter,
             velocidade: velocidadeEfeitos(global) * (antiDup ? antiDup.atempo : 1),
             preset: lg.preset, posicaoY: lg.posicaoY, fonte: global.estiloTexto.fonte,
-            token, pasta, nome: String(indice + 1),
+            token, pasta, nome: String(indice + 1), clipId: v.clipId,
           });
           legendas = r?.arquivo ?? null;
           log(job, r ? `[LEGENDA] ${v.nome}: ${r.palavras} palavras` : `[LEGENDA] ${v.nome}: sem fala, sem legenda`);

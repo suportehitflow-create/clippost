@@ -549,6 +549,7 @@ export default function EditorMassa({
         carregado: false,
         tocavel: !!c.url,
         marcaEmbutida: !projeto.crus,
+        clipId: c.id,
         detectando: false,
         statusJob: null,
         progressoJob: 0,

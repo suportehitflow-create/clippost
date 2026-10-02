@@ -769,6 +769,11 @@ def _download_via_piped(url: str, tmp_dir: Path) -> tuple[str, dict]:
     return str(merged_path), {}
 
 
+_WHISPER_MODELO = None
+_WHISPER_VAGAS = threading.Semaphore(2)
+_WHISPER_CARGA = threading.Lock()
+
+
 def transcribe_media(video_path: str, audio_path: str) -> dict:
     """Transcrição com tempo por palavra: Groq Whisper; se falhar, Whisper tiny local.
     Retorna {"segments": [...], "words": [...]} (listas vazias se o vídeo não tiver fala)."""
@@ -827,14 +832,21 @@ def transcribe_media(video_path: str, audio_path: str) -> dict:
             print(f"[transcricao] Groq Whisper falhou: {groq_err}, usando Whisper local")
 
     from faster_whisper import WhisperModel
-    print("[transcricao] iniciando Whisper tiny local...")
-    model = WhisperModel("tiny", device="cpu", compute_type="int8")
-    fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1, language="pt")
-    segments, words = [], []
-    for seg in fw_segments_gen:
-        segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
-        for w in seg.words or []:
-            words.append({"start": w.start, "end": w.end, "word": w.word})
+    # o modelo é carregado uma vez (levava ~5 s por vídeo) e só 2 transcrições rodam juntas: mais que isso
+    # só disputa CPU entre si e com a renderização
+    with _WHISPER_VAGAS:
+        global _WHISPER_MODELO
+        with _WHISPER_CARGA:
+            if _WHISPER_MODELO is None:
+                print("[transcricao] iniciando Whisper tiny local...")
+                _WHISPER_MODELO = WhisperModel("tiny", device="cpu", compute_type="int8")
+        model = _WHISPER_MODELO
+        fw_segments_gen, _ = model.transcribe(audio_path, word_timestamps=True, beam_size=1, language="pt")
+        segments, words = [], []
+        for seg in fw_segments_gen:
+            segments.append({"start": seg.start, "end": seg.end, "text": seg.text})
+            for w in seg.words or []:
+                words.append({"start": w.start, "end": w.end, "word": w.word})
     print(f"[transcricao] Whisper concluído — {len(segments)} segmentos")
     return {"segments": segments, "words": words}
 
@@ -1298,6 +1310,23 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
             supabase.table("clips").delete().eq("project_id", project_id).execute()
         except Exception as del_err:
             print(f"[pipeline] aviso ao limpar cortes antigos: {del_err}")
+
+        # Dois cortes que repetem o mesmo trecho (mais de 40% de sobreposição) viram um só: fica o de maior nota.
+        # Sem isso o mesmo assunto sai 3 vezes seguidas, só com o começo e o fim deslocados.
+        try:
+            _fins = [limites_do_corte(c["start_time"], c["end_time"], words) for c in clips_meta]
+            _ordem = sorted(range(len(clips_meta)), key=lambda k: -float(clips_meta[k].get("ai_score") or 0))
+            _fica: list[int] = []
+            for k in _ordem:
+                ks, ke = _fins[k]
+                if any(min(ke, _fins[j][1]) - max(ks, _fins[j][0]) > 0.4 * min(ke - ks, _fins[j][1] - _fins[j][0]) for j in _fica):
+                    continue
+                _fica.append(k)
+            if len(_fica) < len(clips_meta):
+                print(f"[pipeline] {len(clips_meta) - len(_fica)} corte(s) repetiam o mesmo trecho e foram unidos ao de maior nota")
+                clips_meta[:] = [clips_meta[k] for k in range(len(clips_meta)) if k in set(_fica)]
+        except Exception as _ov_err:
+            print(f"[pipeline] não consegui checar sobreposição ({_ov_err})")
 
         # Título depois do corte pronto: a IA escolhe o título olhando o trecho original, mas o começo e o
         # fim mudam ao encaixar nas frases e o título deixava de combinar. Aqui ele é reescrito em cima

@@ -144,6 +144,8 @@ export interface ConfigVideo {
   musica: { musicaId: string; inicio: number } | null;
   /** Corte vindo do Criar Cortes: o vídeo já tem a marca d'água do template dentro (não desenha de novo) */
   marcaEmbutida?: boolean;
+  /** Id do corte no Clipost: deixa o servidor reaproveitar a transcrição do projeto na legenda */
+  clipId?: string;
 }
 
 export interface VideoJob extends ConfigVideo {

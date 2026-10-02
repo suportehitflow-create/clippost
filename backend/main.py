@@ -1863,6 +1863,56 @@ async def gerar_variacoes_legenda(request: Request):
     return {"variacoes": versoes[:n]}
 
 
+def _transcricao_do_corte(clip_id: str, user_id: str, inicio: float, duracao: float,
+                          velocidade: float, manter: list | None) -> dict | None:
+    """Palavras e trechos da transcrição do projeto que caem dentro do corte, já no tempo do vídeo final
+    do editor (trecho usado, sem as pausas removidas e com a velocidade aplicada). None se não houver."""
+    clip = maybe_one(supabase.table("clips").select("project_id,start_time,end_time").eq("id", clip_id)).data
+    if not clip:
+        return None
+    proj = maybe_one(supabase.table("projects").select("user_id,transcript").eq("id", clip["project_id"])).data
+    if not proj or str(proj.get("user_id")) != user_id:
+        return None
+    transcript = proj.get("transcript") or {}
+    words = transcript.get("words") or []
+    segs = transcript.get("segments") or []
+    if not words or duracao <= 0:
+        return None
+    base = float(clip.get("start_time") or 0)
+    trechos = sorted(((float(m["ini"]), float(m["fim"])) for m in (manter or [])), key=lambda x: x[0])
+
+    def mapear(t: float) -> float | None:
+        rel = t - base - inicio  # tempo dentro do trecho usado
+        if rel < -0.001 or rel > duracao + 0.001:
+            return None
+        if trechos:
+            acum = 0.0
+            for ini, fim in trechos:
+                if ini - 0.001 <= rel <= fim + 0.001:
+                    return (acum + max(0.0, rel - ini)) / velocidade
+                acum += fim - ini
+            return None  # caiu numa pausa que foi removida
+        return rel / velocidade
+
+    palavras = []
+    for w in words:
+        a = mapear(float(w["start"]))
+        if a is None:
+            continue
+        b = mapear(float(w["end"]))
+        palavras.append({"start": round(a, 3), "end": round(max(a + 0.05, b if b is not None else a + 0.3), 3), "word": w["word"]})
+    trechos_txt = []
+    for s in segs:
+        a = mapear(float(s["start"]))
+        if a is None:
+            continue
+        b = mapear(float(s["end"]))
+        trechos_txt.append({"start": round(a, 3), "end": round(max(a + 0.05, b if b is not None else a + 0.3), 3), "text": s["text"]})
+    if not palavras:
+        return None
+    return {"segments": trechos_txt, "words": palavras}
+
+
 @app.post("/api/subtitles/ass")
 async def gerar_legendas_ass(request: Request):
     """Legendas para o Editor em Massa: recebe o ÁUDIO já no tempo final do vídeo (cortado,
@@ -1880,11 +1930,10 @@ async def gerar_legendas_ass(request: Request):
 
     form = await request.form()
     arquivo = form.get("file")
-    if arquivo is None or not hasattr(arquivo, "read"):
+    clip_id = str(form.get("clip_id") or "")
+    tem_audio = arquivo is not None and hasattr(arquivo, "read")
+    if not tem_audio and not clip_id:
         raise HTTPException(status_code=400, detail="Envie o áudio no campo 'file'.")
-    dados = await arquivo.read()
-    if len(dados) > 25 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Áudio grande demais (máx. 25MB).")
     preset = str(form.get("preset") or "hormozi_yellow")
     font_family = str(form.get("font_family") or "") or None
     try:
@@ -1896,6 +1945,37 @@ async def gerar_legendas_ass(request: Request):
     from pathlib import Path
     from tasks import transcribe_media
     from services.subtitle_generator import generate_ass
+
+    # Atalho: o corte já tem a transcrição guardada no projeto (com o tempo de cada palavra). Reaproveita
+    # em vez de transcrever o áudio de novo — o Whisper é o que mais demora e pesa na exportação.
+    if clip_id:
+        try:
+            manter = _json.loads(str(form.get("manter") or "null"))
+            tr = await asyncio.to_thread(
+                _transcricao_do_corte, clip_id, str(user.user.id),
+                float(form.get("inicio") or 0), float(form.get("duracao") or 0),
+                float(form.get("velocidade") or 1) or 1.0, manter,
+            )
+        except Exception as e:
+            print(f"[legendas] transcrição guardada indisponível ({e})")
+            tr = None
+        if tr is not None:
+            def _montar() -> tuple[str, int]:
+                with tempfile.TemporaryDirectory(prefix="clippost_leg_") as tmp:
+                    saida = generate_ass(
+                        tr["segments"], str(Path(tmp) / "legenda.ass"),
+                        words=tr["words"] or None, margin_v=margin_v,
+                        subtitle_preset=preset, font_family=font_family,
+                    )
+                    return Path(saida).read_text(encoding="utf-8"), len(tr["words"])
+            ass, palavras = await asyncio.to_thread(_montar)
+            return {"ass": ass, "palavras": palavras, "origem": "transcricao_guardada"}
+        if not tem_audio:
+            raise HTTPException(status_code=409, detail="sem_transcricao")
+
+    dados = await arquivo.read()
+    if len(dados) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Áudio grande demais (máx. 25MB).")
 
     def _rodar() -> tuple[str, int]:
         with tempfile.TemporaryDirectory(prefix="clippost_leg_") as tmp:

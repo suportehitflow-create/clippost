@@ -31,7 +31,43 @@ export async function gerarLegendas(p: {
   token: string;
   pasta: string;
   nome: string;
+  /** corte do Criar cortes: usa a transcrição que já está guardada no projeto (sem transcrever o áudio) */
+  clipId?: string;
 }): Promise<{ arquivo: string; palavras: number } | null> {
+  // No .ass (1280 de altura, alinhado embaixo) a margem é a distância da base até a legenda
+  const margem = String(Math.round(1280 * (1 - p.posicaoY / 100) - 30));
+
+  if (p.clipId) {
+    try {
+      const form = new FormData();
+      form.append('clip_id', p.clipId);
+      form.append('inicio', String(p.inicio));
+      form.append('duracao', String(p.duracao));
+      form.append('velocidade', String(p.velocidade));
+      form.append('manter', JSON.stringify(p.manter));
+      form.append('preset', p.preset);
+      form.append('margin_v', margem);
+      if (p.fonte) form.append('font_family', p.fonte);
+      const resp = await fetch(`${BACKEND}/api/subtitles/ass`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${p.token}` },
+        body: form,
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (resp.ok) {
+        const j: any = await resp.json().catch(() => ({}));
+        if (j.ass && j.palavras) {
+          const ass = path.join(p.pasta, `${p.nome}.ass`);
+          await fs.writeFile(ass, j.ass, 'utf8');
+          return { arquivo: ass, palavras: j.palavras };
+        }
+      }
+      // 409 (sem transcrição guardada) ou qualquer falha: segue para a transcrição pelo áudio
+    } catch {
+      /* idem */
+    }
+  }
+
   const audio = path.join(p.pasta, `${p.nome}.legenda.mp3`);
   const filtros = [
     'asetpts=PTS-STARTPTS',
@@ -50,8 +86,7 @@ export async function gerarLegendas(p: {
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(await fs.readFile(audio))], { type: 'audio/mpeg' }), 'audio.mp3');
     form.append('preset', p.preset);
-    // No .ass (1280 de altura, alinhado embaixo) a margem é a distância da base até a legenda
-    form.append('margin_v', String(Math.round(1280 * (1 - p.posicaoY / 100) - 30)));
+    form.append('margin_v', margem);
     if (p.fonte) form.append('font_family', p.fonte);
     const resp = await fetch(`${BACKEND}/api/subtitles/ass`, {
       method: 'POST',
