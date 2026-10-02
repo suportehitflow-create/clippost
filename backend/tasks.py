@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import xml.etree.ElementTree as ET
@@ -457,9 +458,42 @@ def _set_step(pid: str | None, step: str):
         pass
 
 
+def _download_via_gallery_dl(url: str, tmp_dir: Path) -> str:
+    """Mais uma camada de reserva: baixa com o gallery-dl (pip install gallery-dl)."""
+    destino = tmp_dir / "gallery_dl"
+    # o gallery-dl só aceita YouTube pelo prefixo "ytdl:" (que usa o yt-dlp por dentro)
+    alvo = f"ytdl:{url}" if ("youtube.com" in url or "youtu.be" in url) else url
+    r = subprocess.run(
+        [sys.executable, "-m", "gallery_dl", "--quiet", "-D", str(destino), "-f", "original.{extension}", alvo],
+        capture_output=True, text=True, timeout=900,
+    )
+    arquivos = [p for p in destino.glob("*") if p.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov")] if destino.exists() else []
+    if not arquivos:
+        raise Exception(f"GalleryDlError: sem vídeo ({(r.stderr or r.stdout).strip()[-200:]})")
+    final = tmp_dir / f"original_gallery{arquivos[0].suffix}"
+    shutil.move(str(arquivos[0]), final)
+    if final.stat().st_size < 100 * 1024:
+        raise Exception("GalleryDlError: arquivo muito pequeno")
+    return str(final)
+
+
+_COBALTS = ["https://clippost-cobalt.fly.dev", "https://clippost-cobalt-fra.fly.dev"]
+
+
 def _download_via_cobalt(url: str, tmp_dir: Path) -> tuple[str, dict]:
-    """Fallback via yt-dlp-fra Frankfurt (IP europeu, proxy streaming)."""
-    cobalt_base = os.environ.get("COBALT_URL", "https://clippost-cobalt-fra.fly.dev")
+    """Fallback pelos cobalts do Clipost (o do COBALT_URL primeiro, depois os outros)."""
+    bases = list(dict.fromkeys([b for b in [os.environ.get("COBALT_URL"), *_COBALTS] if b]))
+    erros = []
+    for base in bases:
+        try:
+            return _download_via_um_cobalt(url, tmp_dir, base.rstrip("/"))
+        except Exception as e:
+            print(f"[cobalt] {base} falhou: {str(e)[:160]}")
+            erros.append(f"{base.split('//')[-1]}: {str(e)[:80]}")
+    raise Exception("CobaltError: " + " | ".join(erros))
+
+
+def _download_via_um_cobalt(url: str, tmp_dir: Path, cobalt_base: str) -> tuple[str, dict]:
     print(f"[cobalt] tentando: {cobalt_base}")
     resp = httpx.post(
         f"{cobalt_base}/",
@@ -1070,10 +1104,25 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
                         print(f"[pipeline] invidious falhou: {inv_err}")
                         _motivos.append("invidious: " + str(inv_err)[-100:])
 
+                # Fallback 5: gallery-dl (outro baixador; para o YouTube ele usa o mesmo motor do
+                # yt-dlp por dentro, então só ajuda quando o bloqueio é do jeito de pedir, não do IP)
+                if not fallback_ok:
+                    print(f"[pipeline] fallback 5: gallery-dl...")
+                    try:
+                        video_path = _download_via_gallery_dl(url, tmp_dir)
+                        video_id = _vid_id
+                        title = _vid_id
+                        video_duration = None
+                        fallback_ok = True
+                        print(f"[pipeline] gallery-dl OK")
+                    except Exception as gd_err:
+                        print(f"[pipeline] gallery-dl falhou: {gd_err}")
+                        _motivos.append("gallery-dl: " + str(gd_err)[-100:])
+
                 if not fallback_ok:
                     raise Exception(
                         "YouTubeBlockError: todos os métodos de download falharam "
-                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious). "
+                        "(yt-dlp, cobalt privado, cobalt público, piped, invidious, gallery-dl). "
                         + " | ".join(m.replace("\n", " ") for m in _motivos)[:1500]
                     )
 
