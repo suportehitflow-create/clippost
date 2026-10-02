@@ -35,6 +35,7 @@ import { Icone } from './icones';
 import Inspetor from './Inspetor';
 import Lateral from './Lateral';
 import { GavetaLog, ModalFormaExportar, type FormaExportar } from './Paineis';
+import { TelaExportando } from './TelaExportando';
 import ImportarPerfil from './ImportarPerfil';
 import BibliotecaMusicas from '@/components/musicas/BibliotecaMusicas';
 import { enviarMusicaNuvem, listarMusicas } from '@/lib/musicas';
@@ -175,6 +176,7 @@ export default function EditorMassa({
   musicasRef.current = musicas;
   const uploads = useRef(new Map<string, Promise<string>>());
   const cancelarUploads = useRef(new Map<string, () => void>());
+  const cancelouEnvio = useRef(false);
   const analisando = useRef(new Set<string>());
   const ultimoClicado = useRef<string | null>(null);
   const inputVideos = useRef<HTMLInputElement>(null);
@@ -946,14 +948,21 @@ export default function EditorMassa({
 
   const acompanhar = useCallback(async (abaId: string, nomeAba: string, jobId: string, forma: FormaExportar) => {
     let lidos = 0;
+    let falhasSeguidas = 0;
     const erros: string[] = [];
     for (;;) {
       await new Promise((r) => setTimeout(r, 900));
       let st;
       try {
         st = await api.statusJob(jobId, lidos);
+        falhasSeguidas = 0;
       } catch {
-        continue;
+        // servidor reiniciou ou a sessão caiu: depois de ~1 min sem resposta, sai da tela em vez de ficar parada
+        if (++falhasSeguidas < 60) continue;
+        api.controlarJob(jobId, 'cancelar').catch(() => {}); // se o servidor voltar, não deixa o job velho gastando CPU
+        setAbas((as) => as.map((a) => (a.id === abaId ? { ...a, processando: false, pausado: false, videos: a.videos.map((v) => ({ ...v, statusJob: null })) } : a)));
+        avisar('Perdi a conexão com o servidor. Entre de novo e exporte outra vez.');
+        return;
       }
       if (st.log.length) setLog((l) => [...l.slice(-1500), ...st.log]);
       st.log.forEach((l: string) => /ERRO|FALHA|falhou/i.test(l) && erros.push(l));
@@ -1004,6 +1013,7 @@ export default function EditorMassa({
     const g = globalRef.current;
     if (!templateRef.current) return avisar(carregandoTpl ? 'Espere o seu template carregar' : 'Não foi possível carregar o seu template — recarregue a página');
 
+    cancelouEnvio.current = false;
     setAbas((as) => as.map((a) => (a.id === aba.id ? { ...a, processando: true, pausado: false, videos: a.videos.map((v) => ({ ...v, statusJob: 'fila', progressoJob: 0 })) } : a)));
     try {
       setStatus('Enviando arquivos…');
@@ -1036,6 +1046,7 @@ export default function EditorMassa({
         }),
       );
 
+      if (cancelouEnvio.current) return;
       const job = await api.criarJob({ global: g, templateArquivoId, musicas: musicasMapa, videos, nomeAba: aba.nome });
       escreverLog(`[PROC] ${aba.nome}: ${videos.length} vídeo(s) enviados para processamento`);
       setAbas((as) => as.map((a) => (a.id === aba.id ? { ...a, jobId: job.id } : a)));
@@ -1056,7 +1067,13 @@ export default function EditorMassa({
 
   const cancelar = async () => {
     const jobId = abaAtiva.jobId;
-    if (!jobId || !window.confirm('Cancelar o processamento?')) return;
+    if (!window.confirm('Cancelar o processamento?')) return;
+    if (!jobId) {
+      // ainda enviando os arquivos: o job nem existe; avisa o processar() para parar antes de criá-lo
+      cancelouEnvio.current = true;
+      setAbas((as) => as.map((a) => (a.id === abaAtiva.id ? { ...a, processando: false, pausado: false, videos: a.videos.map((v) => ({ ...v, statusJob: null })) } : a)));
+      return;
+    }
     await api.controlarJob(jobId, 'cancelar').catch(() => {});
     await api.apagarProcessados(jobId).catch(() => {});
   };
@@ -1292,6 +1309,16 @@ export default function EditorMassa({
             setSobre(null);
             processar(forma);
           }}
+        />
+      )}
+      {abaAtiva.processando && (
+        <TelaExportando
+          nome={abaAtiva.nome}
+          videos={abaAtiva.videos}
+          pausado={abaAtiva.pausado}
+          temJob={!!abaAtiva.jobId}
+          pausar={pausar}
+          cancelar={cancelar}
         />
       )}
       {toast && <div className={s.toast}>{toast}</div>}

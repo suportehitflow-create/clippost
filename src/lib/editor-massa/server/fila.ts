@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import type { CriarJobPayload, ItemJobInfo, JobInfo, StatusJob } from '../types';
 import { gerarAntiDup } from './antidup';
@@ -34,7 +35,26 @@ interface EstadoFila {
 const g = globalThis as unknown as { __editorMassaFila?: EstadoFila };
 const estado: EstadoFila = (g.__editorMassaFila ??= { jobs: new Map(), rodando: 0, ultimaLimpeza: 0 });
 
-const CONCORRENCIA = Math.max(1, Number(process.env.EDITOR_MASSA_CONCURRENCIA || 2));
+// Dois limites: quantos vídeos são preparados ao mesmo tempo (detecção, legenda — espera de rede/IA) e
+// quantos codificam de uma vez (usa CPU). Preparar mais do que codificar mantém o FFmpeg sempre ocupado.
+// Dá para fixar com EDITOR_MASSA_CONCURRENCIA (codificações) .
+const CODIFICACOES = Math.max(1, Number(process.env.EDITOR_MASSA_CONCURRENCIA || Math.max(2, Math.min(5, Math.floor(os.cpus().length / 3)))));
+const CONCORRENCIA = CODIFICACOES + 3;
+
+let codificando = 0;
+const esperandoVaga: (() => void)[] = [];
+async function pegarVagaCodificar() {
+  if (codificando < CODIFICACOES) {
+    codificando++;
+    return;
+  }
+  await new Promise<void>((r) => esperandoVaga.push(r)); // a vaga passa direto para quem esperava
+}
+function soltarVagaCodificar() {
+  const prox = esperandoVaga.shift();
+  if (prox) prox();
+  else codificando--;
+}
 
 function hora() {
   return new Date().toLocaleTimeString('pt-BR', { hour12: false });
@@ -168,6 +188,7 @@ async function processarItem(job: Job, indice: number) {
   const controle = new AbortController();
   job.controladores.set(v.id, controle);
   const total = job.payload.videos.length;
+  let comVaga = false;
 
   try {
     const pasta = pastaJob(job.info.id);
@@ -239,6 +260,13 @@ async function processarItem(job: Job, indice: number) {
       }
     }
 
+    await pegarVagaCodificar();
+    comVaga = true;
+    // cancelou enquanto esperava a vaga: não gasta CPU codificando um vídeo descartado
+    if (job.cancelado) {
+      item.status = 'cancelado';
+      return;
+    }
     item.status = 'processando';
     for (const seguro of [false, true]) {
       const cmd = montarComando({
@@ -291,6 +319,7 @@ async function processarItem(job: Job, indice: number) {
     item.erro = String(e?.message ?? e);
     log(job, `[ERRO] ${v.nome} - ${item.erro}`);
   } finally {
+    if (comVaga) soltarVagaCodificar();
     job.controladores.delete(v.id);
   }
 }

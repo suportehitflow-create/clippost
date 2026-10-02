@@ -174,7 +174,7 @@ export function montarComando(e: EntradaFiltro): { args: string[]; duracaoSaida:
   else args.push('-an');
 
   args.push(
-    '-c:v', 'libx264', '-preset', process.env.EDITOR_MASSA_PRESET || 'veryfast', '-crf', String(crf),
+    '-c:v', 'libx264', '-preset', process.env.EDITOR_MASSA_PRESET || 'superfast', '-crf', String(crf),
     '-profile:v', 'high', '-level', '4.1', '-pix_fmt', 'yuv420p',
   );
   if (ad?.gop && !e.seguro) args.push('-g', String(ad.gop));
