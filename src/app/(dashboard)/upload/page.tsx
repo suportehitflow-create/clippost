@@ -188,6 +188,17 @@ function Conteudo() {
         router.push('/bulk?aba=editor')
         return
       }
+      // vídeo do YouTube com a extensão: entra na mesma fila do canal (baixa pelo navegador, que o
+      // YouTube não bloqueia, e o servidor fica de plano B) — direto pelo servidor ele costuma ser barrado
+      if (extensaoInstalada === true && idYouTube(url.trim())) {
+        let nome = 'Vídeo do YouTube'
+        try {
+          const oe = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url.trim())}&format=json`)
+          if (oe.ok) nome = (await oe.json()).title || nome
+        } catch {}
+        await cortesDoCanal([{ url: url.trim(), titulo: nome }], { nome, foto: null })
+        return
+      }
       router.push(`/project/${await criarCortes({ url: url.trim() })}`)
     } catch (e: any) {
       setErro(e.message || 'Falha ao iniciar.')
@@ -243,7 +254,7 @@ function Conteudo() {
     }
     if (!ids.length) throw new Error('Não deu para começar os cortes agora. Tente de novo.')
     const { data: lote, error } = await supabase.from('projects').insert({
-      user_id: user.id, title: `${origem.nome} · ${ids.length} vídeo${ids.length === 1 ? '' : 's'}`,
+      user_id: user.id, title: videos.length === 1 ? origem.nome : `${origem.nome} · ${ids.length} vídeo${ids.length === 1 ? '' : 's'}`,
       source_url: PREFIXO_LOTE + ids.join(','), source_type: 'url', status: 'processing',
     }).select('id').single()
     if (error || !lote) throw new Error(error?.message || 'Não deu para juntar os vídeos num lote.')
