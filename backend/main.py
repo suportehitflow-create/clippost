@@ -356,6 +356,7 @@ ALLOWED_ORIGINS = [
     "https://clippost-three.vercel.app",
     "https://clippost-silk.vercel.app",
     "https://clippost.vercel.app",
+    "https://clipost.clippost.workers.dev",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
