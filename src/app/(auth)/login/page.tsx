@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
 
+// Botões opcionais, OCULTOS em produção. O Google só funciona depois de ativar o provedor no Supabase +
+// Google Cloud (NEXT_PUBLIC_GOOGLE_AUTH=1). O login de teste usa credencial fixa: só para desenvolvimento
+// local (NEXT_PUBLIC_TEST_LOGIN=1), nunca em produção.
+const SHOW_GOOGLE = process.env.NEXT_PUBLIC_GOOGLE_AUTH === '1'
+const SHOW_TEST_LOGIN = process.env.NEXT_PUBLIC_TEST_LOGIN === '1'
+// As credenciais do login de teste NÃO ficam no código: só existem se definidas no .env.local de desenvolvimento.
+const TEST_EMAIL = process.env.NEXT_PUBLIC_TEST_EMAIL ?? ''
+const TEST_PASSWORD = process.env.NEXT_PUBLIC_TEST_PASSWORD ?? ''
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -57,15 +66,15 @@ export default function LoginPage() {
     
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: 'teste@clippost.com',
-        password: 'TestePassword123!',
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
       })
-      
+
       if (error) {
         if (error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')) {
           const signUpRes = await supabase.auth.signUp({
-            email: 'teste@clippost.com',
-            password: 'TestePassword123!',
+            email: TEST_EMAIL,
+            password: TEST_PASSWORD,
             options: {
               data: { full_name: 'Usuário de Teste' }
             }
@@ -109,7 +118,7 @@ export default function LoginPage() {
         </div>
 
         {/* 🌐 BOTÃO OFICIAL: LOGAR COM GOOGLE */}
-        <button
+        {SHOW_GOOGLE && <button
           type="button"
           onClick={handleGoogle}
           disabled={googleLoading}
@@ -122,10 +131,10 @@ export default function LoginPage() {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
           {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
-        </button>
+        </button>}
 
         {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE (CONTA DE TESTE) */}
-        <button
+        {SHOW_TEST_LOGIN && <button
           type="button"
           onClick={handleQuickTestLogin}
           disabled={testLoading}
@@ -139,14 +148,14 @@ export default function LoginPage() {
               <ArrowRight className="w-4 h-4" />
             </>
           )}
-        </button>
+        </button>}
 
-        {/* Divisor */}
-        <div className="flex items-center gap-3 mb-5">
+        {/* Divisor (só se houver outro botão acima) */}
+        {(SHOW_GOOGLE || SHOW_TEST_LOGIN) && <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-white/[0.08]" />
           <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou e-mail e senha</span>
           <div className="flex-1 h-px bg-white/[0.08]" />
-        </div>
+        </div>}
 
         {/* Formulário Tradicional */}
         <form onSubmit={handleSubmit} className="space-y-4">
