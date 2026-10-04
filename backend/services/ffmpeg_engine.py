@@ -406,7 +406,7 @@ def create_vertical_clip(
         if layout.get("enhanceAudio"):
             audio_filters.append(_ENHANCE_AUDIO)
         audio_filters += _edge_fades(out_duration)
-        filter_parts.append(f"{a_src}{','.join(audio_filters)}{'[voz]' if music_path else '[aout]'}")
+        filter_parts.append(f"{a_src}{','.join(audio_filters) or 'anull'}{'[voz]' if music_path else '[aout]'}")
         audio_map = "[aout]"
         last_video = "[base]"
 
@@ -425,6 +425,7 @@ def create_vertical_clip(
             input_files += ["-stream_loop", "-1", "-i", music_path]
             filter_parts.append(
                 f"[{next_input}:a]atrim=0:{out_duration:.3f},asetpts=PTS-STARTPTS,volume={volume:.2f},"
+                f"afade=t=in:st=0:d={min(fade, 0.5):.3f},"
                 f"afade=t=out:st={max(0.0, out_duration - fade):.3f}:d={fade:.3f}[mus]"
             )
             filter_parts.append("[voz][mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]")
@@ -456,6 +457,12 @@ def create_vertical_clip(
                 f":x=40:y=h-60:shadowcolor=black@0.6:shadowx=2:shadowy=2[wmout]"
             )
             last_video = "[wmout]"
+
+        # 7. Fade in no começo e fade out no fim do corte (transição suave entre cenas)
+        video_fades = _video_fades(out_duration)
+        if video_fades:
+            filter_parts.append(f"{last_video}{video_fades}[vfade]")
+            last_video = "[vfade]"
 
         filter_complex = ";".join(filter_parts)
 
@@ -489,15 +496,33 @@ def create_vertical_clip(
     return output_video
 
 
-FADE_SECONDS = 0.03
+# Fade in/out nas pontas de cada corte (vídeo e áudio): evita o corte seco entre cenas.
+# CLIP_FADE_SECONDS=0 desliga; mínimo útil ~0.03 (só tira o estalo do áudio).
+FADE_SECONDS = max(0.0, float(os.environ.get("CLIP_FADE_SECONDS", "0.4")))
+
+
+def _fade_len(out_duration: float) -> float:
+    """Nunca passa de 1/4 do corte, senão um corte curto ficaria quase todo em fade."""
+    return round(min(FADE_SECONDS, max(0.0, out_duration) / 4), 3)
 
 
 def _edge_fades(out_duration: float) -> list[str]:
-    """Fade de 30ms nas duas pontas: corte seco no áudio gera um estalo audível."""
+    """Fade de áudio nas duas pontas (também evita o estalo de um corte seco)."""
+    f = _fade_len(out_duration)
+    if f <= 0:
+        return []
     return [
-        f"afade=t=in:st=0:d={FADE_SECONDS}",
-        f"afade=t=out:st={max(0.0, out_duration - FADE_SECONDS):.3f}:d={FADE_SECONDS}",
+        f"afade=t=in:st=0:d={f}",
+        f"afade=t=out:st={max(0.0, out_duration - f):.3f}:d={f}",
     ]
+
+
+def _video_fades(out_duration: float) -> str:
+    """Fade de vídeo (a partir/para preto) nas duas pontas. Vazio se desligado."""
+    f = _fade_len(out_duration)
+    if f <= 0.05:
+        return ""
+    return f"fade=t=in:st=0:d={f},fade=t=out:st={max(0.0, out_duration - f):.3f}:d={f}"
 
 
 def _simple_render(input_video: str, output_video: str, start: float, duration: float):
@@ -506,8 +531,8 @@ def _simple_render(input_video: str, output_video: str, start: float, duration: 
     subprocess.run([
         "ffmpeg", "-y", "-threads", "2",
         "-ss", str(start), "-t", str(duration), "-i", input_video,
-        "-vf", "crop=ih*9/16:ih,scale=1080:1920",
-        "-af", ",".join(_edge_fades(duration)),
+        "-vf", ",".join(["crop=ih*9/16:ih", "scale=1080:1920"] + ([_video_fades(duration)] if _video_fades(duration) else [])),
+        *(["-af", ",".join(_edge_fades(duration))] if _edge_fades(duration) else []),
         "-vcodec", "libx264", "-preset", "superfast", "-crf", "28", "-maxrate", "1800k", "-bufsize", "3600k",
         "-acodec", "aac", "-b:a", "96k",
         "-movflags", "+faststart",
