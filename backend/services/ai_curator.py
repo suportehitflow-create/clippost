@@ -28,7 +28,7 @@ GEMINI_MODEL = os.environ.get("AI_CURATOR_MODEL", "gemini-flash-lite-latest")
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 # Groq
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
 # OpenRouter

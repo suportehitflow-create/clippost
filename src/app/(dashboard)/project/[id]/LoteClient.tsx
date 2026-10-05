@@ -242,7 +242,7 @@ export default function LoteClient({ lote }: { lote: { id: string; title: string
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] -mb-24 min-h-[620px] bg-[#0a0a0c]">
+    <div className="flex flex-col min-h-[100dvh] min-[901px]:h-[100dvh] -mb-24 min-[901px]:min-h-[620px] bg-[#0a0a0c]">
       <EstudioEditor
         projeto={projetoEstudio}
         titulo={`${lote.title} · ${resumo.replace(/^\d+ vídeos · /, '')}`}

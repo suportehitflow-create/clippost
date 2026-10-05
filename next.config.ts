@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // ffmpeg-static / ffprobe-static precisam ficar fora do bundle para o caminho do binário funcionar
-  serverExternalPackages: ["ffmpeg-static", "ffprobe-static"],
+  // No build do Worker (CF_BUILD=1) o editor em massa não roda aqui (fica na Fly), então não copiamos os binários.
+  serverExternalPackages: process.env.CF_BUILD ? [] : ["ffmpeg-static", "ffprobe-static"],
 
   // O editor em massa roda num servidor Node persistente (Fly) e a tela fica na Vercel:
   // as rotas dele precisam aceitar chamadas de outra origem. A autorização é por token

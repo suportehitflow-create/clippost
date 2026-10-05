@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "cf:build": "cross-env CF_BUILD=1 NEXT_PUBLIC_API_URL=https://clippost-backend.fly.dev NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFN6EKy78-R609vX NEXT_PUBLIC_APP_URL=https://clipost.clippost.workers.dev opennextjs-cloudflare build",
+    "cf:deploy": "npm run cf:build && wrangler deploy"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -20,19 +22,22 @@
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
     "lucide-react": "^1.39.0",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "stripe": "^22.6.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.147.0"
   },
   "allowScripts": {
     "ffmpeg-static@5.3.0": true

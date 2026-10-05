@@ -8,11 +8,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Faça login para continuar.' }, { status: 401 })
 
+  // O backend só aceita o pedido com o token de login do usuário
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) return NextResponse.json({ error: 'Sessão expirada. Entre de novo.' }, { status: 401 })
+
   try {
     const body = await req.json()
     const res = await fetch(`${BACKEND}/api/bulk/start`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ ...body, user_id: user.id }),
       signal: AbortSignal.timeout(25_000),
     })

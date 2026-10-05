@@ -1,9 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import TurnstileWidget, { TURNSTILE_SITE_KEY } from '@/components/auth/TurnstileWidget'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
+
+// O Google só funciona depois de ativar o provedor no Supabase + Google Cloud (NEXT_PUBLIC_GOOGLE_AUTH=1).
+// "Entrar como convidado" cria uma conta descartável no servidor; nenhuma senha fica no código.
+const SHOW_GOOGLE = process.env.NEXT_PUBLIC_GOOGLE_AUTH === '1'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,6 +17,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  // Anti-robô (Turnstile): o token vale uma vez, então o widget é recriado (captchaKey) depois de um erro
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -35,8 +43,8 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captcha ?? undefined } })
+    if (error) { setError(error.message); setLoading(false); setCaptcha(null); setCaptchaKey(k => k + 1); return }
     window.location.href = '/inicio'
   }
 
@@ -50,41 +58,19 @@ export default function LoginPage() {
     if (error) { setError(error.message); setGoogleLoading(false) }
   }
 
-  // 🧪 LOGIN REAL DA CONTA DE TESTE VIA SDK OFICIAL SUPABASE
+  // Convidado: o servidor cria uma conta descartável se a chave do convite estiver certa
   const handleQuickTestLogin = async () => {
     setTestLoading(true)
     setError('')
-    
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: 'teste@clippost.com',
-        password: 'TestePassword123!',
+      const r = await fetch('/api/convidado', {
+        method: 'POST',
       })
-      
-      if (error) {
-        if (error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')) {
-          const signUpRes = await supabase.auth.signUp({
-            email: 'teste@clippost.com',
-            password: 'TestePassword123!',
-            options: {
-              data: { full_name: 'Usuário de Teste' }
-            }
-          })
-          if (signUpRes.error) {
-            throw new Error(
-              'Conta de teste não configurada no Supabase. Execute o script 0009_test_user_seed.sql no painel do Supabase.'
-            )
-          }
-        } else {
-          throw error
-        }
-      }
-
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Não foi possível entrar como convidado.')
       window.location.href = '/inicio'
     } catch (err: any) {
-      console.error('Erro no login de teste:', err)
-      setError(err.message || 'Falha ao autenticar conta de teste.')
-    } finally {
+      setError(err.message || 'Não foi possível entrar como convidado.')
       setTestLoading(false)
     }
   }
@@ -109,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         {/* 🌐 BOTÃO OFICIAL: LOGAR COM GOOGLE */}
-        <button
+        {SHOW_GOOGLE && <button
           type="button"
           onClick={handleGoogle}
           disabled={googleLoading}
@@ -122,7 +108,7 @@ export default function LoginPage() {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
           {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
-        </button>
+        </button>}
 
         {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE (CONTA DE TESTE) */}
         <button
@@ -132,16 +118,16 @@ export default function LoginPage() {
           className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-indigo-600/30 disabled:opacity-60 cursor-pointer mb-5"
         >
           {testLoading ? (
-            'Autenticando via Supabase...'
+            'Criando seu acesso...'
           ) : (
             <>
-              <span>🧪 Entrar com Conta de Teste</span>
+              <span>Entrar como convidado</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
 
-        {/* Divisor */}
+        {/* Divisor (só se houver outro botão acima) */}
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-white/[0.08]" />
           <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou e-mail e senha</span>
@@ -173,6 +159,7 @@ export default function LoginPage() {
             />
           </div>
 
+          <TurnstileWidget key={captchaKey} onToken={setCaptcha} />
           {error && (
             <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
               {error}
@@ -181,7 +168,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (!!TURNSTILE_SITE_KEY && !captcha)}
             className="w-full py-3 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white font-semibold text-sm transition-all duration-200 disabled:opacity-60 cursor-pointer"
           >
             {loading ? 'Entrando...' : 'Entrar com Senha'}

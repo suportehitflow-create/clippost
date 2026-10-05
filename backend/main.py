@@ -356,6 +356,7 @@ ALLOWED_ORIGINS = [
     "https://clippost-three.vercel.app",
     "https://clippost-silk.vercel.app",
     "https://clippost.vercel.app",
+    "https://clipost.clippost.workers.dev",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -1068,8 +1069,11 @@ async def remover_watch(watch_id: str):
 
 
 @app.post("/api/process-url")
-async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
+async def process_url(req: ProcessRequest, request: Request, background_tasks: BackgroundTasks):
     from tasks import process_youtube_video
+    user = await _usuario_logado(request)  # exige login; o dono é o do token, não o user_id do corpo
+    req.user_id = user.id
+    await asyncio.to_thread(_checar_limites_de_uso, user.id, user.email, req.project_id)
     if CELERY_ENABLED:
         try:
             task = process_youtube_video.apply_async(args=[req.url, req.user_id, req.clip_duration, req.project_id, req.remove_silence, req.template_config])
@@ -1081,9 +1085,11 @@ async def process_url(req: ProcessRequest, background_tasks: BackgroundTasks):
 
 
 @app.post("/api/process-bulk")
-async def process_bulk(req: BulkProcessRequest, background_tasks: BackgroundTasks):
+async def process_bulk(req: BulkProcessRequest, request: Request, background_tasks: BackgroundTasks):
     from tasks import process_bulk_videos, process_youtube_video
     """Fila de processamento em massa — apenas Pro."""
+    user = await _usuario_logado(request)  # exige login; o dono é o do token, não o user_id do corpo
+    req.user_id = user.id
     if not req.urls:
         raise HTTPException(status_code=400, detail="Nenhuma URL fornecida")
     if len(req.urls) > 20:
@@ -1113,10 +1119,42 @@ async def instagram_list(req: InstagramListRequest):
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"
 
 
+MAX_PROJETOS_SIMULTANEOS = int(os.environ.get("MAX_PROJETOS_SIMULTANEOS", "2"))
+MAX_PROJETOS_POR_HORA = int(os.environ.get("MAX_PROJETOS_POR_HORA", "12"))
+
+
+def _checar_limites_de_uso(user_id: str, email: str | None, ignorar_projeto: str | None = None) -> None:
+    """Protege o servidor (1 máquina só): limita quantos vídeos cada conta processa ao mesmo tempo e por hora.
+    Administradores (ADMIN_EMAILS) não têm limite. Se o banco falhar, deixa passar para não travar todo mundo."""
+    from datetime import datetime, timedelta, timezone
+    admins = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+    if (email or "").lower() in admins:
+        return
+    agora = datetime.now(timezone.utc)
+    try:
+        na_hora = supabase.table("projects").select("id").eq("user_id", user_id) \
+            .gte("created_at", (agora - timedelta(hours=1)).isoformat()).execute().data or []
+        rodando = supabase.table("projects").select("id").eq("user_id", user_id).eq("status", "processing") \
+            .gte("updated_at", (agora - timedelta(minutes=30)).isoformat()).execute().data or []
+    except Exception as e:
+        print(f"[limites] não consegui checar o uso de {user_id}: {type(e).__name__}")
+        return
+    rodando = [r for r in rodando if r["id"] != ignorar_projeto]
+    if len(rodando) >= MAX_PROJETOS_SIMULTANEOS:
+        raise HTTPException(status_code=429, detail=f"Você já tem {len(rodando)} vídeo(s) em processamento. Espere terminar para criar outro.")
+    if len(na_hora) > MAX_PROJETOS_POR_HORA:
+        raise HTTPException(status_code=429, detail=f"Limite de {MAX_PROJETOS_POR_HORA} vídeos por hora atingido. Tente de novo mais tarde.")
+
+
 @app.post("/api/jobs")
-async def create_job(req: ProcessRequest, background_tasks: BackgroundTasks):
+async def create_job(req: ProcessRequest, request: Request, background_tasks: BackgroundTasks):
     from tasks import process_youtube_video
     """Dispara processamento: Celery se CELERY_ENABLED=true, senão BackgroundTasks."""
+    # Quem manda é o dono do token de login, nunca o user_id do corpo: sem isso qualquer pessoa na internet
+    # dispararia downloads e renderizações pesadas aqui em nome de outro usuário.
+    user = await _usuario_logado(request)
+    req.user_id = user.id
+    await asyncio.to_thread(_checar_limites_de_uso, user.id, user.email, req.project_id)
     if req.project_id:
         try:
             supabase.table("projects").update({"status": "processing"}).eq("id", req.project_id).execute()
@@ -1154,9 +1192,11 @@ class BulkStartRequest(BaseModel):
 
 
 @app.post("/api/bulk/start")
-async def bulk_start(req: BulkStartRequest, background_tasks: BackgroundTasks):
+async def bulk_start(req: BulkStartRequest, request: Request, background_tasks: BackgroundTasks):
     """Edição em massa: aplica o template em cada vídeo inteiro de um perfil ou dos arquivos enviados."""
     from bulk_tasks import create_batch, run_batch
+    user = await _usuario_logado(request)  # exige login; o dono é o do token, não o user_id do corpo
+    req.user_id = user.id
     if req.source == "profile" and not (req.profile_url or "").strip():
         raise HTTPException(status_code=400, detail="Informe o link do perfil.")
     if req.source == "files" and not req.videos:

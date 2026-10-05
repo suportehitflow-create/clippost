@@ -4,7 +4,7 @@
 
 (() => {
   const APP_ID = '936619743392459' // id público do app web do Instagram (vai em todo request do site)
-  const CLIPOST = 'https://clippost-three.vercel.app'
+  const CLIPOST = 'https://clipost.clippost.workers.dev'
   const RESERVADAS = new Set(['', 'p', 'reel', 'reels', 'explore', 'stories', 'direct', 'accounts', 'about', 'developer', 'legal', 'tv'])
   const esperar = ms => new Promise(r => setTimeout(r, ms))
 

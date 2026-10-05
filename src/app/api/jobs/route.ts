@@ -9,6 +9,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
+    // O backend só aceita o pedido com o token de login do usuário (e usa o dono do token, não o corpo)
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      return NextResponse.json({ error: 'Sessão expirada. Entre de novo.' }, { status: 401 })
+    }
+
     const body = await req.json()
     body.user_id = user.id
     const flyUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clippost-backend.fly.dev'
@@ -18,13 +25,19 @@ export async function POST(req: NextRequest) {
     // o pipeline e responde em segundos.
     const res = await fetch(`${flyUrl}/api/jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(25_000),
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
       console.warn('[jobs] backend recusou:', res.status, detail.slice(0, 300))
+      // Limite de uso ou login inválido: mostra ao usuário a mensagem real, não um erro genérico
+      if (res.status === 429 || res.status === 401) {
+        let msg = ''
+        try { msg = JSON.parse(detail).detail } catch { /* corpo não era JSON */ }
+        return NextResponse.json({ error: msg || 'Não foi possível iniciar agora. Tente novamente.' }, { status: res.status })
+      }
       return NextResponse.json(
         { error: `O servidor de processamento recusou o pedido (${res.status}). Tente novamente.` },
         { status: 502 },
