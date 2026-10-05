@@ -6,14 +6,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
 
-// Botões opcionais, OCULTOS em produção. O Google só funciona depois de ativar o provedor no Supabase +
-// Google Cloud (NEXT_PUBLIC_GOOGLE_AUTH=1). O login de teste usa credencial fixa: só para desenvolvimento
-// local (NEXT_PUBLIC_TEST_LOGIN=1), nunca em produção.
+// O Google só funciona depois de ativar o provedor no Supabase + Google Cloud (NEXT_PUBLIC_GOOGLE_AUTH=1).
+// O botão "Entrar como convidado" só aparece em um link com a chave do convite (/login?convidado=CHAVE);
+// a chave é validada no servidor e nenhuma senha fica no código.
 const SHOW_GOOGLE = process.env.NEXT_PUBLIC_GOOGLE_AUTH === '1'
-const SHOW_TEST_LOGIN = process.env.NEXT_PUBLIC_TEST_LOGIN === '1'
-// As credenciais do login de teste NÃO ficam no código: só existem se definidas no .env.local de desenvolvimento.
-const TEST_EMAIL = process.env.NEXT_PUBLIC_TEST_EMAIL ?? ''
-const TEST_PASSWORD = process.env.NEXT_PUBLIC_TEST_PASSWORD ?? ''
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -21,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
+  const [chaveConvite, setChaveConvite] = useState('')
   const [googleLoading, setGoogleLoading] = useState(false)
   // Anti-robô (Turnstile): o token vale uma vez, então o widget é recriado (captchaKey) depois de um erro
   const [captcha, setCaptcha] = useState<string | null>(null)
@@ -34,6 +31,8 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem("clippost_demo_auth")
     }
+
+    setChaveConvite(new URLSearchParams(window.location.search).get('convidado') ?? '')
 
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -63,41 +62,20 @@ export default function LoginPage() {
     if (error) { setError(error.message); setGoogleLoading(false) }
   }
 
-  // 🧪 LOGIN REAL DA CONTA DE TESTE VIA SDK OFICIAL SUPABASE
+  // Convidado: o servidor cria uma conta descartável se a chave do convite estiver certa
   const handleQuickTestLogin = async () => {
     setTestLoading(true)
     setError('')
-    
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: TEST_EMAIL,
-        password: TEST_PASSWORD,
+      const r = await fetch('/api/convidado', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: chaveConvite }),
       })
-
-      if (error) {
-        if (error.message.toLowerCase().includes('invalid') || error.message.toLowerCase().includes('credentials')) {
-          const signUpRes = await supabase.auth.signUp({
-            email: TEST_EMAIL,
-            password: TEST_PASSWORD,
-            options: {
-              data: { full_name: 'Usuário de Teste' }
-            }
-          })
-          if (signUpRes.error) {
-            throw new Error(
-              'Conta de teste não configurada no Supabase. Execute o script 0009_test_user_seed.sql no painel do Supabase.'
-            )
-          }
-        } else {
-          throw error
-        }
-      }
-
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Não foi possível entrar como convidado.')
       window.location.href = '/inicio'
     } catch (err: any) {
-      console.error('Erro no login de teste:', err)
-      setError(err.message || 'Falha ao autenticar conta de teste.')
-    } finally {
+      setError(err.message || 'Não foi possível entrar como convidado.')
       setTestLoading(false)
     }
   }
@@ -138,24 +116,24 @@ export default function LoginPage() {
         </button>}
 
         {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE (CONTA DE TESTE) */}
-        {SHOW_TEST_LOGIN && <button
+        {!!chaveConvite && <button
           type="button"
           onClick={handleQuickTestLogin}
           disabled={testLoading}
           className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-indigo-600/30 disabled:opacity-60 cursor-pointer mb-5"
         >
           {testLoading ? (
-            'Autenticando via Supabase...'
+            'Criando seu acesso...'
           ) : (
             <>
-              <span>🧪 Entrar com Conta de Teste</span>
+              <span>Entrar como convidado</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>}
 
         {/* Divisor (só se houver outro botão acima) */}
-        {(SHOW_GOOGLE || SHOW_TEST_LOGIN) && <div className="flex items-center gap-3 mb-5">
+        {(SHOW_GOOGLE || !!chaveConvite) && <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-white/[0.08]" />
           <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou e-mail e senha</span>
           <div className="flex-1 h-px bg-white/[0.08]" />
