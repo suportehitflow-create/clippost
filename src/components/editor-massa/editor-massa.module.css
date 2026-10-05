@@ -2228,3 +2228,92 @@
   left: 38px;
   z-index: 14;
 }
+
+/* ================= CELULAR: ajustes finais =================
+   Fica no FIM do arquivo de propósito: as regras da barra de ferramentas e da gaveta são definidas depois do
+   bloco responsivo lá de cima e o anulariam. Cobre telas de até 900px (celular e tablet pequeno). */
+@media (max-width: 900px) {
+  /* a página CRESCE e rola (no desktop o editor ocupa a tela toda com altura fixa) */
+  .raiz {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    width: 100%;
+    max-width: 100vw;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  /* a coluna única precisa de minmax(0,1fr); com só 1fr ela cresce até o tamanho do conteúdo e vaza da tela */
+  .corpo {
+    grid-template-columns: minmax(0, 1fr) !important; /* vence o estilo inline do desktop */
+    height: auto;
+  }
+  .corpo > * {
+    min-width: 0;
+    min-height: auto;
+    height: auto;
+  }
+
+  /* barra de ferramentas (Modelos, Texto, Legenda…): vira uma faixa horizontal rolável */
+  .barraTrilhoContainer {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--linha);
+  }
+  .trilho {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 10px;
+    border-right: 0;
+    gap: 6px;
+  }
+  .btnTrilho {
+    flex: 0 0 auto;
+    width: 64px;
+  }
+  /* painel da ferramenta aberta: largura total, rola por dentro se for alto */
+  .gaveta {
+    width: 100%;
+    height: auto;
+    max-height: 60vh;
+    border-right: 0;
+    border-top: 1px solid var(--linha);
+  }
+
+  /* lista de cortes: faixa horizontal com rolagem (em vez de cards enormes empilhados) */
+  .area {
+    min-height: 0;
+  }
+  .areaCabeca {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .grade {
+    display: flex;
+    flex: none;
+    height: auto;
+    max-height: none;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px 12px 16px;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 12px;
+  }
+  .grade > * {
+    flex: 0 0 min(62vw, 240px);
+    scroll-snap-align: start;
+  }
+
+  /* prévia do vídeo: respeita a largura da tela */
+  .inspetor {
+    padding-bottom: 96px; /* espaço para o dock de navegação fixo embaixo */
+  }
+}

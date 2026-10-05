@@ -120,6 +120,15 @@ export default function EditorMassa({
 } = {}) {
   const [emMassa, setEmMassa] = useState(true);
   const [larguraLateral, setLarguraLateral] = useState(330);
+  // true em tela de celular/tablet pequeno (mesmo ponto de corte do CSS responsivo)
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const atualizar = () => setCelular(mq.matches);
+    atualizar();
+    mq.addEventListener('change', atualizar);
+    return () => mq.removeEventListener('change', atualizar);
+  }, []);
   const [lateralRecolhida, setLateralRecolhida] = useState(false);
   const [ferramentaAtiva, setFerramentaAtiva] = useState<string | null>(null);
   const [global, setGlobal] = useState<ConfigGlobal>(configGlobalPadrao);
@@ -1206,7 +1215,8 @@ export default function EditorMassa({
       {/* ================= corpo com largura dinâmica da lateral ================= */}
       <div
         className={s.corpo}
-        style={{
+        // No celular (<=900px) as colunas empilham pelo CSS; o estilo inline venceria a regra, então só vale no desktop.
+        style={celular ? undefined : {
           gridTemplateColumns: `${lateralRecolhida ? '0px' : (ferramentaAtiva ? '388px' : '68px')} minmax(0, 1fr) 390px`,
           transition: 'grid-template-columns 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
