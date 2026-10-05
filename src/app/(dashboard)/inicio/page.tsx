@@ -23,6 +23,7 @@ import {
   Radio,
   CheckCircle2,
   Bot,
+  GalleryHorizontal,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -45,6 +46,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   // os 3 principais
   { capa: 'cortes', title: 'Criar cortes', description: 'Vídeo vira cortes; canal ou perfil traz os vídeos em massa — e pode automatizar os próximos.', href: '/upload', icon: Scissors, cor: '99,102,241', inteiro: true },
+  { capa: 'carrosseis', title: 'Carrosséis', description: 'Podcast, vídeo, artigo ou post vira carrosséis prontos: a IA acha os insights, escreve e monta no seu template.', href: '/carrosseis', icon: GalleryHorizontal, cor: '14,165,233', badge: 'Novo' },
   { capa: 'templates', title: 'Identidade Visual', description: 'O template de cada perfil: nome, foto, fontes, cores, marca d’água e estilo da legenda.', href: '/templates', icon: Sparkles, cor: '236,72,153' },
   { capa: 'calendario', title: 'Calendário', description: 'Agende em massa nas redes do perfil e acompanhe o que foi publicado.', href: '/schedule', icon: Calendar, cor: '245,158,11' },
   { capa: 'biblioteca', title: 'Biblioteca', description: 'Todos os seus cortes e vídeos exportados, com a ferramenta que gerou cada um.', href: '/dashboard', icon: FolderOpen, cor: '161,161,170' },

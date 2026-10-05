@@ -54,3 +54,6 @@ backend/.claude/
 
 .open-next
 .wrangler
+
+# Prompts privados (comprados/autorais): ficam só na máquina, nunca no repositório público
+backend/prompts/privado/

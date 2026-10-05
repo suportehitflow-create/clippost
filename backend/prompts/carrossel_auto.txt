@@ -1,0 +1,45 @@
+{especificacao}
+
+=====================================================================
+MODO AUTOMÁTICO DO CLIPOST (vale acima do fluxo interativo descrito acima)
+=====================================================================
+Não existe usuário nesta conversa: não há "Iniciar Experiência", "ok", escolha de headline nem escolha de template.
+Execute internamente, nesta ordem e em uma única resposta:
+1. Etapa 1 — Triagem (Transformação, Fricção central, Ângulo narrativo dominante, Evidências do insumo).
+2. Etapa 2 — 10 headlines, cada uma com linha 1 (captura, termina com "?" ou ":") e linha 2 (ancoragem, termina com "." ou "!"), seguindo a distribuição e as regras de qualidade.
+3. Escolha VOCÊ a headline mais forte (a que mais interrompe o scroll e mais ancora na tese, sem prometer o que o insumo não sustenta).
+4. Etapa 3 — Espinha dorsal (Hook, Mecanismo, Prova, Aplicação, Direção) a partir da headline escolhida.
+5. Etapa 5 — Render final no template: {template_nome}, com EXATAMENTE {blocos} textos.
+
+Regras do render para virar slide:
+- Os textos são distribuídos assim nos slides: {distribuicao}
+- O texto 1 e o texto 2 formam a capa: texto 1 = linha 1 da headline escolhida; texto 2 = linha 2.
+- Em slides com dois textos, o primeiro é o título do slide (curto, até {max_titulo} palavras) e o segundo é o corpo (até {max_corpo} palavras).
+- Em slides com um texto só, até {max_unico} palavras.
+- O título de cada slide é uma frase de CONTEÚDO, nunca um rótulo da estrutura: proibido usar como título palavras como "Mecanismo", "Prova", "Aplicação", "Direção", "Hook", "Conclusão", "Introdução", "Contexto", "Resumo" ou variações ("O mecanismo da perda", "Conclusão estrutural").
+- Cada slide precisa trazer informação nova e concreta do insumo (número, exemplo, fala, consequência); nada de frase genérica que caberia em qualquer tema.
+- Nada de 2ª pessoa, de metalinguagem, de sugestão de imagem/design, nem do termo "cena".
+- Não invente fatos: use somente o que está no insumo.
+- Português do Brasil, com acentuação correta.
+
+Além do carrossel, gere:
+- "legenda": legenda para o post (2 a 4 frases curtas que puxam a leitura, sem 2ª pessoa) + 3 a 5 hashtags relevantes no final.
+
+Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois, neste formato:
+{{
+  "triagem": {{"transformacao": "...", "friccao": "...", "angulo": "...", "evidencias": "..."}},
+  "headlines": [{{"linha1": "...", "linha2": "..."}}, ... 10 itens],
+  "escolhida": <número de 1 a 10>,
+  "espinha": {{"hook": "...", "mecanismo": "...", "prova": "...", "aplicacao": "...", "direcao": "..."}},
+  "blocos": ["texto 1 sem o prefixo", "texto 2 sem o prefixo", ... exatamente {blocos} itens],
+  "legenda": "..."
+}}
+
+INSUMO
+Fonte: {fonte_titulo}
+Assunto: {titulo_interno}
+Tese: {tese}
+Evidências: {evidencias}
+
+Trecho do conteúdo original:
+{trecho}

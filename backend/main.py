@@ -1808,6 +1808,114 @@ async def frases_status(job_id: str, request: Request):
     return st
 
 
+def _marca_do_usuario(user_id: str) -> dict:
+    """Identidade do template de corte (brand kit) reaproveitada nos carrosséis: foto, nome, @, selo, fundo."""
+    try:
+        bk = maybe_one(supabase.table("brand_kits").select("*").eq("user_id", user_id)).data or {}
+    except Exception:
+        bk = {}
+    cfg = bk.get("layout_config") or {}
+    nome = cfg.get("brandName") if cfg.get("brandName") not in (None, "", "Nome da Página") else ""
+    arroba = cfg.get("brandHandle") if cfg.get("brandHandle") not in (None, "", "@nomedapagina") else bk.get("username")
+    return {"nome": nome or (arroba or "").lstrip("@"), "arroba": arroba or "", "avatar_url": bk.get("avatar_url"),
+            "fundo": cfg.get("templateBg") or "dark", "selo": cfg.get("showVerifiedBadge", True) is not False,
+            "destaque": cfg.get("highlightColor") or cfg.get("accentColor")}
+
+
+@app.post("/api/carrosseis/gerar")
+async def carrosseis_gerar(request: Request):
+    """Carrosséis automáticos. Corpo: { fontes: [link ou texto], template: principal|autoral|futurista|twitter,
+    quantidade: "auto"|1..8 (por fonte), imagens: algumas|capa|nenhuma, marca?: {nome, arroba, avatar_url, fundo} }"""
+    user = await _usuario_logado(request)
+    body = await request.json()
+    if not [f for f in body.get("fontes") or [] if str(f).strip()]:
+        raise HTTPException(status_code=400, detail="Cole pelo menos um link ou um texto.")
+    from services import carrosseis
+    marca = await asyncio.to_thread(_marca_do_usuario, user.id)
+    # o navegador só pode ajustar texto/cor da marca; a foto vem do brand kit (nada de URL arbitrária → SSRF)
+    marca.update({k: str(v)[:80] for k, v in (body.get("marca") or {}).items()
+                  if k in ("nome", "arroba", "fundo", "destaque") and v not in (None, "")})
+    try:
+        job_id = carrosseis.iniciar(user.id, {**body, "marca": marca}, supabase)
+    except carrosseis.Ocupado as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"job_id": job_id}
+
+
+@app.get("/api/carrosseis/job/{job_id}")
+async def carrosseis_status(job_id: str, request: Request):
+    user = await _usuario_logado(request)
+    from services import carrosseis
+    st = carrosseis.status(job_id, user.id)
+    if st is None:
+        raise HTTPException(status_code=404, detail="Geração não encontrada (o servidor pode ter reiniciado).")
+    return st
+
+
+@app.get("/api/carrosseis")
+async def carrosseis_listar(request: Request):
+    user = await _usuario_logado(request)
+    linhas = await asyncio.to_thread(lambda: supabase.table("carousels").select(
+        "id,title,caption,template,source_url,slides,created_at,project_id").eq("user_id", user.id)
+        .order("created_at", desc=True).limit(100).execute().data or [])
+    return {"carrosseis": linhas}
+
+
+@app.delete("/api/carrosseis/{carrossel_id}")
+async def carrosseis_apagar(carrossel_id: str, request: Request):
+    user = await _usuario_logado(request)
+
+    def apagar():
+        c = maybe_one(supabase.table("carousels").select("id,slides").eq("id", carrossel_id).eq("user_id", user.id)).data
+        if not c:
+            return False
+        from services import armazenamento as _arm
+        try:
+            _arm.apagar([s.get("url") for s in (c.get("slides") or []) if s.get("url")])
+        except Exception as e:
+            print(f"[carrossel] apagar arquivos: {type(e).__name__}")
+        supabase.table("carousels").delete().eq("id", carrossel_id).eq("user_id", user.id).execute()
+        return True
+
+    if not await asyncio.to_thread(apagar):
+        raise HTTPException(status_code=404, detail="Carrossel não encontrado.")
+    return {"ok": True}
+
+
+@app.get("/api/carrosseis/{carrossel_id}/zip")
+async def carrosseis_zip(carrossel_id: str, request: Request):
+    """Os slides do carrossel num .zip (01.png, 02.png, ...) + a legenda em legenda.txt."""
+    user = await _usuario_logado(request)
+    import io as _io
+    import zipfile
+    import httpx
+    from fastapi.responses import Response
+
+    def montar() -> tuple[bytes, str] | None:
+        c = maybe_one(supabase.table("carousels").select("title,caption,slides").eq("id", carrossel_id).eq("user_id", user.id)).data
+        if not c:
+            return None
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z, httpx.Client(timeout=60, follow_redirects=True) as cli:
+            for n, s in enumerate(c.get("slides") or [], 1):
+                r = cli.get(s["url"])
+                r.raise_for_status()
+                z.writestr(f"{n:02d}.png", r.content)
+            if c.get("caption"):
+                z.writestr("legenda.txt", c["caption"])
+        nome = re.sub(r"[^\w\- ]+", "", (c.get("title") or "carrossel"))[:50].strip().replace(" ", "_") or "carrossel"
+        return buf.getvalue(), nome
+
+    res = await asyncio.to_thread(montar)
+    if not res:
+        raise HTTPException(status_code=404, detail="Carrossel não encontrado.")
+    dados, nome = res
+    return Response(content=dados, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}.zip"'})
+
+
 @app.post("/api/tools/raio-x-pagina")
 async def ferramenta_raio_x_pagina(request: Request):
     """Painel da página (estilo Insights): KPIs, melhor horário, formato campeão, séries por dia,
