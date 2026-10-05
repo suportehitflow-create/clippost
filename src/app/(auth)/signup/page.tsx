@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import TurnstileWidget, { TURNSTILE_SITE_KEY } from '@/components/auth/TurnstileWidget'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -14,6 +15,10 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [aceito, setAceito] = useState(false)
+  // Anti-robô (Turnstile): o token vale uma vez, então o widget é recriado (captchaKey) depois de um erro
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -23,9 +28,9 @@ export default function SignupPage() {
     setError('')
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: name } }
+      options: { data: { full_name: name }, captchaToken: captcha ?? undefined }
     })
-    if (error) { setError(error.message); setLoading(false); return }
+    if (error) { setError(error.message); setLoading(false); setCaptcha(null); setCaptchaKey(k => k + 1); return }
     router.push('/inicio')
   }
 
@@ -104,6 +109,20 @@ export default function SignupPage() {
               className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition-all"
             />
           </div>
+          <label className="flex items-start gap-2.5 text-[11px] leading-snug text-zinc-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={aceito}
+              onChange={e => setAceito(e.target.checked)}
+              required
+              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-500"
+            />
+            <span>
+              Li e concordo com os <Link href="/termos" target="_blank" className="text-indigo-400 hover:text-indigo-300 underline">Termos de Uso</Link> e
+              a <Link href="/privacidade" target="_blank" className="text-indigo-400 hover:text-indigo-300 underline">Política de Privacidade</Link>.
+            </span>
+          </label>
+          <TurnstileWidget key={captchaKey} onToken={setCaptcha} />
           {error && (
             <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
               {error}
@@ -111,7 +130,7 @@ export default function SignupPage() {
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !aceito || (!!TURNSTILE_SITE_KEY && !captcha)}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-indigo-600/30 disabled:opacity-60 cursor-pointer"
           >
             {loading ? 'Criando conta...' : 'Criar Conta Grátis'}

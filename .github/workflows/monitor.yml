@@ -1,0 +1,34 @@
+name: Monitor de saúde
+
+# A cada 30 minutos confere se o site, o backend e o editor respondem. Se algum falhar, o job fica vermelho e o
+# GitHub avisa por e-mail quem mantém o repositório (Settings > Notifications). Não usa nenhum segredo.
+# Obs.: o GitHub desliga agendamentos em repositório sem atividade por 60 dias; um push religa.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  saude:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Site, backend e editor respondem?
+        run: |
+          falhou=0
+          checa() {
+            # tenta 2 vezes para não alarmar por um tropeço de rede
+            for t in 1 2; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$2")
+              [ "$code" = "$3" ] && { echo "OK      $1 ($code)"; return; }
+              sleep 5
+            done
+            echo "FALHOU  $1 -> $code (esperado $3)"; falhou=1
+          }
+          checa "Site (login)"      https://clipost.clippost.workers.dev/login 200
+          checa "Backend (health)"  https://clippost-backend.fly.dev/health 200
+          checa "Editor em massa"   https://clippost-editor.fly.dev/api/editor-massa/saude 200
+          exit $falhou

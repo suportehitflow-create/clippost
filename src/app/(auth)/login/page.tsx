@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import TurnstileWidget, { TURNSTILE_SITE_KEY } from '@/components/auth/TurnstileWidget'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
@@ -21,6 +22,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  // Anti-robô (Turnstile): o token vale uma vez, então o widget é recriado (captchaKey) depois de um erro
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -44,8 +48,8 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captcha ?? undefined } })
+    if (error) { setError(error.message); setLoading(false); setCaptcha(null); setCaptchaKey(k => k + 1); return }
     window.location.href = '/inicio'
   }
 
@@ -182,6 +186,7 @@ export default function LoginPage() {
             />
           </div>
 
+          <TurnstileWidget key={captchaKey} onToken={setCaptcha} />
           {error && (
             <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
               {error}
@@ -190,7 +195,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (!!TURNSTILE_SITE_KEY && !captcha)}
             className="w-full py-3 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white font-semibold text-sm transition-all duration-200 disabled:opacity-60 cursor-pointer"
           >
             {loading ? 'Entrando...' : 'Entrar com Senha'}
