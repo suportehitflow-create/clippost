@@ -916,7 +916,9 @@ def process_youtube_video(url: str, user_id: str, clip_duration: str = "auto", p
         _ydl_base = {
             # H.264 primeiro: o YouTube costuma entregar AV1, que é muito lento de abrir quadro a quadro
             # (achar o rosto levava ~1 min por corte); AV1/VP9 só se não houver H.264
-            'format': 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best/18',
+            # Áudio ORIGINAL primeiro: o YouTube oferece faixas dubladas (inglês/espanhol "dubbed-auto") no mesmo
+            # vídeo e, sem esse filtro, o download pegava a dublagem em vez da fala do vídeo
+            'format': 'bestvideo[height<=1080][vcodec^=avc1]+bestaudio[format_note*=original][ext=m4a]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio[format_note*=original]/bestvideo[height<=1080]+bestaudio[format_note*=original]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best/18',
             'outtmpl': str(tmp_dir / "original.%(ext)s"),
             'noprogress': True,
             'noplaylist': True,
@@ -1641,7 +1643,7 @@ def rerender_clip_task(clip_id: str, subtitle_preset: str, subtitle_y: float | N
                 _fallback_cookies if os.path.exists(_fallback_cookies) else None
             )
             ydl_opts = {
-                "format": "bestvideo[height<=720][vcodec^=avc1]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+                "format": "bestvideo[height<=720][vcodec^=avc1]+bestaudio[format_note*=original]/bestvideo[height<=720]+bestaudio[format_note*=original]/bestvideo[height<=720][vcodec^=avc1]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
                 "outtmpl": str(tmp_dir / "raw.%(ext)s"),
                 "merge_output_format": "mp4",
                 "quiet": True,

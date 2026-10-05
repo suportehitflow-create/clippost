@@ -88,11 +88,12 @@ def baixar(url: str, pasta: Path, formato: str = "mp4", altura: int | None = Non
     pasta.mkdir(parents=True, exist_ok=True)
     base = {**_opcoes_base(), "outtmpl": str(pasta / "arquivo.%(ext)s")}
     if formato == "mp3":
-        opts = {**base, "format": "bestaudio/best",
+        opts = {**base, "format": "bestaudio[format_note*=original]/bestaudio/best",
                 "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]}
     else:
         limite = f"[height<={int(altura)}]" if altura else ""
-        opts = {**base, "format": f"bv*{limite}[vcodec^=avc1]+ba[ext=m4a]/bv*{limite}[ext=mp4]+ba[ext=m4a]/bv*{limite}+ba/b{limite}/b",
+        # sempre a faixa de áudio original (o YouTube mistura dublagens automáticas no mesmo vídeo)
+        opts = {**base, "format": f"bv*{limite}[vcodec^=avc1]+ba[format_note*=original][ext=m4a]/bv*{limite}[vcodec^=avc1]+ba[format_note*=original]/bv*{limite}+ba[format_note*=original]/bv*{limite}[vcodec^=avc1]+ba[ext=m4a]/bv*{limite}[ext=mp4]+ba[ext=m4a]/bv*{limite}+ba/b{limite}/b",
                 "merge_output_format": "mp4"}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
