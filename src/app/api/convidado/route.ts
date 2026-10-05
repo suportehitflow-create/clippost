@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdmin } from '@supabase/supabase-js'
 import { createClient as createSession } from '@/lib/supabase/server'
 
-// Conta de convidado para testes: só funciona com a chave secreta DEMO_KEY (segredo do Worker, nunca no código).
-// Cada clique cria uma conta nova e descartável com senha aleatória, então nada fixo fica no repositório público.
+// "Entrar como convidado": cria uma conta descartável com senha aleatória (nada fixo no repositório público).
+// Plano sem limite de cortes: uso de teste. Antes de divulgar o site, voltar ao plano grátis ou remover o botão.
 export async function POST(req: NextRequest) {
-  const esperada = process.env.DEMO_KEY || ''
-  const { key } = await req.json().catch(() => ({ key: '' }))
-  if (!esperada || typeof key !== 'string' || key !== esperada) {
-    return NextResponse.json({ error: 'Convite inválido.' }, { status: 403 })
+  // só aceita pedidos vindos do próprio site (barra chamadas de scripts em outros domínios)
+  const origem = req.headers.get('origin')
+  if (!origem || new URL(origem).host !== req.nextUrl.host) {
+    return NextResponse.json({ error: 'Pedido não permitido.' }, { status: 403 })
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const admin = createAdmin(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
+  const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
   const email = `convidado-${id}@clipost.app`
   const password = crypto.randomUUID() + crypto.randomUUID()
@@ -22,7 +21,7 @@ export async function POST(req: NextRequest) {
   })
   if (error || !data.user) return NextResponse.json({ error: 'Não foi possível criar o convidado.' }, { status: 500 })
 
-  // plano sem limite de cortes, só para o teste (o limite de vídeos por hora do servidor continua valendo)
+  // só duas pessoas usam o site por enquanto: convidado sem limite de cortes (revisar antes de abrir ao público)
   await admin.from('user_plans').upsert(
     { user_id: data.user.id, plan: 'pro', clips_used_this_month: 0, clips_limit: 999999 },
     { onConflict: 'user_id' },

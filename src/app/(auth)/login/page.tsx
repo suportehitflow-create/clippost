@@ -7,8 +7,7 @@ import Link from 'next/link'
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
 
 // O Google só funciona depois de ativar o provedor no Supabase + Google Cloud (NEXT_PUBLIC_GOOGLE_AUTH=1).
-// O botão "Entrar como convidado" só aparece em um link com a chave do convite (/login?convidado=CHAVE);
-// a chave é validada no servidor e nenhuma senha fica no código.
+// "Entrar como convidado" cria uma conta descartável no servidor; nenhuma senha fica no código.
 const SHOW_GOOGLE = process.env.NEXT_PUBLIC_GOOGLE_AUTH === '1'
 
 export default function LoginPage() {
@@ -17,7 +16,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
-  const [chaveConvite, setChaveConvite] = useState('')
   const [googleLoading, setGoogleLoading] = useState(false)
   // Anti-robô (Turnstile): o token vale uma vez, então o widget é recriado (captchaKey) depois de um erro
   const [captcha, setCaptcha] = useState<string | null>(null)
@@ -31,8 +29,6 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem("clippost_demo_auth")
     }
-
-    setChaveConvite(new URLSearchParams(window.location.search).get('convidado') ?? '')
 
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -68,8 +64,7 @@ export default function LoginPage() {
     setError('')
     try {
       const r = await fetch('/api/convidado', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: chaveConvite }),
+        method: 'POST',
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Não foi possível entrar como convidado.')
@@ -116,7 +111,7 @@ export default function LoginPage() {
         </button>}
 
         {/* 🚀 BOTÃO DE ACESSO RÁPIDO DE 1 CLIQUE (CONTA DE TESTE) */}
-        {!!chaveConvite && <button
+        <button
           type="button"
           onClick={handleQuickTestLogin}
           disabled={testLoading}
@@ -130,14 +125,14 @@ export default function LoginPage() {
               <ArrowRight className="w-4 h-4" />
             </>
           )}
-        </button>}
+        </button>
 
         {/* Divisor (só se houver outro botão acima) */}
-        {(SHOW_GOOGLE || !!chaveConvite) && <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-white/[0.08]" />
           <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">ou e-mail e senha</span>
           <div className="flex-1 h-px bg-white/[0.08]" />
-        </div>}
+        </div>
 
         {/* Formulário Tradicional */}
         <form onSubmit={handleSubmit} className="space-y-4">
