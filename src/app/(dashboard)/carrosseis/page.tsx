@@ -28,8 +28,7 @@ const QUANTIDADES: { id: string; label: string; desc: string }[] = [
   { id: '5', label: '5', desc: 'por link' },
 ]
 const IMAGENS: { id: Imagens; label: string; desc: string }[] = [
-  { id: 'algumas', label: 'Do vídeo', desc: 'capa + alguns slides' },
-  { id: 'capa', label: 'Só na capa', desc: 'frame do vídeo' },
+  { id: 'algumas', label: 'Do vídeo', desc: 'fotos do seu molde, do vídeo' },
   { id: 'nenhuma', label: 'Sem imagem', desc: 'só texto' },
 ]
 const NOME_TIPO: Record<string, string> = { video: 'Vídeo', instagram: 'Instagram', pagina: 'Artigo/site', texto: 'Texto' }

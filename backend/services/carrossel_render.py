@@ -257,6 +257,24 @@ def _tweet(tema: dict, marca: dict, textos: list[str], img, foco: float, n: int,
     return c.convert("RGB")
 
 
+def estrutura_figma(template: str) -> dict | None:
+    """Molde do Figma do usuário, se estiver importado (senão None e valem os 4 desenhos embutidos)."""
+    try:
+        from services import figma_modelo
+        return figma_modelo.estrutura(template)
+    except Exception as e:
+        print(f"[carrossel] molde do Figma indisponível: {type(e).__name__}: {str(e)[:100]}")
+        return None
+
+
+def montar_slides_figma(template: str, blocos: list[str], marca: dict, fotos: dict[int, tuple]) -> list[Image.Image]:
+    """Desenha o carrossel no molde do Figma: cada textoN recebe o bloco N; cada imagemNN, a foto NN."""
+    from services import figma_modelo
+    est = figma_modelo.estrutura(template)
+    textos = {i + 1: limpar(b) for i, b in enumerate(blocos)}
+    return [figma_modelo.renderizar_slide(template, k, textos, fotos, marca) for k in range(len(est["slides"]))]
+
+
 def montar_slides(template: str, blocos: list[str], marca: dict, imagens: dict[int, tuple[Image.Image, float]]) -> list[Image.Image]:
     """blocos = textos do carrossel; imagens = {índice do slide: (imagem, foco_x)}. Devolve os slides prontos."""
     tema = _tema(template, marca)

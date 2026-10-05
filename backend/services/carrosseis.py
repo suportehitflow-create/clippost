@@ -229,12 +229,58 @@ def _reescrever_sem_segunda_pessoa(blocos: list[str]) -> list[str] | None:
     return None
 
 
+def _papeis_figma(est: dict, template: str) -> tuple[str, int, int, int]:
+    """Instruções por texto a partir do molde do Figma: a capacidade de cada caixa vem do tamanho dela."""
+    linhas, titulos, corpos, unicos = [], [], [], []
+    for k, s in enumerate(est["slides"]):
+        for pos, n in enumerate(s["textos"]):
+            palavras = max(3, int(s["capacidade"].get(n, 12) * 0.85))
+            papel = s["papel"].get(n, "corpo")
+            if template == "twitter":
+                # no post do X cada texto é um parágrafo: frase COMPLETA, nunca um fragmento solto
+                if k == 0 and pos == 0:
+                    desc = f"abertura do post: a pergunta/manchete como frase COMPLETA, termina com ? ou : (até {palavras} palavras)"
+                elif k == 0 and pos == 1:
+                    desc = f"segundo parágrafo da abertura: frase COMPLETA que ancora a manchete, termina com . ou ! (até {palavras} palavras)"
+                else:
+                    desc = f"parágrafo do post: frase COMPLETA, com sujeito e verbo (até {palavras} palavras)"
+                corpos.append(palavras)
+                linhas.append(f"\n  texto {n} → slide {k + 1}: {desc}")
+                continue
+            if k == 0 and pos == 0:
+                desc = f"capa, linha 1 da headline (captura, até {palavras} palavras)"
+                titulos.append(palavras)
+            elif k == 0 and pos == 1:
+                desc = f"capa, linha 2 da headline (ancoragem, até {palavras} palavras)"
+            elif template == "twitter":
+                desc = f"parágrafo do post, frase completa (até {palavras} palavras)"
+                corpos.append(palavras)
+            elif papel == "título":
+                desc = f"título do slide, frase de CONTEÚDO (até {palavras} palavras)"
+                titulos.append(palavras)
+            elif papel == "frase":
+                desc = f"texto ÚNICO do slide: frase completa e autossuficiente (até {palavras} palavras), NÃO é título"
+                unicos.append(palavras)
+            else:
+                desc = f"corpo do slide (até {palavras} palavras)"
+                corpos.append(palavras)
+            linhas.append(f"\n  texto {n} → slide {k + 1}: {desc}")
+        if not s["textos"]:
+            linhas.append(f"\n  slide {k + 1}: só imagem, sem texto")
+    return "".join(linhas), min(titulos or [12]), min(corpos or [40]), min(unicos or [40])
+
+
 def escrever(c: dict, ins: dict, template: str) -> dict:
-    t = render.TEMPLATES[template]
-    mt, mc, mu = LIMITES.get(template, (12, 45, 40))
+    est = render.estrutura_figma(template)
+    if est:
+        t = {"nome": f"Template {template.capitalize()}", "blocos": est["blocos"]}
+        distribuicao, mt, mc, mu = _papeis_figma(est, template)
+    else:
+        t = render.TEMPLATES[template]
+        mt, mc, mu = LIMITES.get(template, (12, 45, 40))
     # papel de cada texto, um por linha: a IA erra menos quando sabe exatamente o que vai em cada slide
     papeis = []
-    for k, g in enumerate(t["slides"]):
+    for k, g in enumerate(t.get("slides", []) if not est else []):
         for pos, i in enumerate(g):
             if k == 0:
                 papel = "capa, linha 1 da headline (captura)" if pos == 0 else "capa, linha 2 da headline (ancoragem)"
@@ -245,7 +291,8 @@ def escrever(c: dict, ins: dict, template: str) -> dict:
             else:
                 papel = f"título do slide (até {mt} palavras)" if pos == 0 else f"corpo do slide (até {mc} palavras)"
             papeis.append(f"\n  texto {i + 1} → slide {k + 1}: {papel}")
-    distribuicao = "".join(papeis)
+    if not est:
+        distribuicao = "".join(papeis)
     prompt = (PROMPTS / "carrossel_auto.txt").read_text(encoding="utf-8").format(
         especificacao=especificacao(), template_nome=t["nome"], blocos=t["blocos"], distribuicao=distribuicao,
         max_titulo=mt, max_corpo=mc, max_unico=mu, fonte_titulo=c.get("titulo") or "(sem título)",
@@ -431,7 +478,15 @@ def _rodar(job_id: str, user_id: str, req: dict, supabase):
 def _rodar_com_vaga(job_id: str, user_id: str, req: dict, supabase):
     tmp = Path(tempfile.mkdtemp(prefix="clippost_carrossel_"))
     template = _jobs[job_id]["template"]
-    marca = req.get("marca") or {}
+    marca = dict(req.get("marca") or {})
+    if marca.get("avatar_url"):  # foto do perfil (do brand kit do usuário) baixada uma vez para o molde do Figma
+        try:
+            from PIL import Image
+            from services.carrossel_conteudo import baixar_seguro
+            dados, _ = baixar_seguro(marca["avatar_url"], limite=8_000_000, tipo_prefixo="image/")
+            marca["_avatar"] = Image.open(io.BytesIO(dados)).convert("RGBA")
+        except Exception as e:
+            print(f"[carrossel] foto de perfil: {type(e).__name__}")
     modo_img = req.get("imagens") if req.get("imagens") in ("capa", "algumas", "nenhuma") else "algumas"
     quantidade = req.get("quantidade") or "auto"
     try:
@@ -485,20 +540,36 @@ def _rodar_com_vaga(job_id: str, user_id: str, req: dict, supabase):
 def _fazer_carrossel(job_id, idx, k, c, ins, template, marca, modo_img, project_id, user_id, supabase, pasta):
     r = escrever(c, ins, template)
     blocos = r["blocos"]
-    grupos = render.textos_por_slide(template, blocos)
-    titulo = " ".join(grupos[0]) if grupos else ins.get("titulo_interno", "")
+    est = render.estrutura_figma(template)
+    if est:
+        grupos = [[blocos[n - 1] for n in s["textos"] if n - 1 < len(blocos)] for s in est["slides"]]
+    else:
+        grupos = render.textos_por_slide(template, blocos)
+    primeiro = next((g for g in grupos if g), [])
+    titulo = " ".join(primeiro) if primeiro else ins.get("titulo_interno", "")
     _carrossel(job_id, idx, k, titulo=titulo[:160], etapa="escolhendo as imagens")
 
-    alvo = slides_com_imagem(template, len(grupos), modo_img)
-    fotos: list[tuple] = []
-    if alvo and c.get("video"):
-        fotos = frames_do_trecho(c["video"], segundos(ins.get("inicio")), segundos(ins.get("fim")), len(alvo))
-    if alvo and not fotos and c.get("imagens"):
-        fotos = _imagens_de_url(c["imagens"], len(alvo))
-    imagens = {s: fotos[i] for i, s in enumerate(alvo) if i < len(fotos)}
-
-    _carrossel(job_id, idx, k, etapa="montando os slides")
-    slides = render.montar_slides(template, blocos, marca, imagens)
+    if est:
+        # molde do Figma: uma foto para cada "imagemNN" do molde (a capa e os slides com foto, como desenhados)
+        quantos = max(1, est["fotos"])
+        fotos: list[tuple] = []
+        if modo_img != "nenhuma" and c.get("video"):
+            fotos = frames_do_trecho(c["video"], segundos(ins.get("inicio")), segundos(ins.get("fim")), quantos)
+        if modo_img != "nenhuma" and len(fotos) < quantos and c.get("imagens"):
+            fotos += _imagens_de_url(c["imagens"], quantos - len(fotos))
+        imagens = {n: fotos[(n - 1) % len(fotos)] for n in range(1, quantos + 1)} if fotos else {}
+        _carrossel(job_id, idx, k, etapa="montando os slides")
+        slides = render.montar_slides_figma(template, blocos, marca, imagens)
+    else:
+        alvo = slides_com_imagem(template, len(grupos), modo_img)
+        fotos = []
+        if alvo and c.get("video"):
+            fotos = frames_do_trecho(c["video"], segundos(ins.get("inicio")), segundos(ins.get("fim")), len(alvo))
+        if alvo and not fotos and c.get("imagens"):
+            fotos = _imagens_de_url(c["imagens"], len(alvo))
+        imagens = {s: fotos[i] for i, s in enumerate(alvo) if i < len(fotos)}
+        _carrossel(job_id, idx, k, etapa="montando os slides")
+        slides = render.montar_slides(template, blocos, marca, imagens)
 
     from services import armazenamento
     cid = uuid.uuid4().hex[:10]

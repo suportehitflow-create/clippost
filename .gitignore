@@ -57,3 +57,6 @@ backend/.claude/
 
 # Prompts privados (comprados/autorais): ficam só na máquina, nunca no repositório público
 backend/prompts/privado/
+
+# Moldes do Figma do usuário (Content Machine é de terceiros): ficam só na máquina
+backend/modelos_privados/
